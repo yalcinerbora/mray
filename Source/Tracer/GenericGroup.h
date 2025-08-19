@@ -1,25 +1,11 @@
 #pragma once
 
-#include <array>
-#include <tuple>
-#include <vector>
-#include <cstdint>
-#include <numeric>
-#include <atomic>
-
-#include "Core/Types.h"
-#include "Core/Map.h"
-#include "Core/MemAlloc.h"
-#include "Core/DataStructures.h"
 #include "Core/TracerI.h"
-#include "Core/Error.h"
+#include "Core/Vector.h"
 
 #include "TransientPool/TransientPool.h"
 
-#include "Device/GPUSystemForward.h"
-#include "Device/GPUMemory.h"
-
-#include "TracerTypes.h"
+#include "TextureView.h"
 #include "ParamVaryingData.h"
 
 using AttributeRanges = StaticVector<Vector<2, size_t>,
@@ -168,13 +154,13 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
 
     template<uint32_t D, class T>
     std::vector<TracerTexView<D, T>>
-            ConvertToView(std::vector<TextureId> texIds,
-                          uint32_t attributeIndex) const;
+    ConvertToView(std::vector<TextureId> texIds,
+                  uint32_t attributeIndex) const;
 
     template<uint32_t D, class T>
     std::vector<Optional<TracerTexView<D, T>>>
-            ConvertToView(std::vector<Optional<TextureId>> texIds,
-                          uint32_t attributeIndex) const;
+    ConvertToView(std::vector<Optional<TextureId>> texIds,
+                  uint32_t attributeIndex) const;
 
     protected:
     const TextureViewMap& globalTextureViews;
@@ -225,392 +211,159 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
                                      const GPUQueue& queue) = 0;
 };
 
-template<class ID, class AI>
-const AttributeRanges& GenericGroupT<ID, AI>::FindRange(IdInt id) const
-{
-    auto range = itemRanges.at(ID(id).FetchIndexPortion());
-    if(!range)
-    {
-        throw MRayError("{:s}:{:d}: Unkown key {}",
-                        this->Name(), this->groupId, id);
-    }
-    return range.value().get();
-}
+// Due to high amount of instantiations we pre-generate
+// these classes.
+//
+// TODO: This somewhat of a bullshit impl.
+// This should be type-ereased etc. to minimize templates
+//
+// ========================== //
+//     GENERIC PUSH NORMAL    //
+// ========================== //
+#define MRAY_GENERIC_PUSH_ATTRIB_INST_0(I, A, T) \
+    template void GenericGroupT<I, A>::          \
+    GenericPushData                              \
+    (                                            \
+        const Span<T>&, typename I::Type,        \
+        uint32_t, TransientData, const GPUQueue& \
+    ) const
 
-template<class ID, class AI>
-template <class... Args>
-void GenericGroupT<ID, AI>::GenericCommit(Tuple<Span<Args>&...> output,
-                                          std::array<int32_t, sizeof...(Args)> countLookup)
-{
-    constexpr size_t TypeCount = sizeof...(Args);
-    if(isCommitted)
-    {
-        MRAY_WARNING_LOG("{:s}:{:d}: is in committed state, "
-                         "you cannot re-commit!", this->Name(), groupId);
-        return;
-    }
-    // Cactuate offsets
-    std::array<size_t, TypeCount> offsets = {0ull};
-    for(const auto& c : itemCounts)
-    {
-        const auto& counts = c.second;
-        AttributeRanges range;
-        for(size_t i = 0; i < TypeCount; i++)
-        {
-            size_t count = (countLookup[i] == -1)
-                    ? 1
-                    : counts[static_cast<uint32_t>(countLookup[i])];
-            range.emplace_back(offsets[i], offsets[i] + count);
-            offsets[i] += count;
-        }
+#define MRAY_GENERIC_PUSH_ATTRIB_INST_1(I, A, T) \
+    template void GenericGroupT<I, A>::          \
+    GenericPushData                              \
+    (                                            \
+        const Span<T>&,                          \
+        Vector<2, typename I::Type>,             \
+        uint32_t, TransientData,                 \
+        const GPUQueue&                          \
+    ) const
 
-        [[maybe_unused]]
-        auto r = itemRanges.emplace(c.first, range);
-        assert(r.second);
-    }
-    // Rename for clarity
-    const auto& totalSize = offsets;
-    if(std::reduce(totalSize.cbegin(), totalSize.cend()) == 0)
-    {
-        MRAY_WARNING_LOG("{:s}:{:d}: committing as empty, "
-                         "is this correct?", this->Name(), groupId);
-        isCommitted = true;
-        return;
-    }
+#define MRAY_GENERIC_PUSH_ATTRIB_INST_2(I, A, T) \
+    template void GenericGroupT<I, A>::          \
+    GenericPushData                              \
+    (                                            \
+        const Span<T>&, typename I::Type,        \
+        uint32_t, const Vector2ui&,              \
+        TransientData, const GPUQueue&           \
+    ) const
 
-    using namespace MemAlloc;
-    AllocateMultiData<DeviceMemory, Args...>(output, deviceMem, totalSize);
-    isCommitted = true;
-}
-
-template<class ID, class AI>
-template <class T>
-void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
-                                            //
-                                            IdInt id, uint32_t attribIndex,
-                                            TransientData data,
-                                            const GPUQueue& deviceQueue) const
-{
-    if(!isCommitted)
-    {
-        throw MRayError("{:s}:{:d}: is not committed yet. "
-                        "You cannot push data!",
-                        this->Name(), groupId);
-    }
-
-    assert(data.IsFull());
-    auto range = FindRange(id)[attribIndex];
-    size_t itemCount = range[1] - range[0];
-    assert(data.Size<T>() == itemCount);
-
-    Span<T> dSubBatch = dAttributeRegion.subspan(range[0], itemCount);
-    deviceQueue.MemcpyAsync(dSubBatch, ToSpan<const T>(data));
-    deviceQueue.IssueBufferForDestruction(std::move(data));
-}
-
-template<class ID, class AI>
-template <class T>
-void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
-                                            //
-                                            Vector<2, IdInt> idRange,
-                                            uint32_t attribIndex,
-                                            TransientData data,
-                                            const GPUQueue& deviceQueue) const
-{
-    if(!isCommitted)
-    {
-        throw MRayError("{:s}:{:d}: is not committed yet. "
-                        "You cannot push data!",
-                        this->Name(), groupId);
-    }
-    assert(data.IsFull());
-    auto rangeStart = FindRange(idRange[0])[attribIndex];
-    auto rangeEnd   = FindRange(idRange[1])[attribIndex];
-    size_t itemCount = rangeEnd[1] - rangeStart[0];
-    assert(data.Size<T>() == itemCount);
-
-    Span<T> dSubBatch = dAttributeRegion.subspan(rangeStart[0], itemCount);
-    deviceQueue.MemcpyAsync(dSubBatch, ToSpan<const T>(data));
-    deviceQueue.IssueBufferForDestruction(std::move(data));
-}
-
-template<class ID, class AI>
-template <class T>
-void GenericGroupT<ID, AI>::GenericPushData(const Span<T>& dAttributeRegion,
-                                            //
-                                            IdInt id, uint32_t attribIndex,
-                                            const Vector2ui& subRange,
-                                            TransientData data,
-                                            const GPUQueue& deviceQueue) const
-{
-    if(!isCommitted)
-    {
-        throw MRayError("{:s}:{:d}: is not committed yet. "
-                        "You cannot push data!",
-                        this->Name(), groupId);
-    }
-    assert(data.IsFull());
-    auto range = FindRange(id)[attribIndex];
-    size_t itemCount = subRange[1] - subRange[0];
-    assert(data.Size<T>() <= itemCount);
-
-    auto dLocalSpan = dAttributeRegion.subspan(range[0], range[1] - range[0]);
-    auto dLocalSubspan = dLocalSpan.subspan(subRange[0], itemCount);
-    deviceQueue.MemcpyAsync(dLocalSubspan, ToSpan<const T>(data));
-    deviceQueue.IssueBufferForDestruction(std::move(data));
-}
-
-template<class ID, class AI>
-GenericGroupT<ID, AI>::GenericGroupT(uint32_t groupId, const GPUSystem& s,
-                                     size_t allocationGranularity,
-                                     size_t initialReservationSize)
-    : gpuSystem(s)
-    , isCommitted(false)
-    , groupId(groupId)
-    , deviceMem(gpuSystem.AllGPUs(), allocationGranularity, initialReservationSize)
-{}
-
-template<class ID, class AI>
-typename GenericGroupT<ID, AI>::IdList
-GenericGroupT<ID, AI>::Reserve(const std::vector<AttributeCountList>& countArrayList)
-{
-    std::lock_guard<std::mutex> lock(mutex);
-    assert(!countArrayList.empty());
-    if(isCommitted)
-    {
-        throw MRayError("{:s}:{:d}: is in committed state, "
-                        "you cannot change reservations!",
-                        this->Name(), groupId);
-    }
-    // Lets not use zero
-    IdInt lastId = (itemCounts.empty()) ? 0 : std::prev(itemCounts.end())->first + 1;
-    IdList result(countArrayList.size());
-    for(size_t i = 0; i < countArrayList.size(); i++)
-    {
-        IdInt id = lastId++;
-
-        [[maybe_unused]]
-        auto r = itemCounts.emplace(id, countArrayList[i]);
-        assert(r.second);
-
-        // Convert result to actual groupId packed id
-        result[i] = ID::CombinedKey(groupId, id);
-    }
-    return result;
-}
-
-template<class ID, class AI>
-bool GenericGroupT<ID, AI>::IsInCommitState() const
-{
-    return isCommitted;
-}
-
-template<class ID, class AI>
-size_t GenericGroupT<ID, AI>::GPUMemoryUsage() const
-{
-    return deviceMem.Size();
-}
-
-template<class ID, class AI>
-typename GenericGroupT<ID, AI>::IdInt
-GenericGroupT<ID, AI>::GroupId() const
-{
-    return groupId;
-}
-
-template<class ID, class AI>
-size_t GenericGroupT<ID, AI>::TotalItemCount() const
-{
-    return itemCounts.size();
-}
-
-template<class I, class A>
-template<uint32_t D, class T>
-std::vector<TracerTexView<D, T>>
-GenericTexturedGroupT<I, A>::ConvertToView(std::vector<TextureId> texIds,
-                                           uint32_t attributeIndex) const
-{
-    using ViewType = TracerTexView<D, T>;
-    std::vector<ViewType> result;
-    result.reserve(texIds.size());
-    for(const auto& texId : texIds)
-    {
-        auto optView = globalTextureViews.at(texId);
-        if(!optView)
-        {
-            throw MRayError("{:s}:{:d}: Given texture({:d}) is not found",
-                            this->Name(), this->groupId,
-                            static_cast<CommonKey>(texId));
-        }
-        const GenericTextureView& view = optView.value();
-        if(!std::holds_alternative<ViewType>(view))
-        {
-            throw MRayError("{:s}:{:d}: Given texture({:d}) does not have "
-                            "a correct type for, Attribute {:d}",
-                            this->Name(), this->groupId,
-                            static_cast<CommonKey>(texId), attributeIndex);
-            return std::vector<Optional<TracerTexView<D, T>>>{};
-        }
-        result.push_back(std::get<ViewType>(view));
-    }
-    return result;
-}
-
-template<class I, class A>
-template<uint32_t D, class T>
-std::vector<Optional<TracerTexView<D, T>>>
-GenericTexturedGroupT<I, A>::ConvertToView(std::vector<Optional<TextureId>> texIds,
-                                           uint32_t attributeIndex) const
-{
-    using ViewType = TracerTexView<D, T>;
-
-    std::vector<Optional<ViewType>> result;
-    result.reserve(texIds.size());
-    for(const auto& texId : texIds)
-    {
-        if(!texId)
-        {
-            result.push_back(std::nullopt);
-            continue;
-        }
-        auto optView = globalTextureViews.at(texId.value());
-        if(!optView)
-        {
-            throw MRayError("{:s}:{:d}: Given texture({:d}) is not found",
-                            this->Name(), this->groupId,
-                            static_cast<CommonKey>(texId.value()));
-        }
-        const GenericTextureView& view = optView.value();
-        if(!std::holds_alternative<ViewType>(view))
-        {
-            throw MRayError("{:s}:{:d}: Given texture({:d}) does not have "
-                            "a correct type for, Attribute {:d}",
-                            this->Name(), this->groupId,
-                            static_cast<CommonKey>(texId.value()),
-                            attributeIndex);
-        }
-        result.push_back(std::get<ViewType>(view));
-    }
-    return result;
-}
+#define MRAY_GENERIC_PUSH_ATTRIB_INST(E, I, A, T) \
+    E MRAY_GENERIC_PUSH_ATTRIB_INST_0(I, A, T);   \
+    E MRAY_GENERIC_PUSH_ATTRIB_INST_1(I, A, T);   \
+    E MRAY_GENERIC_PUSH_ATTRIB_INST_2(I, A, T)
 
 
-template<class I, class A>
-GenericTexturedGroupT<I, A>::GenericTexturedGroupT(uint32_t groupId, const GPUSystem& s,
-                                                   const TextureViewMap& map,
-                                                   size_t allocationGranularity,
-                                                   size_t initialReservationSize)
-    : Parent(groupId, s,
-             allocationGranularity,
-             initialReservationSize)
-    , globalTextureViews(map)
-{}
+// ========================== //
+//     GENERIC PUSH TEXTURE   //
+// ========================== //
+#define MRAY_GENERIC_TEX_PUSH_ATTRIB_INST_0(I, A, D, T)     \
+    template void GenericTexturedGroupT<I, A>::             \
+    GenericPushTexAttribute                                 \
+    (                                                       \
+        Span<ParamVaryingData<D, T>>,                       \
+        I, I, uint32_t, TransientData,                      \
+        std::vector<Optional<TextureId>>,                   \
+        const GPUQueue&                                     \
+    );
 
-template<class I, class A>
-template<uint32_t D, class T>
-void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<ParamVaryingData<D, T>> dAttributeSpan,
-                                                          //
-                                                          I idStart, I idEnd,
-                                                          uint32_t attributeIndex,
-                                                          TransientData hData,
-                                                          std::vector<Optional<TextureId>> optionalTexIds,
-                                                          const GPUQueue& queue)
-{
-    if(!this->isCommitted)
-    {
-        throw MRayError("{:s}:{:d}: is not committed yet. "
-                        "You cannot push data!",
-                        this->Name(), this->groupId);
-    }
-    assert(hData.IsFull());
-    auto hOptTexViews = ConvertToView<D, T>(std::move(optionalTexIds),
-                                            attributeIndex);
+#define MRAY_GENERIC_TEX_PUSH_ATTRIB_INST_1(I, A, D, T)     \
+    template void GenericTexturedGroupT<I, A>::             \
+    GenericPushTexAttribute                                 \
+    (                                                       \
+        Span<Optional<TracerTexView<D, T>>>,                \
+        I, I, uint32_t,                                     \
+        std::vector<Optional<TextureId>>,                   \
+        const GPUQueue&                                     \
+    );
 
-    // Now we need to be careful
-    auto rangeStart = this->FindRange(idStart.FetchIndexPortion())[attributeIndex];
-    auto rangeEnd = this->FindRange(idEnd.FetchIndexPortion())[attributeIndex];
-    size_t count = rangeEnd[1] - rangeStart[0];
-    Span<ParamVaryingData<D, T>> dSubspan = dAttributeSpan.subspan(rangeStart[0], count);
+#define MRAY_GENERIC_TEX_PUSH_ATTRIB_INST_2(I, A, D, T)     \
+    template void GenericTexturedGroupT<I, A>::             \
+    GenericPushTexAttribute                                 \
+    (                                                       \
+        Span<TracerTexView<D, T>>,                          \
+        I, I, uint32_t,                                     \
+        std::vector<TextureId>,const GPUQueue&              \
+    )
 
-    assert(dSubspan.size() == hOptTexViews.size());
-    assert(hOptTexViews.size() == hData.Size<T>());
+// We only instantiate Float / Vector2 / Vector3 since for
+// textures attributes it should be enough. We can add more later
+#define MRAY_GENERIC_TEX_PUSH_ATTRIB_INST(E, I, A, D)        \
+    E MRAY_GENERIC_TEX_PUSH_ATTRIB_INST_0(I, A, D, Float);   \
+    E MRAY_GENERIC_TEX_PUSH_ATTRIB_INST_1(I, A, D, Float);   \
+    E MRAY_GENERIC_TEX_PUSH_ATTRIB_INST_2(I, A, D, Float);   \
+    E MRAY_GENERIC_TEX_PUSH_ATTRIB_INST_0(I, A, D, Vector2); \
+    E MRAY_GENERIC_TEX_PUSH_ATTRIB_INST_1(I, A, D, Vector2); \
+    E MRAY_GENERIC_TEX_PUSH_ATTRIB_INST_2(I, A, D, Vector2); \
+    E MRAY_GENERIC_TEX_PUSH_ATTRIB_INST_0(I, A, D, Vector3); \
+    E MRAY_GENERIC_TEX_PUSH_ATTRIB_INST_1(I, A, D, Vector3); \
+    E MRAY_GENERIC_TEX_PUSH_ATTRIB_INST_2(I, A, D, Vector3)
 
-    // Construct in host, then memcpy
-    std::vector<ParamVaryingData<D, T>> hParamVaryingData;
-    hParamVaryingData.reserve(dSubspan.size());
-    Span<const T> hDataSpan = hData.AccessAs<T>();
-    for(size_t i = 0; i < hOptTexViews.size(); i++)
-    {
-        auto pvd = hOptTexViews[i].has_value()
-            ? ParamVaryingData<D, T>(hOptTexViews[i].value())
-            : ParamVaryingData<D, T>(hDataSpan[i]);
-        hParamVaryingData.push_back(pvd);
-    }
-    auto hParamVaryingDataSpan = Span<const ParamVaryingData<D, T>>(hParamVaryingData.cbegin(),
-                                                                    hParamVaryingData.cend());
-    queue.MemcpyAsync(dSubspan, hParamVaryingDataSpan);
-    // TODO: Try to find a way to remove this wait
-    queue.Barrier().Wait();
-}
+// ================== //
+//   INSTANTIATIONS   //
+// ================== //
+//     PRIMITIVE      //
+// ================== //
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, PrimBatchKey, PrimAttributeInfo, Float);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, PrimBatchKey, PrimAttributeInfo, Vector2);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, PrimBatchKey, PrimAttributeInfo, Vector3);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, PrimBatchKey, PrimAttributeInfo, Vector3ui);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, PrimBatchKey, PrimAttributeInfo, Vector4);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, PrimBatchKey, PrimAttributeInfo, Quaternion);
+// Skeleton-related
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, PrimBatchKey, PrimAttributeInfo, Vector4uc);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, PrimBatchKey, PrimAttributeInfo, UNorm4x8);
 
-template<class I, class A>
-template<uint32_t D, class T>
-void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<Optional<TracerTexView<D, T>>> dAttributeSpan,
-                                                          //
-                                                          I idStart, I idEnd,
-                                                          uint32_t attributeIndex,
-                                                          std::vector<Optional<TextureId>> optionalTexIds,
-                                                          const GPUQueue& queue)
-{
-    if(!this->isCommitted)
-    {
-        throw MRayError("{:s}:{:d}: is not committed yet. "
-                        "You cannot push data!",
-                        this->Name(), this->groupId);
-    }
-    auto hOptTexViews = ConvertToView<D, T>(std::move(optionalTexIds),
-                                            attributeIndex);
+// ================== //
+//     TRANSFORM      //
+// ================== //
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, TransformKey, TransAttributeInfo, Matrix4x4);
 
-    // YOLO memcpy here! Hopefully it works
-    auto rangeStart = this->FindRange(idStart.FetchIndexPortion())[attributeIndex];
-    auto rangeEnd = this->FindRange(idEnd.FetchIndexPortion())[attributeIndex];
-    size_t count = rangeEnd[1] - rangeStart[0];
-    Span<Optional<TracerTexView<D, T>>> dSubspan = dAttributeSpan.subspan(rangeStart[0],
-                                                                          count);
-    Span<Optional<TracerTexView<D, T>>> hSpan(hOptTexViews.begin(), hOptTexViews.end());
-    assert(hSpan.size() == dSubspan.size());
-    queue.MemcpyAsync(dSubspan, ToConstSpan(hSpan));
-    // TODO: Try to find a way to remove this wait
-    queue.Barrier().Wait();
-}
+// ================== //
+//       CAMERA       //
+// ================== //
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, CameraKey, CamAttributeInfo, Float);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, CameraKey, CamAttributeInfo, Vector2);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, CameraKey, CamAttributeInfo, Vector3);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, CameraKey, CamAttributeInfo, Vector4);
 
-template<class I, class A>
-template<uint32_t D, class T>
-void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<TracerTexView<D, T>> dAttributeSpan,
-                                                          //
-                                                          I idStart, I idEnd,
-                                                          uint32_t attributeIndex,
-                                                          std::vector<TextureId> textureIds,
-                                                          const GPUQueue& queue)
-{
-    if(!this->isCommitted)
-    {
-        throw MRayError("{:s}:{:d}: is not committed yet. "
-                        "You cannot push data!",
-                        this->Name(), this->groupId);
-    }
-    auto hTexViews = ConvertToView<D, T>(std::move(textureIds),
-                                         attributeIndex);
+// ================== //
+//       MEDIUM       //
+// ================== //
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, MediumKey, MediumAttributeInfo, Float);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, MediumKey, MediumAttributeInfo, Vector2);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, MediumKey, MediumAttributeInfo, Vector3);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, MediumKey, MediumAttributeInfo, Vector4);
+//
+MRAY_GENERIC_TEX_PUSH_ATTRIB_INST(extern, MediumKey, MediumAttributeInfo, 3);
 
-    // YOLO memcpy here! Hopefully it works
-    auto rangeStart = this->FindRange(idStart.FetchIndexPortion())[attributeIndex];
-    auto rangeEnd = this->FindRange(idEnd.FetchIndexPortion())[attributeIndex];
-    size_t count = rangeEnd[1] - rangeStart[0];
-    Span<TracerTexView<D, T>> dSubspan = dAttributeSpan.subspan(rangeStart[0],
-                                                              count);
-    Span<TracerTexView<D, T>> hSpan(hTexViews.cbegin(), hTexViews.cend());
-    assert(hSpan.size() == dSubspan.size());
-    queue.MemcpyAsync(dSubspan, ToConstSpan(hSpan));
-    // TODO: Try to find a way to remove this wait
-    queue.Barrier().Wait();
-}
+// ================== //
+//       LIGHT        //
+// ================== //
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, LightKey, LightAttributeInfo, Float);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, LightKey, LightAttributeInfo, Vector2);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, LightKey, LightAttributeInfo, Vector3);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, LightKey, LightAttributeInfo, Vector4);
+//
+MRAY_GENERIC_TEX_PUSH_ATTRIB_INST(extern, LightKey, LightAttributeInfo, 2);
+
+// ================== //
+//      MATERIAL      //
+// ================== //
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, MaterialKey, MatAttributeInfo, Float);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, MaterialKey, MatAttributeInfo, Vector2);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, MaterialKey, MatAttributeInfo, Vector3);
+MRAY_GENERIC_PUSH_ATTRIB_INST(extern, MaterialKey, MatAttributeInfo, Vector4);
+//
+MRAY_GENERIC_TEX_PUSH_ATTRIB_INST(extern, MaterialKey, MatAttributeInfo, 2);
+
+// ================== //
+//      CLASSES       //
+// ================== //
+// Non-Textured
+extern template class GenericGroupT<PrimBatchKey, PrimAttributeInfo>;
+extern template class GenericGroupT<CameraKey, CamAttributeInfo>;
+extern template class GenericGroupT<TransformKey, TransAttributeInfo>;
+// Textured
+extern template class GenericTexturedGroupT<MediumKey, MediumAttributeInfo>;
+extern template class GenericTexturedGroupT<MaterialKey, MatAttributeInfo>;
+extern template class GenericTexturedGroupT<LightKey, LightAttributeInfo>;

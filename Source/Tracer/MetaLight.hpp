@@ -163,7 +163,7 @@ MR_HF_DEF
 SampleT<Vector3> MetaLightViewT<V, ST>::SampleSolidAngle(RNGDispenser& rng,
                                                          const Vector3& distantPoint) const
 {
-    return DeviceVisit(light, [&](auto&& l) -> SampleT<Vector3>
+    return Visit(light, [&](auto&& l) -> SampleT<Vector3>
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -178,7 +178,7 @@ Float MetaLightViewT<V, ST>::PdfSolidAngle(const MetaHit& hit,
                                            const Vector3& distantPoint,
                                            const Vector3& dir) const
 {
-    return DeviceVisit(light, [=](auto&& l) -> Float
+    return Visit(light, [=](auto&& l) -> Float
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -198,7 +198,7 @@ template<class V, class ST>
 MR_HF_DEF
 uint32_t MetaLightViewT<V, ST>::SampleSolidAngleRNCount() const
 {
-    return DeviceVisit(light, [](auto&& l) -> uint32_t
+    return Visit(light, [](auto&& l) -> uint32_t
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -211,7 +211,7 @@ template<class V, class ST>
 MR_HF_DEF
 SampleT<Ray> MetaLightViewT<V, ST>::SampleRay(RNGDispenser& rng) const
 {
-    return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
+    return Visit(light, [&](auto&& l) -> SampleT<Ray>
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -224,7 +224,7 @@ template<class V, class ST>
 MR_HF_DEF
 Float MetaLightViewT<V, ST>::PdfRay(const Ray& ray) const
 {
-    return DeviceVisit(light, [&](auto&& l) -> Float
+    return Visit(light, [&](auto&& l) -> Float
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -237,7 +237,7 @@ template<class V, class ST>
 MR_HF_DEF
 uint32_t MetaLightViewT<V, ST>::SampleRayRNCount() const
 {
-    return DeviceVisit(light, [](auto&& l) -> uint32_t
+    return Visit(light, [](auto&& l) -> uint32_t
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -252,7 +252,7 @@ Spectrum MetaLightViewT<V, ST>::EmitViaHit(const Vector3& wO,
                                            const MetaHit& hit,
                                            const RayCone& rayCone) const
 {
-    return DeviceVisit(light, [=, this](auto&& l) -> Spectrum
+    return Visit(light, [=, this](auto&& l) -> Spectrum
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -278,7 +278,7 @@ Spectrum MetaLightViewT<V, ST>::EmitViaSurfacePoint(const Vector3& wO,
                                                     const Vector3& surfacePoint,
                                                     const RayCone& rayCone) const
 {
-    return DeviceVisit(light, [&, this](auto&& l) -> Spectrum
+    return Visit(light, [&, this](auto&& l) -> Spectrum
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -291,7 +291,7 @@ template<class V, class ST>
 MR_HF_DEF
 bool MetaLightViewT<V, ST>::IsPrimitiveBackedLight() const
 {
-    return DeviceVisit(light, [](auto&& l) -> bool
+    return Visit(light, [](auto&& l) -> bool
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)

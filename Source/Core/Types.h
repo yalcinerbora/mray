@@ -16,8 +16,25 @@
 template <class T>
 using Optional = std::optional<T>;
 
+// For some recent compilers (for examlpe, clang-18)
+// CTAD for alias templates (C++20 feature) is not implemented
+// yet. so this does not work.
+//
+//template<class First, class Second>
+//using Pair = std::pair<First, Second>;
+//
+// So we inherit the pair
 template<class First, class Second>
-using Pair = std::pair<First, Second>;
+struct Pair : public std::pair<First, Second>
+{
+    using Base = std::pair<First, Second>;
+    using Base::Base;
+};
+
+template<class F, class S>
+Pair(F&&, S&&) -> Pair<std::remove_cvref_t<F>,
+                       std::remove_cvref_t<S>>;
+
 
 // TODO: reference_wrapper<T> vs. span<T,1> which is better?
 template <class T>

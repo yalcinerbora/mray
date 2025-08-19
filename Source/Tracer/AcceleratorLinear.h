@@ -76,9 +76,10 @@ namespace LinearAccelDetail
 }
 
 template<PrimitiveGroupC PrimitiveGroupType>
-class AcceleratorGroupLinear final : public AcceleratorGroupT<AcceleratorGroupLinear<PrimitiveGroupType>, PrimitiveGroupType>
+class AcceleratorGroupLinear final 
+    : public AcceleratorGroupT<AcceleratorGroupLinear<PrimitiveGroupType>>
 {
-    using Base = AcceleratorGroupT<AcceleratorGroupLinear<PrimitiveGroupType>, PrimitiveGroupType>;
+    using Base = AcceleratorGroupT<AcceleratorGroupLinear<PrimitiveGroupType>>;
 
     public:
     static std::string_view TypeName();

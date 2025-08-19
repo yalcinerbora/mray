@@ -1,11 +1,12 @@
 #include "PrimitivesDefault.h"
+#include "GenericGroup.hpp"
 
 #include "Device/GPUMemory.h"
+#include "Device/GPUAlgReduce.h"
 
 #ifdef MRAY_GPU_BACKEND_CPU
     #include "Device/GPUSystem.hpp"
 #endif
-
 
 PrimGroupSphere::PrimGroupSphere(uint32_t primGroupId,
                                  const GPUSystem& sys)

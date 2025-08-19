@@ -21,6 +21,23 @@
 // A better, fast to compile and constexpr implementation
 // could've been achieved if unions accept inheritance (see Tuple.h).
 // Alas, it is not allowed :(
+//
+// ==================================================== //
+//   DO NOT THRUST AND COPY THIS CODE IT WORKS BUT      //
+//   IT IS NOT OPTIMAL. YOU'VE BEEN WARNED.             //
+//                                                      //
+//  Writing this because its on the internet.           //
+//                                                      //
+//   Issues:                                            //
+//    -- Probably we do copy/assign too much            //
+//    -- Also we construct/destruct via visit which     //
+//       may not be optimal given type(s).              //
+//    -- Variant of single type is not allowed.         //
+//    -- We do not utilize move/copy assignment         //
+//    -- We destroy object then construct via move/copy //
+//       construct.                                     //
+//    --                                                //
+// ==================================================== //
 
 #include <concepts>
 #include <utility>
@@ -32,7 +49,12 @@
 
 #include "Definitions.h"
 #include "TypePack.h"
+#include "Error.h"
 
+// TODO: We remove this when we fully confident of this
+// variant to be perfectly usable. Until then, we specialize
+// STL std::visit / std::variant_alternative etc. and
+// swtich between std::variant and this variant.
 #include <variant>
 
 template<class... Types>
@@ -62,7 +84,7 @@ namespace VariantDetail
         bool IsUnique;
     };
 
-    template<template<class> class X, class... Args>
+    template<template<class...> class X, class... Args>
     constexpr bool AllTrait(TypePack<Args...>);
 
     template<size_t C>
@@ -130,7 +152,7 @@ namespace VariantDetail
         constexpr              ~UnionStorage() noexcept requires(TD) = default;
         constexpr              ~UnionStorage() noexcept requires(!TD) {}
         // These can be defaulted since actual variant will manually move etc.
-        // Even we state it sdefault it may be deleted.
+        // Even we state it is default, it may be deleted by the compiler.
         constexpr               UnionStorage(const UnionStorage& other) = default;
         constexpr               UnionStorage(UnionStorage&& other)      = default;
         constexpr UnionStorage& operator=(const UnionStorage& other)    = default;
@@ -154,6 +176,9 @@ namespace VariantDetail
 
     template<class R, class T, class... Types>
     constexpr IndexOfResult<R> IndexOfTypeImpl();
+
+    template<uint32_t O, class VariantT, class Func>
+    constexpr auto SwitchCaseVisitImpl(UIntTConst<O>, VariantT&& v, Func&& f) -> decltype(auto);
 
     template<uint32_t O, class VariantT, class Func>
     constexpr auto IfElseVisitImpl(UIntTConst<O>, VariantT&& v, Func&& f) -> decltype(auto);
@@ -213,27 +238,31 @@ namespace VariantDetail
         public:
         template<class T>
         static constexpr auto IndexOfType = IndexOfTypeImpl<VariantIndex, T, Types...>();
+        template<class T>
+        static constexpr bool TypeIsInPack = (IndexOfType<std::remove_cvref_t<T>>.Index != INVALID_INDEX);
         static constexpr auto TypeCount = sizeof...(Types);
 
         // Constructors & Destructor
+        // TODO: MSVC Bug? Cant define outside class. It says it is ambiguous
+        constexpr ~VariantImpl() noexcept requires(!TD)
+        {
+            if(tag != INVALID_INDEX) DestroyAlternative();
+        }
+        //
         constexpr             VariantImpl() noexcept requires(FIRST_DC);
         template<class T>
-        constexpr             VariantImpl(T&&) noexcept requires(!std::derived_from<std::remove_cvref_t<T>, VariantImpl>);
+        constexpr             VariantImpl(T&&) noexcept requires(TypeIsInPack<T>);
         template<size_t I, class... Args>
         constexpr             VariantImpl(std::in_place_index_t<I>, Args&&... args);
         template<class T>
-        constexpr VariantImpl& operator=(T&&) noexcept requires(!std::derived_from<std::remove_cvref_t<T>, VariantImpl>);
+        constexpr VariantImpl& operator=(T&&) noexcept requires(TypeIsInPack<T>);
         // Logistics
         constexpr              VariantImpl(const VariantImpl& other) noexcept requires(!TCC);
         constexpr              VariantImpl(VariantImpl&& other) noexcept      requires(!TMC);
         constexpr VariantImpl& operator=(const VariantImpl& other) noexcept   requires(!TCA);
         constexpr VariantImpl& operator=(VariantImpl&& other) noexcept        requires(!TMA);
-        constexpr              ~VariantImpl() noexcept                        requires(!TD)
-        {
-            // TODO: MSVC Bug? Cant define outside class. It says it is ambiguous
-            if(tag != INVALID_INDEX) DestroyAlternative();
-        }
         //
+        constexpr              VariantImpl() noexcept                         requires(!FIRST_DC) = delete;
         constexpr              VariantImpl(const VariantImpl& other) noexcept requires(TCC) = default;
         constexpr              VariantImpl(VariantImpl&& other) noexcept      requires(TMC) = default;
         constexpr VariantImpl& operator=(const VariantImpl& other) noexcept   requires(TCA) = default;
@@ -278,7 +307,7 @@ using UniqueVariant = typename VariantDetail::TypePackToVariant<UniqueTypePack<T
 
 // Try to utilize execution unit of the compiler instead of
 // instantiation unit. (NVCC reports too many conjunction instantiations)
-template<template<class> class X, class... Args>
+template<template<class...> class X, class... Args>
 constexpr bool VariantDetail::AllTrait(TypePack<Args...>)
 {
     constexpr auto N = sizeof...(Args);
@@ -323,6 +352,18 @@ VariantDetail::IndexOfTypeImpl()
     return IndexOfResult<R>{ .Index = tag, .IsUnique = (duplicate == R(1)) };
 }
 
+// std::visit fails on NVCC when STL is GCC's stl.
+// (see: https://godbolt.org/z/fM811b4cx,
+// for the compiled down result. It traps immediately)
+//
+// We use if/else chain instead of switch case also we
+// expand the template by 16 to reduce instantiation count.
+//
+// This is technically not O(1) but on GPU switch may not be
+// O(1) anyway, also NVCC crashed with swtich/case in the past
+// so I'am reluctant to use it.
+// Anyway there is an implementation down below, we may change
+// to it if it is better.
 template<uint32_t O, class VariantT, class Func>
 constexpr auto VariantDetail::IfElseVisitImpl(UIntTConst<O>, VariantT&& v, Func&& f) -> decltype(auto)
 {
@@ -358,13 +399,19 @@ constexpr auto VariantDetail::IfElseVisitImpl(UIntTConst<O>, VariantT&& v, Func&
     COND_INVOKE(13)
     COND_INVOKE(14)
     COND_INVOKE(15)
+    #undef COND_INVOKE
     if constexpr(VSize > O + STAMP_COUNT)
         return IfElseVisitImpl(UIntTConst<O + STAMP_COUNT>{},
                                std::forward<VariantT>(v),
                                std::forward<Func>(f));
-    MRAY_UNREACHABLE;
 
-    #undef COND_INVOKE
+    // On GPU we crash and burn...
+    // on CPU we throw
+    #ifdef MRAY_DEVICE_CODE_PATH
+        MRAY_UNREACHABLE;
+    #else
+        else throw MRayError("Unable to invoke visit over a variant!");
+    #endif
 }
 
 template<uint32_t O, class VariantT, class Func>
@@ -402,13 +449,79 @@ constexpr void VariantDetail::IfElseIndexImpl(UIntTConst<O>, VariantT&& v, Func&
     COND_INVOKE(13)
     COND_INVOKE(14)
     COND_INVOKE(15)
+    #undef COND_INVOKE
     if constexpr(VSize > O + STAMP_COUNT)
         return IfElseIndexImpl(UIntTConst<O + STAMP_COUNT>{},
                                std::forward<VariantT>(v),
                                std::forward<Func>(f));
-    MRAY_UNREACHABLE;
+    // On GPU we crash and burn...
+    // on CPU we throw
+    #ifdef MRAY_DEVICE_CODE_PATH
+        MRAY_UNREACHABLE;
+    #else
+        else throw MRayError("Unable to invoke visit over a variant!");
+    #endif
+}
 
-    #undef COND_INVOKE
+template<uint32_t O, class VariantT, class Func>
+constexpr auto VariantDetail::SwitchCaseVisitImpl(UIntTConst<O>, VariantT&& v, Func&& f) -> decltype(auto)
+{
+    using V = std::remove_cvref_t<VariantT>;
+    constexpr uint32_t STAMP_COUNT = 16;
+    constexpr uint32_t VSize = uint32_t(V::TypeCount);
+    // I dunno how to make this compile time
+    // so we check it runtime
+    #define CASE_INVOKE(I)                        \
+        case(O + I):                              \
+        {                                         \
+            if constexpr(VSize > (I + O))         \
+                return std::invoke                \
+                (                                 \
+                    std::forward<Func>(f),        \
+                    Alternative<O + I>            \
+                    (                             \
+                        std::forward<VariantT>(v) \
+                    )                             \
+                );                                \
+        }
+    //
+    switch(v.Index())
+    {
+        CASE_INVOKE(0)
+        CASE_INVOKE(1)
+        CASE_INVOKE(2)
+        CASE_INVOKE(3)
+        CASE_INVOKE(4)
+        CASE_INVOKE(5)
+        CASE_INVOKE(6)
+        CASE_INVOKE(7)
+        CASE_INVOKE(8)
+        CASE_INVOKE(9)
+        CASE_INVOKE(10)
+        CASE_INVOKE(11)
+        CASE_INVOKE(12)
+        CASE_INVOKE(13)
+        CASE_INVOKE(14)
+        CASE_INVOKE(15)
+        #undef CASE_INVOKE
+        default:
+        {
+            if constexpr(VSize > O + STAMP_COUNT)
+                return SwitchCaseVisitImpl
+                (
+                    UIntTConst<O + STAMP_COUNT>{},
+                    std::forward<VariantT>(v),
+                    std::forward<Func>(f)
+                );
+            // On GPU we crash and burn...
+            // on CPU we throw
+            #ifdef MRAY_DEVICE_CODE_PATH
+                MRAY_UNREACHABLE;
+            #else
+                else throw MRayError("Unable to invoke visit over a variant!");
+            #endif
+        }
+    }
 }
 
 template<class ... Types>
@@ -438,7 +551,7 @@ void VariantDetail::VariantImpl<Types...>::DestroyAlternative()
 {
     assert(tag != INVALID_INDEX);
     // If all the types are trivially destructible just skip
-    if constexpr(!TD) return;
+    if constexpr(TD) return;
     //
     // Or do the if else dance...
     else Visit(*this, [](auto& t)
@@ -449,10 +562,10 @@ void VariantDetail::VariantImpl<Types...>::DestroyAlternative()
 
 template<class... Types>
 constexpr
-VariantDetail::VariantImpl<Types...>::VariantImpl() noexcept
-requires(FIRST_DC)
+VariantDetail::VariantImpl<Types...>::VariantImpl() noexcept requires(FIRST_DC)
     : tag(VariantIndex(0))
 {
+    // TODO: Do we really need this?
     if constexpr(FIRST_TDC)
     {
         std::construct_at<FirstType>(&MetaGet<0, 0, TypeCount>(storage));
@@ -462,8 +575,7 @@ requires(FIRST_DC)
 template<class... Types>
 template<class T>
 constexpr
-VariantDetail::VariantImpl<Types...>::VariantImpl(T&& other) noexcept
-requires(!std::derived_from<std::remove_cvref_t<T>, VariantImpl>)
+VariantDetail::VariantImpl<Types...>::VariantImpl(T&& other) noexcept requires(TypeIsInPack<T>)
 {
     using TBase = std::remove_cvref_t<T>;
     constexpr auto R = IndexOfType<TBase>;
@@ -490,8 +602,7 @@ VariantDetail::VariantImpl<Types...>::VariantImpl(std::in_place_index_t<I>, Args
 template<class ... Types>
 template<class T>
 constexpr VariantDetail::VariantImpl<Types...>&
-VariantDetail::VariantImpl<Types...>::operator=(T&& t) noexcept
-requires(!std::derived_from<std::remove_cvref_t<T>, VariantImpl>)
+VariantDetail::VariantImpl<Types...>::operator=(T&& t) noexcept requires(TypeIsInPack<T>)
 {
     using TBase = std::remove_cvref_t<T>;
     constexpr auto R = IndexOfType<TBase>;
@@ -617,6 +728,8 @@ constexpr auto Visit(VariantT&& v, Func&& f) -> decltype(auto)
     using namespace VariantDetail;
     assert(v.Index() < VariantSize<std::remove_cvref_t<VariantT>>);
     return IfElseVisitImpl(UIntTConst<0>{}, std::forward<VariantT>(v), std::forward<Func>(f));
+    // TODO: Enable / Disable this depending on the performance.
+    //return SwitchCaseVisitImpl(UIntTConst<0>{}, std::forward<VariantT>(v), std::forward<Func>(f));
 }
 
 // TODO: Overloading std functions is very fragile (can be UB etc.)

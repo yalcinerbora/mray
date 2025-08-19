@@ -1,4 +1,5 @@
 #include "TransformsDefault.h"
+#include "GenericGroup.hpp"
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"

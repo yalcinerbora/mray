@@ -143,9 +143,10 @@ namespace LBVHAccelDetail
 }
 
 template<PrimitiveGroupC PrimitiveGroupType>
-class AcceleratorGroupLBVH final : public AcceleratorGroupT<AcceleratorGroupLBVH<PrimitiveGroupType>, PrimitiveGroupType>
+class AcceleratorGroupLBVH final 
+    : public AcceleratorGroupT<AcceleratorGroupLBVH<PrimitiveGroupType>>
 {
-    using Base = AcceleratorGroupT<AcceleratorGroupLBVH<PrimitiveGroupType>, PrimitiveGroupType>;
+    using Base = AcceleratorGroupT<AcceleratorGroupLBVH<PrimitiveGroupType>>;
 
     public:
     static std::string_view TypeName();

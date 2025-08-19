@@ -298,7 +298,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     for(const auto& accGroup : generatedAccels)
     {
         using Base = AcceleratorGroupOptixI;
-        Base* aGroup = static_cast<Base*>(accGroup.second.get());
+        Base* aGroup = dynamic_cast<Base*>(accGroup.second.get());
         size_t localCount = instanceOffsets[i + 1] - instanceOffsets[i];
         size_t offset = instanceOffsets[i];
         // Get required parameters for IAS construction
@@ -445,7 +445,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     for(const auto& accGroup : generatedAccels)
     {
         using Base = AcceleratorGroupOptixI;
-        const Base* aGroup = static_cast<const Base*>(accGroup.second.get());
+        const Base* aGroup = dynamic_cast<const Base*>(accGroup.second.get());
         uint32_t recordStartOffset = static_cast<uint32_t>(hAllHitRecords.size());
         // Get the shader names
         auto hitRecords = aGroup->GetHitRecords();

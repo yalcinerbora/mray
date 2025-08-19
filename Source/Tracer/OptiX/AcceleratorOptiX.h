@@ -151,7 +151,7 @@ class MRayOptiXContext
 };
 
 // Add Optix specific functions
-class AcceleratorGroupOptixI : public AcceleratorGroupI
+class AcceleratorGroupOptixI
 {
     public:
     virtual ~AcceleratorGroupOptixI() = default;
@@ -176,10 +176,9 @@ class AcceleratorGroupOptixI : public AcceleratorGroupI
 
 template<PrimitiveGroupC PrimitiveGroupType>
 class AcceleratorGroupOptiX final
-    : public AcceleratorGroupT<AcceleratorGroupOptiX<PrimitiveGroupType>, PrimitiveGroupType, AcceleratorGroupOptixI>
+    : public AcceleratorGroupT<AcceleratorGroupOptiX<PrimitiveGroupType>, AcceleratorGroupOptixI>
 {
-    using Base = AcceleratorGroupT<AcceleratorGroupOptiX <PrimitiveGroupType>,
-                                   PrimitiveGroupType, AcceleratorGroupOptixI>;
+    using Base = AcceleratorGroupT<AcceleratorGroupOptiX<PrimitiveGroupType>, AcceleratorGroupOptixI>;
     using HitRecordVector = std::vector<GenericHitRecord<>>;
     public:
     static std::string_view TypeName();

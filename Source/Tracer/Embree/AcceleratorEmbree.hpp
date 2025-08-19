@@ -420,8 +420,9 @@ void AcceleratorGroupEmbree<PG>::MultiBuildViaTriangle_CLT(const PreprocessResul
             //
             Vector2ui primRange = primRanges[j];
             uint32_t primCount = primRange[1] - primRange[0];
-            Span<const Vector3> verts = this->pg.GetVertexPositionSpan();
-            Span<const Vector3ui> indices = this->pg.GetIndexSpan();
+            const auto& pgTri = static_cast<const PG&>(this->pg);
+            Span<const Vector3> verts = pgTri.GetVertexPositionSpan();
+            Span<const Vector3ui> indices = pgTri.GetIndexSpan();
             RTCGeometry g = rtcNewGeometry(rtcDevice, RTC_GEOMETRY_TYPE_TRIANGLE);
             rtcSetSharedGeometryBuffer(g, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3,
                                        verts.data(), 0u, sizeof(Vector3), verts.size());
@@ -634,7 +635,7 @@ void AcceleratorGroupEmbree<PG>::Construct(AccelGroupConstructParams p,
                                  transformSoAOffsets.back(), 1,
                                  geomDataArraySize});
     // Copy pgSoA to common buffer (easy)
-    auto pgSoALocal = this->pg.SoA();
+    auto pgSoALocal = static_cast<const PG&>(this->pg).SoA();
     queue.MemcpyAsync(pgSoA, Span<const PGSoA>(&pgSoALocal, 1));
     queue.MemcpyAsync(hInstanceHitRecordOffsets, Span<const uint32_t>(hitRecordOffsets));
     // Copy TransformSoA's to local buffer

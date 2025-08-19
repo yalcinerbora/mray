@@ -9,6 +9,7 @@
 #include "Tracer/LightsDefault.h"
 #include "Tracer/MetaLight.h"
 #include "Tracer/TextureView.hpp"
+#include "Tracer/GenericGroup.hpp"
 
 #include "Core/Log.h"
 

@@ -53,7 +53,6 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/ColorFunctions.h
     ${CURRENT_SOURCE_DIR}/TypeNameGenerators.h
     ${CURRENT_SOURCE_DIR}/BitFunctions.h
-    ${CURRENT_SOURCE_DIR}/DeviceVisit.h
     ${CURRENT_SOURCE_DIR}/MemAlloc.h
     ${CURRENT_SOURCE_DIR}/MemAlloc.cpp
     ${CURRENT_SOURCE_DIR}/TypeFinder.h

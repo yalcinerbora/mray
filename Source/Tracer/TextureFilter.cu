@@ -1114,12 +1114,12 @@ void ClampImageFromBufferGeneric(// Output
     // Find maximum block count for state allocation
     // TODO: Change this so that it is relative to the
     // filter radius.
-    static constexpr Vector2ui SPP = Vector2ui(8, 8);
+    static constexpr Vector2ui SPP = Vector2ui(4, 4);
     static constexpr Vector2ui TILE_SIZE = KC_CLAMP_IMAGE_TILE_SIZE;
     static constexpr uint32_t THREAD_PER_BLOCK = TILE_SIZE.Multiply();
     uint32_t blockCount = DivideUp(surfImageDims, TILE_SIZE).Multiply();
 
-    SurfViewVariant surfRef = DeviceVisit(surf, [](auto&& v) -> SurfViewVariant
+    SurfViewVariant surfRef = Visit(surf, [](auto&& v) -> SurfViewVariant
     {
         using T = std::remove_cvref_t<decltype(v)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -1146,7 +1146,7 @@ void ClampImageFromBufferGeneric(// Output
         SPP,
         // Use sampling here, quality is not that important
         // (We are clamping textures)
-        FilterMode::ACCUMULATE,
+        FilterMode::SAMPLING,
         filter
     );
 }

@@ -108,7 +108,7 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
         [](const auto& pair)
         {
             const auto& [_, agBase] = pair;
-            auto& ag = static_cast<AcceleratorGroupEmbreeI&>(*agBase);
+            auto& ag = dynamic_cast<AcceleratorGroupEmbreeI&>(*agBase);
             return ag.HitRecordCount();
         }
     );
@@ -138,7 +138,7 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
     uint32_t accelI = 0;
     for(const auto& [_, agBase] : this->generatedAccels)
     {
-        auto& ag = static_cast<AcceleratorGroupEmbreeI&>(*agBase);
+        auto& ag = dynamic_cast<AcceleratorGroupEmbreeI&>(*agBase);
 
         size_t hrStart = groupHitRecordOffsets[accelI];
         size_t hrEnd = groupHitRecordOffsets[accelI + 1];

@@ -1,4 +1,6 @@
 #include "MediumsDefault.h"
+#include "GenericGroup.hpp"
+
 #include "Core/TypeNameGenerators.h"
 
 #ifdef MRAY_GPU_BACKEND_CPU

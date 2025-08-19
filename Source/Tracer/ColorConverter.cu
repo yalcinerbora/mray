@@ -84,7 +84,7 @@ Vector3 GenericFromNorm(const Vector3& t, const SurfViewVariant& surfView)
 {
     using namespace NormConversion;
     // Utilize the surfView variant to get the type etc
-    return DeviceVisit(surfView, [t](auto&& sv) -> Vector3
+    return Visit(surfView, [t](auto&& sv) -> Vector3
     {
         Vector3 result = t;
         using VariantType = std::remove_cvref_t<decltype(sv)>;
@@ -127,7 +127,7 @@ Vector3 GenericToNorm(const Vector3& t, const SurfViewVariant& surfView)
 {
     using namespace NormConversion;
     // Utilize the surfView variant to get the type etc
-    return DeviceVisit(surfView, [t](auto&& sv) -> Vector3
+    return Visit(surfView, [t](auto&& sv) -> Vector3
     {
         using Math::Clamp;
         Vector3 result = t;
@@ -181,7 +181,7 @@ Vector3 GenericToNorm(const Vector3& t, const SurfViewVariant& surfView)
 MR_GF_DECL
 Vector3 GenericReadFromView(const Vector2& uv, GenericTextureView& view)
 {
-    return DeviceVisit(view, [&](auto&& t) -> Vector3
+    return Visit(view, [&](auto&& t) -> Vector3
     {
         using T = std::remove_cvref_t<decltype(t)>;
         if constexpr(T::Dimensions != 2)

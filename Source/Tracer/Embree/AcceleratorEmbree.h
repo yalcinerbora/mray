@@ -118,7 +118,7 @@ class AcceleratorWorkEmbreeI : public AcceleratorWorkI
     virtual RTCOccludedFunctionN    OccludedFunction() const = 0;
 };
 
-class AcceleratorGroupEmbreeI : public AcceleratorGroupI
+class AcceleratorGroupEmbreeI
 {
     public:
     virtual ~AcceleratorGroupEmbreeI() = default;
@@ -170,10 +170,9 @@ struct AcceleratorWorkEmbree
 
 template<PrimitiveGroupC PrimitiveGroupType>
 class AcceleratorGroupEmbree final
-    : public AcceleratorGroupT<AcceleratorGroupEmbree<PrimitiveGroupType>, PrimitiveGroupType, AcceleratorGroupEmbreeI>
+    : public AcceleratorGroupT<AcceleratorGroupEmbree<PrimitiveGroupType>, AcceleratorGroupEmbreeI>
 {
-    using Base = AcceleratorGroupT<AcceleratorGroupEmbree<PrimitiveGroupType>,
-                                   PrimitiveGroupType, AcceleratorGroupEmbreeI>;
+    using Base = AcceleratorGroupT<AcceleratorGroupEmbree<PrimitiveGroupType>, AcceleratorGroupEmbreeI>;
     public:
     static std::string_view TypeName();
     using PrimitiveGroup    = PrimitiveGroupType;

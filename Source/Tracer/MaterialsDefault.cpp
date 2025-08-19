@@ -1,5 +1,6 @@
 #include "MaterialsDefault.h"
 #include "Texture.h"
+#include "GenericGroup.hpp"
 
 #include "Core/TypeNameGenerators.h"
 

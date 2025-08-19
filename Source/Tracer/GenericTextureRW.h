@@ -21,7 +21,7 @@ MR_GF_DEF
 Vector4 GenericRead(const Vector2ui& pixCoords,
                     const SurfViewVariant& surf)
 {
-    Vector4 v = DeviceVisit
+    Vector4 v = Visit
     (
         std::as_const(surf),
         // Visitor
@@ -54,7 +54,7 @@ Vector4 GenericReadFromBuffer(const Span<const Byte>& dBufferImage,
                               const SurfViewVariant& surfToVisit,
                               uint32_t pixCoordLinear)
 {
-    return DeviceVisit
+    return Visit
     (
         surfToVisit,
         [pixCoordLinear, dBufferImage](auto&& s) -> Vector4
@@ -91,7 +91,7 @@ void GenericWrite(SurfViewVariant& surf,
                   const Vector4& value,
                   const Vector2ui& pixCoords)
 {
-    DeviceVisit
+    Visit
     (
         surf,
         // Visitor

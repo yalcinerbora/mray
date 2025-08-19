@@ -13,6 +13,7 @@
 #include "Core/Variant.h"
 
 #include "Tracer/TextureView.hpp"
+#include "Tracer/GenericGroup.hpp"
 
 #include "Device/GPUAlgReduce.h"
 

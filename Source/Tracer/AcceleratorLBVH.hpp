@@ -743,7 +743,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
             BLOCK_PER_INSTANCE,
             processedAccelCount,
             typename TransformGroupIdentity::DataSoA{},
-            this->pg.SoA()
+            static_cast<const PG&>(this->pg).SoA()
         );
     }
     // We don't have segmented reduce atm.
@@ -785,7 +785,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
             BLOCK_PER_INSTANCE,
             processedAccelCount,
             typename TransformGroupIdentity::DataSoA{},
-            this->pg.SoA()
+            static_cast<const PG&>(this->pg).SoA()
 
         );
     }

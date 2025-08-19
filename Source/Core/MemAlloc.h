@@ -119,27 +119,23 @@ static_assert(MemoryC<AlignedMemory>,
 
 namespace MemAlloc::Detail
 {
-    template<size_t I = 0, class... Tp>
-    requires (I == sizeof...(Tp))
-    constexpr size_t AcquireTotalSize(std::array<size_t, sizeof...(Tp)>&,
-                                      const std::array<size_t, sizeof...(Tp)>&,
-                                      size_t)
-    {
-        return 0;
-    }
 
-    template<std::size_t I = 0, class... Tp>
-    requires (I < sizeof...(Tp))
+    template<class... Tp>
     constexpr size_t AcquireTotalSize(std::array<size_t, sizeof...(Tp)>& alignedSizeList,
                                       const std::array<size_t, sizeof...(Tp)>& countList,
                                       size_t alignment)
     {
-        using namespace Math;
-        using CurrentType = TupleElement<I, Tuple<Tp...>>;
-        size_t alignedSize = NextMultiple(sizeof(CurrentType) * countList[I], alignment);
-        alignedSizeList[I] = alignedSize;
-        return alignedSize + AcquireTotalSize<I + 1, Tp...>(alignedSizeList,
-                                                            countList, alignment);
+        constexpr size_t N = sizeof...(Tp);
+        constexpr std::array<size_t, N> sizeList = {sizeof(Tp)...};
+
+        size_t totalSize = 0;
+        for(uint32_t i = 0; i < N; i++)
+        {
+            using Math::NextMultiple;
+            alignedSizeList[i] = NextMultiple(sizeList[i] * countList[i], alignment);
+            totalSize += alignedSizeList[i];
+        }
+        return totalSize;
     }
 
     template<std::size_t... Is, class... Tp>
@@ -148,26 +144,29 @@ namespace MemAlloc::Detail
                                     const std::array<size_t, sizeof...(Tp)>& countList,
                                     std::index_sequence<Is...>)
     {
+        constexpr size_t N = sizeof...(Tp);
+        std::array<size_t, N> byteOffsets = {};
         size_t offset = 0;
-        auto GenSpan = [&]<size_t I>(std::in_place_index_t<I>)
+        for(uint32_t i = 0; i < N; i++)
         {
-            using CurrentType = TupleElement<I, Tuple<Tp...>>;
-            // Set Pointer
-            size_t size = alignedSizeList[I];
-            CurrentType* tPtr = reinterpret_cast<CurrentType*>(memory + offset);
-            tPtr = std::launder(tPtr);
-            get<I>(t) = Span<CurrentType>((size == 0) ? nullptr : tPtr, countList[I]);
-            assert(size / sizeof(CurrentType) >= countList[I]);
-            // Increment Offset
-            offset += size;
-        };
-
+            byteOffsets[i] = offset;
+            offset += alignedSizeList[i];
+        }
+        if constexpr(MRAY_IS_DEBUG)
+        {
+            std::array<size_t, N> sizes = {sizeof(Tp)...};
+            for(uint32_t i = 0; i < N; i++)
+                assert(alignedSizeList[i] / sizes[i] >= countList[I]);
+        }
         // Param pack expansion
         (
-            (GenSpan(std::in_place_index_t<Is>{})),
+            // Expanding statement...
+            (get<Is>(t) = Span<Tp>(std::launder(reinterpret_cast<Tp*>(memory + byteOffsets[Is])),
+                                                countList[Is])),
+            // Expand
             ...
         );
-        return offset;
+        return alignedSizeList.back() + byteOffsets.back();
     }
 }
 
@@ -196,9 +195,9 @@ void AllocateMultiData(Tuple<Span<Args>&...> spans, Memory& memory,
 {
     std::array<size_t, sizeof...(Args)> alignedSizeList;
     // Acquire total size & allocation size of each array
-    size_t totalSize = Detail::AcquireTotalSize<0, Args...>(alignedSizeList,
-                                                            countList,
-                                                            alignment);
+    size_t totalSize = Detail::AcquireTotalSize<Args...>(alignedSizeList,
+                                                         countList,
+                                                         alignment);
     // Allocate Memory
     memory.ResizeBuffer(totalSize);
     Byte* ptr = static_cast<Byte*>(memory);

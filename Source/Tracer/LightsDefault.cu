@@ -1,4 +1,5 @@
 #include "LightsDefault.h"
+#include "GenericGroup.hpp"
 
 #include "Device/GPUSystem.hpp" // IWYU pragma: keep
 
