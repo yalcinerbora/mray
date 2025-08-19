@@ -9,7 +9,6 @@
 #include "Device/GPUAlgRadixSort.h"
 
 #include "Core/ColorFunctions.h"
-#include "Core/DeviceVisit.h"
 #include "Core/GraphicsFunctions.h"
 
 #ifdef MRAY_GPU_BACKEND_CUDA

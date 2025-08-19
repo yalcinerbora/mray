@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Device/GPUTextureView.h"  // IWYU pragma: keep
-#include "Core/DeviceVisit.h"
 #include "TextureCommon.h"
 
 MR_GF_DECL

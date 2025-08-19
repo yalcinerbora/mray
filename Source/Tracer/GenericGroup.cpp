@@ -390,12 +390,12 @@ MRAY_GENERIC_TEX_PUSH_ATTRIB_INST(, MediumKey, MediumAttributeInfo, 3);
 // ================== //
 //       LIGHT        //
 // ================== //
-MRAY_GENERIC_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, Float);
-MRAY_GENERIC_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, Vector2);
-MRAY_GENERIC_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, Vector3);
-MRAY_GENERIC_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, Vector4);
+//MRAY_GENERIC_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, Float);
+//MRAY_GENERIC_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, Vector2);
+//MRAY_GENERIC_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, Vector3);
+//MRAY_GENERIC_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, Vector4);
 //
-MRAY_GENERIC_TEX_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, 2);
+//MRAY_GENERIC_TEX_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, 2);
 
 // ================== //
 //      MATERIAL      //
@@ -413,8 +413,8 @@ MRAY_GENERIC_TEX_PUSH_ATTRIB_INST(, MaterialKey, MatAttributeInfo, 2);
 // Non-Textured
 template class GenericGroupT<PrimBatchKey, PrimAttributeInfo>;
 template class GenericGroupT<CameraKey, CamAttributeInfo>;
-template class GenericGroupT<TransformKey, TransAttributeInfo>;
+//template class GenericGroupT<TransformKey, TransAttributeInfo>;
 // Textured
 template class GenericTexturedGroupT<MediumKey, MediumAttributeInfo>;
 template class GenericTexturedGroupT<MaterialKey, MatAttributeInfo>;
-template class GenericTexturedGroupT<LightKey, LightAttributeInfo>;
+//template class GenericTexturedGroupT<LightKey, LightAttributeInfo>;

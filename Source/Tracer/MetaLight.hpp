@@ -3,8 +3,6 @@
 #include "MetaLight.h"
 #include "SurfaceComparators.h"
 
-#include "Core/DeviceVisit.h"
-
 #include "Device/GPUSystem.hpp"
 
 template<class MetaLightArray, LightGroupC LightGroup, TransformGroupC TransformGroup>

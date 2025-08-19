@@ -156,7 +156,7 @@ namespace MemAlloc::Detail
         {
             std::array<size_t, N> sizes = {sizeof(Tp)...};
             for(uint32_t i = 0; i < N; i++)
-                assert(alignedSizeList[i] / sizes[i] >= countList[I]);
+                assert(alignedSizeList[i] / sizes[i] >= countList[i]);
         }
         // Param pack expansion
         (
