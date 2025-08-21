@@ -242,9 +242,9 @@ class MetaLightArrayT
     using TLGroupPtrTuple = Tuple<TransformLightTuple*...>;
     // We will memcpy the SoA's these must be implicit lifetime types.
     // And we pray that std::variant implementation does not break between CPU/GPU.
-    static_assert(ImplicitLifetimeC<VariantLightSoA>);
-    static_assert(ImplicitLifetimeC<VariantPrimSoA>);
-    static_assert(ImplicitLifetimeC<VariantTransformSoA>);
+    static_assert(RelaxedLifetimeC<VariantLightSoA>);
+    static_assert(RelaxedLifetimeC<VariantPrimSoA>);
+    static_assert(RelaxedLifetimeC<VariantTransformSoA>);
     // Other variants will be constructed on GPU so inter CGPU will not be an issue.
 
     public:

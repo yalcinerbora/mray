@@ -416,7 +416,7 @@ void LoadPrimitive(TracerI& tracer,
             Span<const Vector3> bitangents = bData.AccessAs<const Vector3>();
             Span<const Vector3> normals = nData.AccessAs<const Vector3>();
 
-            for(size_t i = 0; i < normalCount; i++)
+            for(uint32_t i = 0; i < normalCount; i++)
             {
                 using Math::Normalize;
                 Vector3 t = Normalize(tangents[i]);
@@ -522,7 +522,7 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
                                                 ? sL.value().AccessAs<Vector3>()
                                                 : Span<const Vector3>();
 
-                for(size_t i = 0; i < tSpan.size(); i++)
+                for(uint32_t i = 0; i < tSpan.size(); i++)
                 {
                     Vector3 t = (tSpan.empty()) ? tSpan[i] : Vector3::Zero();
                     Vector3 r = (rSpan.empty()) ? rSpan[i] : Vector3::Zero();
@@ -855,7 +855,7 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
             size_t localCount = end - start;
             using ItDiff = decltype(nodes.cbegin())::difference_type;
             auto startConv = static_cast<ItDiff>(start);
-            auto nodeRange = Span<const JsonNode>(nodes.cbegin() + startConv, localCount);
+            auto nodeRange = Span<const JsonNode>(nodes.data() + startConv, localCount);
             IdList generatedIds;
             try
             {

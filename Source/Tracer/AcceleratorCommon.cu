@@ -1,5 +1,6 @@
 #include "AcceleratorC.h"
 #include "Device/GPUSystem.hpp" // IWYU pragma: keep
+#include <memory>
 
 class KeyGeneratorFunctor
 {
@@ -577,7 +578,8 @@ void BaseAccelerator::PartitionSurfaces(std::vector<AccelGroupConstructParams>& 
                 return value < TransGroupIdFetcher()(tId);
             });
 
-            auto surfSpan = Span<const SurfParam>(innerStart, innerEnd);
+            auto surfSpan = Span<const SurfParam>(std::to_address(innerStart),
+                                                 size_t(innerEnd - innerStart));
             partitions.back().tGroupSurfs.emplace_back(TransGroupId(tGroupId), surfSpan);
             innerStart = innerEnd;
         }

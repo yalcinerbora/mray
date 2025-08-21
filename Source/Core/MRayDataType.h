@@ -88,7 +88,7 @@ namespace MRayDataDetail
         typename M:: template ETPair<MRayDataEnum::MR_SNORM_4x8,    SNorm4x8>,
         typename M:: template ETPair<MRayDataEnum::MR_SNORM_2x16,   SNorm2x16>,
 
-        typename M:: template ETPair<MRayDataEnum::MR_STRING,       std::string>,
+        typename M:: template ETPair<MRayDataEnum::MR_STRING,       std::string_view>,
         typename M:: template ETPair<MRayDataEnum::MR_BOOL,         bool>
     >;
 

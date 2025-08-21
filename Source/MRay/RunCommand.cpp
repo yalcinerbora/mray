@@ -295,9 +295,9 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
 {
 
     assert(output.Size() == input.Size());
-    constexpr size_t SIMD_WIDTH = MRay::HostArchSIMDWidth<double>();
+    constexpr uint32_t SIMD_WIDTH = MRay::HostArchSIMDWidth<double>();
 
-    auto Iteration_AVX512 = [&](size_t i)
+    auto Iteration_AVX512 = [&](uint32_t i)
     {
         __m512d rOut = _mm512_loadu_pd(output.Get<R>().data() + i * SIMD_WIDTH);
         __m512d gOut = _mm512_loadu_pd(output.Get<G>().data() + i * SIMD_WIDTH);
@@ -338,7 +338,7 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
         _mm512_storeu_pd(output.Get<W>().data() + i * SIMD_WIDTH, sTotal);
     };
 
-    auto Iteration_AVX2 = [&](size_t i)
+    auto Iteration_AVX2 = [&](uint32_t i)
     {
         __m256d rOut = _mm256_loadu_pd(output.Get<R>().data() + i * SIMD_WIDTH);
         __m256d gOut = _mm256_loadu_pd(output.Get<G>().data() + i * SIMD_WIDTH);
@@ -384,7 +384,7 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
         _mm256_storeu_pd(output.Get<W>().data() + i * SIMD_WIDTH, sTotal);
     };
 
-    auto Iteration_Common = [&](size_t i)
+    auto Iteration_Common = [&](uint32_t i)
     {
         double rOut = output.Get<R>()[i];
         double gOut = output.Get<G>()[i];
@@ -411,9 +411,9 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
     // alignment, (due to image width is not aligned
     // with SIMD width)
     // So the code below should be slower.
-    size_t loopSize = output.Size() / SIMD_WIDTH;
-    size_t residual = output.Size() % SIMD_WIDTH;
-    for(size_t i = 0; i < loopSize; i++)
+    uint32_t loopSize = uint32_t(output.Size() / SIMD_WIDTH);
+    uint32_t residual = uint32_t(output.Size() % SIMD_WIDTH);
+    for(uint32_t i = 0; i < loopSize; i++)
     {
        using enum MRay::HostArch;
        if constexpr(MRay::MRAY_HOST_ARCH == MRAY_AVX512)
@@ -425,8 +425,8 @@ void Accum::AccumulateScanline(RGBWeightSpan<double> output,
     }
     // Calculate the rest via scalar ops
     // TODO: We can decay to 8/4/2/1 etc but is it worth it?
-    size_t offset = loopSize * SIMD_WIDTH;
-    for(size_t i = offset; i < offset + residual; i++)
+    uint32_t offset = loopSize * SIMD_WIDTH;
+    for(uint32_t i = offset; i < offset + residual; i++)
     {
        Iteration_Common(i);
     }
@@ -887,7 +887,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         Span<Vector3> rgbData;
         MemAlloc::AlignedMemory saveMem;
         MemAlloc::AllocateMultiData(Tie(rgbData), saveMem, {pixCount});
-        for(size_t i = 0; i < pixCount; i++)
+        for(uint32_t i = 0; i < pixCount; i++)
         {
             rgbData[i] = Vector3(imageRData[i],
                                  imageGData[i],
@@ -964,6 +964,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
 
         //
         uint64_t totalUsedMem = memUsage + rendererInfo.usedGPUMemoryBytes;
+        using MemAlloc::ConvertMemSizeToString;
         auto usedGPUMem = ConvertMemSizeToString(totalUsedMem);
         auto totalGPUMem = ConvertMemSizeToString(tracerInfo.totalGPUMemoryBytes);
         //

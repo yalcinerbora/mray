@@ -1,5 +1,7 @@
 #pragma once
 
+#include "JsonNode.h"
+
 inline bool IsDashed(const nlohmann::json& n)
 {
     using namespace std::literals;

@@ -6,6 +6,7 @@
 #include <array>
 #include <string_view>
 #include <algorithm>
+#include <type_traits>
 
 // Commonize some  non-standart attributes etc.
 #define MR_STAMP_PRAGMA_(X)     _Pragma(#X)
@@ -17,12 +18,21 @@
     #define MRAY_ATTRIB_FLATTEN     [[msvc::flatten]]
     #define MRAY_ATTRIB_PURE
     #define MRAY_DEBUG_BREAK        __debugbreak()
+    #define MRAY_RESTRICT           __restrict
+
+    static constexpr bool MRAY_IS_ON_WINDOWS    = true;
+    static constexpr bool MRAY_IS_ON_LINUX      = false;
 
 #elif defined(MRAY_CLANG) || defined(MRAY_GCC)
     #define MRAY_FORCE_INLINE_DECL  [[gnu::always_inline]] inline
     #define MRAY_FORCE_INLINE_DEF   inline
     #define MRAY_FLATTEN            [[gnu::flatten]]
     #define MRAY_ATTRIB_PURE        [[gnu::pure]]
+    #define MRAY_RESTRICT           __restrict
+
+    static constexpr bool MRAY_IS_ON_WINDOWS    = false;
+    static constexpr bool MRAY_IS_ON_LINUX      = true;
+
 #endif
 
 #ifdef MRAY_CLANG
@@ -196,29 +206,57 @@ static_assert(SpectraPerSpectrum <= 4,
               "Spectra per spectrum can at most be 4"
               " (Due to Vector template at most hold 4 floats).");
 
+
+// We do not use implicit lifetime for allocations
+// since we use this to allocate variants etc. on the GPU
+// Only important factor is trivial destructibility of the
+// type (hopefully)
+template <class T>
+concept RelaxedLifetimeC = std::is_trivially_destructible_v<T>;
+
 // Until c++23, we custom define this
 // https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2674r0.pdf
 // Directly from the above paper
-template <class T>
-concept ImplicitLifetimeC = requires()
+//
+// std::disjunction
+// <
+//     std::is_scalar<T>,
+//     std::is_array<T>,
+//     std::is_aggregate<T>,
+//     std::conjunction
+//     <
+//         std::is_trivially_destructible<T>,
+//         std::disjunction
+//         <
+//             std::is_trivially_default_constructible<T>,
+//             std::is_trivially_copy_constructible<T>,
+//             std::is_trivially_move_constructible<T>
+//         >
+//     >
+// >::value;
+//
+// We do not use it it is quite a bit expensive to
+// Btw, why array is implicit lifetime?,
+// (If an array has non trivial_destructor/constructor?,
+// "static_assert(std::is_array_v<std::string[2]> == true)
+// compiles")
+// This is somewhat more restrictive and easier to compile
+//
+// This definition is quite expensive instantiation wise,
+// So we try to utilize the execution engine of the compiler.
+// (Similar trick like in Variant)
+template<class T>
+static constexpr bool CheckImplicitLifetime()
 {
-    std::disjunction
-    <
-        std::is_scalar<T>,
-        std::is_array<T>,
-        std::is_aggregate<T>,
-        std::conjunction
-        <
-            std::is_trivially_destructible<T>,
-            std::disjunction
-            <
-                std::is_trivially_default_constructible<T>,
-                std::is_trivially_copy_constructible<T>,
-                std::is_trivially_move_constructible<T>
-            >
-        >
-    >::value;
-};
+    bool trivialD = std::is_trivially_destructible_v<T>;
+    bool trivialC = (std::is_trivially_default_constructible_v<T> ||
+                     std::is_trivially_copy_constructible_v<T>    ||
+                     std::is_trivially_move_constructible_v<T>);
+    // No offense, nobodies D is trivial
+    return trivialD && trivialC;
+}
+template <class T>
+concept ImplicitLifetimeC = CheckImplicitLifetime<T>();
 
 // TODO: This should come from CMake
 using Float = float;

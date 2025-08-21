@@ -638,8 +638,8 @@ void GPUQueueCUDA::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
     size_t actualInStride = (inputByteStride == 0) ? sizeof(T) : inputByteStride;
     size_t actualOutStride = (outputByteStride == 0) ? sizeof(T) : outputByteStride;
 
-    size_t elemCountIn = Math::DivideUp(regionFrom.size_bytes(), actualInStride);
-    assert(elemCountIn == Math::DivideUp(regionTo.size_bytes(), actualOutStride));
+    size_t elemCountIn = Math::DivideUp(size_t(regionFrom.size_bytes()), actualInStride);
+    assert(elemCountIn == Math::DivideUp(size_t(regionTo.size_bytes()), actualOutStride));
 
     cudaMemcpy2DAsync(regionTo.data(),
                       actualOutStride,

@@ -1039,10 +1039,8 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
         hSurfViews.push_back(mipViews);
     }
 
-    auto hSurfViewSpan = Span<MipArray<SurfViewVariant>>(hSurfViews.begin(),
-                                                         hSurfViews.end());
-    auto hMipGenParams = Span<const MipGenParams>(mipGenParams.cbegin(),
-                                                  mipGenParams.cend());
+    auto hSurfViewSpan = Span<MipArray<SurfViewVariant>>(hSurfViews);
+    auto hMipGenParams = Span<const MipGenParams>(mipGenParams);
     queue.MemcpyAsync(dSufViews, ToConstSpan(hSurfViewSpan));
     queue.MemcpyAsync(dMipGenParams, hMipGenParams);
 

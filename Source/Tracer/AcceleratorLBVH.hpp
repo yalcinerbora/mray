@@ -595,8 +595,8 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         // the instance leaf ranges itself, since we cannot reuse an accelerator
         // for primitives that require "per_primitive_transform"
         auto iLeafRange = this->instanceLeafRanges;
-        auto localInstanceLeafRanges = Span<const Vector2ui>(iLeafRange.cbegin() + workInstanceRange[0],
-                                                             iLeafRange.cbegin() + workInstanceRange[1]);
+        auto localInstanceLeafRanges = Span(std::to_address(iLeafRange.cbegin()),
+                                            workInstanceRange[1] - workInstanceRange[0]);
         hLeafSegmentRanges.reserve(localInstanceLeafRanges.size() + 1);
         hLeafSegmentRanges.push_back(0);
         for(const Vector2ui& range : localInstanceLeafRanges)
@@ -605,8 +605,8 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         // Node Segments
         // Do the same logic to the nodes as well
         const auto& iNodeRange = instanceNodeRanges;
-        auto localInstanceNodeRanges = Span<const Vector2ui>(iNodeRange.cbegin() + workInstanceRange[0],
-                                                             iNodeRange.cbegin() + workInstanceRange[1]);
+        auto localInstanceNodeRanges = Span(std::to_address(iNodeRange.cbegin()),
+                                            workInstanceRange[1] - workInstanceRange[0]);
 
         hNodeSegmentRanges.reserve(localInstanceNodeRanges.size() + 1);
         hNodeSegmentRanges.push_back(0);

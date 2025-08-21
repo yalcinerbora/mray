@@ -408,12 +408,12 @@ void AcceleratorGroupEmbree<PG>::MultiBuildViaTriangle_CLT(const PreprocessResul
     // We can directly set the geometry buffers here.
     //
     // Create a scene for each MRay surface
-    for(size_t i = 0; i < ppResult.concretePrimRanges.size(); i++)
+    for(uint32_t i = 0; i < ppResult.concretePrimRanges.size(); i++)
     {
         const PrimRangeArray& primRanges = ppResult.concretePrimRanges[i];
         RTCScene s = rtcNewScene(rtcDevice);
         hConcreteScenes[i] = s;
-        for(size_t j = 0; j < primRanges.size(); j++)
+        for(uint32_t j = 0; j < primRanges.size(); j++)
         {
             static constexpr auto INVALID_PRIM_RANGE = Vector2ui(std::numeric_limits<uint32_t>::max());
             if(primRanges[j] == INVALID_PRIM_RANGE) break;
@@ -449,7 +449,7 @@ void AcceleratorGroupEmbree<PG>::MultiBuildViaTriangle_CLT(const PreprocessResul
     }
 
     // Distribute the concrete accelerators to instances
-    for(size_t i = 0; i < this->InstanceCount(); i++)
+    for(uint32_t i = 0; i < this->InstanceCount(); i++)
     {
         uint32_t cIndex = this->concreteIndicesOfInstances[i];
         hInstanceScenes[i] = hConcreteScenes[cIndex];
@@ -480,7 +480,7 @@ void AcceleratorGroupEmbree<PG>::MultiBuildViaUser_CLT(const PreprocessResult& p
         instanceIndicesOfConcreteAccels[this->concreteIndicesOfInstances[i]] = i;
 
     uint32_t concreteGeomPtrIndex = 0;
-    for(size_t i = 0; i < ppResult.concretePrimRanges.size(); i++)
+    for(uint32_t i = 0; i < ppResult.concretePrimRanges.size(); i++)
     {
         const PrimRangeArray& primRanges = ppResult.concretePrimRanges[i];
         RTCScene s = rtcNewScene(rtcDevice);
@@ -521,7 +521,7 @@ void AcceleratorGroupEmbree<PG>::MultiBuildViaUser_CLT(const PreprocessResult& p
     }
 
     // Distribute the concrete accelerators to instances
-    for(size_t i = 0; i < this->InstanceCount(); i++)
+    for(uint32_t i = 0; i < this->InstanceCount(); i++)
     {
         uint32_t cIndex = this->concreteIndicesOfInstances[i];
         hInstanceScenes[i] = hConcreteScenes[cIndex];

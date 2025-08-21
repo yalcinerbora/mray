@@ -181,7 +181,7 @@ void CreateDiffuseMaterials(Span<MRayUSDMatAlphaPack> matIdsOut, TracerI& tracer
     std::vector<Optional<TextureId>> alphaMaps(matPairs.size());
     TransientData albedoBuffer(std::in_place_type<Vector3>, matPairs.size());
     albedoBuffer.ReserveAll();
-    for(size_t i = 0; i < matPairs.size(); i++)
+    for(uint32_t i = 0; i < matPairs.size(); i++)
     {
         Span<Vector3> albedoSpan = albedoBuffer.AccessAs<Vector3>();
         const auto& pair = matPairs[i];
@@ -211,7 +211,7 @@ void CreateDiffuseMaterials(Span<MRayUSDMatAlphaPack> matIdsOut, TracerI& tracer
                             TransientData(std::in_place_type<Vector3>, 0),
                             normalTextures);
 
-    for(size_t i = 0; i < matIdsOut.size(); i++)
+    for(uint32_t i = 0; i < matIdsOut.size(); i++)
     {
         matIdsOut[i].materialId = matIds[i];
         matIdsOut[i].alphaMap = alphaMaps[i];
@@ -256,7 +256,7 @@ void CreateUnrealMaterials(Span<MRayUSDMatAlphaPack> matIdsOut, TracerI& tracer,
     Span<Float> roughnessSpan = roughnessBuffer.AccessAs<Float>();
     Span<Float> specularSpan = specularBuffer.AccessAs<Float>();
     Span<Float> metallicSpan = metallicBuffer.AccessAs<Float>();
-    for(size_t i = 0; i < matPairs.size(); i++)
+    for(uint32_t i = 0; i < matPairs.size(); i++)
     {
         const auto& pair = matPairs[i];
         // Albedo
@@ -305,7 +305,7 @@ void CreateUnrealMaterials(Span<MRayUSDMatAlphaPack> matIdsOut, TracerI& tracer,
     tracer.PushMatAttribute(mgId, range, 4, std::move(metallicBuffer),
                             metallicTextures);
 
-    for(size_t i = 0; i < matIdsOut.size(); i++)
+    for(uint32_t i = 0; i < matIdsOut.size(); i++)
     {
         matIdsOut[i].materialId = matIds[i];
         matIdsOut[i].alphaMap = alphaMaps[i];
@@ -335,7 +335,7 @@ void CreateRefractMaterials(Span<MRayUSDMatAlphaPack> matIdsOut, TracerI& tracer
     TransientData cauchyBackBuffer(std::in_place_type<Vector3>, matPairs.size());
     cauchyBackBuffer.ReserveAll();
     cauchyFrontBuffer.ReserveAll();
-    for(size_t i = 0; i < matPairs.size(); i++)
+    for(uint32_t i = 0; i < matPairs.size(); i++)
     {
         Span<Vector3> iorBackSpan = cauchyBackBuffer.AccessAs<Vector3>();
         Span<Vector3> iorFrontSpan = cauchyFrontBuffer.AccessAs<Vector3>();
@@ -358,7 +358,7 @@ void CreateRefractMaterials(Span<MRayUSDMatAlphaPack> matIdsOut, TracerI& tracer
                         std::bit_cast<CommonId>(matIds.back()));
     tracer.PushMatAttribute(mgId, range, 0, std::move(cauchyBackBuffer));
     tracer.PushMatAttribute(mgId, range, 1, std::move(cauchyFrontBuffer));
-    for(size_t i = 0; i < matIdsOut.size(); i++)
+    for(uint32_t i = 0; i < matIdsOut.size(); i++)
     {
         matIdsOut[i].materialId = matIds[i];
         matIdsOut[i].alphaMap = std::nullopt;
@@ -386,7 +386,7 @@ void CreateReflectMaterials(Span<MRayUSDMatAlphaPack> matIdsOut, TracerI& tracer
     std::vector<AttributeCountList> attribCounts(matPairs.size());
     std::vector<MaterialId> matIds = tracer.ReserveMaterials(mgId, attribCounts);
     std::vector<Optional<TextureId>> alphaMaps(matPairs.size());
-    for(size_t i = 0; i < matPairs.size(); i++)
+    for(uint32_t i = 0; i < matPairs.size(); i++)
     {
         const auto& pair = matPairs[i];
         auto [_, opacityTex] = ReadUSDMatAttribute(pair.second->opacity, texLookup);
@@ -394,7 +394,7 @@ void CreateReflectMaterials(Span<MRayUSDMatAlphaPack> matIdsOut, TracerI& tracer
     }
 
     tracer.CommitMatReservations(mgId);
-    for(size_t i = 0; i < matIdsOut.size(); i++)
+    for(uint32_t i = 0; i < matIdsOut.size(); i++)
     {
         matIdsOut[i].materialId = matIds[i];
         matIdsOut[i].alphaMap = alphaMaps[i];
@@ -845,9 +845,9 @@ MaterialConverter::CreateMaterials(TracerI& tracer,
     std::vector<MRayUSDMatAlphaPack> flatMaterialIds(combinedMatKVPairs.size());
     for(const Vector2ul& range : ranges)
     {
-        Span<const MatKeyValPair> localKVPairs(combinedMatKVPairs.begin() + std::ptrdiff_t(range[0]),
+        Span<const MatKeyValPair> localKVPairs(combinedMatKVPairs.data() + range[0],
                                                range[1] - range[0]);
-        Span<MRayUSDMatAlphaPack> idOuts(flatMaterialIds.begin() + std::ptrdiff_t(range[0]),
+        Span<MRayUSDMatAlphaPack> idOuts(flatMaterialIds.data() + range[0],
                                          range[1] - range[0]);
         switch(localKVPairs.front().second->type)
         {

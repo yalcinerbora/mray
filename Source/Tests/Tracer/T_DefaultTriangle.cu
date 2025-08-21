@@ -307,6 +307,6 @@ TEST(DefaultTriangle, LoadMulti)
     // Wait the data (we will directly access it)
     queue.Barrier().Wait();
 
-    for(size_t i = 0; i < TRI_COUNT; i++)
+    for(uint32_t i = 0; i < TRI_COUNT; i++)
         EXPECT_EQ(dIsValid[i], 1);
 }

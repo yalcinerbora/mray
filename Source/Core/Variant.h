@@ -39,7 +39,6 @@
 //    --                                                //
 // ==================================================== //
 
-#include <concepts>
 #include <utility>
 #include <cstddef>
 #include <cstdint>
@@ -47,15 +46,19 @@
 #include <limits>
 #include <functional>
 
-#include "Definitions.h"
 #include "TypePack.h"
-#include "Error.h"
 
 // TODO: We remove this when we fully confident of this
 // variant to be perfectly usable. Until then, we specialize
 // STL std::visit / std::variant_alternative etc. and
 // swtich between std::variant and this variant.
 #include <variant>
+
+// TODO: Check if this works (and nvcc does not include it
+// while compiling cuda code)
+#ifndef MRAY_DEVICE_CODE_PATH
+    #include "Error.h"
+#endif
 
 template<class... Types>
 struct Variant;
@@ -310,6 +313,10 @@ using UniqueVariant = typename VariantDetail::TypePackToVariant<UniqueTypePack<T
 template<template<class...> class X, class... Args>
 constexpr bool VariantDetail::AllTrait(TypePack<Args...>)
 {
+    using SecondType = TypePackElement<1, TypePack<Args...>>;
+    if constexpr(!X<SecondType>::value)
+        return false;
+
     constexpr auto N = sizeof...(Args);
     constexpr std::array<bool, N> TraitList = {X<Args>::value ...};
 

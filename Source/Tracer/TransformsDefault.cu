@@ -116,10 +116,7 @@ void TransformGroupMulti::CommitReservations()
     for(const auto& range : itemRanges)
         hFlattenedRanges.push_back(range.second[0]);
 
-    using HostSpan = Span<const Vector<2, size_t>>;
-    queue.MemcpyAsync(dFlattenedRanges,
-                      HostSpan(hFlattenedRanges.cbegin(),
-                               hFlattenedRanges.cend()));
+    queue.MemcpyAsync(dFlattenedRanges, Span<const Vector2ul>(hFlattenedRanges));
 
     uint32_t workCount = static_cast<uint32_t>(hFlattenedRanges.size());
     using namespace std::literals;

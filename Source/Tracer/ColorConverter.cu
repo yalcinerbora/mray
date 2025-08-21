@@ -17,7 +17,7 @@ static constexpr uint32_t BC_TEX_PER_BATCH = 16;
 
 struct BCColorConvParams
 {
-    Vector2ul           blockRange;
+    Vector2ui           blockRange;
     Float               gamma;
     MRayColorSpaceEnum  fromColorSpace;
 };
@@ -585,23 +585,23 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
         uint32_t  end = Math::Min((batchIndex + 1) * BC_TEX_PER_BATCH, localTexCount);
         auto localTextures = textureRange.subspan(start, uint32_t(end - start));
         //
-        uint64_t texBlockOffset = 0;
+        uint32_t texBlockOffset = 0;
         BCColorConvParamList paramsList;
-        for(size_t tI = 0; tI < localTextures.size(); tI++)
+        for(uint32_t tI = 0; tI < localTextures.size(); tI++)
         {
             const auto* t = localTextures[tI];
             auto [mipBlocks, totalBlocks] = FindTotalTilesOf<E>(t);
             assert(mipBlocks.size() == t->MipCount());
             paramsList[tI] = BCColorConvParams
             {
-                .blockRange = Vector2ul(texBlockOffset, texBlockOffset + totalBlocks),
+                .blockRange = Vector2ui(texBlockOffset, texBlockOffset + totalBlocks),
                 .gamma = t->Gamma(),
                 .fromColorSpace = t->ColorSpace()
             };
 
             // While calculating other stuff, issue memcpy of
             // this texture
-            uint64_t mipBlockOffset = texBlockOffset;
+            uint32_t mipBlockOffset = texBlockOffset;
             for(uint32_t mipLevel = 0; mipLevel < t->MipCount(); mipLevel++)
             {
                 uint64_t mipBlockSize = mipBlocks[mipLevel];
@@ -653,7 +653,7 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
         });
 
         texBlockOffset = 0;
-        for(size_t tI = 0; tI < localTextures.size(); tI++)
+        for(uint32_t tI = 0; tI < localTextures.size(); tI++)
         {
             auto* t = localTextures[tI];
             auto [mipBlocks, totalBlocks] = FindTotalTilesOf<E>(t);

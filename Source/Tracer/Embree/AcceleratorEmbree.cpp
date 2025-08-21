@@ -157,7 +157,7 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
                                         queue);
         ag.OffsetAccelKeyInRecords(uint32_t(instanceOffsets[accelI]));
         queue.Barrier().Wait();
-        for(size_t i = 0; i < localHandles.size(); i++)
+        for(uint32_t i = 0; i < localHandles.size(); i++)
         {
             auto g = rtcNewGeometry(embreeContext.device, RTC_GEOMETRY_TYPE_INSTANCE);
             rtcSetGeometryInstancedScene(g, localHandles[i]);

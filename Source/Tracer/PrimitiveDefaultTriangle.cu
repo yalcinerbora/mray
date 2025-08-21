@@ -123,7 +123,7 @@ void KCApplyTransformsTriangle(// I-O
         for(uint32_t i = vertexStart; i < vertexCount; i += vertexIncrement)
         {
             // Convert the position (easy)
-            uint64_t vI = sVertexRanges[0] + i;
+            uint32_t vI = uint32_t(sVertexRanges[0] + i);
             Vector4 pos = Vector4(dPositionsInOut[vI], 1);
             dPositionsInOut[vI] = Vector3(sBatchTransform * pos);
             // Convert the normal (hard)
@@ -280,9 +280,7 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
                                                   ranges[INDICES_ATTRIB_INDEX][0],
                                                   ranges[INDICES_ATTRIB_INDEX][1]));
     }
-    queue.MemcpyAsync(dVertexIndexRanges,
-                      Span<const Vector4ui>(hVertexIndexRanges.cbegin(),
-                                            hVertexIndexRanges.end()));
+    queue.MemcpyAsync(dVertexIndexRanges, Span<const Vector4ui>(hVertexIndexRanges));
 
     uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
     using namespace std::string_view_literals;
@@ -534,9 +532,7 @@ void PrimGroupSkinnedTriangle::Finalize(const GPUQueue& queue)
                                                   ranges[INDICES_ATTRIB_INDEX][0],
                                                   ranges[INDICES_ATTRIB_INDEX][1]));
     }
-    queue.MemcpyAsync(dVertexIndexRanges,
-                      Span<const Vector4ui>(hVertexIndexRanges.cbegin(),
-                                            hVertexIndexRanges.end()));
+    queue.MemcpyAsync(dVertexIndexRanges, Span<const Vector4ui>(hVertexIndexRanges));
 
     uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
     using namespace std::string_view_literals;

@@ -82,7 +82,7 @@ void GenericTexture::CopyToAsync(Span<Byte> regionTo,
                                  const TextureExtent<3>& size) const
 {
     Impl()->CopyToAsync(regionTo, queue, mipLevel,
-                          offset, size);
+                        offset, size);
 }
 
 GenericTextureView GenericTexture::View(TextureReadMode mode) const

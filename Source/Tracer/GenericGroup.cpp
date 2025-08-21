@@ -273,15 +273,15 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<ParamVaryingData<
     std::vector<ParamVaryingData<D, T>> hParamVaryingData;
     hParamVaryingData.reserve(dSubspan.size());
     Span<const T> hDataSpan = hData.AccessAs<T>();
-    for(size_t i = 0; i < hOptTexViews.size(); i++)
+    for(uint32_t i = 0; i < hOptTexViews.size(); i++)
     {
         auto pvd = hOptTexViews[i].has_value()
             ? ParamVaryingData<D, T>(hOptTexViews[i].value())
             : ParamVaryingData<D, T>(hDataSpan[i]);
         hParamVaryingData.push_back(pvd);
     }
-    auto hParamVaryingDataSpan = Span<const ParamVaryingData<D, T>>(hParamVaryingData.cbegin(),
-                                                                    hParamVaryingData.cend());
+    auto hParamVaryingDataSpan = Span(hParamVaryingData.cbegin(),
+                                      hParamVaryingData.cend());
     queue.MemcpyAsync(dSubspan, hParamVaryingDataSpan);
     // TODO: Try to find a way to remove this wait
     queue.Barrier().Wait();

@@ -45,7 +45,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
         }
         Span<Vector3> nSpan = data.AccessAs<Vector3>();
         // Calculate normals
-        for(size_t i = 0; i < primCount; i++)
+        for(uint32_t i = 0; i < primCount; i++)
         {
             Vector3ui index = iSpan[i];
 
@@ -85,7 +85,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
     if(uvs.has_value())
     {
         Span<Vector2> uvSpan = uvs.value().AccessAs<Vector2>();
-        for(size_t i = 0; i < primCount; i++)
+        for(uint32_t i = 0; i < primCount; i++)
         {
             Vector3ui index = iSpan[i];
             Vector3 n0 = nSpan[index[0]];
@@ -121,7 +121,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
 
         }
         // Normalize and calculate bitangent
-        for(size_t i = 0; i < attribCount; i++)
+        for(uint32_t i = 0; i < attribCount; i++)
         {
             tSpan[i] = Math::Normalize(tSpan[i]);
             bSpan[i] = Math::Cross(nSpan[i], tSpan[i]);
@@ -130,7 +130,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
     // Just put random orthogonal spaces
     else
     {
-        for(size_t i = 0; i < attribCount; i++)
+        for(uint32_t i = 0; i < attribCount; i++)
         {
             Vector3 n = normals.value().AccessAs<Vector3>()[i];
             Vector3 t = Graphics::OrthogonalVector(n);

@@ -298,10 +298,10 @@ MRayError ProcessCameras(CameraGroupId& camGroupId,
     gazeBuffer.ReserveAll();
     positionBuffer.ReserveAll();
     upBuffer.ReserveAll();
-    std::span fovPlaneSpan = fovPlaneBuffer.AccessAs<Vector4>();
-    std::span gazeSpan = gazeBuffer.AccessAs<Vector3>();
-    std::span positionSpan = positionBuffer.AccessAs<Vector3>();
-    std::span upSpan = upBuffer.AccessAs<Vector3>();
+    Span fovPlaneSpan = fovPlaneBuffer.AccessAs<Vector4>();
+    Span gazeSpan = gazeBuffer.AccessAs<Vector3>();
+    Span positionSpan = positionBuffer.AccessAs<Vector3>();
+    Span upSpan = upBuffer.AccessAs<Vector3>();
     std::fill(gazeSpan.begin(), gazeSpan.end(), -Vector3::ZAxis());
     std::fill(positionSpan.begin(), positionSpan.end(), Vector3::Zero());
     std::fill(upSpan.begin(), upSpan.end(), Vector3::YAxis());
@@ -352,7 +352,7 @@ MRayError ProcessCameras(CameraGroupId& camGroupId,
         positionSpan[0] = Vector3(pos[0], pos[1], pos[2]);
         gazeSpan[0] = Vector3(gaze[0], gaze[1], gaze[2]);
     }
-    else for(size_t i = 0; i < cameras.size(); i++)
+    else for(uint32_t i = 0; i < cameras.size(); i++)
     {
         const auto& cam = cameras[i];
         auto camPrim = pxr::UsdGeomCamera(cam.surfacePrim);
@@ -613,7 +613,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     MRayUSDGeomMatResolWarnings geomExpandWarnings;
     for(const auto& startEnd : primTypeRange)
     {
-        Span<MRayUSDPrimSurface> range(surfaces.begin() + std::ptrdiff_t(startEnd[0]),
+        Span<MRayUSDPrimSurface> range(surfaces.data() + startEnd[0],
                                        startEnd[1] - startEnd[0]);
         if(range.front().surfacePrim.IsA<pxr::UsdGeomMesh>())
             geomExpandWarnings |= ExpandGeomsAndFindMaterials(meshMatPrims,
@@ -666,7 +666,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     std::vector<MRayUSDPrimSurface> cameras;
     for(const auto& startEnd : primTypeRange)
     {
-        Span<MRayUSDPrimSurface> range(surfaces.begin() + std::ptrdiff_t(startEnd[0]),
+        Span<MRayUSDPrimSurface> range(surfaces.data() + startEnd[0],
                                        startEnd[1] - startEnd[0]);
 
         if(range.front().surfacePrim.IsA<pxr::UsdGeomCamera>())
@@ -818,13 +818,13 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     //
     TransientData matrixBuffer(std::in_place_type_t<Matrix4x4>(), totalSurfSize);
     matrixBuffer.ReserveAll();
-    std::span allMatrices           = matrixBuffer.AccessAs<Matrix4x4>();
-    std::span meshSurfMats          = allMatrices.subspan(allSizes[0], allSizes[1] - allSizes[0]);
-    std::span meshLightSurfMats     = allMatrices.subspan(allSizes[1], allSizes[2] - allSizes[1]);
-    std::span sphereSurfMats        = allMatrices.subspan(allSizes[2], allSizes[3] - allSizes[2]);
-    std::span sphereLightSurfMats   = allMatrices.subspan(allSizes[3], allSizes[4] - allSizes[3]);
-    std::span cameraSurfMats        = allMatrices.subspan(allSizes[4], allSizes[5] - allSizes[4]);
-    std::span domeLightSurfMats     = allMatrices.subspan(allSizes[5], allSizes[6] - allSizes[5]);
+    Span allMatrices           = matrixBuffer.AccessAs<Matrix4x4>();
+    Span meshSurfMats          = allMatrices.subspan(allSizes[0], allSizes[1] - allSizes[0]);
+    Span meshLightSurfMats     = allMatrices.subspan(allSizes[1], allSizes[2] - allSizes[1]);
+    Span sphereSurfMats        = allMatrices.subspan(allSizes[2], allSizes[3] - allSizes[2]);
+    Span sphereLightSurfMats   = allMatrices.subspan(allSizes[3], allSizes[4] - allSizes[3]);
+    Span cameraSurfMats        = allMatrices.subspan(allSizes[4], allSizes[5] - allSizes[4]);
+    Span domeLightSurfMats     = allMatrices.subspan(allSizes[5], allSizes[6] - allSizes[5]);
 
     for(size_t i = 0; i < meshSurfMats.size(); i++)
     {
@@ -833,13 +833,13 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
 
         meshSurfMats[meshTransformOffsets[i]] = *meshMatPrims.surfaces[i].surfaceTransform;
     }
-    for(size_t i = 0; i < meshLightSurfMats.size(); i++)
+    for(uint32_t i = 0; i < meshLightSurfMats.size(); i++)
         meshLightSurfMats[i] = *meshMatPrims.geomLightSurfaces[i].surfaceTransform;
-    for(size_t i = 0; i < sphereSurfMats.size(); i++)
+    for(uint32_t i = 0; i < sphereSurfMats.size(); i++)
         sphereSurfMats[i] = *sphereMatPrims.surfaces[i].surfaceTransform;
-    for(size_t i = 0; i < sphereLightSurfMats.size(); i++)
+    for(uint32_t i = 0; i < sphereLightSurfMats.size(); i++)
         sphereLightSurfMats[i] = *sphereMatPrims.geomLightSurfaces[i].surfaceTransform;
-    for(size_t i = 0; i < cameraSurfMats.size(); i++)
+    for(uint32_t i = 0; i < cameraSurfMats.size(); i++)
         cameraSurfMats[i] = *cameras[i].surfaceTransform;
     if(domeLight.has_value())
         domeLightSurfMats[0] = *domeLight->surfaceTransform;
@@ -847,7 +847,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     // Convert to Y up if required
     if(pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z)
     {
-        std::span allExceptDome = allMatrices.subspan(allSizes[0], allSizes[5] - allSizes[0]);
+        Span allExceptDome = allMatrices.subspan(allSizes[0], allSizes[5] - allSizes[0]);
         for(auto& mat : allExceptDome)
             mat = TransformGen::ZUpToYUpMat<Float>() * mat;
     }

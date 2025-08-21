@@ -199,14 +199,14 @@ RendererOptionPack PathTracerRenderer::CurrentAttributes() const
     result.attributes.back().Push(Span<const uint32_t>(&currentOptions.burstSize, 1));
     //
     std::string_view curRenderModeName = currentOptions.renderMode.ToString();
-    result.attributes.push_back(TransientData(std::in_place_type_t<std::string>{},
+    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
                                               curRenderModeName.size()));
     auto svRead = result.attributes.back().AccessAsString();
     assert(svRead.size() == curRenderModeName.size());
     std::copy(curRenderModeName.cbegin(), curRenderModeName.cend(), svRead.begin());
     //
     std::string_view curModeName = currentOptions.sampleMode.ToString();
-    result.attributes.push_back(TransientData(std::in_place_type_t<std::string>{},
+    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
                                               curModeName.size()));
     svRead = result.attributes.back().AccessAsString();
     assert(svRead.size() == curModeName.size());
@@ -216,7 +216,7 @@ RendererOptionPack PathTracerRenderer::CurrentAttributes() const
     result.attributes.back().Push(Span<const Vector2ui>(&currentOptions.russianRouletteRange, 1));
     //
     std::string_view lightSamplerName = currentOptions.lightSampler.ToString();
-    result.attributes.push_back(TransientData(std::in_place_type_t<std::string>{}, lightSamplerName.size()));
+    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{}, lightSamplerName.size()));
     svRead = result.attributes.back().AccessAsString();
     assert(svRead.size() == lightSamplerName.size());
     std::copy(lightSamplerName.cbegin(), lightSamplerName.cend(), svRead.begin());

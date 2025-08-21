@@ -75,7 +75,7 @@ void KernelCallFreeFunctionTester(const GPUSystem& system)
                                 mem,
                                 {totalThreads, 1});
     // Copy reference to host
-    Span<const uint32_t, 1> readSpan(&hReferenceTest, 1);
+    Span<const uint32_t> readSpan(&hReferenceTest, 1);
     system.Memcpy<uint32_t>(dRefSpan, readSpan);
     system.Memset(dWriteSpan, 0x12);
 
@@ -139,7 +139,7 @@ void KernelCallLambdaTester(const GPUSystem& system)
                                 mem,
                                 {totalThreads, 1});
     // Copy reference to host
-    Span<const uint32_t, 1> readSpan(&hReferenceTest, 1);
+    Span<const uint32_t> readSpan(&hReferenceTest, 1);
     system.Memcpy<uint32_t>(dRefSpan, readSpan);
     system.Memset(dWriteSpan, 0x12);
 
@@ -216,7 +216,7 @@ void KernelCallLambdaTester(const GPUSystem& system)
                                     mem,
                                     {totalThreads, 1});
         // Copy reference to host
-        Span<const uint32_t, 1> readSpan(&hReferenceTest, 1);
+        Span<const uint32_t> readSpan(&hReferenceTest, 1);
         system.Memcpy<uint32_t>(dRefSpan, readSpan);
         system.Memset(dWriteSpan, 0x12);
 

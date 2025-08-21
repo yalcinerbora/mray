@@ -1,10 +1,10 @@
 #pragma once
 
-#include <tuple>
 #include <concepts>
+#include <type_traits>
 
 #include "Math.h"
-#include "Types.h"
+#include "Definitions.h"
 
 constexpr inline size_t operator ""_TiB(unsigned long long int s)
 {
@@ -48,17 +48,17 @@ static constexpr bool RepurposeAllocRequirements =
 
 constexpr size_t DefaultSystemAlignment();
 
-template <MemoryC Memory, ImplicitLifetimeC... Args>
+template <MemoryC Memory, RelaxedLifetimeC... Args>
 void AllocateMultiData(Tuple<Span<Args>&...> spans, Memory& memory,
                        const std::array<size_t, sizeof...(Args)>& countList,
                        size_t alignment = DefaultSystemAlignment());
 
-template <MemoryC Memory, ImplicitLifetimeC... Args>
+template <MemoryC Memory, RelaxedLifetimeC... Args>
 Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
                                        const std::array<size_t, sizeof...(Args)>& countList,
                                        size_t alignment = DefaultSystemAlignment());
 
-template<ImplicitLifetimeC T, MemoryC Memory>
+template<RelaxedLifetimeC T, MemoryC Memory>
 std::vector<Span<T>>
 AllocateSegmentedData(Memory& memory, const std::vector<size_t>& counts,
                       size_t alignment = DefaultSystemAlignment());
@@ -106,8 +106,6 @@ struct AlignedMemory
 
     explicit operator Byte*();
     explicit operator const Byte*() const;
-
-
 
 };
 
@@ -188,7 +186,7 @@ constexpr size_t DefaultSystemAlignment()
     return 256;
 }
 
-template <MemoryC Memory, ImplicitLifetimeC... Args>
+template <MemoryC Memory, RelaxedLifetimeC... Args>
 void AllocateMultiData(Tuple<Span<Args>&...> spans, Memory& memory,
                        const std::array<size_t, sizeof...(Args)>& countList,
                        size_t alignment)
@@ -208,7 +206,7 @@ void AllocateMultiData(Tuple<Span<Args>&...> spans, Memory& memory,
     assert(totalSize == offset);
 }
 
-template <MemoryC Memory, ImplicitLifetimeC... Args>
+template <MemoryC Memory, RelaxedLifetimeC... Args>
 Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
                                        const std::array<size_t, sizeof...(Args)>& countList,
                                        size_t alignment)
@@ -219,7 +217,7 @@ Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
     return result;
 }
 
-template<ImplicitLifetimeC T, MemoryC Memory>
+template<RelaxedLifetimeC T, MemoryC Memory>
 std::vector<Span<T>>
 AllocateSegmentedData(Memory& memory, const std::vector<size_t>& counts,
                       size_t alignment)
@@ -303,5 +301,7 @@ constexpr Span<Left> RepurposeAlloc(Span<Right> rhs)
     Left* leftPtr = std::launder(reinterpret_cast<Left*>(rawPtr));
     return Span<Left>(leftPtr, elementCount);
 }
+
+Pair<double, std::string_view> ConvertMemSizeToString(size_t size);
 
 }

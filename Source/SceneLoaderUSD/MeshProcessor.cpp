@@ -327,8 +327,8 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
 
         // First off triangulate the mesh
         // Skip if we can't triangulate (either 1,2 or more than 16 vertices)
-        failTriangulation = Triangulate(std::span(localIndicesTriangulated.data(), faceTriCount),
-                                        std::span(localPositions.data(), faceVertexCount),
+        failTriangulation = Triangulate(Span(localIndicesTriangulated.data(), faceTriCount),
+                                        Span(localPositions.data(), faceVertexCount),
                                         GenFaceNormal());
         if(failTriangulation)
         {
@@ -456,7 +456,7 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
 
         // Calculate the Quaternion
         assert(triangleDataNormals.size() == triangleDataTangents.size());
-        for(size_t i = 0; i < triangleDataNormals.size(); i++)
+        for(uint32_t i = 0; i < triangleDataNormals.size(); i++)
         {
             Vector3 n = triangleDataNormals[i];
             Vector3 t = Math::Normalize(triangleDataTangents[i]);
@@ -715,8 +715,8 @@ MRayError ProcessUniqueMeshes(// Output
         auto annotation = _.AnnotateScope();
 
         // Subset the data to per core
-        std::span myPrimRange(flatUniques.begin() + start, end - start);
-        std::span myPrimBatchOutput(outPrimBatchesFlat.begin() + start, end - start);
+        Span myPrimRange(flatUniques.data() + start, end - start);
+        Span myPrimBatchOutput(outPrimBatchesFlat.data() + start, end - start);
         MeshProcessorThread meshProcessor
         {
             .tracer = tracer,

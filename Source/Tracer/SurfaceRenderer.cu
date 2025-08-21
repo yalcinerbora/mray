@@ -156,7 +156,7 @@ RendererOptionPack SurfaceRenderer::CurrentAttributes() const
     result.attributes.back().Push(Span<const uint32_t>(&currentOptions.totalSPP, 1));
 
     std::string_view curModeName = SurfRDetail::Mode::ToString(currentOptions.mode);
-    result.attributes.push_back(TransientData(std::in_place_type_t<std::string>{},
+    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
                                               curModeName.size()));
     auto svRead = result.attributes.back().AccessAsString();
     assert(svRead.size() == curModeName.size());
