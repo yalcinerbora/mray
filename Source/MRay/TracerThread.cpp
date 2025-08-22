@@ -3,12 +3,14 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
+#include "Core/Definitions.h"
 #include "Core/Timer.h"
 #include "Core/TypeNameGenerators.h"
 #include "Core/Error.h"
 #include "Core/ThreadPool.h"
 
 #include "Common/JsonCommon.h" // IWYU pragma: keep
+#include "TransientPool/TransientPool.h"
 
 static constexpr RendererId INVALID_RENDERER_ID = RendererId(std::numeric_limits<uint32_t>::max());
 
@@ -177,41 +179,80 @@ MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPa
 
             AttributeOptionality optionality = attrib.isOptional;
             std::string_view name = attrib.name;
-            MRayDataTypeRT type = attrib.dataType;
+            MRayDataTypeRT dataType = attrib.dataType;
 
-            MRayError e = type.SwitchCase([&, this](auto&& t) -> MRayError
+            // Find the item in the json file
+            using enum AttributeOptionality;
+            auto loc = rendererNode.find(name);
+            if(optionality != MR_OPTIONAL && loc == rendererNode.end())
+                return MRayError("Config read \"{}\": Mandatory variable \"{}\" "
+                                    "for \"{}\" is not found in config file",
+                                    configJsonPath, name, rName);
+            if(loc == rendererNode.end()) return MRayError::OK;
+
+            size_t count = 0;
+            if(dataType.Name() == MRayDataEnum::MR_STRING)
+                count = loc->get<std::string_view>().size();
+            else
+                count = 1;
+
+            TransientData tData = AllocateTransientData(dataType, count);
+            tData.ReserveAll();
+
+            if(dataType.Name() == MRayDataEnum::MR_STRING)
             {
-                using enum AttributeOptionality;
-                using MRDataType = std::remove_cvref_t<decltype(t)>;
-                using T = MRDataType::Type;
-                auto loc = rendererNode.find(name);
-                if(optionality != MR_OPTIONAL && loc == rendererNode.end())
-                    return MRayError("Config read \"{}\": Mandatory variable \"{}\" "
-                                     "for \"{}\" is not found in config file",
-                                     configJsonPath, name, rName);
-                if(loc == rendererNode.end()) return MRayError::OK;
-
-                T in = loc->get<T>();
-                if constexpr(MRDataType::Name == MRayDataEnum::MR_STRING)
+                std::string_view in = loc->get<std::string_view>();
+                Span<char> out = tData.AccessAsString();
+                std::copy(in.cbegin(), in.cend(), out.begin());
+            }
+            else
+            {
+                dataType.SwitchCase([&](auto&& t)
                 {
-                    TransientData data(std::in_place_type_t<T>{}, in.size());
-                    data.ReserveAll();
-                    Span<char> out = data.AccessAsString();
-                    std::copy(in.cbegin(), in.cend(), out.begin());
-                    tracer->PushRendererAttribute(currentRenderer, attribIndex,
-                                                  std::move(data));
-                }
-                else
-                {
-                    TransientData data(std::in_place_type_t<T>{}, 1);
-                    data.Push(Span<const T>(&in, 1));
-                    tracer->PushRendererAttribute(currentRenderer, attribIndex,
-                                                  std::move(data));
-                }
-                return MRayError::OK;
-            });
+                    using MRDataType = std::remove_cvref_t<decltype(t)>;
+                    using T = MRDataType::Type;
+                    auto s = tData.AccessAs<T>();
+                    s.front() = loc->get<T>();
+                });
+            }
+            tracer->PushRendererAttribute(currentRenderer, attribIndex,
+                                          std::move(tData));
 
-            if(e) return e;
+            // MRayError e = dataType.SwitchCase([&, this](auto&& t) -> MRayError
+            // {
+            //     using enum AttributeOptionality;
+            //     using MRDataType = std::remove_cvref_t<decltype(t)>;
+            //     using T = MRDataType::Type;
+            //     auto loc = rendererNode.find(name);
+            //     if(optionality != MR_OPTIONAL && loc == rendererNode.end())
+            //         return MRayError("Config read \"{}\": Mandatory variable \"{}\" "
+            //                          "for \"{}\" is not found in config file",
+            //                          configJsonPath, name, rName);
+            //     if(loc == rendererNode.end()) return MRayError::OK;
+
+            //     T in = loc->get<T>();
+            //     if constexpr(MRDataType::Name == MRayDataEnum::MR_STRING)
+            //     {
+            //         TransientData data(std::in_place_type_t<T>{}, in.size());
+            //         data.ReserveAll();
+            //         Span<char> out = data.AccessAsString();
+            //         std::copy(in.cbegin(), in.cend(), out.begin());
+            //         tracer->PushRendererAttribute(currentRenderer, attribIndex,
+            //                                       std::move(data));
+            //     }
+            //     else
+            //     {
+            //         TransientData data(std::in_place_type_t<T>{}, 1);
+            //         data.Push(Span<const T>(&in, 1));
+            //         tracer->PushRendererAttribute(currentRenderer, attribIndex,
+            //                                       std::move(data));
+            //     }
+            //     return MRayError::OK;
+            // });
+            // if(e) return e;
+
+
+
             attribIndex++;
         }
     }

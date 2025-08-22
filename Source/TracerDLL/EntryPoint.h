@@ -1,7 +1,10 @@
 #pragma once
 
-#include "Core/TracerI.h"
 #include "Core/System.h"
+#include "Core/TracerI.h"
+
+class TracerI;
+struct TracerParameters;
 
 #ifdef MRAY_TRACER_DEVICE_SHARED_EXPORT
     #define MRAY_TRACER_DEVICE_ENTRYPOINT MRAY_DLL_EXPORT

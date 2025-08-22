@@ -15,7 +15,6 @@
 #include "Ray.h"        // IWYU pragma: keep
 #include "AABB.h"       // IWYU pragma: keep
 
-#include <string>
 #include <functional>
 
 // This implementation is quite taxing on compilation times.
@@ -219,20 +218,6 @@ constexpr bool MRayPixelType<E>::FindIsSigned()
 {
     return std::is_signed_v<typename T::InnerType>;
 }
-
-//template<MRayDataEnum L, MRayDataEnum R>
-//constexpr bool operator==(MRayDataType<L>,
-//                          MRayDataType<R>)
-//{
-//    return L == R;
-//}
-//
-//template<MRayPixelEnum L, MRayPixelEnum R>
-//constexpr bool operator==(MRayPixelType<L>,
-//                          MRayPixelType<R>)
-//{
-//    return L == R;
-//}
 
 namespace DataTypeDetail
 {

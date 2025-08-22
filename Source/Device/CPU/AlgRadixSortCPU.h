@@ -1,5 +1,5 @@
 #pragma once
-// IWYU pragma: private; include "AlgRadixSort.h"
+// IWYU pragma: private, include "AlgRadixSort.h"
 
 #include "Core/Definitions.h"
 #include "Core/Types.h"

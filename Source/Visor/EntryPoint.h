@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "Core/System.h"
-
 #include "VisorI.h"
 
 #ifdef MRAY_VISOR_SHARED_EXPORT

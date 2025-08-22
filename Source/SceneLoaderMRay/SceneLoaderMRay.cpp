@@ -9,9 +9,11 @@
 #include "Core/ThreadPool.h"
 #include "Core/Profiling.h"
 
+#include "Core/Types.h"
 #include "ImageLoader/EntryPoint.h"
 #include "MeshLoader/EntryPoint.h"
 #include "MeshLoaderJson.h"
+#include "TransientPool/TransientPool.h"
 
 #include <nlohmann/json.hpp>
 #include <filesystem>
@@ -119,13 +121,7 @@ std::vector<TransientData> GenericAttributeLoad(const AttributeCountList& totalC
     result.reserve(list.size());
 
     for(size_t i = 0; i < totalCounts.size(); i++)
-    {
-        list[i].dataType.SwitchCase([&](auto&& dataType)
-        {
-            using T = std::remove_cvref_t<decltype(dataType)>::Type;
-            result.emplace_back(std::in_place_type_t<T>{}, totalCounts[i]);
-        });
-    }
+        result.push_back(AllocateTransientData(list[i].dataType, totalCounts[i]));
 
     // Now data is set we can load
     for(const JsonNode& node : nodes)
@@ -193,22 +189,32 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
 
     for(size_t i = 0; i < totalCounts.size(); i++)
     {
-        //auto texturability = std::get<TexturedAttributeInfo::TEXTURABLE_INDEX>(list[i]);
         auto texturability = list[i].isTexturable;
-        list[i].dataType.SwitchCase([&](auto&& dataType)
+        using enum AttributeTexturable;
+        size_t count = (texturability == MR_TEXTURE_ONLY)
+                        ? 0
+                        : totalCounts[i];
+        TransientData tData = AllocateTransientData(list[i].dataType, count);
+        result.push_back(TexturedAttributeData
         {
-            using T = std::remove_cvref_t<decltype(dataType)>::Type;
-            using enum AttributeTexturable;
-            auto initData = TexturedAttributeData
-            {
-                .data = TransientData(std::in_place_type_t<T>{},
-                                      (texturability == MR_TEXTURE_ONLY)
-                                        ? 0
-                                        : totalCounts[i]),
-                .textures = std::vector<Optional<TextureId>>()
-            };
-            result.push_back(std::move(initData));
+            .data = std::move(tData),
+            .textures = std::vector<Optional<TextureId>>()
         });
+
+        // list[i].dataType.SwitchCase([&](auto&& dataType)
+        // {
+        //     using T = std::remove_cvref_t<decltype(dataType)>::Type;
+        //     using enum AttributeTexturable;
+        //     auto initData = TexturedAttributeData
+        //     {
+        //         .data = TransientData(std::in_place_type_t<T>{},
+        //                               (texturability == MR_TEXTURE_ONLY)
+        //                                 ? 0
+        //                                 : totalCounts[i]),
+        //         .textures = std::vector<Optional<TextureId>>()
+        //     };
+        //     result.push_back(std::move(initData));
+        // });
     }
 
     // Now data is set we can load

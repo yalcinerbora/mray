@@ -1,5 +1,5 @@
 #pragma once
-// IWYU pragma: private; include "Texture.h"
+// IWYU pragma: private, include "Texture.h"
 
 #include "DeviceMemoryCPU.h"
 #include "TextureViewCPU.h"

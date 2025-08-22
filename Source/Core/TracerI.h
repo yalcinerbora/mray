@@ -748,17 +748,3 @@ constexpr PrimitiveAttributeLogic PrimAttributeStringifier::FromString(std::stri
     }
     return PrimitiveAttributeLogic::END;
 }
-
-// formatter for AcceleratorType
-inline std::string_view format_as(AcceleratorType t)
-{
-    using namespace std::string_view_literals;
-    using enum AcceleratorType::E;
-    switch(t.type)
-    {
-        case SOFTWARE_NONE:         return "SOFTWARE_LINEAR"sv;
-        case SOFTWARE_BASIC_BVH:    return "SOFTWARE_BVH"sv;
-        case HARDWARE:              return "HARDWARE"sv;
-        default:                    return "UNKNOWN"sv;
-    }
-}

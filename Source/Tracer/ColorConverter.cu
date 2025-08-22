@@ -555,7 +555,7 @@ void BCColorConverter::CallKernelForType(Span<Byte>, const Vector2ui&,
     MRAY_WARNING_LOG("[Tracer]: Scene has BC6H textures with a non \"MR_DEFAULT\" "
                      "color space. BC6H color space conversion is not supported."
                      "These textures will be treated as in Tracer's color space "
-                     "(which is \"Linear/ACES_CG\")",
+                     "(which is \"{}\")",
                      MRayColorSpaceStringifier::ToString(globalColorSpace));
 }
 

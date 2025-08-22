@@ -124,6 +124,11 @@ size_t TransientData::Size() const
     return usedBytes / sizeof(T);
 }
 
+inline size_t TransientData::ByteSize() const
+{
+    return usedBytes;
+}
+
 template<>
 inline Span<const Byte> TransientData::AccessAs() const
 {

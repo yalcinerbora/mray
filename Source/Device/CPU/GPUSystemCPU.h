@@ -1,6 +1,6 @@
 
 #pragma once
-// IWYU pragma: private; include "GPUSystem.h"
+// IWYU pragma: private, include "GPUSystem.h"
 
 #include <vector>
 #include <mutex>

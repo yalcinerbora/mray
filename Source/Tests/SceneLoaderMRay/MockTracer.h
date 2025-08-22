@@ -9,11 +9,14 @@
 static size_t AcquireTransientDataCount(MRayDataTypeRT dataTypeRT,
                                         const TransientData& data)
 {
-    return dataTypeRT.SwitchCase([&data](auto&& type)
-    {
-        using T = typename std::remove_cvref_t<decltype(type)>::Type;
-        return data.AccessAs<const T>().size();
-    });
+    assert(data.ByteSize() % dataTypeRT.Size() == 0);
+    return data.ByteSize() / dataTypeRT.Size();
+
+    // return dataTypeRT.SwitchCase([&data](auto&& type)
+    // {
+    //     using T = typename std::remove_cvref_t<decltype(type)>::Type;
+    //     return data.AccessAs<const T>().size();
+    // });
 }
 
 // Mock tracer has

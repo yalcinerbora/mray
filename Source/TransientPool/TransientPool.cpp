@@ -1,6 +1,7 @@
 #include "TransientPool.h"
 #include <new>
 #include <type_traits>
+#include <utility>
 
 #include "Core/MemAlloc.h"
 
@@ -61,4 +62,17 @@ MRAY_TRANSIENT_POOL_ENTRYPOINT void TransientPoolDestroyCallback(void* ptr)
     // and it may have a mutex
     nodePtr->input = TransientData();
     freeList.GiveTheLocation(nodePtr);
+}
+
+MRAY_TRANSIENT_POOL_ENTRYPOINT
+extern TransientPoolDetail::TransientData
+AllocateTransientData(MRayDataTypeRT dt, size_t elemCount)
+{
+    using namespace TransientPoolDetail;
+    return dt.SwitchCase([&](auto&& dt) -> TransientData
+    {
+        using DT = std::remove_cvref_t<decltype(dt)>;
+        using T = typename DT::Type;
+        return TransientData(std::in_place_type_t<T>{}, elemCount);
+    });
 }

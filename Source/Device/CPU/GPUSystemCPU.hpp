@@ -61,8 +61,9 @@ struct GenericWorkFunctor
             const auto thrdWorkScope = thrdWorkAnnot.AnnotateScope();
 
             assert(blockEnd - blockStart == 1);
+            uint32_t SelectedTPB = (TPB == 0) ? dynamicTPB : TPB;
             const_cast<uint32_t&>(globalKCParams.gridSize) = callerBlockCount;
-            const_cast<uint32_t&>(globalKCParams.blockSize) = TPB;
+            const_cast<uint32_t&>(globalKCParams.blockSize) = SelectedTPB;
 
             // Do the block stride loop here,
             // each thread may be responsible for one or more blocks
@@ -72,8 +73,8 @@ struct GenericWorkFunctor
                 bId = blockCounter.fetch_add(1u))
             {
                 globalKCParams.blockId = bId;
-                uint32_t TPB_SELECT = (TPB == 0) ? dynamicTPB : TPB;
-                for(uint32_t j = 0; j < TPB_SELECT; j++)
+
+                for(uint32_t j = 0; j < SelectedTPB; j++)
                 {
                     globalKCParams.threadId = j;
                     func();
@@ -112,6 +113,7 @@ void GPUQueueCPU::IssueInternal(std::string_view name,
                                 uint32_t blockSize,
                                 WrappedKernel&& kernel) const
 {
+    assert(TPB == 0 || blockSize == TPB);
     static const auto annotation = GPUAnnotationCPU(domain, name);
     const auto annotationHandle = annotation.AnnotateScope();
     // We are locking here, since all of the block submissions
@@ -127,9 +129,9 @@ void GPUQueueCPU::IssueInternal(std::string_view name,
 
     // Give just enough grid to eliminate grid-stride / block-stride
     // loops (for CPU these do more harm than good, unlike GPU)
-    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, TPB,
+    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, blockSize,
                                                    totalWorkCount);
-    uint32_t callerBlockCount = Math::DivideUp(totalWorkCount, TPB);
+    uint32_t callerBlockCount = Math::DivideUp(totalWorkCount, blockSize);
     //
     uint64_t oldIssueCount = cb->issuedKernelCounter.fetch_add(blockCount);
     uint64_t newIssueCount = oldIssueCount + blockCount;
@@ -209,7 +211,7 @@ void GPUQueueCPU::IssueBlockKernel(std::string_view name,
     #define MRAY_KCALL(BLOCK_SIZE)                      \
         IssueInternal<BLOCK_SIZE>                       \
         (                                               \
-            name, workCount, BLOCK_SIZE,                \
+            name, workCount, p.blockSize,               \
             [...fArgs = std::forward<Args>(fArgs)]()    \
             {                                           \
                 Kernel(fArgs...);                       \
@@ -247,7 +249,7 @@ void GPUQueueCPU::IssueBlockLambda(std::string_view name,
     #define MRAY_KCALL(BLOCK_SIZE)                  \
         IssueInternal<BLOCK_SIZE>                   \
         (                                           \
-            name, workCount, BLOCK_SIZE,            \
+            name, workCount, p.blockSize,           \
             [func = std::forward<Lambda>(func)]()   \
             {                                       \
                 KernelCallParamsCPU kp;             \

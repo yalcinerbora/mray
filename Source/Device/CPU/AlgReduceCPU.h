@@ -1,5 +1,5 @@
 #pragma once
-// IWYU pragma: private; include "AlgReduce.h"
+// IWYU pragma: private, include "AlgReduce.h"
 
 #include "Core/Definitions.h"
 #include "Core/Types.h"

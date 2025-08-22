@@ -1,11 +1,13 @@
 #include "MeshProcessor.h"
 
+#include "Core/Definitions.h"
 #include "Core/Log.h"
 #include "Core/TracerI.h"
 #include "Core/TypeNameGenerators.h"
 #include "Core/ShapeFunctions.h"
 #include "Core/ThreadPool.h"
 #include "Core/Profiling.h"
+#include "TransientPool/TransientPool.h"
 
 #include <barrier>
 
@@ -202,37 +204,63 @@ MRayError MeshProcessorThread::AllocateTransientBuffers(Span<Vector3ui>& indexBu
     {
         PrimitiveAttributeLogic logic = attribInfo.logic;
         MRayDataTypeRT dataType = attribInfo.dataType;
-        MRayError err = dataType.SwitchCase([&](auto&& type) -> MRayError
-        {
-            using DataType = typename std::remove_cvref_t<decltype(type)>::Type;
-            size_t elementCount = (logic == PrimitiveAttributeLogic::INDEX)
-                                    ? primCount : attributeCount;
-            transientDataList.emplace_back(std::in_place_type_t<DataType>{}, elementCount);
-            transientDataList.back().ReserveAll();
-            switch(logic)
-            {
-                using enum PrimitiveAttributeLogic;
-                case INDEX:     indexAttribI    = attribIndex; break;
-                case POSITION:  posAttribI      = attribIndex; break;
-                case UV0:       uvAttribI       = attribIndex; break;
-                case NORMAL:    normalAttribI   = attribIndex; break;
-                default: break;
-            }
+        MRayDataEnum dataEnum = dataType.Name();
 
+        switch(logic)
+        {
             using enum PrimitiveAttributeLogic;
-            bool fatalCrash = ((logic == INDEX    && !std::is_same_v<Vector3ui, DataType>) ||
-                               (logic == POSITION && !std::is_same_v<Vector3, DataType>)   ||
-                               (logic == UV0      && !std::is_same_v<Vector2, DataType>)   ||
-                               (logic == NORMAL   && !std::is_same_v<Quaternion, DataType>));
-            if(fatalCrash)
-            {
-                return MRayError("[Fatal Error!]: MRayUSD's Triangle Layout is different "
-                                 "from Tracer's triangle layout");
-            }
-            return MRayError::OK;
-        });
-        //
-        if(err) return err;
+            case INDEX:     indexAttribI    = attribIndex; break;
+            case POSITION:  posAttribI      = attribIndex; break;
+            case UV0:       uvAttribI       = attribIndex; break;
+            case NORMAL:    normalAttribI   = attribIndex; break;
+            default: break;
+        }
+
+        using enum PrimitiveAttributeLogic;
+        bool fatalCrash = ((logic == INDEX    && dataEnum != MRayDataEnum::MR_VECTOR_3UI) ||
+                           (logic == POSITION && dataEnum != MRayDataEnum::MR_VECTOR_3)   ||
+                           (logic == UV0      && dataEnum != MRayDataEnum::MR_VECTOR_2)   ||
+                           (logic == NORMAL   && dataEnum != MRayDataEnum::MR_QUATERNION));
+        if(fatalCrash)
+        {
+            return MRayError("[MRayUSD]: MRayUSD's Triangle Layout is different "
+                             "from Tracer's triangle layout");
+        }
+        size_t elementCount = (logic == PrimitiveAttributeLogic::INDEX)
+                                ? primCount : attributeCount;
+        transientDataList.push_back(AllocateTransientData(dataType, elementCount));
+        transientDataList.back().ReserveAll();
+
+        // MRayError err = dataType.SwitchCase([&](auto&& type) -> MRayError
+        // {
+        //     using DataType = typename std::remove_cvref_t<decltype(type)>::Type;
+        //     size_t elementCount = (logic == PrimitiveAttributeLogic::INDEX)
+        //                             ? primCount : attributeCount;
+        //     transientDataList.emplace_back(std::in_place_type_t<DataType>{}, elementCount);
+        //     transientDataList.back().ReserveAll();
+        //     switch(logic)
+        //     {
+        //         using enum PrimitiveAttributeLogic;
+        //         case INDEX:     indexAttribI    = attribIndex; break;
+        //         case POSITION:  posAttribI      = attribIndex; break;
+        //         case UV0:       uvAttribI       = attribIndex; break;
+        //         case NORMAL:    normalAttribI   = attribIndex; break;
+        //         default: break;
+        //     }
+
+        //     using enum PrimitiveAttributeLogic;
+        //     bool fatalCrash = ((logic == INDEX    && !std::is_same_v<Vector3ui, DataType>) ||
+        //                        (logic == POSITION && !std::is_same_v<Vector3, DataType>)   ||
+        //                        (logic == UV0      && !std::is_same_v<Vector2, DataType>)   ||
+        //                        (logic == NORMAL   && !std::is_same_v<Quaternion, DataType>));
+        //     if(fatalCrash)
+        //     {
+        //         return MRayError("[Fatal Error!]: MRayUSD's Triangle Layout is different "
+        //                          "from Tracer's triangle layout");
+        //     }
+        //     return MRayError::OK;
+        // });
+        // if(err) return err;
         //
         attribIndex++;
     }

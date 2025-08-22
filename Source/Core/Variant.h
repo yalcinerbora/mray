@@ -234,7 +234,7 @@ namespace VariantDetail
         VariantIndex    tag = 0;
 
         // Helpers
-        template<class T, class... Args>
+        template<class T, uint32_t I, class... Args>
         constexpr void  ConstrcutAlternative(Args&&... args);
         constexpr void  DestroyAlternative();
 
@@ -532,7 +532,7 @@ constexpr auto VariantDetail::SwitchCaseVisitImpl(UIntTConst<O>, VariantT&& v, F
 }
 
 template<class ... Types>
-template<class TT, class... Args>
+template<class TT, uint32_t I, class... Args>
 constexpr
 void VariantDetail::VariantImpl<Types...>::ConstrcutAlternative(Args&&... args)
 {
@@ -543,13 +543,16 @@ void VariantDetail::VariantImpl<Types...>::ConstrcutAlternative(Args&&... args)
     if constexpr(IsTypeTDC && sizeof...(Args) == 0)
         return;
     //
-    // Or do the if else dance...
-    else Visit(*this, [&args...](auto& t)
-    {
-        using T = std::remove_cvref_t<decltype(t)>;
-        if constexpr(std::is_same_v<TT, T>)
-            std::construct_at<T>(&t, std::forward<Args>(args)...);
-    });
+    // Or do the visitor...
+    TT& loc = MetaGet<I, 0, TypeCount>(storage);
+    std::construct_at<TT>(&loc, std::forward<Args>(args)...);
+
+    // else Visit(*this, [&args...](auto& t)
+    // {
+    //     using T = std::remove_cvref_t<decltype(t)>;
+    //     if constexpr(std::is_same_v<TT, T>)
+    //         std::construct_at<T>(&t, std::forward<Args>(args)...);
+    // });
 }
 
 template<class ... Types>
@@ -591,7 +594,7 @@ VariantDetail::VariantImpl<Types...>::VariantImpl(T&& other) noexcept requires(T
     static_assert(R.Index != INVALID_INDEX, "Unable to Construct Variant with type T");
     //
     tag = R.Index;
-    ConstrcutAlternative<TBase>(std::forward<T>(other));
+    ConstrcutAlternative<TBase, R.Index>(std::forward<T>(other));
 }
 
 template<class... Types>
@@ -603,7 +606,7 @@ VariantDetail::VariantImpl<Types...>::VariantImpl(std::in_place_index_t<I>, Args
     using T = TypePackElement<I, TP>;
     //
     tag = I;
-    ConstrcutAlternative<T>(std::forward<Args>(args)...);
+    ConstrcutAlternative<T, I>(std::forward<Args>(args)...);
 }
 
 template<class ... Types>
@@ -619,7 +622,7 @@ VariantDetail::VariantImpl<Types...>::operator=(T&& t) noexcept requires(TypeIsI
     //
     if(tag != INVALID_INDEX) DestroyAlternative();
     tag = R.Index;
-    ConstrcutAlternative<TBase>(std::forward<T>(t));
+    ConstrcutAlternative<TBase, R.Index>(std::forward<T>(t));
     return *this;
 }
 
@@ -737,6 +740,12 @@ constexpr auto Visit(VariantT&& v, Func&& f) -> decltype(auto)
     return IfElseVisitImpl(UIntTConst<0>{}, std::forward<VariantT>(v), std::forward<Func>(f));
     // TODO: Enable / Disable this depending on the performance.
     //return SwitchCaseVisitImpl(UIntTConst<0>{}, std::forward<VariantT>(v), std::forward<Func>(f));
+}
+
+template<class Func, class... Args>
+constexpr auto Visit(std::variant<Args...>&& v, Func&& f) -> decltype(auto)
+{
+    return std::visit(f, v);
 }
 
 // TODO: Overloading std functions is very fragile (can be UB etc.)

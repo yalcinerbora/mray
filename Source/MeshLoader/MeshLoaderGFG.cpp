@@ -2,6 +2,7 @@
 
 #include "Core/ShapeFunctions.h"
 #include "Core/Profiling.h"
+#include "TransientPool/TransientPool.h"
 
 #include <filesystem>
 #include <gfg/GFGFileExporter.h>
@@ -203,28 +204,40 @@ TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
 
     if(logic == PrimitiveAttributeLogic::INDEX)
     {
+        uint64_t totalByteSize = gfgFile.loader.MeshIndexDataSize(innerIndex);
+        uint64_t dtSize;
+
         MRayDataTypeRT dataType;
         using enum MRayDataEnum;
         switch(m.headerCore.indexSize)
         {
-            case 1: dataType = MRayDataTypeRT(MR_VECTOR_3UC); break;
-            case 2: dataType = MRayDataTypeRT(MR_VECTOR_3US); break;
-            case 4: dataType = MRayDataTypeRT(MR_VECTOR_3UI); break;
-            case 8: dataType = MRayDataTypeRT(MR_VECTOR_3UL); break;
+            case 1: dataType = MRayDataTypeRT(MR_VECTOR_3UC); dtSize = sizeof(Vector3uc); break;
+            case 2: dataType = MRayDataTypeRT(MR_VECTOR_3US); dtSize = sizeof(Vector3us); break;
+            case 4: dataType = MRayDataTypeRT(MR_VECTOR_3UI); dtSize = sizeof(Vector3ui); break;
+            case 8: dataType = MRayDataTypeRT(MR_VECTOR_3UL); dtSize = sizeof(Vector3ul); break;
             default: throw MRayError("GFG: Unkown index layout \"{}\"", gfgFile.Name());
         }
-        return dataType.SwitchCase([&](auto&& v) -> TransientData
-        {
-            using T = std::remove_cvref_t<decltype(v)>::Type;
-            size_t count = gfgFile.loader.MeshIndexDataSize(innerIndex) / v.Size;
-            TransientData result(std::in_place_type_t<T>{}, count);
-            result.ReserveAll();
-            Span<T> span = result.AccessAs<T>();
-            gfgFile.loader.MeshIndexData(reinterpret_cast<uint8_t*>(span.data()),
-                                         innerIndex);
-            return result;
+        assert(totalByteSize % dtSize == 0);
+        size_t totalCount = size_t(totalByteSize / dtSize);
+        TransientData tData = AllocateTransientData(dataType, totalCount);
+        tData.ReserveAll();
 
-        });
+        Span<Byte> span = tData.AccessAs<Byte>();
+        gfgFile.loader.MeshIndexData(reinterpret_cast<uint8_t*>(span.data()),
+                                     innerIndex);
+        return tData;
+        // return dataType.SwitchCase([&](auto&& v) -> TransientData
+        // {
+        //     using T = std::remove_cvref_t<decltype(v)>::Type;
+        //     size_t count = gfgFile.loader.MeshIndexDataSize(innerIndex) / v.Size;
+        //     TransientData result(std::in_place_type_t<T>{}, count);
+        //     result.ReserveAll();
+        //     Span<T> span = result.AccessAs<T>();
+        //     gfgFile.loader.MeshIndexData(reinterpret_cast<uint8_t*>(span.data()),
+        //                                  innerIndex);
+        //     return result;
+
+        // });
     }
     else
     {
@@ -236,20 +249,30 @@ TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
         const auto& comp = c.value();
         MRayDataTypeRT type = GFGDataTypeToMRayDataType(comp.dataType);
 
-        return type.SwitchCase([&](auto&& v) -> TransientData
-        {
-            using T = std::remove_cvref_t<decltype(v)>::Type;
-            size_t count = gfgFile.loader.MeshVertexComponentDataGroupSize(innerIndex,
-                                                                           comp.logic) / v.Size;
-            TransientData result(std::in_place_type_t<T>{}, count);
-            result.ReserveAll();
-            Span<Byte> span = result.AccessAs<Byte>();
 
-            // TODO: Change this later
-            gfgFile.loader.MeshVertexComponentDataGroup(reinterpret_cast<uint8_t*>(span.data()),
-                                                        innerIndex, comp.logic);
-            return result;
-        });
+        size_t count = gfgFile.loader.MeshVertexComponentDataGroupSize(innerIndex, comp.logic);
+        count /= type.Size();
+        TransientData tData = AllocateTransientData(type, count);
+        tData.ReserveAll();
+        Span<Byte> span = tData.AccessAs<Byte>();
+        gfgFile.loader.MeshVertexComponentDataGroup(reinterpret_cast<uint8_t*>(span.data()),
+                                                    innerIndex, comp.logic);
+        return tData;
+
+        // return type.SwitchCase([&](auto&& v) -> TransientData
+        // {
+        //     using T = std::remove_cvref_t<decltype(v)>::Type;
+        //     size_t count = gfgFile.loader.MeshVertexComponentDataGroupSize(innerIndex,
+        //                                                                    comp.logic) / v.Size;
+        //     TransientData result(std::in_place_type_t<T>{}, count);
+        //     result.ReserveAll();
+        //     Span<Byte> span = result.AccessAs<Byte>();
+
+        //     // TODO: Change this later
+        //     gfgFile.loader.MeshVertexComponentDataGroup(reinterpret_cast<uint8_t*>(span.data()),
+        //                                                 innerIndex, comp.logic);
+        //     return result;
+        // });
     }
 }
 

@@ -1,5 +1,5 @@
 #pragma once
-// IWYU pragma: private; include "GPUTextureView.h"
+// IWYU pragma: private, include "GPUTextureView.h"
 
 #include <cstdint>
 

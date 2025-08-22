@@ -1,6 +1,7 @@
 #include "TextureMemory.h"
 #include "ColorConverter.h"
 
+#include "Core/Definitions.h"
 #include "Core/GraphicsFunctions.h"
 #include "Core/Timer.h"
 #include "Core/Vector.h"
@@ -390,22 +391,38 @@ TextureReadMode DetermineReadMode(MRayPixelTypeRT pixelType,
 
 bool FindNormIntegers(MRayPixelTypeRT pixelType)
 {
-    return pixelType.SwitchCase([](auto&& v) -> bool
-    {
-        using VisitedType = std::remove_cvref_t<decltype(v)>;
-        constexpr auto Enum = VisitedType::Name;
-        using PixType = typename VisitedType::Type;
-        using enum MRayPixelEnum;
-        if constexpr(Enum == MRayPixelEnum::MR_BC6H_SFLOAT ||
-                     Enum == MRayPixelEnum::MR_BC6H_UFLOAT)
-            return false;
-        else if constexpr(VisitedType::IsBCPixel)
-            return true;
-        else if constexpr(VectorC<PixType>)
-            return std::is_integral_v<typename PixType::InnerType>;
-        else
-            return std::is_integral_v<PixType>;
-    });
+    // Below code is cool and all but slow to compile
+    // (~130 ms) so we yolo check.
+    MRayPixelEnum pixEnum = pixelType.Name();
+    using enum MRayPixelEnum;
+    bool result = (pixEnum == MR_BC6H_SFLOAT ||
+                   pixEnum == MR_BC6H_UFLOAT ||
+                   pixEnum == MR_R_FLOAT     ||
+                   pixEnum == MR_RG_FLOAT    ||
+                   pixEnum == MR_RGB_FLOAT   ||
+                   pixEnum == MR_RGBA_FLOAT  ||
+                   pixEnum == MR_R_HALF      ||
+                   pixEnum == MR_RG_HALF     ||
+                   pixEnum == MR_RGB_HALF    ||
+                   pixEnum == MR_RGBA_HALF);
+    return !result;
+
+    // return pixelType.SwitchCase([](auto&& v) -> bool
+    // {
+    //     using VisitedType = std::remove_cvref_t<decltype(v)>;
+    //     constexpr auto Enum = VisitedType::Name;
+    //     using PixType = typename VisitedType::Type;
+    //     using enum MRayPixelEnum;
+    //     if constexpr(Enum == MRayPixelEnum::MR_BC6H_SFLOAT ||
+    //                  Enum == MRayPixelEnum::MR_BC6H_UFLOAT)
+    //         return false;
+    //     else if constexpr(VisitedType::IsBCPixel)
+    //         return true;
+    //     else if constexpr(VectorC<PixType>)
+    //         return std::is_integral_v<typename PixType::InnerType>;
+    //     else
+    //         return std::is_integral_v<PixType>;
+    // });
 }
 
 void TextureMemory::ConvertColorspaces()
