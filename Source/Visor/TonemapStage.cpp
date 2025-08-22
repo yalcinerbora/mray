@@ -1,10 +1,8 @@
 #include "TonemapStage.h"
 
 #include <cassert>
-#include <type_traits>
 #include <utility>
 #include <map>
-#include <filesystem>
 
 #include <Imgui/imgui.h>
 
@@ -628,9 +626,6 @@ MRayError TonemapStage::Initialize(const VulkanSystemView& view,
 {
     handlesVk = &view;
     tmCommand = VulkanCommandBuffer(*handlesVk);
-
-    using namespace std::string_view_literals;
-    namespace fs = std::filesystem;
 
     std::unique_ptr<TonemapperI> tm0 = std::make_unique<Tonemapper_Empty_AcesCG_To_HDR10>();
     std::unique_ptr<TonemapperI> tm1 = std::make_unique<Tonemapper_Reinhard_AcesCG_To_SRGB>();

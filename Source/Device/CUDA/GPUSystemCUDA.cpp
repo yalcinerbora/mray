@@ -7,8 +7,6 @@
 #include <nvtx3/nvToolsExt.h>
 #include <fmt/color.h>
 
-#include "Core/Timer.h"
-
 #ifdef MRAY_ENABLE_TRACY_DISABLED_FOR_NOW
     #include "Core/Profiling.h"
     #include <tracy/tracy/TracyCUDA.hpp>

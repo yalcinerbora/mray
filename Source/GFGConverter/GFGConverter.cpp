@@ -11,6 +11,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "Core/Log.h"
 #include "Core/Timer.h"
 #include "Core/MemAlloc.h"
 #include "Core/Vector.h"
@@ -350,6 +351,7 @@ void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
             // Normals
             if(flags[NORMAL_AS_QUATERNION])
             {
+                bool warnDegenerateTangents = false;
                 for(unsigned int i = 0; i < meshIn->mNumVertices; i++)
                 {
                     Vector3 t(meshIn->mTangents[i].x,
@@ -364,11 +366,27 @@ void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
 
                     // If the tangents are left-handed,
                     // convert them to right-handed
-                    if(Math::Dot(Math::Cross(t, b), n) < Float(0))
+                    if(Math::Dot(Math::Cross(b, n), t) < Float(0))
                         t = -t;
                     auto [newT, newB] = Graphics::GSOrthonormalize(t, b, n);
-                    Quaternion q = TransformGen::ToSpaceQuat(newT, newB, n);
+                    Quaternion q;
+                    if(!(Math::IsFinite(newT) && Math::IsFinite(newB)))
+                    {
+                        warnDegenerateTangents = true;
+                        // If we fail randomly generate space
+                        b = Graphics::OrthogonalVector(n);
+                        t = Math::Cross(b, n);
+                        q = TransformGen::ToSpaceQuat(t, b, n);
+                    }
+                    else q = TransformGen::ToSpaceQuat(newT, newB, n);
                     normalsQuat[i] = q;
+                }
+
+                if(warnDegenerateTangents)
+                {
+                    MRAY_WARNING_LOG("Mesh File{:s}:[{:d}] has degenerate tangents. "
+                                     "These are randomly generated.",
+                                     mesh.filePath, meshIndex);
                 }
             }
             else

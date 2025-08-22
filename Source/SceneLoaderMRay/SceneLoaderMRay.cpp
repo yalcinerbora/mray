@@ -1,5 +1,6 @@
 #include "SceneLoaderMRay.h"
 
+#include "Core/Math.h"
 #include "Core/TracerI.h"
 #include "Core/Log.h"
 #include "Core/Timer.h"
@@ -378,6 +379,8 @@ void LoadPrimitive(TracerI& tracer,
     // The solution here is to rely on assimp's tangent/bitangent generation capabilities
     // and use it. On the other hand, for in json triangle primitives compute it on the
     // class.
+    bool warnDegenerateTangents = false;
+
     for(uint32_t attribIndex = 0; attribIndex < attributeList.size();
         attribIndex++)
     {
@@ -430,10 +433,20 @@ void LoadPrimitive(TracerI& tracer,
                 Vector3 n = Normalize(normals[i]);
                 // If the tangents are left-handed,
                 // convert them to right-handed
-                if(Math::Dot(Math::Cross(t, b), n) < Float(0))
+                if(Math::Dot(Math::Cross(b, n), t) < Float(0))
                     t = -t;
                 auto [newT, newB] = Graphics::GSOrthonormalize(t, b, n);
-                Quaternion q = TransformGen::ToSpaceQuat(newT, newB, n);
+                Quaternion q;
+                if(!(Math::IsFinite(newT) && Math::IsFinite(newB)))
+                {
+                    warnDegenerateTangents = true;
+                    // If we fail randomly generate space
+                    b = Graphics::OrthogonalVector(n);
+                    t = Math::Cross(b, n);
+                    q = TransformGen::ToSpaceQuat(t, b, n);
+                }
+                else q = TransformGen::ToSpaceQuat(newT, newB, n);
+
                 quats.Push(Span<const Quaternion>(&q, 1));
             }
             assert(quats.IsFull());
@@ -460,6 +473,14 @@ void LoadPrimitive(TracerI& tracer,
                             tracer.TypeName(groupId),
                             MRayDataTypeStringifier::ToString(groupsLayout.Name()));
         }
+    }
+
+    if(warnDegenerateTangents)
+    {
+        MRAY_WARNING_LOG("Mesh File{:s}:[{:d}] has degenerate tangents. "
+                         "tbn matrix is arbitrarily generated. If mesh attached "
+                         "to a normal map it may not look right!",
+                         meshFileView->Name(), meshFileView->InnerIndex());
     }
 }
 
