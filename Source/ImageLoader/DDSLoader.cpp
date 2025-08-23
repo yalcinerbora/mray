@@ -186,7 +186,7 @@ enum class FlagBitsDX9 : uint32_t
     // (so no counting mistake)
     DDSD_PIXELFORMAT    = Bit::RequiredBitsToRepresent(0x1000u) - 1,
     DDSD_MIPMAPCOUNT    = Bit::RequiredBitsToRepresent(0x20000u) - 1,
-    DDSD_LINEARSIZE	    = Bit::RequiredBitsToRepresent(0x80000u) - 1,
+    DDSD_LINEARSIZE     = Bit::RequiredBitsToRepresent(0x80000u) - 1,
     DDSD_DEPTH          = Bit::RequiredBitsToRepresent(0x800000u) - 1,
     END
 };

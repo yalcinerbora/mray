@@ -188,6 +188,8 @@ set(MRAY_CUDA_OPTIONS
     -restrict
     # Misc.
     -extra-device-vectorization
+
+    #-fdevice-time-trace=-
 )
 
 # Platform Specific CUDA Options

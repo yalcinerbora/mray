@@ -79,11 +79,8 @@ struct DistTester2D
         distGroup.Construct(id, dFunction, queue);
 
         Span<const Dist2D> dists = distGroup.DeviceDistributions();
-        EXPECT_EQ(dists.size(), 1);
-
-        queue.MemcpyAsync(dRandomNumbers,
-                          Span<const Vector2>(hRandomNumbers.cbegin(),
-                                              hRandomNumbers.cend()));
+        EXPECT_EQ(dists.size(), 1u);
+        queue.MemcpyAsync(dRandomNumbers, Span<const Vector2>(hRandomNumbers));
 
         queue.IssueWorkKernel<KCSampleDist<Dist2D, DoUV>>
         (

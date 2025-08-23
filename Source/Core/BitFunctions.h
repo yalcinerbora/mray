@@ -336,12 +336,12 @@ MR_PF_DEF T Bit::BitReverse(T value, T width) noexcept
     {
         // TODO: Is there a good way to do this
         // other than O(n)
-        T result = 0;
+        T result = T(0);
         for(T i = 0; i < width; i++)
         {
+            result <<= T(1);
             result |= value & 0b1;
-            result <<= 1;
-            value >>= 1;
+            value >>= T(1);
         }
         return result;
     };

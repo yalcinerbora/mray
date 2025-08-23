@@ -124,7 +124,6 @@ namespace PathTraceRDetail
         // Only used when NEE/MIS is active
         Span<Float>             dPrevMatPDF;
         Span<Spectrum>          dShadowRayRadiance;
-        //Span<uint32_t>          dShadowRayLightIndex;
     };
 
     template<class LightSampler, PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
@@ -194,8 +193,8 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
     Vector3 wO = Math::Normalize(tContext.InvApplyN(-rayIn.Dir()));
-    RayConeSurface rConeRefract = mat.RefractRayCone(surfRayCone, wO, surf);
-    SampleT<BxDFResult> raySample = mat.SampleBxDF(wO, surf, rng);
+    RayConeSurface rConeRefract = mat.RefractRayCone(surfRayCone, wO);
+    SampleT<BxDFResult> raySample = mat.SampleBxDF(wO, rng);
     Vector3 wI = Math::Normalize(tContext.ApplyN(raySample.value.wI.Dir()));
 
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
@@ -206,12 +205,12 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // ================ //
     // Russian Roulette //
     // ================ //
-    Float specularity = mat.Specularity(surf);
+    Float specularity = mat.Specularity();
     dataPack.depth += 1u;
     Vector2ui rrRange = params.globalState.russianRouletteRange;
     bool isPathDead = (dataPack.depth >= rrRange[1]);
     if(!isPathDead && dataPack.depth >= rrRange[0] &&
-       !MaterialCommon::IsSpecular(mat.Specularity(surf)))
+       !MaterialCommon::IsSpecular(specularity))
     {
         Float rrXi = rng.NextFloat<Material::SampleRNCount>();
         Float rrFactor = throughput.Sum() * Float(0.33333);
@@ -346,14 +345,14 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
     Vector3 wO = Math::Normalize(-tContext.InvApplyN(rayIn.Dir()));
     const LightSampler& lightSampler = params.globalState.lightSampler;
     Vector3 worldPos = surf.position;
-    RayConeSurface refractedRayCone = mat.RefractRayCone(surfRayCone, wO, surf);
+    RayConeSurface refractedRayCone = mat.RefractRayCone(surfRayCone, wO);
     LightSample lightSample = lightSampler.SampleLight(rng, specConverter,
                                                        worldPos, surf.geoNormal,
                                                        refractedRayCone);
     auto [shadowRay, shadowTMM] = lightSample.value.SampledRay(worldPos);
     Ray wI = tContext.InvApply(shadowRay);
 
-    Spectrum reflectance = mat.Evaluate(wI, wO, surf);
+    Spectrum reflectance = mat.Evaluate(wI, wO);
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= reflectance;
 
@@ -362,7 +361,7 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
     if(params.globalState.sampleMode == SampleMode::E::NEE_WITH_MIS)
     {
         using Distribution::MIS::BalanceCancelled;
-        Float bxdfPdf = mat.Pdf(shadowRay, wO, surf);
+        Float bxdfPdf = mat.Pdf(shadowRay, wO);
         std::array<Float, 2> pdfs = {bxdfPdf, lightSample.pdf};
         std::array<Float, 2> weights = {1, 1};
         pdf = BalanceCancelled<2>(pdfs, weights);
@@ -374,7 +373,7 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
     shadowRadiance = DivideByPDF(shadowRadiance, pdf);
 
     // Writing
-    if(MaterialCommon::IsSpecular(mat.Specularity(surf)))
+    if(MaterialCommon::IsSpecular(mat.Specularity()))
     {
         // Set the shadow ray as specular ray, we overwrite the ray state
         // but ray state is important for rays that hit light.

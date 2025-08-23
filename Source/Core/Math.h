@@ -628,7 +628,7 @@ MR_PF_DEF T ArcTan(T x) noexcept
         return std::atan(x);
     // GPU Code path
     #else
-        if constexpr(std::is_same_v<T, float>)  return atan(x);
+        if constexpr(std::is_same_v<T, float>)  return atanf(x);
         if constexpr(std::is_same_v<T, double>) return atan(x);
     #endif
 }
@@ -663,7 +663,7 @@ MR_PF_DEF T ArcTan2(T y, T x) noexcept
         return std::atan2(y, x);
     // GPU Code path
     #else
-        if constexpr(std::is_same_v<T, float>)  return atan2(y, x);
+        if constexpr(std::is_same_v<T, float>)  return atan2f(y, x);
         if constexpr(std::is_same_v<T, double>) return atan2(y, x);
     #endif
 }

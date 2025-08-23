@@ -40,46 +40,41 @@ concept MaterialC = requires(MatType mt,
     typename MatType::DataSoA;
 
     // Constructor
-    MatType(sc, typename MatType::DataSoA{}, MaterialKey{});
+    MatType(sc, typename MatType::Surface{},
+            typename MatType::DataSoA{}, MaterialKey{});
 
     // Sample should support BSSRDF (it will return a "ray"
     // instead of a direction)
     // This means for other types ray.pos == surface.pos
     // At the same time we sample a reflection
-    {mt.SampleBxDF(Vector3{}, typename MatType::Surface{},
-                   rng)
-    } -> std::same_as<SampleT<BxDFResult>>;
+    {mt.SampleBxDF(Vector3{}, rng)} -> std::same_as<SampleT<BxDFResult>>;
 
     // Given wO (with outgoing position)
     // and wI (with incoming position)
     // Calculate the pdf value
     // TODO: should we provide a surface?
     // For BSSRDF how tf we get the pdf???
-    {mt.Pdf(Ray{}, Vector3{}, typename MatType::Surface{})
-    } -> std::same_as<Float>;
+    {mt.Pdf(Ray{}, Vector3{})} -> std::same_as<Float>;
 
     // How many random numbers the sampler of this class uses
     MatType::SampleRNCount;
     requires std::is_same_v<decltype(MatType::SampleRNCount), const uint32_t>;
 
     // Evaluate material given w0, wI
-    {mt.Evaluate(Ray{}, Vector3{}, typename MatType::Surface{})
-    }-> std::same_as<Spectrum>;
+    {mt.Evaluate(Ray{}, Vector3{})}-> std::same_as<Spectrum>;
 
     // Emissive Query
     {mt.IsEmissive()} -> std::same_as<bool>;
 
     // Emission
-    {mt.Emit(Vector3{}, typename MatType::Surface{})
-    } -> std::same_as<Spectrum>;
+    {mt.Emit(Vector3{})} -> std::same_as<Spectrum>;
 
     // Specularity of the material
     // The value is between [0-1]. If one the material
     // is perfectly specular (non-physical perfect mirror, glass
     // etc)
     // This is not a bool to make it flexible
-    {mt.Specularity(typename MatType::Surface{})
-    } -> std::same_as<Float>;
+    {mt.Specularity()} -> std::same_as<Float>;
     // TODO: Add for position as well (except for BSSRDF
     // it will return zero)
 
@@ -87,13 +82,15 @@ concept MaterialC = requires(MatType mt,
     // invBetaN of the cone. If refraction
     // does not make sense with this material
     // This function should be an identity function.
-    {mt.RefractRayCone(RayConeSurface{}, Vector3{},
-                       typename MatType::Surface{})
+    {mt.RefractRayCone(RayConeSurface{}, Vector3{})
     } -> std::same_as<RayConeSurface>;
 
     // Streaming texture query
     // Given surface, all textures of this material should be accessible
-    { mt.IsAllTexturesAreResident(typename MatType::Surface{})} -> std::same_as<bool>;
+    {MatType::IsAllTexturesAreResident(typename MatType::Surface{},
+                                       typename MatType::DataSoA{},
+                                       MaterialKey{})
+    } -> std::same_as<bool>;
 };
 
 template <class MGType>

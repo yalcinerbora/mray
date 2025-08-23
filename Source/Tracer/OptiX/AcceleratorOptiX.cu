@@ -475,8 +475,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
 
     //
     queue.MemcpyAsync(dHitRecords, ToConstSpan(Span(hAllHitRecords)));
-    queue.MemcpyAsync(dEmptyRecords, ToConstSpan(Span(hEmptyRecords.cbegin(),
-                                                      hEmptyRecords.cend())));
+    queue.MemcpyAsync(dEmptyRecords, ToConstSpan(Span(hEmptyRecords)));
     // Finally set the table and GG
     commonCastSBT = {};
     // RG

@@ -9,7 +9,7 @@
 #include "StreamingTextureView.h"
 
 // ============================================== //
-//       THIS SYSTEM IS IN CONCEPTION PHASE		  //
+//       THIS SYSTEM IS IN CONCEPTION PHASE       //
 //  CODE IS ARBITRARY AND MAY NOT WORK AT ALL     //
 // ============================================== //
 // Texture Streaming system of MRay
@@ -77,10 +77,10 @@
 //
 //  - For 2:1 tiles these correspond to:
 //     -- RG_8       (256 x 128)
-//     -- R_16		 (256 x 128)
+//     -- R_16       (256 x 128)
 //     -- RGBA_16    (128x64)
 //     -- RG_32F     (128x64)
-//     -- BC1		 (512x128) (128x64 Blocks)
+//     -- BC1        (512x128) (128x64 Blocks)
 //     -- BC4           "           "
 //
 //  - Since we store different virtual textures on the same virtual texture
@@ -159,192 +159,192 @@
 //// It supports
 //class PageAllocator
 //{
-//	enum class Handle : uint64_t {};
+//  enum class Handle : uint64_t {};
 //
-//	struct FreeListNode
-//	{
-//		FreeListNode*	next;
-//		FreeListNode*	prev;
-//		std::byte*		memory;
-//	};
-//	using MonoAllocator = std::pmr::monotonic_buffer_resource;
-//	using PoolAllocator = std::pmr::unsynchronized_pool_resource;
+//  struct FreeListNode
+//  {
+//      FreeListNode*   next;
+//      FreeListNode*   prev;
+//      std::byte*      memory;
+//  };
+//  using MonoAllocator = std::pmr::monotonic_buffer_resource;
+//  using PoolAllocator = std::pmr::unsynchronized_pool_resource;
 //
-//	private:
-//	//
-//	uint32_t		pageSize;
-//	uint32_t		pageAlignment;
-//	uint32_t		curPageCount;
-//	uint32_t		maxPageCount;
-//	FreeListNode*	freeList;
-//	MonoAllocator	baseAlloc;
-//	PoolAllocator	poolAlloc;
+//  private:
+//  //
+//  uint32_t        pageSize;
+//  uint32_t        pageAlignment;
+//  uint32_t        curPageCount;
+//  uint32_t        maxPageCount;
+//  FreeListNode*   freeList;
+//  MonoAllocator   baseAlloc;
+//  PoolAllocator   poolAlloc;
 //
-//	protected:
-//	public:
-//	// Constructors & Destructor
-//					PageAllocator(uint32_t pageSize, uint32_t maxPageCount);
-//					PageAllocator(const PageAllocator&) = delete;
-//					PageAllocator(PageAllocator&&) = default;
-//	PageAllocator&	operator=(const PageAllocator&) = delete;
-//	PageAllocator&	operator=(PageAllocator&&) = default;
-//					~PageAllocator() = default;
+//  protected:
+//  public:
+//  // Constructors & Destructor
+//                  PageAllocator(uint32_t pageSize, uint32_t maxPageCount);
+//                  PageAllocator(const PageAllocator&) = delete;
+//                  PageAllocator(PageAllocator&&) = default;
+//  PageAllocator&  operator=(const PageAllocator&) = delete;
+//  PageAllocator&  operator=(PageAllocator&&) = default;
+//                  ~PageAllocator() = default;
 //
-//	std::byte* AllocPage();
-//			//AllocPages(uint32_t pageCount);
-//	void RemovePage(uint32_t pageId);
-//	void RemovePages(std::vector<uint32_t> pageIds);
+//  std::byte* AllocPage();
+//          //AllocPages(uint32_t pageCount);
+//  void RemovePage(uint32_t pageId);
+//  void RemovePages(std::vector<uint32_t> pageIds);
 //};
 //
 //inline PageAllocator::PageAllocator(uint32_t pageSize,
-//									uint32_t pageAlignment,
-//									uint32_t maxPageCount)
-//	: pageSize(pageSize)
-//	, curPageCount(0)
-//	, maxPageCount(maxPageCount)
-//	, freeList(nullptr)
-//	, poolAlloc(std::pmr::pool_options{.largest_required_pool_block = pageSize},
-//				&baseAlloc)
+//                                  uint32_t pageAlignment,
+//                                  uint32_t maxPageCount)
+//  : pageSize(pageSize)
+//  , curPageCount(0)
+//  , maxPageCount(maxPageCount)
+//  , freeList(nullptr)
+//  , poolAlloc(std::pmr::pool_options{.largest_required_pool_block = pageSize},
+//              &baseAlloc)
 //{}
 //
 //std::byte* PageAllocator::AllocPage()
 //{
-//	Handle handle = Handle(0);
-//	std::byte* mem = nullptr;
+//  Handle handle = Handle(0);
+//  std::byte* mem = nullptr;
 //
-//	// Full mem edge case
-//	if(curPageCount == maxPageCount)
-//		return nullptr;
+//  // Full mem edge case
+//  if(curPageCount == maxPageCount)
+//      return nullptr;
 //
-//	if(freeList)
-//	{
-//		FreeListNode* flNode = freeList;
-//		freeList = freeList->next;
-//		mem = freeList->memory;
-//		poolAlloc.deallocate(flNode, sizeof(FreeListNode), alignof(FreeListNode));
+//  if(freeList)
+//  {
+//      FreeListNode* flNode = freeList;
+//      freeList = freeList->next;
+//      mem = freeList->memory;
+//      poolAlloc.deallocate(flNode, sizeof(FreeListNode), alignof(FreeListNode));
 //
-//	}
-//		return
+//  }
+//      return
 //
 //}
 //
 //
 struct StreamingTexturePack
 {
-	template <class T>
-	using TextureList = StaticVector<Texture<2, T>, StreamingTexParams::MaxPhysicalTextureCount>;
+    template <class T>
+    using TextureList = StaticVector<Texture<2, T>, StreamingTexParams::MaxPhysicalTextureCount>;
 
-	private:
-	// Aliases - Pair 1 - Square tiles
-	// These textures will have different sizes
-	// 16k x 16k (256 x 256)
-	TextureList<uint8_t>	texList_R8_UNORM;
-	TextureList<int8_t>		texList_R8_SNORM;
-	// 8k x 8k (128 x 128)
-	TextureList<Vector4uc>	texList_RGBA8_UNORM;
-	TextureList<Vector4c>	texList_RGBA8_SNORM;
-	// 8k x 8k (128 x 128)
-	TextureList<Vector2us>	texList_RG16_UNORM;
-	TextureList<Vector2s>	texList_RG16_SNORM;
-	// 8k x 8k (128 x 128)
-	TextureList<float>		texList_R32F;
-	// 4k x 4k (64 x 64)
-	TextureList<Vector4f>	texList_RGBA32F;
-	// 16k x 16k (256 x 256) (64 x 64 Blocks)
-	TextureList<PixelBC2>	texList_BC2;
-	TextureList<PixelBC3>	texList_BC3;
-	TextureList<PixelBC5U>	texList_BC5U;
-	TextureList<PixelBC5S>	texList_BC5S;
-	TextureList<PixelBC6U>	texList_BC6U;
-	TextureList<PixelBC6S>	texList_BC6S;
-	TextureList<PixelBC7>	texList_BC7;
-	//
-	// Aliases - Pair 2 - Rectangle Tiles
-	// 8k x 8k (256 x 128)
-	TextureList<Vector2uc>	texList_RG8_UNORM;
-	TextureList<Vector2c>	texList_RG8_SNORM;
-	// 16k x 8k (256 x 128)
-	TextureList<uint16_t>	texList_R16_UNORM;
-	TextureList<int16_t>	texList_R16_SNORM;
-	// 8k x 4k (128 x 64)
-	TextureList<Vector4us>	texList_RGBA16_UNORM;
-	TextureList<Vector4s>	texList_RGBA16_SNORM;
-	// 8k x 4k (128 x 64)
-	TextureList<Vector2f>	texList_RG32F;
-	// 32k x 16k (512 x 128) (128 x 64 Blocks)
-	TextureList<PixelBC1>	texList_BC1;
-	TextureList<PixelBC4U>	texList_BC4U;
-	TextureList<PixelBC4S>	texList_BC4S;
+    private:
+    // Aliases - Pair 1 - Square tiles
+    // These textures will have different sizes
+    // 16k x 16k (256 x 256)
+    TextureList<uint8_t>    texList_R8_UNORM;
+    TextureList<int8_t>     texList_R8_SNORM;
+    // 8k x 8k (128 x 128)
+    TextureList<Vector4uc>  texList_RGBA8_UNORM;
+    TextureList<Vector4c>   texList_RGBA8_SNORM;
+    // 8k x 8k (128 x 128)
+    TextureList<Vector2us>  texList_RG16_UNORM;
+    TextureList<Vector2s>   texList_RG16_SNORM;
+    // 8k x 8k (128 x 128)
+    TextureList<float>      texList_R32F;
+    // 4k x 4k (64 x 64)
+    TextureList<Vector4f>   texList_RGBA32F;
+    // 16k x 16k (256 x 256) (64 x 64 Blocks)
+    TextureList<PixelBC2>   texList_BC2;
+    TextureList<PixelBC3>   texList_BC3;
+    TextureList<PixelBC5U>  texList_BC5U;
+    TextureList<PixelBC5S>  texList_BC5S;
+    TextureList<PixelBC6U>  texList_BC6U;
+    TextureList<PixelBC6S>  texList_BC6S;
+    TextureList<PixelBC7>   texList_BC7;
+    //
+    // Aliases - Pair 2 - Rectangle Tiles
+    // 8k x 8k (256 x 128)
+    TextureList<Vector2uc>  texList_RG8_UNORM;
+    TextureList<Vector2c>   texList_RG8_SNORM;
+    // 16k x 8k (256 x 128)
+    TextureList<uint16_t>   texList_R16_UNORM;
+    TextureList<int16_t>    texList_R16_SNORM;
+    // 8k x 4k (128 x 64)
+    TextureList<Vector4us>  texList_RGBA16_UNORM;
+    TextureList<Vector4s>   texList_RGBA16_SNORM;
+    // 8k x 4k (128 x 64)
+    TextureList<Vector2f>   texList_RG32F;
+    // 32k x 16k (512 x 128) (128 x 64 Blocks)
+    TextureList<PixelBC1>   texList_BC1;
+    TextureList<PixelBC4U>  texList_BC4U;
+    TextureList<PixelBC4S>  texList_BC4S;
 };
 
 struct StreamingTexture
 {
-	std::string				absoluteFilePath;
-	MRayTextureParameters	texParams;
+    std::string             absoluteFilePath;
+    MRayTextureParameters   texParams;
 };
 
 class StreamingTextureCache
 {
-	private:
-	StreamingTexturePack concreteTextures;
+    private:
+    StreamingTexturePack concreteTextures;
 
-	//// Aliases - Pair 1 - Square tiles
-	//// These textures will have different sizes
-	//// 16k x 16k (256 x 256)
-	//TextureList<uint8_t>	texList_R8_UNORM;
-	//TextureList<int8_t>		texList_R8_SNORM;
-	//// 8k x 8k (128 x 128)
-	//TextureList<Vector4uc>	texList_RGBA8_UNORM;
-	//TextureList<Vector4c>	texList_RGBA8_SNORM;
-	//// 8k x 8k (128 x 128)
-	//TextureList<Vector2us>	texList_RG16_UNORM;
-	//TextureList<Vector2s>	texList_RG16_SNORM;
-	//// 8k x 8k (128 x 128)
-	//TextureList<float>		texList_R32F;
-	//// 4k x 4k (64 x 64)
-	//TextureList<Vector4f>	texList_RGBA32F;
-	//// 16k x 16k (256 x 256) (64 x 64 Blocks)
-	//TextureList<PixelBC2>	texList_BC2;
-	//TextureList<PixelBC3>	texList_BC3;
-	//TextureList<PixelBC5U>	texList_BC5U;
-	//TextureList<PixelBC5S>	texList_BC5S;
-	//TextureList<PixelBC6U>	texList_BC6U;
-	//TextureList<PixelBC6S>	texList_BC6S;
-	//TextureList<PixelBC7>	texList_BC7;
-	////
-	//// Aliases - Pair 2 - Rectangle Tiles
-	//// 8k x 8k (256 x 128)
-	//TextureList<Vector2uc>	texList_RG8_UNORM;
-	//TextureList<Vector2c>	texList_RG8_SNORM;
-	//// 16k x 8k (256 x 128)
-	//TextureList<uint16_t>	texList_R16_UNORM;
-	//TextureList<int16_t>	texList_R16_SNORM;
-	//// 8k x 4k (128 x 64)
-	//TextureList<Vector4us>	texList_RGBA16_UNORM;
-	//TextureList<Vector4s>	texList_RGBA16_SNORM;
-	//// 8k x 4k (128 x 64)
-	//TextureList<Vector2f>	texList_RG32F;
-	//// 32k x 16k (512 x 128) (128 x 64 Blocks)
-	//TextureList<PixelBC1>	texList_BC1;
-	//TextureList<PixelBC4U>	texList_BC4U;
-	//TextureList<PixelBC4S>	texList_BC4S;
-	// All of the tile sizes are fixed and is 64k
-	//
-	// Aliasing enables easier load-balancing
-	// since we need to keep track of two values
-	//
-	// Currently only CUDA supports aliasing
-	// (even though it is not documented but
-	// "cudaArrayDeferredMapping" enables such behaviour.
-	//
-	// For other backends this will be a hassle to optimize
-	// between **24** different texture types!!!
-	// Probably we will not support streaming on other platforms
-	// until SYCL and HIP enables such futures.
-	//
-	// These backends are not even in conception phase, but
-	// future proofing this system will come in handy.
+    //// Aliases - Pair 1 - Square tiles
+    //// These textures will have different sizes
+    //// 16k x 16k (256 x 256)
+    //TextureList<uint8_t>  texList_R8_UNORM;
+    //TextureList<int8_t>       texList_R8_SNORM;
+    //// 8k x 8k (128 x 128)
+    //TextureList<Vector4uc>    texList_RGBA8_UNORM;
+    //TextureList<Vector4c> texList_RGBA8_SNORM;
+    //// 8k x 8k (128 x 128)
+    //TextureList<Vector2us>    texList_RG16_UNORM;
+    //TextureList<Vector2s> texList_RG16_SNORM;
+    //// 8k x 8k (128 x 128)
+    //TextureList<float>        texList_R32F;
+    //// 4k x 4k (64 x 64)
+    //TextureList<Vector4f> texList_RGBA32F;
+    //// 16k x 16k (256 x 256) (64 x 64 Blocks)
+    //TextureList<PixelBC2> texList_BC2;
+    //TextureList<PixelBC3> texList_BC3;
+    //TextureList<PixelBC5U>    texList_BC5U;
+    //TextureList<PixelBC5S>    texList_BC5S;
+    //TextureList<PixelBC6U>    texList_BC6U;
+    //TextureList<PixelBC6S>    texList_BC6S;
+    //TextureList<PixelBC7> texList_BC7;
+    ////
+    //// Aliases - Pair 2 - Rectangle Tiles
+    //// 8k x 8k (256 x 128)
+    //TextureList<Vector2uc>    texList_RG8_UNORM;
+    //TextureList<Vector2c> texList_RG8_SNORM;
+    //// 16k x 8k (256 x 128)
+    //TextureList<uint16_t> texList_R16_UNORM;
+    //TextureList<int16_t>  texList_R16_SNORM;
+    //// 8k x 4k (128 x 64)
+    //TextureList<Vector4us>    texList_RGBA16_UNORM;
+    //TextureList<Vector4s> texList_RGBA16_SNORM;
+    //// 8k x 4k (128 x 64)
+    //TextureList<Vector2f> texList_RG32F;
+    //// 32k x 16k (512 x 128) (128 x 64 Blocks)
+    //TextureList<PixelBC1> texList_BC1;
+    //TextureList<PixelBC4U>    texList_BC4U;
+    //TextureList<PixelBC4S>    texList_BC4S;
+    // All of the tile sizes are fixed and is 64k
+    //
+    // Aliasing enables easier load-balancing
+    // since we need to keep track of two values
+    //
+    // Currently only CUDA supports aliasing
+    // (even though it is not documented but
+    // "cudaArrayDeferredMapping" enables such behaviour.
+    //
+    // For other backends this will be a hassle to optimize
+    // between **24** different texture types!!!
+    // Probably we will not support streaming on other platforms
+    // until SYCL and HIP enables such futures.
+    //
+    // These backends are not even in conception phase, but
+    // future proofing this system will come in handy.
 
 
-	//
+    //
 };

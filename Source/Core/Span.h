@@ -32,7 +32,7 @@ static constexpr uint32_t DynamicExtent = uint32_t(0);
 namespace SpanDetail
 {
     template <class T>
-    struct DSpan
+    struct alignas(16) DSpan
     {
         T* MRAY_RESTRICT ptr;
         uint32_t         count;
@@ -57,10 +57,10 @@ namespace SpanDetail
 }
 
 template<class It>
-concept SpanIt = std::contiguous_iterator<It>;
+concept SpanIt = std::contiguous_iterator<It> && !SpanDetail::IsConstIterator<It>;
 
 template<class It>
-concept ConstSpanIt = SpanIt<It> && SpanDetail::IsConstIterator<It>;
+concept ConstSpanIt = std::contiguous_iterator<It> && SpanDetail::IsConstIterator<It>;
 
 //
 template <class T, uint32_t Extent = DynamicExtent>
@@ -144,8 +144,7 @@ class Span : public std::conditional_t<Extent == DynamicExtent,
 };
 
 template<ConstSpanIt It>
-Span(It begin, It end) ->
-    Span<const typename std::iterator_traits<It>::value_type>;
+Span(It begin, It end) -> Span<const typename std::iterator_traits<It>::value_type>;
 
 template<class T, uint32_t Extent = DynamicExtent>
 constexpr Span<const T, Extent> ToConstSpan(Span<T, Extent> s);

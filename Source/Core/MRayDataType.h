@@ -307,10 +307,10 @@ struct MRayDataTypeRT
 
 struct MRayPixelTypeRT
 {
-	private:
-	MRayPixelEnum name;
+    private:
+    MRayPixelEnum name;
 
-	public:
+    public:
     using enum MRayPixelEnum;
 
     constexpr MRayPixelEnum Name() const;
@@ -324,8 +324,8 @@ struct MRayPixelTypeRT
     constexpr           MRayPixelTypeRT() = default;
     constexpr explicit  MRayPixelTypeRT(MRayPixelEnum e);
 
-	template<class Func>
-	constexpr auto SwitchCase(Func&&) const -> decltype(auto);
+    template<class Func>
+    constexpr auto SwitchCase(Func&&) const -> decltype(auto);
     constexpr bool operator==(MRayPixelTypeRT other) const;
 };
 
@@ -335,13 +335,13 @@ constexpr MRayDataTypeRT::MRayDataTypeRT(MRayDataEnum e)
 
 constexpr MRayDataEnum MRayDataTypeRT::Name() const
 {
-	return name;
+    return name;
 }
 
 template<class Func>
 constexpr auto MRayDataTypeRT::SwitchCase(Func&& F) const -> decltype(auto)
 {
-	assert(name < MRayDataEnum::MR_END);
+    assert(name < MRayDataEnum::MR_END);
     return DataTypeDetail::SwitchCaseAsIfStatements<MRayDataEnum, MRayDataType>
     (
         std::forward<Func>(F),

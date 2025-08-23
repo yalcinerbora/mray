@@ -119,12 +119,12 @@ const PPGenericVert = `#version 300 es
 
     void main(void)
     {
-        //		Pos					UV
-	    //	-1.0f, 3.0f,	-->	0.0f, 2.0f,
-	    //	3.0f, -1.0f,	-->	2.0f, 0.0f,
-	    //	-1.0f, -1.0f,	-->	0.0f, 0.0f
-	    fUV = (vPos + 1.0f) * 0.5f;
-	    gl_Position = vec4(vPos, 0.0f, 1.0f);
+        //      Pos                 UV
+        //  -1.0f, 3.0f,    --> 0.0f, 2.0f,
+        //  3.0f, -1.0f,    --> 2.0f, 0.0f,
+        //  -1.0f, -1.0f,   --> 0.0f, 0.0f
+        fUV = (vPos + 1.0f) * 0.5f;
+        gl_Position = vec4(vPos, 0.0f, 1.0f);
     }
 `;
 

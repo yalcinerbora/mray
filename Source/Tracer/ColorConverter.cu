@@ -11,7 +11,7 @@
 #include "Core/GraphicsFunctions.h"
 #include "Core/Algorithm.h"
 
-using MipBlockCountList = StaticVector<uint64_t, TracerConstants::MaxTextureMipCount>;
+using MipBlockCountList = StaticVector<uint32_t, TracerConstants::MaxTextureMipCount>;
 
 static constexpr uint32_t BC_TEX_PER_BATCH = 16;
 
@@ -471,6 +471,12 @@ void KCExtractLuminance(// I-O
     }
 }
 
+struct TotalTilesOfResult
+{
+    MipBlockCountList countList;
+    uint32_t totalBlocks;
+};
+
 class BCColorConverter
 {
     private:
@@ -479,8 +485,7 @@ class BCColorConverter
     size_t                          bufferSize;
 
     template<MRayPixelEnum E>
-    Pair<MipBlockCountList, uint64_t>
-            FindTotalTilesOf(const GenericTexture* t) const;
+    TotalTilesOfResult FindTotalTilesOf(const GenericTexture* t) const;
     //
     template<MRayPixelEnum E>
     requires(E != MRayPixelEnum::MR_BC6H_UFLOAT &&
@@ -521,7 +526,7 @@ class NormalColorConverter
 };
 
 template<MRayPixelEnum E>
-Pair<MipBlockCountList, uint64_t>
+TotalTilesOfResult
 BCColorConverter::FindTotalTilesOf(const GenericTexture* t) const
 {
     static_assert(MRayPixelType<E>::IsBCPixel,
@@ -530,7 +535,7 @@ BCColorConverter::FindTotalTilesOf(const GenericTexture* t) const
     static constexpr uint32_t TILE_SIZE = PixType::TileSize;
 
     using Math::DivideUp;
-    uint64_t total = 0;
+    uint32_t total = 0;
     MipBlockCountList result;
     for(uint32_t i = 0; i < t->MipCount(); i++)
     {
@@ -538,7 +543,7 @@ BCColorConverter::FindTotalTilesOf(const GenericTexture* t) const
         Vector3ui blockCount = Vector3ui(DivideUp(Vector2ui(mipSize),
                                                   Vector2ui(TILE_SIZE)),
                                          mipSize[2]);
-        uint64_t mipBlockCount = blockCount.Multiply();
+        uint32_t mipBlockCount = blockCount.Multiply();
         result.push_back(mipBlockCount);
         total += mipBlockCount;
     }
@@ -604,7 +609,7 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
             uint32_t mipBlockOffset = texBlockOffset;
             for(uint32_t mipLevel = 0; mipLevel < t->MipCount(); mipLevel++)
             {
-                uint64_t mipBlockSize = mipBlocks[mipLevel];
+                uint32_t mipBlockSize = mipBlocks[mipLevel];
                 Vector3ui mipSize = Graphics::TextureMipSize(t->Extents(), mipLevel);
                 Span<Byte> copyRegion = dScratchBuffer.subspan(mipBlockOffset * sizeof(BlockT),
                                                                mipBlockSize * sizeof(BlockT));
@@ -658,10 +663,10 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
             auto* t = localTextures[tI];
             auto [mipBlocks, totalBlocks] = FindTotalTilesOf<E>(t);
             assert(mipBlocks.size() == t->MipCount());
-            size_t mipBlockOffset = texBlockOffset;
+            uint32_t mipBlockOffset = texBlockOffset;
             for(uint32_t mipLevel = 0; mipLevel < t->MipCount(); mipLevel++)
             {
-                uint64_t mipBlockSize = mipBlocks[mipLevel];
+                uint32_t mipBlockSize = mipBlocks[mipLevel];
                 Vector3ui mipSize = Graphics::TextureMipSize(t->Extents(), mipLevel);
                 Span<Byte> copyRegion = dScratchBuffer.subspan(mipBlockOffset * sizeof(BlockT),
                                                                mipBlockSize * sizeof(BlockT));
@@ -884,10 +889,8 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
             hSurfViews.push_back(mipViews);
         }
         //
-        auto hSurfViewSpan = Span<MipArray<SurfViewVariant>>(hSurfViews.begin(),
-                                                             hSurfViews.end());
-        auto hColorConvParams = Span<const ColorConvParams>(colorConvParams.cbegin(),
-                                                            colorConvParams.cend());
+        auto hSurfViewSpan = Span<MipArray<SurfViewVariant>>(hSurfViews);
+        auto hColorConvParams = Span<const ColorConvParams>(colorConvParams);
         queue.MemcpyAsync(dSufViews, ToConstSpan(hSurfViewSpan));
         queue.MemcpyAsync(dColorConvParams, hColorConvParams);
         //
