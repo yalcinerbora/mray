@@ -3,7 +3,6 @@
 #include "TracerTypes.h"
 #include "RenderImage.h"
 #include "GenericGroup.h"
-#include "TextureMemory.h"
 #include "MaterialC.h"
 #include "PrimitiveC.h"
 #include "CameraC.h"
@@ -11,6 +10,8 @@
 #include "LightC.h"
 #include "TracerTypes.h"
 #include "AcceleratorC.h"
+#include "Texture.h"
+#include "TextureFilter.h"
 
 #include "Core/TracerI.h"
 #include "Core/Algorithm.h"

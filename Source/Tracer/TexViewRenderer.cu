@@ -1,5 +1,4 @@
 #include "TexViewRenderer.h"
-#include "TracerBase.h"
 #include "TextureView.hpp"  // IWYU pragma: keep
 
 #include "Device/GPUSystem.hpp"

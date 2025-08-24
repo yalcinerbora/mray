@@ -122,7 +122,7 @@ Tuple<Vector3, Float> ConvertNaNsToColor(Spectrum value, Float weight)
 template<uint32_t TPB, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCGenerateMipmaps(// I-O
-                       MRAY_GRID_CONSTANT const Span<MipArray<SurfViewVariant>> dSurfaces,
+                       MRAY_GRID_CONSTANT const Span<MipArray<TracerSurfView>> dSurfaces,
                        // Inputs
                        MRAY_GRID_CONSTANT const Span<const MipGenParams> dMipGenParamsList,
                        // Constants
@@ -146,8 +146,8 @@ void KCGenerateMipmaps(// I-O
         uint32_t localBI = bI % blockPerTexture;
         // Load to local space
         MipGenParams curParams = dMipGenParamsList[tI];
-        SurfViewVariant writeSurf = dSurfaces[tI][currentMipLevel];
-        const SurfViewVariant readSurf = dSurfaces[tI][currentMipLevel - 1];
+        TracerSurfView writeSurf = dSurfaces[tI][currentMipLevel];
+        const TracerSurfView readSurf = dSurfaces[tI][currentMipLevel - 1];
         //
         Vector2ui mipRes = Graphics::TextureMipSize(curParams.mipZeroRes,
                                                     currentMipLevel);
@@ -202,7 +202,7 @@ static constexpr auto KC_CLAMP_IMAGE_TILE_SIZE = Vector2ui(32, 16);
 template<uint32_t TPB, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCClampImage(// Output
-                  MRAY_GRID_CONSTANT const SurfViewVariant surfaceOut,
+                  MRAY_GRID_CONSTANT const TracerSurfView surfaceOut,
                   // Inputs
                   MRAY_GRID_CONSTANT const Span<const Byte> dBufferImage,
                   // Constants
@@ -254,7 +254,7 @@ void KCClampImage(// Output
             return outData;
         });
         // Finally write the pixel
-        SurfViewVariant sOut = surfaceOut;
+        TracerSurfView sOut = surfaceOut;
         GenericWrite(sOut, writePix, wPixCoordInt);
     }
 }
@@ -1001,7 +1001,7 @@ void MultiPassReconFilterGenericRGB(// Output
 }
 
 template<class Filter>
-void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
+void GenerateMipsGeneric(const std::vector<MipArray<TracerSurfRef>>& textures,
                          const std::vector<MipGenParams>& mipGenParams,
                          const GPUSystem& gpuSystem, Filter filter)
 {
@@ -1014,21 +1014,21 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     // We can temporarily allocate here. This will be done at
     // initialization time.
     DeviceLocalMemory mem(gpuSystem.BestDevice());
-    Span<MipArray<SurfViewVariant>> dSufViews;
+    Span<MipArray<TracerSurfView>> dSufViews;
     Span<MipGenParams> dMipGenParams;
     MemAlloc::AllocateMultiData(Tie(dSufViews, dMipGenParams),
                                 mem, {textures.size(), textures.size()});
 
     // Copy references
-    std::vector<MipArray<SurfViewVariant>> hSurfViews;
+    std::vector<MipArray<TracerSurfView>> hSurfViews;
     hSurfViews.reserve(textures.size());
-    for(const MipArray<SurfRefVariant>& surfRefs : textures)
+    for(const MipArray<TracerSurfRef>& surfRefs : textures)
     {
-        MipArray<SurfViewVariant> mipViews;
+        MipArray<TracerSurfView> mipViews;
         for(size_t i = 0; i < TracerConstants::MaxTextureMipCount; i++)
         {
-            const SurfRefVariant& surf = surfRefs[i];
-            mipViews[i] = std::visit([](auto&& v) -> SurfViewVariant
+            const TracerSurfRef& surf = surfRefs[i];
+            mipViews[i] = std::visit([](auto&& v) -> TracerSurfView
             {
                 using T = std::remove_cvref_t<decltype(v)>;
                 if constexpr(std::is_same_v<T, std::monostate>)
@@ -1039,7 +1039,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
         hSurfViews.push_back(mipViews);
     }
 
-    auto hSurfViewSpan = Span<MipArray<SurfViewVariant>>(hSurfViews);
+    auto hSurfViewSpan = Span<MipArray<TracerSurfView>>(hSurfViews);
     auto hMipGenParams = Span<const MipGenParams>(mipGenParams);
     queue.MemcpyAsync(dSufViews, ToConstSpan(hSurfViewSpan));
     queue.MemcpyAsync(dMipGenParams, hMipGenParams);
@@ -1098,7 +1098,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
 
 template<class Filter>
 void ClampImageFromBufferGeneric(// Output
-                                 const SurfRefVariant& surf,
+                                 const TracerSurfRef& surf,
                                  // Input
                                  const Span<const Byte>& dDataBuffer,
                                  // Constants
@@ -1116,7 +1116,7 @@ void ClampImageFromBufferGeneric(// Output
     static constexpr uint32_t THREAD_PER_BLOCK = TILE_SIZE.Multiply();
     uint32_t blockCount = DivideUp(surfImageDims, TILE_SIZE).Multiply();
 
-    SurfViewVariant surfRef = Visit(surf, [](auto&& v) -> SurfViewVariant
+    TracerSurfView surfRef = Visit(surf, [](auto&& v) -> TracerSurfView
     {
         using T = std::remove_cvref_t<decltype(v)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -1156,7 +1156,7 @@ TextureFilterT<E, FF>::TextureFilterT(const GPUSystem& system,
 {}
 
 template<FilterType::E E, class FF>
-void TextureFilterT<E, FF>::GenerateMips(const std::vector<MipArray<SurfRefVariant>>& textures,
+void TextureFilterT<E, FF>::GenerateMips(const std::vector<MipArray<TracerSurfRef>>& textures,
                                          const std::vector<MipGenParams>& params) const
 {
     using namespace std::string_literals;
@@ -1169,7 +1169,7 @@ void TextureFilterT<E, FF>::GenerateMips(const std::vector<MipArray<SurfRefVaria
 
 template<FilterType::E E, class FF>
 void TextureFilterT<E, FF>::ClampImageFromBuffer(// Output
-                                                 const SurfRefVariant& surf,
+                                                 const TracerSurfRef& surf,
                                                  // Input
                                                  const Span<const Byte>& dDataBuffer,
                                                  // Constants

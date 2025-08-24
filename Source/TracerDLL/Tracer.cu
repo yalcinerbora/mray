@@ -9,6 +9,7 @@
 #include "Tracer.h"
 #include "RequestedTypes.h"
 #include "RequestedRenderers.h"
+#include "SurfaceView.h"
 
 #include "Core/Variant.h"
 

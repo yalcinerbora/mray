@@ -10,6 +10,8 @@
 #include "Filters.h"
 
 class RayPartitioner;
+struct TracerSurfRef;
+struct TracerSurfView;
 
 struct alignas(Vector4ui) MipGenParams
 {
@@ -55,10 +57,10 @@ class TextureFilterI
     public:
     virtual         ~TextureFilterI() = default;
     // Interface
-    virtual void    GenerateMips(const std::vector<MipArray<SurfRefVariant>>&,
+    virtual void    GenerateMips(const std::vector<MipArray<TracerSurfRef>>&,
                                  const std::vector<MipGenParams>&) const = 0;
     virtual void    ClampImageFromBuffer(// Output
-                                         const SurfRefVariant& surf,
+                                         const TracerSurfRef& surf,
                                          // Input
                                          const Span<const Byte>& dDataBuffer,
                                          // Constants
@@ -104,10 +106,10 @@ class TextureFilterT : public TextureFilterI
     // Constructors & Destructor
             TextureFilterT(const GPUSystem&, Float filterRadius);
     //
-    void    GenerateMips(const std::vector<MipArray<SurfRefVariant>>&,
+    void    GenerateMips(const std::vector<MipArray<TracerSurfRef>>&,
                          const std::vector<MipGenParams>&) const override;
     void    ClampImageFromBuffer(// Output
-                                 const SurfRefVariant& surf,
+                                 const TracerSurfRef& surf,
                                  // Input
                                  const Span<const Byte>& dDataBuffer,
                                  // Constants
@@ -148,3 +150,5 @@ using TextureFilterBox = TextureFilterT<FilterType::BOX, BoxFilter>;
 using TextureFilterTent = TextureFilterT<FilterType::TENT, TentFilter>;
 using TextureFilterGaussian = TextureFilterT<FilterType::GAUSSIAN, GaussianFilter>;
 using TextureFilterMitchellNetravali = TextureFilterT<FilterType::MITCHELL_NETRAVALI, MitchellNetravaliFilter>;
+
+using FilterGeneratorMap = Map<FilterType::E, TexFilterGenerator>;

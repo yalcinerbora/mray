@@ -589,10 +589,10 @@ Expected<ImageHeader> ImageFileDDS::ReadHeader()
                                         ddsHeader.dwHeight, 1u);
 
     // Calculate the color space and pixel
-    Expected<Pair<ColorSpacePack, MRayPixelTypeRT>> r;
-    r = (headerDX10)
-            ? ReadPixelTypeDDS_DX10(*headerDX10)
-            : ReadPixelTypeDDS_DX9(ddsHeader);
+    using HeaderResult = Expected<Pair<ColorSpacePack, MRayPixelTypeRT>>;
+    HeaderResult r = (headerDX10)
+                    ? ReadPixelTypeDDS_DX10(*headerDX10)
+                    : ReadPixelTypeDDS_DX9(ddsHeader);
     // Delegate to the OIIO
     if(r.has_error()) return r.error();
 

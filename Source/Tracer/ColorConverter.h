@@ -5,6 +5,7 @@
 #include "TextureCommon.h"
 
 class GenericTexture;
+struct TracerSurfRef;
 
 struct ColorConvParams
 {
@@ -24,7 +25,7 @@ class ColorConverter
     // Constructors & Destructor
             ColorConverter(const GPUSystem&);
 
-    void    ConvertColor(std::vector<MipArray<SurfRefVariant>> textures,
+    void    ConvertColor(std::vector<MipArray<TracerSurfRef>> textures,
                          std::vector<ColorConvParams> params,
                          std::vector<GenericTexture*> bcTextures,
                          MRayColorSpaceEnum globalColorSpace) const;

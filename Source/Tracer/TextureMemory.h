@@ -10,16 +10,26 @@
 #include "TextureFilter.h"
 #include "Texture.h"
 
-using FilterGeneratorMap = Map<FilterType::E, TexFilterGenerator>;
+struct TracerSurfRef;
+struct TracerSurfView;
 
 struct TexClampParameters
 {
     Vector2ui       inputMaxRes;
-    uint16_t        filteredMipLevel;
-    uint16_t        ignoredMipCount;
-    bool            willBeFiltered = false;
-    // Utilize this struct to extent the lifetime of the surface
-    SurfRefVariant  surface;
+    uint16_t        filteredMipLevel    = 0;
+    uint16_t        ignoredMipCount     = 0;
+    bool            willBeFiltered      = false;
+    // TODO: Due to heavy template cost of SurfRefVariant
+    // (and it is parsed by most of the cu files)
+    // we heap allocate the thing.
+    std::unique_ptr<TracerSurfRef> surface = nullptr;
+
+    // Constructors & Destructor
+    TexClampParameters() = default;
+    TexClampParameters(TexClampParameters&&) = default;
+    // To accept fully incomplete type, define the destructor
+    // (we will default it outside)
+    ~TexClampParameters();
 };
 
 // Lets use type erasure on the host side
@@ -80,7 +90,7 @@ class GenericTextureI
     // Writable view only used for mipmap generation,
     // Only 2D and not block-compressed textures are supported
     virtual bool            HasRWView() const = 0;
-    virtual SurfRefVariant  RWView(uint32_t mipLevel) = 0;
+    virtual TracerSurfRef   RWView(uint32_t mipLevel) = 0;
     virtual bool            IsBlockCompressed() const = 0;
 
     // And All Done!

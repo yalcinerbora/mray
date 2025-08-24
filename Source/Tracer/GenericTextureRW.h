@@ -2,23 +2,24 @@
 
 #include "Device/GPUTextureView.h"  // IWYU pragma: keep
 #include "TextureCommon.h"
+#include "SurfaceView.h"
 
 MR_GF_DECL
 Vector4 GenericRead(const Vector2ui& pixCoords,
-                    const SurfViewVariant& surf);
+                    const TracerSurfView& surf);
 
 MR_GF_DECL
 Vector4 GenericReadFromBuffer(const Span<const Byte>& dBufferImage,
-                              const SurfViewVariant& surfToVisit,
+                              const TracerSurfView& surfToVisit,
                               uint32_t pixCoordLinear);
 
 MR_GF_DECL
-void GenericWrite(SurfViewVariant& surf, const Vector4& value,
+void GenericWrite(TracerSurfView& surf, const Vector4& value,
                   const Vector2ui& pixCoords);
 
 MR_GF_DEF
 Vector4 GenericRead(const Vector2ui& pixCoords,
-                    const SurfViewVariant& surf)
+                    const TracerSurfView& surf)
 {
     Vector4 v = Visit
     (
@@ -50,7 +51,7 @@ Vector4 GenericRead(const Vector2ui& pixCoords,
 
 MR_GF_DEF
 Vector4 GenericReadFromBuffer(const Span<const Byte>& dBufferImage,
-                              const SurfViewVariant& surfToVisit,
+                              const TracerSurfView& surfToVisit,
                               uint32_t pixCoordLinear)
 {
     return Visit
@@ -86,7 +87,7 @@ Vector4 GenericReadFromBuffer(const Span<const Byte>& dBufferImage,
 }
 
 MR_GF_DEF
-void GenericWrite(SurfViewVariant& surf,
+void GenericWrite(TracerSurfView& surf,
                   const Vector4& value,
                   const Vector2ui& pixCoords)
 {

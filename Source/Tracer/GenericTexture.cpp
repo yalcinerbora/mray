@@ -1,4 +1,5 @@
 #include "TextureMemory.h"
+#include "SurfaceView.h"
 
 GenericTextureI* GenericTexture::Impl()
 {
@@ -100,7 +101,7 @@ bool GenericTexture::IsBlockCompressed() const
     return Impl()->IsBlockCompressed();
 }
 
-SurfRefVariant GenericTexture::RWView(uint32_t mipLevel)
+TracerSurfRef GenericTexture::RWView(uint32_t mipLevel)
 {
     return Impl()->RWView(mipLevel);
 }

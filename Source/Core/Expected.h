@@ -2,24 +2,61 @@
 
 #include "Error.h"
 #include "Types.h"
-#include "Variant.h"
+
+#include <memory>
 
 // std::expected is not in standard as of c++20 so rolling a simple
 // version of it, all errors in this codebase is MRayError
 // so no template for it.
-//
-// Piggybacking variant here for most of the construction stuff
-template<class T>
-struct Expected : protected Variant<T, MRayError>
+template<class Val>
+struct Expected
 {
+    template<class T>
+    static constexpr bool
+    IsValConstructor = (!std::is_same_v<std::remove_cvref_t<T>, Expected> &&
+                        !std::is_same_v<std::remove_cvref_t<T>, MRayError>);
+    template<class T>
+    static constexpr bool
+    IsErrConstructor = (!std::is_same_v<std::remove_cvref_t<T>, Expected> &&
+                        std::is_same_v<std::remove_cvref_t<T>, MRayError>);
+
+    enum class State : uint8_t
+    {
+        VALUELESS,
+        HAS_ERROR,
+        HAS_VALUE
+    };
+
+    // TODO: Defensively checking for this without any reason.
+    // Having an expected error is not logical. But if
+    // it is required later we can remove this check.
+    static_assert(!std::is_same_v<Val, MRayError>,
+                  "Expected can not hold MRayError as its "
+                  "template parameter");
     private:
-    using Base = Variant<T, MRayError>;
+    union
+    {
+        MRayError   err;
+        Val         val;
+    };
+    State state = State::VALUELESS;
 
     public:
-    using Base::Base;
-    // Our variant does not deduce implicit conversions
-    // So exclusively construct
-    Expected(MRayError::Type E) : Base(MRayError(E)) {}
+    // Constructors
+    // Enum Constructor
+                Expected(MRayError::Type E);
+    // Data Constructor
+    template<class T>
+                Expected(T&& v) requires(IsValConstructor<T>);
+    // We also define Error as template so it gets forwarded properly
+    template<class E>
+                Expected(E&& e) requires(IsErrConstructor<E>);
+    // Logistics
+                Expected(const Expected&);
+                Expected(Expected&&);
+    Expected&   operator=(const Expected&);
+    Expected&   operator=(Expected&&);
+                ~Expected();
 
     // Provide semantically the same API,
     // we may switch this to actual std::expected later
@@ -30,64 +67,145 @@ struct Expected : protected Variant<T, MRayError>
     constexpr bool  has_value() const noexcept;
     constexpr bool  has_error() const noexcept;
 
-    constexpr const T&  value() const;
-    constexpr T&        value();
+    constexpr const Val&  value() const;
+    constexpr Val&        value();
 
     constexpr const MRayError&  error() const noexcept;
     constexpr MRayError&        error() noexcept;
 
     // This is not technically 1 to 1
     // but it is more restrictive so ok
-    constexpr T value_or(const T&) const;
+    constexpr Val value_or(const Val&) const;
 };
 
-template <class T>
-constexpr Expected<T>::operator bool() const noexcept
+template <class V>
+Expected<V>::Expected(MRayError::Type E)
+    : err(E)
+    , state(State::HAS_ERROR)
+{}
+
+// Error Constructor
+template<class V>
+template<class T>
+Expected<V>::Expected(T&& v) requires(IsValConstructor<T>)
+{
+    std::construct_at(&val, std::forward<T>(v));
+    state = State::HAS_VALUE;
+}
+
+// We also define Error as template so it gets forwarded properly
+template<class V>
+template<class E>
+Expected<V>::Expected(E&& e) requires(IsErrConstructor<E>)
+{
+    std::construct_at(&err, std::forward<E>(e));
+    state = State::HAS_ERROR;
+}
+
+template<class V>
+Expected<V>::Expected(const Expected& other)
+{
+         if(state == State::HAS_ERROR) err = other.err;
+    else if(state == State::HAS_VALUE) val = other.val;
+    //
+    state = other.state;
+}
+
+template<class V>
+Expected<V>::Expected(Expected&& other)
+{
+         if(state == State::HAS_ERROR) err = std::move(other.err);
+    else if(state == State::HAS_VALUE) val = std::move(other.val);
+    //
+    state = other.state;
+    other.state = State::VALUELESS;
+}
+
+template<class V>
+Expected<V>& Expected<V>::operator=(const Expected& other)
+{
+    assert(this != &other);
+         if(state == State::HAS_ERROR) std::destroy_at(&err);
+    else if(state == State::HAS_VALUE) std::destroy_at(&val);
+    //
+         if(state == State::HAS_ERROR) err = other.err;
+    else if(state == State::HAS_VALUE) val = other.val;
+    //
+    state = other.state;
+    return *this;
+}
+
+template<class V>
+Expected<V>& Expected<V>::operator=(Expected&& other)
+{
+    assert(this != &other);
+         if(state == State::HAS_ERROR) std::destroy_at(&err);
+    else if(state == State::HAS_VALUE) std::destroy_at(&val);
+    //
+         if(state == State::HAS_ERROR) err = std::move(other.err);
+    else if(state == State::HAS_VALUE) val = std::move(other.val);
+    //
+    state = other.state;
+    other.state = State::VALUELESS;
+    return *this;
+}
+
+template<class V>
+Expected<V>::~Expected()
+{
+         if(state == State::HAS_ERROR) std::destroy_at(&err);
+    else if(state == State::HAS_VALUE) std::destroy_at(&val);
+}
+
+template <class V>
+constexpr Expected<V>::operator bool() const noexcept
 {
     return has_error();
 }
 
-template <class T>
-constexpr bool Expected<T>::has_value() const noexcept
+template <class V>
+constexpr bool Expected<V>::has_value() const noexcept
 {
-    return !std::holds_alternative<MRayError>(*this);
+    return state == State::HAS_VALUE;
 }
 
-template <class T>
-constexpr bool Expected<T>::has_error() const noexcept
+template <class V>
+constexpr bool Expected<V>::has_error() const noexcept
 {
-    return !has_value();
+    return state == State::HAS_ERROR;
 }
 
-template <class T>
-constexpr const T& Expected<T>::value() const
+template <class V>
+constexpr const V& Expected<V>::value() const
 {
-    return std::get<T>(*this);
+    assert(has_value());
+    return val;
 }
 
-template <class T>
-constexpr T& Expected<T>::value()
+template <class V>
+constexpr V& Expected<V>::value()
 {
-    return std::get<T>(*this);
+    assert(has_value());
+    return val;
 }
 
-template <class T>
-constexpr const MRayError& Expected<T>::error() const noexcept
+template <class V>
+constexpr const MRayError& Expected<V>::error() const noexcept
 {
-    return std::get<MRayError>(*this);
+    assert(has_error());
+    return err;
 }
 
-template <class T>
-constexpr MRayError& Expected<T>::error() noexcept
+template <class V>
+constexpr MRayError& Expected<V>::error() noexcept
 {
-    return std::get<MRayError>(*this);
+    assert(has_error());
+    return err;
 }
 
-template <class T>
-constexpr T Expected<T>::value_or(const T& t) const
+template <class V>
+constexpr V Expected<V>::value_or(const V& t) const
 {
-    if(std::holds_alternative<MRayError>(*this))
-        return t;
-    else
-        return std::get<T>(*this);
+    if(state == State::HAS_VALUE)   return val;
+    else                            return t;
 }

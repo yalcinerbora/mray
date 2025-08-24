@@ -239,15 +239,6 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
         // ================ //
         //  Scattered Ray   //
         // ================ //
-        // TODO: Report bug on NVIDIA, Below code crashes on 1080 (CC_61)
-        // ACCESS_VIOLATION on ptxas. But not on 3070ti mobile (CC_89)
-        // ==========================================
-        //Vector3 nudgeNormal = (raySample.value.isPassedThrough)
-        //    ? -surf.geoNormal
-        //    : surf.geoNormal;
-        //Ray rayOut = Ray(wI, surf.position);
-        // rayOut.NudgeSelf(nudgeNormal);
-        // ==========================================
         Vector3 nudgeNormal = surf.geoNormal;
         if(raySample.value.isPassedThrough)
             nudgeNormal *= Float(-1);
