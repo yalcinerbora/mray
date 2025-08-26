@@ -359,8 +359,8 @@ async function FetchShader(fName)
     function DecorateWithPrefix(fName)
     {
         // Use this sphinx stuff for relative fetch
-        const body = document.body;
-        return (body.getAttribute('data-content_root') || '/') + fName;
+        const htmlTag = document.documentElement;
+        return (htmlTag.getAttribute('data-content_root') || '/') + fName;
     }
 
     const absFName = DecorateWithPrefix(fName)
@@ -428,7 +428,7 @@ function CreateProgramGL(vShaderSource, fShaderSource)
         if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
         {
             var info = gl.getShaderInfoLog(shader);
-            console.log("CompilerError \n" + info);
+            console.log("CompileError \n" + info);
         }
         return shader;
     };
