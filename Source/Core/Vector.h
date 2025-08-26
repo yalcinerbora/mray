@@ -44,7 +44,7 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
 
     public:
     // Constructors & Destructor
-    constexpr           Vector() = default;
+    constexpr             Vector() = default;
     template<std::convertible_to<T> C>
     MR_PF_DECL_V explicit Vector(C);
     template<std::convertible_to<T> C>
@@ -53,7 +53,7 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     MR_PF_DECL_V explicit Vector(const Args... dataList);
     template <class... Args>
     MR_PF_DECL_V explicit Vector(const Vector<N - sizeof...(Args), T>&,
-                               const Args... dataList) requires (N - sizeof...(Args) > 1);
+                                 const Args... dataList) requires (N - sizeof...(Args) > 1);
     template<std::convertible_to<T> C>
     MR_PF_DECL_V explicit Vector(std::array<C, N>&& data);
     template<std::convertible_to<T> C>

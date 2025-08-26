@@ -5,6 +5,7 @@
 #include "../GPUSystem.h"   // IWYU pragma: keep
 
 #include "Core/ThreadPool.h"
+#include <cstdint>
 
 static constexpr uint32_t WarpSize()
 {
@@ -39,6 +40,7 @@ struct GenericWorkFunctor
     uint64_t            newIssueCount;
     ControlBlock*       cbPtr;
     uint32_t            callerBlockCount;
+    uint32_t            dynamicTPB;
     WrappedFunc         func;
     AnnotationHandle    domain;
     std::string_view    name;
@@ -59,8 +61,9 @@ struct GenericWorkFunctor
             const auto thrdWorkScope = thrdWorkAnnot.AnnotateScope();
 
             assert(blockEnd - blockStart == 1);
+            uint32_t SelectedTPB = (TPB == 0) ? dynamicTPB : TPB;
             const_cast<uint32_t&>(globalKCParams.gridSize) = callerBlockCount;
-            const_cast<uint32_t&>(globalKCParams.blockSize) = TPB;
+            const_cast<uint32_t&>(globalKCParams.blockSize) = SelectedTPB;
 
             // Do the block stride loop here,
             // each thread may be responsible for one or more blocks
@@ -70,7 +73,8 @@ struct GenericWorkFunctor
                 bId = blockCounter.fetch_add(1u))
             {
                 globalKCParams.blockId = bId;
-                for(uint32_t j = 0; j < TPB; j++)
+
+                for(uint32_t j = 0; j < SelectedTPB; j++)
                 {
                     globalKCParams.threadId = j;
                     func();
@@ -106,8 +110,10 @@ template<uint32_t TPB, class WrappedKernel>
 MR_HF_DEF
 void GPUQueueCPU::IssueInternal(std::string_view name,
                                 uint32_t totalWorkCount,
+                                uint32_t blockSize,
                                 WrappedKernel&& kernel) const
 {
+    assert(TPB == 0 || blockSize == TPB);
     static const auto annotation = GPUAnnotationCPU(domain, name);
     const auto annotationHandle = annotation.AnnotateScope();
     // We are locking here, since all of the block submissions
@@ -123,9 +129,9 @@ void GPUQueueCPU::IssueInternal(std::string_view name,
 
     // Give just enough grid to eliminate grid-stride / block-stride
     // loops (for CPU these do more harm than good, unlike GPU)
-    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, TPB,
+    uint32_t blockCount = DetermineGridStrideBlock(nullptr, 0, blockSize,
                                                    totalWorkCount);
-    uint32_t callerBlockCount = Math::DivideUp(totalWorkCount, TPB);
+    uint32_t callerBlockCount = Math::DivideUp(totalWorkCount, blockSize);
     //
     uint64_t oldIssueCount = cb->issuedKernelCounter.fetch_add(blockCount);
     uint64_t newIssueCount = oldIssueCount + blockCount;
@@ -144,6 +150,7 @@ void GPUQueueCPU::IssueInternal(std::string_view name,
             .newIssueCount = newIssueCount,
             .cbPtr = cb.get(),
             .callerBlockCount = callerBlockCount,
+            .dynamicTPB = blockSize,
             .func = std::forward<WrappedKernel>(kernel),
             .domain = this->domain,
             .name = name
@@ -162,7 +169,7 @@ void GPUQueueCPU::IssueWorkKernel(std::string_view name,
     assert(p.workCount != 0);
     IssueInternal<StaticThreadPerBlock1D()>
     (
-        name, p.workCount,
+        name, p.workCount, StaticThreadPerBlock1D(),
         [...fArgs = std::forward<Args>(fArgs)]()
         {
             Kernel(fArgs...);
@@ -180,7 +187,7 @@ void GPUQueueCPU::IssueWorkLambda(std::string_view name,
     assert(p.workCount != 0);
     IssueInternal<StaticThreadPerBlock1D()>
     (
-        name, p.workCount,
+        name, p.workCount, StaticThreadPerBlock1D(),
         [func = std::forward<Lambda>(func)]()
         {
             KernelCallParamsCPU kp;
@@ -201,25 +208,30 @@ void GPUQueueCPU::IssueBlockKernel(std::string_view name,
     // TODO: Reason about this
     uint32_t workCount = p.blockSize * p.gridSize;
     //
-    #define KCall(BLOCK_SIZE)                           \
+    #define MRAY_KCALL(BLOCK_SIZE)                      \
         IssueInternal<BLOCK_SIZE>                       \
         (                                               \
-            name, workCount,                            \
+            name, workCount, p.blockSize,               \
             [...fArgs = std::forward<Args>(fArgs)]()    \
             {                                           \
                 Kernel(fArgs...);                       \
             }                                           \
-        )                                               \
-    //
-    switch (p.blockSize)
-    {
-        case 1  : KCall(1u);    break;
-        case 128: KCall(128u);  break;
-        case 256: KCall(256u);  break;
-        case 512: KCall(512u);  break;
-        default : throw MRayError("Unable to Call Kernel {}", name);
-    }
-    #undef KCall
+        )
+    // TODO: We are stopping this since it increases compile
+    // times. Also compiler does not benefit form it.
+    // System is stayed the same but we just call the kernel with
+    // zero, and templated function knows what to do.
+    // switch (p.blockSize)
+    // {
+    //     case 1  : MRAY_KCALL(1u);    break;
+    //     case 128: MRAY_KCALL(128u);  break;
+    //     case 256: MRAY_KCALL(256u);  break;
+    //     case 512: MRAY_KCALL(512u);  break;
+    //     default : throw MRayError("Unable to Call Kernel {}", name);
+    // }
+    MRAY_KCALL(0u);
+
+    #undef MRAY_KCALL
 }
 
 template<class Lambda, uint32_t Bounds>
@@ -231,30 +243,33 @@ void GPUQueueCPU::IssueBlockLambda(std::string_view name,
 {
     assert(p.gridSize != 0);
     assert(p.blockSize != 0);
-
     // TODO: Reason about this
     uint32_t workCount = p.blockSize * p.gridSize;
     //
-    #define KCall(BLOCK_SIZE)                       \
+    #define MRAY_KCALL(BLOCK_SIZE)                  \
         IssueInternal<BLOCK_SIZE>                   \
         (                                           \
-            name, workCount,                        \
+            name, workCount, p.blockSize,           \
             [func = std::forward<Lambda>(func)]()   \
             {                                       \
                 KernelCallParamsCPU kp;             \
                 func(kp);                           \
             }                                       \
-        );
-    //
-    switch (p.blockSize)
-    {
-        case 1  : KCall(1u);    break;
-        case 128: KCall(128u);  break;
-        case 256: KCall(256u);  break;
-        case 512: KCall(512u);  break;
-        default : throw MRayError("Unable to Call Kernel {}", name);
-    }
-    #undef KCall
+        )
+    // TODO: We are stopping this since it increases compile
+    // times. Also compiler does not benefit form it.
+    // System is stayed the same but we just call the kernel with
+    // zero, and templated function knows what to do.
+    // switch (p.blockSize)
+    // {
+    //     case 1  : MRAY_KCALL(1u);    break;
+    //     case 128: MRAY_KCALL(128u);  break;
+    //     case 256: MRAY_KCALL(256u);  break;
+    //     case 512: MRAY_KCALL(512u);  break;
+    //     default : throw MRayError("Unable to Call Kernel {}", name);
+    // }
+    MRAY_KCALL(0u);
+    #undef MRAY_KCALL
 }
 
 template<auto Kernel, class... Args>

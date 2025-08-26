@@ -3,6 +3,7 @@
 #include "Core/MPMCQueue.h"
 #include "Core/TracerI.h"
 #include "Core/TimelineSemaphore.h"
+#include "Core/Variant.h"
 
 #include "AnalyticStructs.h"
 #include "RenderImageStructs.h"
@@ -13,7 +14,7 @@ struct SemaphoreInfo
     uint32_t            importMemAlignment  = 0;
 };
 
-struct TracerResponse : public std::variant
+struct TracerResponse : public Variant
 <
     CameraTransform,        // initial cam transform
     SceneAnalyticData,      // scene analytics
@@ -28,11 +29,11 @@ struct TracerResponse : public std::variant
     uint64_t                // memory usage
 >
 {
-    using Base = std::variant<CameraTransform, SceneAnalyticData,
-                              TracerAnalyticData, RendererAnalyticData,
-                              RendererOptionPack, RenderBufferInfo,
-                              bool, RenderImageSection, RenderImageSaveInfo,
-                              RenderImageSaveInfo, uint64_t>;
+    using Base = Variant<CameraTransform, SceneAnalyticData,
+                         TracerAnalyticData, RendererAnalyticData,
+                         RendererOptionPack, RenderBufferInfo,
+                         bool, RenderImageSection, RenderImageSaveInfo,
+                         RenderImageSaveInfo, uint64_t>;
     enum Type
     {
         CAMERA_INIT_TRANSFORM = 0,  // Return a camera initial transform when
@@ -55,7 +56,7 @@ struct TracerResponse : public std::variant
     using Base::Base;
 };
 
-struct VisorAction : public std::variant
+struct VisorAction : public Variant
 <
     CameraTransform,        // transform
     uint32_t,               // camera index
@@ -72,11 +73,11 @@ struct VisorAction : public std::variant
     std::string             // Initial Render Config
 >
 {
-    using Base = std::variant<CameraTransform, uint32_t,
-                              std::string, uint32_t, uint32_t, std::string,
-                              float, bool, bool,
-                              SemaphoreInfo, bool, bool,
-                              std::string>;
+    using Base = Variant<CameraTransform, uint32_t,
+                         std::string, uint32_t, uint32_t, std::string,
+                         float, bool, bool,
+                         SemaphoreInfo, bool, bool,
+                         std::string>;
     enum Type
     {
         CHANGE_CAM_TRANSFORM = 0,   // Give new transform to the tracer

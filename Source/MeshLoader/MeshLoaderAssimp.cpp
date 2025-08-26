@@ -162,13 +162,13 @@ MRayDataTypeRT MeshViewAssimp::AttributeLayout(PrimitiveAttributeLogic attribLog
        attribLogic == PrimitiveAttributeLogic::NORMAL ||
        attribLogic == PrimitiveAttributeLogic::TANGENT ||
        attribLogic == PrimitiveAttributeLogic::BITANGENT)
-        return MRayDataTypeRT(MRayDataType<MR_VECTOR_3>());
+        return MRayDataTypeRT(MR_VECTOR_3);
     else if(attribLogic == PrimitiveAttributeLogic::UV0)
-        return MRayDataTypeRT(MRayDataType<MR_VECTOR_2>());
+        return MRayDataTypeRT(MR_VECTOR_2);
     else if(attribLogic == PrimitiveAttributeLogic::UV1)
-        return MRayDataTypeRT(MRayDataType<MR_VECTOR_2>());
+        return MRayDataTypeRT(MR_VECTOR_2);
     else if(attribLogic == PrimitiveAttributeLogic::INDEX)
-        return MRayDataTypeRT(MRayDataType<MR_VECTOR_3UI>());
+        return MRayDataTypeRT(MR_VECTOR_3UI);
     else
         throw MRayError("Unknown attribute logic!");
 }

@@ -124,6 +124,11 @@ size_t TransientData::Size() const
     return usedBytes / sizeof(T);
 }
 
+inline size_t TransientData::ByteSize() const
+{
+    return usedBytes;
+}
+
 template<>
 inline Span<const Byte> TransientData::AccessAs() const
 {
@@ -142,17 +147,17 @@ inline Span<Byte> TransientData::AccessAs()
 
 // Strings are special, assume as char array
 // count should be the count of
-template<>
-inline TransientData::TransientData(std::in_place_type_t<std::string>,
-                                    size_t charCount)
-    : typeHash(typeid(std::string).hash_code())
-    , usedBytes(0)
-    , alignment(alignof(typename std::string::value_type))
-{
-    using CharType = typename std::string::value_type;
-    Byte* ptr = reinterpret_cast<Byte*>(mainR.allocate(charCount * sizeof(CharType), alignof(CharType)));
-    ownedMem = Span<Byte>(ptr, charCount * sizeof(CharType));
-}
+// template<>
+// inline TransientData::TransientData(std::in_place_type_t<std::string_view>,
+//                                     size_t charCount)
+//     : typeHash(typeid(std::string).hash_code())
+//     , usedBytes(0)
+//     , alignment(alignof(typename std::string::value_type))
+// {
+//     using CharType = typename std::string::value_type;
+//     Byte* ptr = reinterpret_cast<Byte*>(mainR.allocate(charCount * sizeof(CharType), alignof(CharType)));
+//     ownedMem = Span<Byte>(ptr, charCount * sizeof(CharType));
+// }
 
 template<>
 inline TransientData::TransientData(std::in_place_type_t<std::string_view>,

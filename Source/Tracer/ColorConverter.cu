@@ -11,13 +11,13 @@
 #include "Core/GraphicsFunctions.h"
 #include "Core/Algorithm.h"
 
-using MipBlockCountList = StaticVector<uint64_t, TracerConstants::MaxTextureMipCount>;
+using MipBlockCountList = StaticVector<uint32_t, TracerConstants::MaxTextureMipCount>;
 
 static constexpr uint32_t BC_TEX_PER_BATCH = 16;
 
 struct BCColorConvParams
 {
-    Vector2ul           blockRange;
+    Vector2ui           blockRange;
     Float               gamma;
     MRayColorSpaceEnum  fromColorSpace;
 };
@@ -25,7 +25,7 @@ using BCColorConvParamList = std::array<BCColorConvParams, BC_TEX_PER_BATCH>;
 
 // Order is important here
 template <MRayColorSpaceEnum E>
-using ConverterList = std::tuple
+using ConverterList = Tuple
 <
     Color::ColorspaceTransfer<MRayColorSpaceEnum::MR_ACES2065_1,    E>,
     Color::ColorspaceTransfer<MRayColorSpaceEnum::MR_ACES_CG,       E>,
@@ -37,15 +37,15 @@ using ConverterList = std::tuple
 
 // TODO: This cannot be alised or clang throws fatal error
 // Report.
-static constexpr auto ConverterLists = std::tuple
-{
+static constexpr auto ConverterLists = Tuple
+(
     ConverterList<MRayColorSpaceEnum::MR_ACES2065_1>{},
     ConverterList<MRayColorSpaceEnum::MR_ACES_CG>{},
     ConverterList<MRayColorSpaceEnum::MR_REC_709>{},
     ConverterList<MRayColorSpaceEnum::MR_REC_2020>{},
     ConverterList<MRayColorSpaceEnum::MR_DCI_P3>{},
     ConverterList<MRayColorSpaceEnum::MR_ADOBE_RGB>{}
-};
+);
 
 using BCTypeMap = TypeFinder::E_TMapper<MRayPixelEnum>;
 using BCReaderFinder = BCTypeMap::Map
@@ -63,7 +63,7 @@ using BCReaderFinder = BCTypeMap::Map
 >;
 
 // Luminance Extract related
-using ColorspaceList = std::tuple
+using ColorspaceList = Tuple
 <
     Color::Colorspace<MRayColorSpaceEnum::MR_ACES2065_1>,
     Color::Colorspace<MRayColorSpaceEnum::MR_ACES_CG>,
@@ -80,11 +80,11 @@ struct LuminanceExtractParams
 };
 
 MR_GF_DECL
-Vector3 GenericFromNorm(const Vector3& t, const SurfViewVariant& surfView)
+Vector3 GenericFromNorm(const Vector3& t, const TracerSurfView& surfView)
 {
     using namespace NormConversion;
     // Utilize the surfView variant to get the type etc
-    return DeviceVisit(surfView, [t](auto&& sv) -> Vector3
+    return Visit(surfView, [t](auto&& sv) -> Vector3
     {
         Vector3 result = t;
         using VariantType = std::remove_cvref_t<decltype(sv)>;
@@ -123,11 +123,11 @@ Vector3 GenericFromNorm(const Vector3& t, const SurfViewVariant& surfView)
 }
 
 MR_GF_DECL
-Vector3 GenericToNorm(const Vector3& t, const SurfViewVariant& surfView)
+Vector3 GenericToNorm(const Vector3& t, const TracerSurfView& surfView)
 {
     using namespace NormConversion;
     // Utilize the surfView variant to get the type etc
-    return DeviceVisit(surfView, [t](auto&& sv) -> Vector3
+    return Visit(surfView, [t](auto&& sv) -> Vector3
     {
         using Math::Clamp;
         Vector3 result = t;
@@ -181,7 +181,7 @@ Vector3 GenericToNorm(const Vector3& t, const SurfViewVariant& surfView)
 MR_GF_DECL
 Vector3 GenericReadFromView(const Vector2& uv, GenericTextureView& view)
 {
-    return DeviceVisit(view, [&](auto&& t) -> Vector3
+    return Visit(view, [&](auto&& t) -> Vector3
     {
         using T = std::remove_cvref_t<decltype(t)>;
         if constexpr(T::Dimensions != 2)
@@ -303,7 +303,7 @@ void KCConvertColorBC(// I-O
 template<uint32_t TPB, class ConverterTuple>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCConvertColor(// I-O
-                    MRAY_GRID_CONSTANT const Span<MipArray<SurfViewVariant>> dSurfaces,
+                    MRAY_GRID_CONSTANT const Span<MipArray<TracerSurfView>> dSurfaces,
                     // Inputs
                     MRAY_GRID_CONSTANT const Span<const ColorConvParams> dColorConvParamsList,
                     // Constants
@@ -324,7 +324,7 @@ void KCConvertColor(// I-O
         uint32_t localBI = bI % blockPerTexture;
         // Load to local space
         ColorConvParams curParams = dColorConvParamsList[tI];
-        SurfViewVariant rwSurf = dSurfaces[tI][currentMipLevel];
+        TracerSurfView rwSurf = dSurfaces[tI][currentMipLevel];
         //
         // Padded
         Vector2ui mipRes = Graphics::TextureMipSize(curParams.mipZeroRes,
@@ -471,6 +471,12 @@ void KCExtractLuminance(// I-O
     }
 }
 
+struct TotalTilesOfResult
+{
+    MipBlockCountList countList;
+    uint32_t totalBlocks;
+};
+
 class BCColorConverter
 {
     private:
@@ -479,8 +485,7 @@ class BCColorConverter
     size_t                          bufferSize;
 
     template<MRayPixelEnum E>
-    Pair<MipBlockCountList, uint64_t>
-            FindTotalTilesOf(const GenericTexture* t) const;
+    TotalTilesOfResult FindTotalTilesOf(const GenericTexture* t) const;
     //
     template<MRayPixelEnum E>
     requires(E != MRayPixelEnum::MR_BC6H_UFLOAT &&
@@ -513,7 +518,7 @@ class BCColorConverter
 class NormalColorConverter
 {
     public:
-    void CallColorConvertKernel(Span<MipArray<SurfViewVariant>> dSufViews,
+    void CallColorConvertKernel(Span<MipArray<TracerSurfView>> dSufViews,
                                 Span<const ColorConvParams> dColorConvParams,
                                 uint8_t maxMipCount,
                                 MRayColorSpaceEnum globalColorSpace,
@@ -521,7 +526,7 @@ class NormalColorConverter
 };
 
 template<MRayPixelEnum E>
-Pair<MipBlockCountList, uint64_t>
+TotalTilesOfResult
 BCColorConverter::FindTotalTilesOf(const GenericTexture* t) const
 {
     static_assert(MRayPixelType<E>::IsBCPixel,
@@ -530,7 +535,7 @@ BCColorConverter::FindTotalTilesOf(const GenericTexture* t) const
     static constexpr uint32_t TILE_SIZE = PixType::TileSize;
 
     using Math::DivideUp;
-    uint64_t total = 0;
+    uint32_t total = 0;
     MipBlockCountList result;
     for(uint32_t i = 0; i < t->MipCount(); i++)
     {
@@ -538,7 +543,7 @@ BCColorConverter::FindTotalTilesOf(const GenericTexture* t) const
         Vector3ui blockCount = Vector3ui(DivideUp(Vector2ui(mipSize),
                                                   Vector2ui(TILE_SIZE)),
                                          mipSize[2]);
-        uint64_t mipBlockCount = blockCount.Multiply();
+        uint32_t mipBlockCount = blockCount.Multiply();
         result.push_back(mipBlockCount);
         total += mipBlockCount;
     }
@@ -555,7 +560,7 @@ void BCColorConverter::CallKernelForType(Span<Byte>, const Vector2ui&,
     MRAY_WARNING_LOG("[Tracer]: Scene has BC6H textures with a non \"MR_DEFAULT\" "
                      "color space. BC6H color space conversion is not supported."
                      "These textures will be treated as in Tracer's color space "
-                     "(which is \"Linear/ACES_CG\")",
+                     "(which is \"{}\")",
                      MRayColorSpaceStringifier::ToString(globalColorSpace));
 }
 
@@ -585,26 +590,26 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
         uint32_t  end = Math::Min((batchIndex + 1) * BC_TEX_PER_BATCH, localTexCount);
         auto localTextures = textureRange.subspan(start, uint32_t(end - start));
         //
-        uint64_t texBlockOffset = 0;
+        uint32_t texBlockOffset = 0;
         BCColorConvParamList paramsList;
-        for(size_t tI = 0; tI < localTextures.size(); tI++)
+        for(uint32_t tI = 0; tI < localTextures.size(); tI++)
         {
             const auto* t = localTextures[tI];
             auto [mipBlocks, totalBlocks] = FindTotalTilesOf<E>(t);
             assert(mipBlocks.size() == t->MipCount());
             paramsList[tI] = BCColorConvParams
             {
-                .blockRange = Vector2ul(texBlockOffset, texBlockOffset + totalBlocks),
+                .blockRange = Vector2ui(texBlockOffset, texBlockOffset + totalBlocks),
                 .gamma = t->Gamma(),
                 .fromColorSpace = t->ColorSpace()
             };
 
             // While calculating other stuff, issue memcpy of
             // this texture
-            uint64_t mipBlockOffset = texBlockOffset;
+            uint32_t mipBlockOffset = texBlockOffset;
             for(uint32_t mipLevel = 0; mipLevel < t->MipCount(); mipLevel++)
             {
-                uint64_t mipBlockSize = mipBlocks[mipLevel];
+                uint32_t mipBlockSize = mipBlocks[mipLevel];
                 Vector3ui mipSize = Graphics::TextureMipSize(t->Extents(), mipLevel);
                 Span<Byte> copyRegion = dScratchBuffer.subspan(mipBlockOffset * sizeof(BlockT),
                                                                mipBlockSize * sizeof(BlockT));
@@ -653,15 +658,15 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
         });
 
         texBlockOffset = 0;
-        for(size_t tI = 0; tI < localTextures.size(); tI++)
+        for(uint32_t tI = 0; tI < localTextures.size(); tI++)
         {
             auto* t = localTextures[tI];
             auto [mipBlocks, totalBlocks] = FindTotalTilesOf<E>(t);
             assert(mipBlocks.size() == t->MipCount());
-            size_t mipBlockOffset = texBlockOffset;
+            uint32_t mipBlockOffset = texBlockOffset;
             for(uint32_t mipLevel = 0; mipLevel < t->MipCount(); mipLevel++)
             {
-                uint64_t mipBlockSize = mipBlocks[mipLevel];
+                uint32_t mipBlockSize = mipBlocks[mipLevel];
                 Vector3ui mipSize = Graphics::TextureMipSize(t->Extents(), mipLevel);
                 Span<Byte> copyRegion = dScratchBuffer.subspan(mipBlockOffset * sizeof(BlockT),
                                                                mipBlockSize * sizeof(BlockT));
@@ -730,7 +735,7 @@ void BCColorConverter::CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
     for(size_t pIndex = 0; pIndex < partitions.size(); pIndex++)
     {
         const Vector2ul& range = partitions[pIndex];
-        std::visit([&, this](auto&& v)
+        bcTextures[range[0]]->PixelType().SwitchCase([&, this](auto&& v)
         {
             using PT = std::remove_cvref_t<decltype(v)>;
             constexpr MRayPixelEnum E = PT::Name;
@@ -740,7 +745,7 @@ void BCColorConverter::CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
                 CallKernelForType<E>(dScratchBuffer, rangeI32,
                                      globalColorSpace, queue);
             }
-        }, bcTextures[range[0]]->PixelType());
+        });
     }
 }
 
@@ -758,7 +763,7 @@ void BCColorConverter::CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
 // TODO: Report error maybe? (to who though?)
 struct ConvertKernelCallFunctor
 {
-    Span<MipArray<SurfViewVariant>> dSufViews;
+    Span<MipArray<TracerSurfView>> dSufViews;
     Span<const ColorConvParams>     dColorConvParams;
     uint8_t                         maxMipCount;
     MRayColorSpaceEnum              globalColorSpace;
@@ -798,7 +803,7 @@ struct ConvertKernelCallFunctor
     }
 };
 
-void NormalColorConverter::CallColorConvertKernel(Span<MipArray<SurfViewVariant>> dSufViews,
+void NormalColorConverter::CallColorConvertKernel(Span<MipArray<TracerSurfView>> dSufViews,
                                                   Span<const ColorConvParams> dColorConvParams,
                                                   uint8_t maxMipCount,
                                                   MRayColorSpaceEnum globalColorSpace,
@@ -826,7 +831,7 @@ ColorConverter::ColorConverter(const GPUSystem& sys)
     : gpuSystem(sys)
 {}
 
-void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures,
+void ColorConverter::ConvertColor(std::vector<MipArray<TracerSurfRef>> textures,
                                   std::vector<ColorConvParams> colorConvParams,
                                   std::vector<GenericTexture*> bcTextures,
                                   MRayColorSpaceEnum globalColorSpace) const
@@ -844,7 +849,7 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
     // We can temporarily allocate here. This will be done at
     // initialization time.
     DeviceMemory mem({&gpuSystem.BestDevice()}, 16_MiB, 512_MiB, true);
-    Span<MipArray<SurfViewVariant>> dSufViews;
+    Span<MipArray<TracerSurfView>> dSufViews;
     Span<ColorConvParams> dColorConvParams;
 
     BCColorConverter bcColorConverter(std::move(bcTextures));
@@ -853,7 +858,7 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
 
     // Alias the memory, normal color conversion and BC color conversion
     // will be serialized
-    MemAlloc::AllocateMultiData(std::tie(dSufViews, dColorConvParams),
+    MemAlloc::AllocateMultiData(Tie(dSufViews, dColorConvParams),
                                 mem, {textures.size(), textures.size()});
 
     //==============================//
@@ -865,30 +870,27 @@ void ColorConverter::ConvertColor(std::vector<MipArray<SurfRefVariant>> textures
         const auto normAnnotation = normA.AnnotateScope();
 
         // Copy references
-        std::vector<MipArray<SurfViewVariant>> hSurfViews;
+        std::vector<MipArray<TracerSurfView>> hSurfViews;
         hSurfViews.reserve(textures.size());
-        for(const MipArray<SurfRefVariant>& surfRefs : textures)
+        for(const MipArray<TracerSurfRef>& surfRefs : textures)
         {
-            MipArray<SurfViewVariant> mipViews;
+            MipArray<TracerSurfView> mipViews;
             for(size_t i = 0; i < TracerConstants::MaxTextureMipCount; i++)
             {
-                const SurfRefVariant& surf = surfRefs[i];
-                mipViews[i] = std::visit([](auto&& v) -> SurfViewVariant
+                const TracerSurfRef& surf = surfRefs[i];
+                mipViews[i] = std::visit([](auto&& v) -> TracerSurfView
                 {
                     using T = std::remove_cvref_t<decltype(v)>;
                     if constexpr(std::is_same_v<T, std::monostate>)
                         return std::monostate{};
                     else return v.View();
-
                 }, surf);
             }
             hSurfViews.push_back(mipViews);
         }
         //
-        auto hSurfViewSpan = Span<MipArray<SurfViewVariant>>(hSurfViews.begin(),
-                                                             hSurfViews.end());
-        auto hColorConvParams = Span<const ColorConvParams>(colorConvParams.cbegin(),
-                                                            colorConvParams.cend());
+        auto hSurfViewSpan = Span<MipArray<TracerSurfView>>(hSurfViews);
+        auto hColorConvParams = Span<const ColorConvParams>(colorConvParams);
         queue.MemcpyAsync(dSufViews, ToConstSpan(hSurfViewSpan));
         queue.MemcpyAsync(dColorConvParams, hColorConvParams);
         //
@@ -935,7 +937,7 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
     {
         if(!t)
         {
-            hTextureViews.push_back(std::monostate{});
+            hTextureViews.emplace_back(std::monostate{});
             continue;
         }
 
@@ -946,7 +948,7 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
             .colorSpace = t->ColorSpace()
         };
         hLuminanceExtractParams.push_back(params);
-        hTextureViews.push_back(t->View(TextureReadMode::DIRECT));
+        hTextureViews.emplace_back(t->View(TextureReadMode::DIRECT));
     }
 
     // All texture's are nullptr,
@@ -959,9 +961,9 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
     Span<Span<Float>> dLuminanceBuffers;
     Span<Variant<std::monostate, GenericTextureView>> dTextureViews;
     Span<LuminanceExtractParams> dLuminanceExtractParams;
-    MemAlloc::AllocateMultiData(std::tie(dLuminanceExtractParams,
-                                         dTextureViews,
-                                         dLuminanceBuffers),
+    MemAlloc::AllocateMultiData(Tie(dLuminanceExtractParams,
+                                    dTextureViews,
+                                    dLuminanceBuffers),
                                 localMem,
                                 {totalTexSize, totalTexSize, totalTexSize});
 

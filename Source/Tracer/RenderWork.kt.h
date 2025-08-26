@@ -76,7 +76,7 @@ void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG, TG> p
         primitive.GenerateSurface(surface, rayConeSurface,
                                   hit, ray, rayCone);
         // Generate the material
-        auto material = Material(specConverter, params.matSoA,
+        auto material = Material(specConverter, surface, params.matSoA,
                                  std::bit_cast<MaterialKey>(keys.lightOrMatKey));
         // Call the function
         WorkFunction(primitive, material, surface, rayConeSurface,

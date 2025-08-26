@@ -4,6 +4,8 @@
 #include "Core/Timer.h"
 #include "Tracer/RendererCommon.h"
 
+#include "Device/GPUAlgBinaryPartition.h"
+
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCInitPathState(MRAY_GRID_CONSTANT const PathTraceRDetail::RayState dRayState,
                             MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices)
@@ -197,14 +199,14 @@ RendererOptionPack PathTracerRenderer::CurrentAttributes() const
     result.attributes.back().Push(Span<const uint32_t>(&currentOptions.burstSize, 1));
     //
     std::string_view curRenderModeName = currentOptions.renderMode.ToString();
-    result.attributes.push_back(TransientData(std::in_place_type_t<std::string>{},
+    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
                                               curRenderModeName.size()));
     auto svRead = result.attributes.back().AccessAsString();
     assert(svRead.size() == curRenderModeName.size());
     std::copy(curRenderModeName.cbegin(), curRenderModeName.cend(), svRead.begin());
     //
     std::string_view curModeName = currentOptions.sampleMode.ToString();
-    result.attributes.push_back(TransientData(std::in_place_type_t<std::string>{},
+    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
                                               curModeName.size()));
     svRead = result.attributes.back().AccessAsString();
     assert(svRead.size() == curModeName.size());
@@ -214,7 +216,7 @@ RendererOptionPack PathTracerRenderer::CurrentAttributes() const
     result.attributes.back().Push(Span<const Vector2ui>(&currentOptions.russianRouletteRange, 1));
     //
     std::string_view lightSamplerName = currentOptions.lightSampler.ToString();
-    result.attributes.push_back(TransientData(std::in_place_type_t<std::string>{}, lightSamplerName.size()));
+    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{}, lightSamplerName.size()));
     svRead = result.attributes.back().AccessAsString();
     assert(svRead.size() == lightSamplerName.size());
     std::copy(lightSamplerName.cbegin(), lightSamplerName.cend(), svRead.begin());
@@ -279,7 +281,7 @@ uint64_t PathTracerRenderer::SPPLimit(uint32_t spp) const
     return result;
 }
 
-std::pair<Span<RayIndex>, uint32_t>
+Pair<Span<RayIndex>, uint32_t>
 PathTracerRenderer::ReloadPaths(Span<const RayIndex> dIndices,
                                 uint32_t sppLimit,
                                 const GPUQueue& processQueue)
@@ -363,7 +365,7 @@ PathTracerRenderer::ReloadPaths(Span<const RayIndex> dIndices,
     }
     // Index buffer may be invalidated (Binary partition should not
     // invalidate but lets return the new buffer)
-    return std::pair(dDeadAliveRayIndices, aliveRayCount);
+    return Pair(dDeadAliveRayIndices, aliveRayCount);
 }
 
 void PathTracerRenderer::ResetAllPaths(const GPUQueue& queue)
@@ -953,7 +955,8 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
         this->currentCameraWorks.cbegin(), this->currentCameraWorks.cend(),
         [camGroupId, transGroupId](const auto& pack)
         {
-            return pack.idPack == std::pair(camGroupId, transGroupId);
+            return (pack.cgId == camGroupId &&
+                    pack.tgId == transGroupId);
         }
     );
     curCamWork = &packLoc->workPtr;
@@ -965,19 +968,19 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
     uint32_t maxSampleCount = FindMaxSamplePerIteration(maxRayCount, currentOptions.sampleMode);
     if(currentOptions.sampleMode == SampleMode::E::PURE)
     {
-        MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
-                                             dRays, dRayCones,
-                                             dRayState.dPathRadiance,
-                                             dRayState.dImageCoordinates,
-                                             dRayState.dFilmFilterWeights,
-                                             dRayState.dThroughput,
-                                             dRayState.dPathDataPack,
-                                             dRayState.dOutRays,
-                                             dRayState.dOutRayCones,
-                                             dPathRNGDimensions,
-                                             dRandomNumBuffer,
-                                             dWorkHashes, dWorkBatchIds,
-                                             dSubCameraBuffer),
+        MemAlloc::AllocateMultiData(Tie(dHits, dHitKeys,
+                                        dRays, dRayCones,
+                                        dRayState.dPathRadiance,
+                                        dRayState.dImageCoordinates,
+                                        dRayState.dFilmFilterWeights,
+                                        dRayState.dThroughput,
+                                        dRayState.dPathDataPack,
+                                        dRayState.dOutRays,
+                                        dRayState.dOutRayCones,
+                                        dPathRNGDimensions,
+                                        dRandomNumBuffer,
+                                        dWorkHashes, dWorkBatchIds,
+                                        dSubCameraBuffer),
                                     rendererGlobalMem,
                                     {maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
@@ -992,22 +995,22 @@ PathTracerRenderer::StartRender(const RenderImageParams& rIP,
     else
     {
         uint32_t isVisibleIntCount = Bitspan<uint32_t>::CountT(maxRayCount);
-        MemAlloc::AllocateMultiData(std::tie(dHits, dHitKeys,
-                                             dRays, dRayCones,
-                                             dRayState.dPathRadiance,
-                                             dRayState.dImageCoordinates,
-                                             dRayState.dFilmFilterWeights,
-                                             dRayState.dThroughput,
-                                             dRayState.dPathDataPack,
-                                             dRayState.dOutRays,
-                                             dRayState.dOutRayCones,
-                                             dRayState.dPrevMatPDF,
-                                             dRayState.dShadowRayRadiance,
-                                             dPathRNGDimensions,
-                                             dShadowRayVisibilities,
-                                             dRandomNumBuffer,
-                                             dWorkHashes, dWorkBatchIds,
-                                             dSubCameraBuffer),
+        MemAlloc::AllocateMultiData(Tie(dHits, dHitKeys,
+                                        dRays, dRayCones,
+                                        dRayState.dPathRadiance,
+                                        dRayState.dImageCoordinates,
+                                        dRayState.dFilmFilterWeights,
+                                        dRayState.dThroughput,
+                                        dRayState.dPathDataPack,
+                                        dRayState.dOutRays,
+                                        dRayState.dOutRayCones,
+                                        dRayState.dPrevMatPDF,
+                                        dRayState.dShadowRayRadiance,
+                                        dPathRNGDimensions,
+                                        dShadowRayVisibilities,
+                                        dRandomNumBuffer,
+                                        dWorkHashes, dWorkBatchIds,
+                                        dSubCameraBuffer),
                                     rendererGlobalMem,
                                     {maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
@@ -1138,12 +1141,12 @@ PathTracerRenderer::StaticAttributeInfo()
     using enum AttributeOptionality;
     return AttribInfoList
     {
-        {"totalSPP",        MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY},
-        {"burstSize",       MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_OPTIONAL},
-        {"renderMode",      MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
-        {"sampleMode",      MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY},
-        {"rrRange",         MRayDataType<MR_VECTOR_2UI>{}, IS_SCALAR, MR_MANDATORY},
-        {"neeSamplerType",  MRayDataType<MR_STRING>{}, IS_SCALAR, MR_MANDATORY}
+        {"totalSPP",        MRayDataTypeRT(MR_UINT32),      IS_SCALAR, MR_MANDATORY},
+        {"burstSize",       MRayDataTypeRT(MR_UINT32),      IS_SCALAR, MR_OPTIONAL},
+        {"renderMode",      MRayDataTypeRT(MR_STRING),      IS_SCALAR, MR_MANDATORY},
+        {"sampleMode",      MRayDataTypeRT(MR_STRING),      IS_SCALAR, MR_MANDATORY},
+        {"rrRange",         MRayDataTypeRT(MR_VECTOR_2UI),  IS_SCALAR, MR_MANDATORY},
+        {"neeSamplerType",  MRayDataTypeRT(MR_STRING),      IS_SCALAR, MR_MANDATORY}
     };
 }
 

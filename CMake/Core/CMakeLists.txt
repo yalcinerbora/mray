@@ -40,12 +40,19 @@ set(SRC_MATH
     ${CURRENT_SOURCE_DIR}/MathConstants.h
 )
 
+set(SRC_TYPES
+    ${CURRENT_SOURCE_DIR}/Types.h
+    ${CURRENT_SOURCE_DIR}/TypePack.h
+    ${CURRENT_SOURCE_DIR}/Tuple.h
+    ${CURRENT_SOURCE_DIR}/Variant.h
+    ${CURRENT_SOURCE_DIR}/Span.h
+)
+
 set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/Algorithm.h
     ${CURRENT_SOURCE_DIR}/ColorFunctions.h
     ${CURRENT_SOURCE_DIR}/TypeNameGenerators.h
     ${CURRENT_SOURCE_DIR}/BitFunctions.h
-    ${CURRENT_SOURCE_DIR}/DeviceVisit.h
     ${CURRENT_SOURCE_DIR}/MemAlloc.h
     ${CURRENT_SOURCE_DIR}/MemAlloc.cpp
     ${CURRENT_SOURCE_DIR}/TypeFinder.h
@@ -56,7 +63,6 @@ set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/Error.h
     ${CURRENT_SOURCE_DIR}/Error.cpp
     ${CURRENT_SOURCE_DIR}/Expected.h
-    ${CURRENT_SOURCE_DIR}/Types.h
     ${CURRENT_SOURCE_DIR}/Flag.h
     ${CURRENT_SOURCE_DIR}/GraphicsFunctions.h
     ${CURRENT_SOURCE_DIR}/TypeGenFunction.h
@@ -81,6 +87,7 @@ set(SRC_ALL
     ${SRC_INTERFACES}
     ${SRC_CONTAINERS}
     ${SRC_MATH}
+    ${SRC_TYPES}
     ${SRC_UTILITY}
     ${SRC_DATA_TYPES}
     ${SRC_COMMON})
@@ -90,6 +97,7 @@ source_group("System" FILES ${SRC_SYSTEM})
 source_group("Interfaces" FILES ${SRC_INTERFACES})
 source_group("Containers" FILES ${SRC_CONTAINERS})
 source_group("Math" FILES ${SRC_MATH})
+source_group("Types" FILES ${SRC_TYPES})
 source_group("Utility" FILES ${SRC_UTILITY})
 source_group("DataTypes" FILES ${SRC_DATA_TYPES})
 source_group("" FILES ${SRC_COMMON})

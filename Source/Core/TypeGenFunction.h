@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "Core/Map.h"
-#include "Core/Types.h"
+#include "Core/TypePack.h"
 
 template<class BaseType, class... Args>
 using GeneratorFuncType = std::unique_ptr<BaseType>(*)(Args&&... args);
@@ -19,7 +19,7 @@ template<class GeneratorType, class BaseType,
 void GenerateMapping(Map<std::string_view, GeneratorType>& map,
                      // These types are here for overload resolution,
                      // these will not be used directly
-                     PackedTypes<Args...>*, PackedTypes<Types...>*)
+                     TypePack<Args...>*, TypePack<Types...>*)
 {
     // I've come up with this to move the Args... pack away
     // from expansion of Types...
@@ -39,7 +39,7 @@ template<class AttributeListType, class... Types>
 void GenerateAttributeMapping(Map<std::string_view, AttributeListType>& map,
                               // These types are here for overload resolution,
                               // these will not be used directly
-                              PackedTypes<Types...>*)
+                              TypePack<Types...>*)
 {
     // Use comma operator expansion
     // Trick from here

@@ -6,7 +6,8 @@
 
 #include "Core/Definitions.h"
 #include "Core/System.h"
-#include "Core/Types.h"
+#include "Core/Span.h"
+#include "Core/MRayDataType.h"
 
 #ifdef MRAY_TRANSIENT_POOL_SHARED_EXPORT
     #define MRAY_TRANSIENT_POOL_ENTRYPOINT MRAY_DLL_EXPORT
@@ -21,6 +22,11 @@ namespace TransientPoolDetail
 
 MRAY_TRANSIENT_POOL_ENTRYPOINT extern void* TransientPoolIssueBufferForDestruction(TransientPoolDetail::TransientData buffer);
 MRAY_TRANSIENT_POOL_ENTRYPOINT extern void TransientPoolDestroyCallback(void* ptr);
+// This is a new addition, data type template swtich/case generation
+// takes quite a bit of time. So we compile it once here.
+// Most of the switch/case function usage consists of this pattern
+MRAY_TRANSIENT_POOL_ENTRYPOINT
+extern TransientPoolDetail::TransientData AllocateTransientData(MRayDataTypeRT, size_t elemCount);
 
 namespace TransientPoolDetail
 {
@@ -66,6 +72,7 @@ class TransientData
     Span<T>         AccessAs();
     template<ImplicitLifetimeC T>
     size_t          Size() const;
+    size_t          ByteSize() const;
 
     // =========================== //
     //    String Specialization    //

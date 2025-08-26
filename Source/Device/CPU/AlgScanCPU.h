@@ -1,5 +1,5 @@
 #pragma once
-// IWYU pragma: private; include "AlgScan.h"
+// IWYU pragma: private, include "AlgScan.h"
 
 #include "Core/Definitions.h"
 #include "Core/Types.h"
@@ -116,7 +116,7 @@ void ExclusiveScan(Span<T> dScannedValues,
         DeviceBlockIssueParams{.gridSize = 1u, .blockSize = 1u},
         [=](KernelCallParams)
         {
-            for(size_t i = 1; i < dBlockSums.size(); i++)
+            for(uint32_t i = 1; i < dBlockSums.size(); i++)
                 dBlockSums[i] = op(dBlockSums[i], dBlockSums[i - 1]);
         }
     );

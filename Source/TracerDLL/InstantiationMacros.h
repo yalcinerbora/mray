@@ -15,7 +15,7 @@ static constexpr auto GetWorkFunction()
         using P = typename PG:: template Primitive<TC>;
         using S = typename M::Surface;
         constexpr auto WF = R::template WorkFunctions<P, M, S, TC, PG, MG, TG>;
-        return std::get<I>(WF);
+        return get<I>(WF);
     }
 };
 template <class R, class LG, class TG, uint32_t I>
@@ -26,7 +26,7 @@ static constexpr auto GetLightWorkFunction()
         using TC = typename PrimTransformContextType<PG, TG>::Result;
         using L = typename LG::template Light<TC, typename R::SpectrumConverterContext>;
         constexpr auto WF = R:: template LightWorkFunctions<L, LG, TG>;
-        return std::get<I>(WF);
+        return get<I>(WF);
     }
 };
 template <class R, class CG, class TG, uint32_t I>
@@ -35,7 +35,7 @@ static constexpr auto GetCamWorkFunction()
     {
         using C = typename CG::Camera;
         constexpr auto WF = R:: template CamWorkFunctions<C, CG, TG>;
-        return std::get<I>(WF);
+        return get<I>(WF);
     }
 };
 

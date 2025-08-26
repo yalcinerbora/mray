@@ -9,7 +9,6 @@
 #include "Device/GPUAlgRadixSort.h"
 
 #include "Core/ColorFunctions.h"
-#include "Core/DeviceVisit.h"
 #include "Core/GraphicsFunctions.h"
 
 #ifdef MRAY_GPU_BACKEND_CUDA
@@ -111,19 +110,19 @@ Vector4 FilterPixel(const Vector2ui& pixelCoord,
 }
 
 MR_GF_DECL
-std::tuple<Vector3, Float> ConvertNaNsToColor(Spectrum value, Float weight)
+Tuple<Vector3, Float> ConvertNaNsToColor(Spectrum value, Float weight)
 {
     if(!Math::IsFinite(value))
-        return std::tuple(BIG_MAGENTA(), weight * Float(128.0));
+        return Tuple(BIG_MAGENTA(), weight * Float(128.0));
     else
-        return std::tuple(Vector3(value), weight);
+        return Tuple(Vector3(value), weight);
 }
 
 // TODO: Should we dedicate a warp per pixel?
 template<uint32_t TPB, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCGenerateMipmaps(// I-O
-                       MRAY_GRID_CONSTANT const Span<MipArray<SurfViewVariant>> dSurfaces,
+                       MRAY_GRID_CONSTANT const Span<MipArray<TracerSurfView>> dSurfaces,
                        // Inputs
                        MRAY_GRID_CONSTANT const Span<const MipGenParams> dMipGenParamsList,
                        // Constants
@@ -147,8 +146,8 @@ void KCGenerateMipmaps(// I-O
         uint32_t localBI = bI % blockPerTexture;
         // Load to local space
         MipGenParams curParams = dMipGenParamsList[tI];
-        SurfViewVariant writeSurf = dSurfaces[tI][currentMipLevel];
-        const SurfViewVariant readSurf = dSurfaces[tI][currentMipLevel - 1];
+        TracerSurfView writeSurf = dSurfaces[tI][currentMipLevel];
+        const TracerSurfView readSurf = dSurfaces[tI][currentMipLevel - 1];
         //
         Vector2ui mipRes = Graphics::TextureMipSize(curParams.mipZeroRes,
                                                     currentMipLevel);
@@ -203,7 +202,7 @@ static constexpr auto KC_CLAMP_IMAGE_TILE_SIZE = Vector2ui(32, 16);
 template<uint32_t TPB, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
 void KCClampImage(// Output
-                  MRAY_GRID_CONSTANT const SurfViewVariant surfaceOut,
+                  MRAY_GRID_CONSTANT const TracerSurfView surfaceOut,
                   // Inputs
                   MRAY_GRID_CONSTANT const Span<const Byte> dBufferImage,
                   // Constants
@@ -255,7 +254,7 @@ void KCClampImage(// Output
             return outData;
         });
         // Finally write the pixel
-        SurfViewVariant sOut = surfaceOut;
+        TracerSurfView sOut = surfaceOut;
         GenericWrite(sOut, writePix, wPixCoordInt);
     }
 }
@@ -1002,7 +1001,7 @@ void MultiPassReconFilterGenericRGB(// Output
 }
 
 template<class Filter>
-void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
+void GenerateMipsGeneric(const std::vector<MipArray<TracerSurfRef>>& textures,
                          const std::vector<MipGenParams>& mipGenParams,
                          const GPUSystem& gpuSystem, Filter filter)
 {
@@ -1015,21 +1014,21 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
     // We can temporarily allocate here. This will be done at
     // initialization time.
     DeviceLocalMemory mem(gpuSystem.BestDevice());
-    Span<MipArray<SurfViewVariant>> dSufViews;
+    Span<MipArray<TracerSurfView>> dSufViews;
     Span<MipGenParams> dMipGenParams;
-    MemAlloc::AllocateMultiData(std::tie(dSufViews, dMipGenParams),
+    MemAlloc::AllocateMultiData(Tie(dSufViews, dMipGenParams),
                                 mem, {textures.size(), textures.size()});
 
     // Copy references
-    std::vector<MipArray<SurfViewVariant>> hSurfViews;
+    std::vector<MipArray<TracerSurfView>> hSurfViews;
     hSurfViews.reserve(textures.size());
-    for(const MipArray<SurfRefVariant>& surfRefs : textures)
+    for(const MipArray<TracerSurfRef>& surfRefs : textures)
     {
-        MipArray<SurfViewVariant> mipViews;
+        MipArray<TracerSurfView> mipViews;
         for(size_t i = 0; i < TracerConstants::MaxTextureMipCount; i++)
         {
-            const SurfRefVariant& surf = surfRefs[i];
-            mipViews[i] = std::visit([](auto&& v) -> SurfViewVariant
+            const TracerSurfRef& surf = surfRefs[i];
+            mipViews[i] = std::visit([](auto&& v) -> TracerSurfView
             {
                 using T = std::remove_cvref_t<decltype(v)>;
                 if constexpr(std::is_same_v<T, std::monostate>)
@@ -1040,10 +1039,8 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
         hSurfViews.push_back(mipViews);
     }
 
-    auto hSurfViewSpan = Span<MipArray<SurfViewVariant>>(hSurfViews.begin(),
-                                                         hSurfViews.end());
-    auto hMipGenParams = Span<const MipGenParams>(mipGenParams.cbegin(),
-                                                  mipGenParams.cend());
+    auto hSurfViewSpan = Span<MipArray<TracerSurfView>>(hSurfViews);
+    auto hMipGenParams = Span<const MipGenParams>(mipGenParams);
     queue.MemcpyAsync(dSufViews, ToConstSpan(hSurfViewSpan));
     queue.MemcpyAsync(dMipGenParams, hMipGenParams);
 
@@ -1101,7 +1098,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<SurfRefVariant>>& textures,
 
 template<class Filter>
 void ClampImageFromBufferGeneric(// Output
-                                 const SurfRefVariant& surf,
+                                 const TracerSurfRef& surf,
                                  // Input
                                  const Span<const Byte>& dDataBuffer,
                                  // Constants
@@ -1114,18 +1111,18 @@ void ClampImageFromBufferGeneric(// Output
     // Find maximum block count for state allocation
     // TODO: Change this so that it is relative to the
     // filter radius.
-    static constexpr Vector2ui SPP = Vector2ui(8, 8);
+    static constexpr Vector2ui SPP = Vector2ui(4, 4);
     static constexpr Vector2ui TILE_SIZE = KC_CLAMP_IMAGE_TILE_SIZE;
     static constexpr uint32_t THREAD_PER_BLOCK = TILE_SIZE.Multiply();
     uint32_t blockCount = DivideUp(surfImageDims, TILE_SIZE).Multiply();
 
-    SurfViewVariant surfRef = std::visit([](auto&& v) -> SurfViewVariant
+    TracerSurfView surfRef = Visit(surf, [](auto&& v) -> TracerSurfView
     {
         using T = std::remove_cvref_t<decltype(v)>;
         if constexpr(std::is_same_v<T, std::monostate>)
             return std::monostate{};
         else return v.View();
-    }, surf);
+    });
 
     using namespace std::string_view_literals;
     queue.IssueBlockKernel<KCClampImage<THREAD_PER_BLOCK, Filter>>
@@ -1146,7 +1143,7 @@ void ClampImageFromBufferGeneric(// Output
         SPP,
         // Use sampling here, quality is not that important
         // (We are clamping textures)
-        FilterMode::ACCUMULATE,
+        FilterMode::SAMPLING,
         filter
     );
 }
@@ -1159,7 +1156,7 @@ TextureFilterT<E, FF>::TextureFilterT(const GPUSystem& system,
 {}
 
 template<FilterType::E E, class FF>
-void TextureFilterT<E, FF>::GenerateMips(const std::vector<MipArray<SurfRefVariant>>& textures,
+void TextureFilterT<E, FF>::GenerateMips(const std::vector<MipArray<TracerSurfRef>>& textures,
                                          const std::vector<MipGenParams>& params) const
 {
     using namespace std::string_literals;
@@ -1172,7 +1169,7 @@ void TextureFilterT<E, FF>::GenerateMips(const std::vector<MipArray<SurfRefVaria
 
 template<FilterType::E E, class FF>
 void TextureFilterT<E, FF>::ClampImageFromBuffer(// Output
-                                                 const SurfRefVariant& surf,
+                                                 const TracerSurfRef& surf,
                                                  // Input
                                                  const Span<const Byte>& dDataBuffer,
                                                  // Constants

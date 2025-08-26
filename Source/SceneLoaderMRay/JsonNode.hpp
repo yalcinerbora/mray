@@ -1,5 +1,7 @@
 #pragma once
 
+#include "JsonNode.h"
+
 inline bool IsDashed(const nlohmann::json& n)
 {
     using namespace std::literals;
@@ -34,8 +36,8 @@ inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
        primArray.is_number_integer())
     {
         typename SurfaceStruct::IdPair p;
-        std::get<SurfaceStruct::MATERIAL_INDEX>(p) = matArray;
-        std::get<SurfaceStruct::PRIM_INDEX>(p) = primArray;
+        get<SurfaceStruct::MATERIAL_INDEX>(p) = matArray;
+        get<SurfaceStruct::PRIM_INDEX>(p) = primArray;
         s.pairCount = 1;
         s.matPrimBatchPairs[0] = p;
 
@@ -52,8 +54,8 @@ inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
         for(size_t i = 0; i < matArray.size(); i++)
         {
             typename SurfaceStruct::IdPair p;
-            std::get<SurfaceStruct::MATERIAL_INDEX>(p) = matArray[i];
-            std::get<SurfaceStruct::PRIM_INDEX>(p) = primArray[i];
+            get<SurfaceStruct::MATERIAL_INDEX>(p) = matArray[i];
+            get<SurfaceStruct::PRIM_INDEX>(p) = primArray[i];
             s.matPrimBatchPairs[i] = p;
 
             auto alphaIt = n.find(NodeNames::ALPHA_MAP);

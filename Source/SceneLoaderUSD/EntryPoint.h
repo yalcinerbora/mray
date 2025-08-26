@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/System.h"
-#include "Core/SceneLoaderI.h"
 
 #ifdef MRAY_SCENELOADER_USD_SHARED_EXPORT
 #define MRAY_SCENELOADER_USD_ENTRYPOINT MRAY_DLL_EXPORT
@@ -9,6 +8,7 @@
 #define MRAY_SCENELOADER_USD_ENTRYPOINT MRAY_DLL_IMPORT
 #endif
 
+class SceneLoaderI;
 class ThreadPool;
 
 // C Mangling, we will load these in runtime

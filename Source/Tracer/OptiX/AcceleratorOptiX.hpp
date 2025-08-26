@@ -201,7 +201,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildGeneric_CLT(const PreprocessResult& ppResul
     // Might as well allocate these for prim key generation
     Span<Vector2ui> dConcreteLeafRanges;
     Span<PrimRangeArray> dConcretePrimRanges;
-    MemAlloc::AllocateMultiData(std::tie(dAcceleratorMem, dBuildTempMem,
+    MemAlloc::AllocateMultiData(Tie(dAcceleratorMem, dBuildTempMem,
                                          dCompactSizes, dConcreteLeafRanges,
                                          dConcretePrimRanges),
                                 tempMem,
@@ -271,7 +271,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildGeneric_CLT(const PreprocessResult& ppResul
                                       MemAlloc::DefaultSystemAlignment());
         }
     );
-    MemAlloc::AllocateMultiData(std::tie(dAllAccelerators, dAllLeafs,
+    MemAlloc::AllocateMultiData(Tie(dAllAccelerators, dAllLeafs,
                                          dTransformKeys, dPrimGroupSoA,
                                          dTransformGroupSoAList),
                                 memory,
@@ -283,7 +283,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildGeneric_CLT(const PreprocessResult& ppResul
     Span<const TransformKey> hTransformKeySpan(ppResult.surfData.transformKeys);
     queue.MemcpyAsync(dTransformKeys, hTransformKeySpan);
     // Also copy PG SoA
-    typename PG::DataSoA pgSoA = this->pg.SoA();
+    typename PG::DataSoA pgSoA = static_cast<const PG&>(this->pg).SoA();
     using SpanPGData = Span<typename PG::DataSoA>;
     queue.MemcpyAsync(dPrimGroupSoA, ToConstSpan(SpanPGData(&pgSoA, 1)));
 
@@ -369,8 +369,9 @@ AcceleratorGroupOptiX<PG>::MultiBuildTriangle_CLT(const PreprocessResult& ppResu
 
     // Thankfully these are persistent, directly acquire from
     // primitive group
-    Span<const Vector3> verts = this->pg.GetVertexPositionSpan();
-    Span<const Vector3ui> indices = this->pg.GetIndexSpan();
+    const auto& pgLifted = static_cast<const PG&>(this->pg);
+    Span<const Vector3> verts = pgLifted.GetVertexPositionSpan();
+    Span<const Vector3ui> indices = pgLifted.GetIndexSpan();
     for(const auto& primRanges : ppResult.concretePrimRanges)
         allBuildInputs.emplace_back(GenBuildInputsTriangle(verts, indices, primRanges));
     // Fix the references
@@ -413,7 +414,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
      });
 
     DeviceMemory tempMem({queue.Device()}, total, total << 1);
-    MemAlloc::AllocateMultiData(std::tie(dLeafAABBs, dTempLeafs,
+    MemAlloc::AllocateMultiData(Tie(dLeafAABBs, dTempLeafs,
                                          dConcretePrimRanges, dConcreteLeafRanges,
                                          dConcreteLeafOffsets),
                                 tempMem,
@@ -469,7 +470,7 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
         BLOCK_PER_INSTANCE,
         processedAccelCount,
         typename TransformGroupIdentity::DataSoA{},
-        this->pg.SoA()
+        static_cast<const PG&>(this->pg).SoA()
     );
     // AABBs are generated, gen build inputs
 

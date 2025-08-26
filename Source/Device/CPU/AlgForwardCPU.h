@@ -1,5 +1,5 @@
 #pragma once
-// IWYU pragma: private; include "AlgForward.h"
+// IWYU pragma: private, include "AlgForward.h"
 
 #include "../GPUSystemForward.h"
 #include "Core/Vector.h"

@@ -26,7 +26,7 @@ using ConversionFlags = Flag<ConvFlagEnum>;
 // GFG Conversion
 MRAY_GFGCONVERTER_ENTRYPOINT
 Expected<double> ConvertMeshesToGFG(const std::string& outFileName,
-								    const std::string& inFileName,
+                                    const std::string& inFileName,
                                     uint32_t threadCount,
                                     ConversionFlags flags);
 

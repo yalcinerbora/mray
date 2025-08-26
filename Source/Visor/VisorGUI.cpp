@@ -1,4 +1,5 @@
 #include "VisorGUI.h"
+#include "Core/MemAlloc.h"
 #include "VisorState.h"
 #include "VulkanTypes.h"
 #include "TonemapStage.h"
@@ -219,6 +220,7 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
                                    ImGuiDir_Down, height,
                                    window_flags))
     {
+        using MemAlloc::ConvertMemSizeToString;
         if(ImGui::BeginMenuBar())
         {
             uint64_t tracerUsedMem = visorState.tracerUsedGPUMemBytes;
@@ -450,6 +452,7 @@ void ImageSaveProgress::Render()
 void VisorGUI::ShowFrameOverlay(bool& isOpen,
                                 const VisorState& visorState)
 {
+    using MemAlloc::ConvertMemSizeToString;
     static int location = 1;
     ImGuiWindowFlags window_flags = (ImGuiWindowFlags_NoDecoration |
                                      ImGuiWindowFlags_AlwaysAutoResize |

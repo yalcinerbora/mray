@@ -1,10 +1,10 @@
 #pragma once
 
-#include <tuple>
 #include <concepts>
+#include <type_traits>
 
 #include "Math.h"
-#include "Types.h"
+#include "Definitions.h"
 
 constexpr inline size_t operator ""_TiB(unsigned long long int s)
 {
@@ -48,17 +48,17 @@ static constexpr bool RepurposeAllocRequirements =
 
 constexpr size_t DefaultSystemAlignment();
 
-template <MemoryC Memory, ImplicitLifetimeC... Args>
-void AllocateMultiData(std::tuple<Span<Args>&...> spans, Memory& memory,
+template <MemoryC Memory, RelaxedLifetimeC... Args>
+void AllocateMultiData(Tuple<Span<Args>&...> spans, Memory& memory,
                        const std::array<size_t, sizeof...(Args)>& countList,
                        size_t alignment = DefaultSystemAlignment());
 
-template <MemoryC Memory, ImplicitLifetimeC... Args>
-std::tuple<Span<Args>...> AllocateMultiData(Memory& memory,
+template <MemoryC Memory, RelaxedLifetimeC... Args>
+Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
                                        const std::array<size_t, sizeof...(Args)>& countList,
                                        size_t alignment = DefaultSystemAlignment());
 
-template<ImplicitLifetimeC T, MemoryC Memory>
+template<RelaxedLifetimeC T, MemoryC Memory>
 std::vector<Span<T>>
 AllocateSegmentedData(Memory& memory, const std::vector<size_t>& counts,
                       size_t alignment = DefaultSystemAlignment());
@@ -107,8 +107,6 @@ struct AlignedMemory
     explicit operator Byte*();
     explicit operator const Byte*() const;
 
-
-
 };
 
 static_assert(MemoryC<AlignedMemory>,
@@ -119,54 +117,54 @@ static_assert(MemoryC<AlignedMemory>,
 
 namespace MemAlloc::Detail
 {
-    template<size_t I = 0, class... Tp>
-    requires (I == sizeof...(Tp))
-    constexpr size_t AcquireTotalSize(std::array<size_t, sizeof...(Tp)>&,
-                                      const std::array<size_t, sizeof...(Tp)>&,
-                                      size_t)
-    {
-        return 0;
-    }
 
-    template<std::size_t I = 0, class... Tp>
-    requires (I < sizeof...(Tp))
+    template<class... Tp>
     constexpr size_t AcquireTotalSize(std::array<size_t, sizeof...(Tp)>& alignedSizeList,
                                       const std::array<size_t, sizeof...(Tp)>& countList,
                                       size_t alignment)
     {
-        using namespace Math;
-        using CurrentType = typename std::tuple_element_t<I, std::tuple<Tp...>>;
-        size_t alignedSize = NextMultiple(sizeof(CurrentType) * countList[I], alignment);
-        alignedSizeList[I] = alignedSize;
-        return alignedSize + AcquireTotalSize<I + 1, Tp...>(alignedSizeList,
-                                                            countList, alignment);
+        constexpr size_t N = sizeof...(Tp);
+        constexpr std::array<size_t, N> sizeList = {sizeof(Tp)...};
+
+        size_t totalSize = 0;
+        for(uint32_t i = 0; i < N; i++)
+        {
+            using Math::NextMultiple;
+            alignedSizeList[i] = NextMultiple(sizeList[i] * countList[i], alignment);
+            totalSize += alignedSizeList[i];
+        }
+        return totalSize;
     }
 
-    template<std::size_t I = 0, class... Tp>
-    requires (I == sizeof...(Tp))
-    constexpr void CalculateSpans(std::tuple<Span<Tp>&...>&, size_t&, Byte*,
-                                  const std::array<size_t, sizeof...(Tp)>&,
-                                  const std::array<size_t, sizeof...(Tp)>&)
-    {}
-
-    template<std::size_t I = 0, class... Tp>
-    requires (I < sizeof...(Tp))
-    constexpr void CalculateSpans(std::tuple<Span<Tp>&...>& t, size_t& offset, Byte* memory,
-                                  const std::array<size_t, sizeof...(Tp)>& alignedSizeList,
-                                  const std::array<size_t, sizeof...(Tp)>& countList)
+    template<std::size_t... Is, class... Tp>
+    constexpr size_t CalculateSpans(Tuple<Span<Tp>&...>& t, Byte* memory,
+                                    const std::array<size_t, sizeof...(Tp)>& alignedSizeList,
+                                    const std::array<size_t, sizeof...(Tp)>& countList,
+                                    std::index_sequence<Is...>)
     {
-        using CurrentType = typename std::tuple_element_t<I, std::tuple<Tp...>>;
-        // Set Pointer
-        size_t size = alignedSizeList[I];
-        CurrentType* tPtr = reinterpret_cast<CurrentType*>(memory + offset);
-        tPtr = std::launder(tPtr);
-        std::get<I>(t) = Span<CurrentType>((size == 0) ? nullptr : tPtr, countList[I]);
-        assert(size / sizeof(CurrentType) >= countList[I]);
-
-        // Increment Offset
-        offset += size;
-        // Statically Recurse over other pointers
-        CalculateSpans<I + 1, Tp...>(t, offset, memory, alignedSizeList, countList);
+        constexpr size_t N = sizeof...(Tp);
+        std::array<size_t, N> byteOffsets = {};
+        size_t offset = 0;
+        for(uint32_t i = 0; i < N; i++)
+        {
+            byteOffsets[i] = offset;
+            offset += alignedSizeList[i];
+        }
+        if constexpr(MRAY_IS_DEBUG)
+        {
+            std::array<size_t, N> sizes = {sizeof(Tp)...};
+            for(uint32_t i = 0; i < N; i++)
+                assert(alignedSizeList[i] / sizes[i] >= countList[i]);
+        }
+        // Param pack expansion
+        (
+            // Expanding statement...
+            (get<Is>(t) = Span<Tp>(std::launder(reinterpret_cast<Tp*>(memory + byteOffsets[Is])),
+                                                countList[Is])),
+            // Expand
+            ...
+        );
+        return alignedSizeList.back() + byteOffsets.back();
     }
 }
 
@@ -188,38 +186,38 @@ constexpr size_t DefaultSystemAlignment()
     return 256;
 }
 
-template <MemoryC Memory, ImplicitLifetimeC... Args>
-void AllocateMultiData(std::tuple<Span<Args>&...> spans, Memory& memory,
+template <MemoryC Memory, RelaxedLifetimeC... Args>
+void AllocateMultiData(Tuple<Span<Args>&...> spans, Memory& memory,
                        const std::array<size_t, sizeof...(Args)>& countList,
                        size_t alignment)
 {
     std::array<size_t, sizeof...(Args)> alignedSizeList;
     // Acquire total size & allocation size of each array
-    size_t totalSize = Detail::AcquireTotalSize<0, Args...>(alignedSizeList,
-                                                            countList,
-                                                            alignment);
+    size_t totalSize = Detail::AcquireTotalSize<Args...>(alignedSizeList,
+                                                         countList,
+                                                         alignment);
     // Allocate Memory
     memory.ResizeBuffer(totalSize);
     Byte* ptr = static_cast<Byte*>(memory);
     // Populate pointers
-    size_t offset = 0;
-    Detail::CalculateSpans(spans, offset, ptr, alignedSizeList, countList);
-
+    [[maybe_unused]]
+    size_t offset = Detail::CalculateSpans(spans, ptr, alignedSizeList, countList,
+                                           std::make_index_sequence<sizeof...(Args)>{});
     assert(totalSize == offset);
 }
 
-template <MemoryC Memory, ImplicitLifetimeC... Args>
-std::tuple<Span<Args>...> AllocateMultiData(Memory& memory,
+template <MemoryC Memory, RelaxedLifetimeC... Args>
+Tuple<Span<Args>...> AllocateMultiData(Memory& memory,
                                        const std::array<size_t, sizeof...(Args)>& countList,
                                        size_t alignment)
 {
-    std::tuple<Span<Args>...> result;
-    std::tuple<Span<Args>&...> resultRef = ToTupleRef(result);
+    Tuple<Span<Args>...> result;
+    Tuple<Span<Args>&...> resultRef = ToTupleRef(result);
     AllocateMultiData(resultRef, memory, countList, alignment);
     return result;
 }
 
-template<ImplicitLifetimeC T, MemoryC Memory>
+template<RelaxedLifetimeC T, MemoryC Memory>
 std::vector<Span<T>>
 AllocateSegmentedData(Memory& memory, const std::vector<size_t>& counts,
                       size_t alignment)
@@ -303,5 +301,7 @@ constexpr Span<Left> RepurposeAlloc(Span<Right> rhs)
     Left* leftPtr = std::launder(reinterpret_cast<Left*>(rawPtr));
     return Span<Left>(leftPtr, elementCount);
 }
+
+Pair<double, std::string_view> ConvertMemSizeToString(size_t size);
 
 }

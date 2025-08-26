@@ -54,14 +54,20 @@ set(MRAY_MSVC_OPTIONS
     /GR
     /EHsc
 
+    # TODO: Only release or all builds?
+    /Zc:inline
+
+    #
+    /Zc:__cplusplus
+
     # Debug Default
     $<$<CONFIG:Debug>:/MDd /Zi /Ob0 /Oy- /Od /RTC1>
     # Release Default
-    $<$<CONFIG:Release>:/MD /O2 /Zi /Ob3 /DNDEBUG>
+    $<$<CONFIG:Release>:/MD /O2 /Oi /Zi /Ob3 /DNDEBUG>
     # Release Debug Build
     # Generate pdb and enable optimizations
     # Also flag address sanitizer
-    $<$<CONFIG:SanitizeR>:/MD /O1 /Zi /Ob0 /Oy->
+    $<$<CONFIG:SanitizeR>:/MD /O1 /Oi /Zi /Ob0 /Oy->
     $<$<CONFIG:SanitizeR>:/fsanitize=${MRAY_SANITIZER_MODE}>
 
     # FP-related
@@ -182,6 +188,8 @@ set(MRAY_CUDA_OPTIONS
     -restrict
     # Misc.
     -extra-device-vectorization
+
+    #-fdevice-time-trace=-
 )
 
 # Platform Specific CUDA Options

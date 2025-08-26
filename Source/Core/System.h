@@ -15,33 +15,23 @@
     // This is fine?
     #define MRAY_DLL_EXPORT __declspec(dllexport)
 
-    static constexpr bool MRAY_IS_ON_WINDOWS    = true;
-    static constexpr bool MRAY_IS_ON_LINUX      = false;
-
     // TODO: Try to skip loading entire windows.h for the handle
     // This is not good, but windows prob will not change the def
     // of handle probably ever. :)
     typedef void* HANDLE;
 
     using SystemSemaphoreHandle = HANDLE;
-    using SystemMemoryHandle = HANDLE;
-    using SystemThreadHandle = HANDLE;
-
-    #define MRAY_RESTRICT __restrict
+    using SystemMemoryHandle    = HANDLE;
+    using SystemThreadHandle    = HANDLE;
 
 #elif defined MRAY_LINUX
 
     #define MRAY_DLL_IMPORT
     #define MRAY_DLL_EXPORT
 
-    static constexpr bool MRAY_IS_ON_WINDOWS    = false;
-    static constexpr bool MRAY_IS_ON_LINUX      = true;
-
-    using SystemThreadHandle = unsigned long int;
+    using SystemThreadHandle    = unsigned long int;
     using SystemSemaphoreHandle = int;
-    using SystemMemoryHandle = int;
-
-    #define MRAY_RESTRICT __restrict
+    using SystemMemoryHandle    = int;
 
 #else
     #error System preprocessor definition is not set properly! (CMake should have handled this)

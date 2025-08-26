@@ -1,4 +1,5 @@
 #include "TextureMemory.h"
+#include "SurfaceView.h"
 
 GenericTextureI* GenericTexture::Impl()
 {
@@ -82,7 +83,7 @@ void GenericTexture::CopyToAsync(Span<Byte> regionTo,
                                  const TextureExtent<3>& size) const
 {
     Impl()->CopyToAsync(regionTo, queue, mipLevel,
-                          offset, size);
+                        offset, size);
 }
 
 GenericTextureView GenericTexture::View(TextureReadMode mode) const
@@ -100,7 +101,7 @@ bool GenericTexture::IsBlockCompressed() const
     return Impl()->IsBlockCompressed();
 }
 
-SurfRefVariant GenericTexture::RWView(uint32_t mipLevel)
+TracerSurfRef GenericTexture::RWView(uint32_t mipLevel)
 {
     return Impl()->RWView(mipLevel);
 }

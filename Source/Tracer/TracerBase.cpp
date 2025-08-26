@@ -2,7 +2,7 @@
 
 #include "Core/Timer.h"
 
-using FilterFuncPair = Pair< const FilterType::E, TexFilterGenerator>;
+using FilterFuncPair = std::pair< const FilterType::E, TexFilterGenerator>;
 template<class T>
 static constexpr auto FilterGenFuncPack = FilterFuncPair
 
@@ -19,7 +19,7 @@ static constexpr const std::initializer_list<FilterFuncPair> FilterGenFuncList =
     FilterGenFuncPack<TextureFilterMitchellNetravali>
 };
 
-using RNGGenPair = Pair<const SamplerType::E, RNGGenerator>;
+using RNGGenPair = std::pair<const SamplerType::E, RNGGenerator>;
 
 template<class T>
 static constexpr auto RNGGenFuncPack = RNGGenPair
@@ -1447,7 +1447,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     if(!accelGenerator || !accelGGeneratorMap || !accelWGeneratorMap)
     {
         throw MRayError("[Tracer]: Unable to find accelerator generators for type \"{}\"",
-                        type);
+                        AcceleratorType::ToString(type.type));
     }
     accelerator = accelGenerator.value().get()
     (

@@ -21,8 +21,8 @@ class Timer
     public:
     // Utility
     void        Start();
-    void		Split();
-    void		Lap();
+    void        Split();
+    void        Lap();
     //
     uint64_t    ElapsedIntMS() const;
     template <class Time>

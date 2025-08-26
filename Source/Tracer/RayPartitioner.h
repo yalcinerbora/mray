@@ -2,8 +2,7 @@
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUMemory.h"
-#include "Device/GPUAlgBinaryPartition.h"
-#include "Device/GPUAlgGeneric.h"
+#include "Device/GPUAlgForward.h"
 
 #include "TracerTypes.h"
 #include "Core/Types.h"

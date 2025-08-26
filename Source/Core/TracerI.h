@@ -7,6 +7,7 @@
 #include "MRayDataType.h"
 #include "DataStructures.h"
 #include "MRayDescriptions.h"
+#include "TypePack.h"
 
 #include "Common/RenderImageStructs.h"
 
@@ -274,38 +275,22 @@ struct MRayTextureParameters
 };
 
 // Generic Attribute Info
-struct GenericAttributeInfo : public std::tuple<std::string, MRayDataTypeRT,
-                                                AttributeIsArray, AttributeOptionality>
+struct GenericAttributeInfo
 {
-    using Base = std::tuple<std::string, MRayDataTypeRT,
-                            AttributeIsArray, AttributeOptionality>;
-    using Base::Base;
-    enum E
-    {
-        LOGIC_INDEX         = 0,
-        LAYOUT_INDEX        = 1,
-        IS_ARRAY_INDEX      = 2,
-        OPTIONALITY_INDEX   = 3
-    };
+    std::string             name;
+    MRayDataTypeRT          dataType;
+    AttributeIsArray        isArray;
+    AttributeOptionality    isOptional;
 };
 
-struct TexturedAttributeInfo : public std::tuple<std::string, MRayDataTypeRT,
-                                                 AttributeIsArray, AttributeOptionality,
-                                                 AttributeTexturable, AttributeIsColor>
+struct TexturedAttributeInfo
 {
-    using Base = std::tuple<std::string, MRayDataTypeRT,
-                            AttributeIsArray, AttributeOptionality,
-                            AttributeTexturable, AttributeIsColor>;
-    using Base::Base;
-    enum E
-    {
-        LOGIC_INDEX         = 0,
-        LAYOUT_INDEX        = 1,
-        IS_ARRAY_INDEX      = 2,
-        OPTIONALITY_INDEX   = 3,
-        TEXTURABLE_INDEX    = 4,
-        COLORIMETRY_INDEX   = 5,
-    };
+    std::string             name;
+    MRayDataTypeRT          dataType;
+    AttributeIsArray        isArray;
+    AttributeOptionality    isOptional;
+    AttributeTexturable     isTexturable;
+    AttributeIsColor        isColor;
 };
 
 using GenericAttributeInfoList = StaticVector<GenericAttributeInfo,
@@ -347,19 +332,12 @@ MRAY_GENERIC_ID(PrimGroupId, CommonId);
 MRAY_GENERIC_ID(PrimBatchId, CommonId);
 struct PrimCount { uint32_t primCount; uint32_t attributeCount; };
 using PrimBatchIdList = std::vector<PrimBatchId>;
-struct PrimAttributeInfo : public std::tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
-                                             AttributeIsArray, AttributeOptionality>
+struct PrimAttributeInfo
 {
-    using Base = std::tuple<PrimitiveAttributeLogic, MRayDataTypeRT,
-                            AttributeIsArray, AttributeOptionality>;
-    using Base::Base;
-    enum
-    {
-        LOGIC_INDEX         = 0,
-        LAYOUT_INDEX        = 1,
-        IS_ARRAY_INDEX      = 2,
-        OPTIONALITY_INDEX   = 3
-    };
+    PrimitiveAttributeLogic logic;
+    MRayDataTypeRT          dataType;
+    AttributeIsArray        isArray;
+    AttributeOptionality    isOptional;
 };
 using PrimAttributeInfoList = StaticVector<PrimAttributeInfo,
                                            TracerConstants::MaxAttributePerGroup>;
@@ -439,7 +417,7 @@ namespace TracerConstants
     static constexpr PrimBatchId EmptyPrimBatchId       = PrimBatchId{0};
 
     static constexpr TextureId InvalidTexture           = TextureId{0};
-    static constexpr MediumPair VacuumMediumPair        = std::make_pair(VacuumMediumId, VacuumMediumId);
+    static constexpr MediumPair VacuumMediumPair        = Pair(VacuumMediumId, VacuumMediumId);
 
     static const auto NoAlphaMapList = OptionalAlphaMapList(StaticVecSize(MaxPrimBatchPerSurface),
                                                             std::nullopt);
@@ -692,7 +670,7 @@ class [[nodiscard]] TracerI
     virtual const TracerParameters& Parameters() const = 0;
 };
 
-using TracerConstructorArgs = PackedTypes<const TracerParameters&>;
+using TracerConstructorArgs = TypePack<const TracerParameters&>;
 
 // We use this on a map, so overload less
 inline bool AcceleratorType::operator<(AcceleratorType t) const
@@ -769,18 +747,4 @@ constexpr PrimitiveAttributeLogic PrimAttributeStringifier::FromString(std::stri
         i++;
     }
     return PrimitiveAttributeLogic::END;
-}
-
-// formatter for AcceleratorType
-inline std::string_view format_as(AcceleratorType t)
-{
-    using namespace std::string_view_literals;
-    using enum AcceleratorType::E;
-    switch(t.type)
-    {
-        case SOFTWARE_NONE:         return "SOFTWARE_LINEAR"sv;
-        case SOFTWARE_BASIC_BVH:    return "SOFTWARE_BVH"sv;
-        case HARDWARE:              return "HARDWARE"sv;
-        default:                    return "UNKNOWN"sv;
-    }
 }

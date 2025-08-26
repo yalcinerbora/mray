@@ -1,7 +1,7 @@
 #pragma once
-
-#include "Core/Map.h"
 #include "Core/TracerI.h"
+#include "Core/Map.h"
+#include "Core/Variant.h"
 
 #include "Device/GPUTextureView.h"
 
@@ -86,7 +86,7 @@ class TracerTexView<2, T>
     // Constructors & Destructor
     MRAY_HOST   TracerTexView(HWTextureView<2> hwView,
                               TextureReadMode mode,
-                              bool flipY = false);
+                                bool flipY = false);
     MRAY_HOST   TracerTexView(StreamingTextureView sTView,
                               TextureReadMode mode,
                               bool flipY = false);

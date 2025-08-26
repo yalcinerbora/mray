@@ -1,5 +1,6 @@
 #include "MaterialsDefault.h"
 #include "Texture.h"
+#include "GenericGroup.hpp"
 
 #include "Core/TypeNameGenerators.h"
 
@@ -27,7 +28,7 @@ MatGroupLambert::MatGroupLambert(uint32_t groupId,
 
 void MatGroupLambert::CommitReservations()
 {
-    GenericCommit(std::tie(dAlbedo, dNormalMaps, dMediumKeys),
+    GenericCommit(Tie(dAlbedo, dNormalMaps, dMediumKeys),
                   {0, 0, -1});
 
     soa.dAlbedo = ToConstSpan(dAlbedo);
@@ -44,9 +45,9 @@ MatAttributeInfoList MatGroupLambert::AttributeInfo() const
     using enum AttributeIsColor;
     static const MatAttributeInfoList LogicList =
     {
-        MatAttributeInfo("albedo", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+        MatAttributeInfo("albedo", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
                          MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR),
-        MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+        MatAttributeInfo("normalMap", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
                          MR_OPTIONAL, MR_TEXTURE_ONLY, IS_PURE_DATA)
     };
     return LogicList;
@@ -157,7 +158,7 @@ MatGroupReflect::MatGroupReflect(uint32_t groupId,
 
 void MatGroupReflect::CommitReservations()
 {
-    GenericCommit(std::tie(dMediumKeys), {-1});
+    GenericCommit(Tie(dMediumKeys), {-1});
     soa.dMediumKeys = ToConstSpan(dMediumKeys);
 }
 
@@ -231,9 +232,9 @@ MatGroupRefract::MatGroupRefract(uint32_t groupId,
 
 void MatGroupRefract::CommitReservations()
 {
-    GenericCommit(std::tie(dMediumKeys,
-                           dFrontCauchyCoeffs,
-                           dBackCauchyCoeffs), {-1, 0, 0});
+    GenericCommit(Tie(dMediumKeys,
+                      dFrontCauchyCoeffs,
+                      dBackCauchyCoeffs), {-1, 0, 0});
 
     soa.dBackCauchyCoeffs = ToConstSpan(dBackCauchyCoeffs);
     soa.dFrontCauchyCoeffs = ToConstSpan(dFrontCauchyCoeffs);
@@ -249,9 +250,9 @@ MatAttributeInfoList MatGroupRefract::AttributeInfo() const
     using enum AttributeIsColor;
     static const MatAttributeInfoList LogicList =
     {
-        MatAttributeInfo("cauchyBack", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+        MatAttributeInfo("cauchyBack", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
                          MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA),
-        MatAttributeInfo("cauchyFront", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+        MatAttributeInfo("cauchyFront", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
                          MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
     };
     return LogicList;
@@ -377,10 +378,10 @@ MatGroupUnreal::MatGroupUnreal(uint32_t groupId,
 
 void MatGroupUnreal::CommitReservations()
 {
-    GenericCommit(std::tie(dAlbedo, dNormalMaps,
-                           dRoughness, dSpecular, dMetallic,
-                           dMediumKeys),
-                           {0, 0, 0, 0, 0, -1});
+    GenericCommit(Tie(dAlbedo, dNormalMaps,
+                      dRoughness, dSpecular, dMetallic,
+                      dMediumKeys),
+                  {0, 0, 0, 0, 0, -1});
 
     soa.dAlbedo = ToConstSpan(dAlbedo);
     soa.dNormalMaps = ToConstSpan(dNormalMaps);
@@ -399,15 +400,15 @@ MatAttributeInfoList MatGroupUnreal::AttributeInfo() const
     using enum AttributeIsColor;
     static const MatAttributeInfoList LogicList =
     {
-        MatAttributeInfo("albedo", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+        MatAttributeInfo("albedo", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
                          MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR),
-        MatAttributeInfo("normalMap", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+        MatAttributeInfo("normalMap", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
                          MR_OPTIONAL, MR_TEXTURE_ONLY, IS_PURE_DATA),
-        MatAttributeInfo("roughness", MRayDataType<MR_FLOAT>(), IS_SCALAR,
+        MatAttributeInfo("roughness", MRayDataTypeRT(MR_FLOAT), IS_SCALAR,
                          MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
-        MatAttributeInfo("specular", MRayDataType<MR_FLOAT>(), IS_SCALAR,
+        MatAttributeInfo("specular", MRayDataTypeRT(MR_FLOAT), IS_SCALAR,
                          MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
-        MatAttributeInfo("metallic", MRayDataType<MR_FLOAT>(), IS_SCALAR,
+        MatAttributeInfo("metallic", MRayDataTypeRT(MR_FLOAT), IS_SCALAR,
                          MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA)
     };
     return LogicList;

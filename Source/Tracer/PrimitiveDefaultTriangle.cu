@@ -1,7 +1,10 @@
 #include "PrimitiveDefaultTriangle.h"
+#include "GenericGroup.hpp"
+
 #include "Device/GPUSystem.hpp"
 #include "Device/GPUMemory.h"
 #include "Device/GPUAlgGeneric.h"
+#include "Device/GPUAlgReduce.h"
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCAdjustIndices(// I-O
@@ -120,7 +123,7 @@ void KCApplyTransformsTriangle(// I-O
         for(uint32_t i = vertexStart; i < vertexCount; i += vertexIncrement)
         {
             // Convert the position (easy)
-            uint64_t vI = sVertexRanges[0] + i;
+            uint32_t vI = uint32_t(sVertexRanges[0] + i);
             Vector4 pos = Vector4(dPositionsInOut[vI], 1);
             dPositionsInOut[vI] = Vector3(sBatchTransform * pos);
             // Convert the normal (hard)
@@ -154,7 +157,7 @@ PrimGroupTriangle::PrimGroupTriangle(uint32_t primGroupId,
 
 void PrimGroupTriangle::CommitReservations()
 {
-    GenericCommit(std::tie(dPositions, dTBNRotations, dUVs, dIndexList),
+    GenericCommit(Tie(dPositions, dTBNRotations, dUVs, dIndexList),
                   {1, 1, 1, 0});
 
     soa.positions = ToConstSpan(dPositions);
@@ -173,10 +176,10 @@ PrimAttributeInfoList PrimGroupTriangle::AttributeInfo() const
     // and not primitive batches
     static const PrimAttributeInfoList LogicList =
     {
-        PrimAttributeInfo(POSITION, MRayDataType<MR_VECTOR_3>(),    IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(NORMAL,   MRayDataType<MR_QUATERNION>(),  IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(UV0,      MRayDataType<MR_VECTOR_2>(),    IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(INDEX,    MRayDataType<MR_VECTOR_3UI>(),  IS_SCALAR, MR_MANDATORY)
+        PrimAttributeInfo(POSITION, MRayDataTypeRT(MR_VECTOR_3),    IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(NORMAL,   MRayDataTypeRT(MR_QUATERNION),  IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(UV0,      MRayDataTypeRT(MR_VECTOR_2),    IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(INDEX,    MRayDataTypeRT(MR_VECTOR_3UI),  IS_SCALAR, MR_MANDATORY)
     };
     return LogicList;
 }
@@ -263,7 +266,7 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
 
     DeviceLocalMemory tempMem(*queue.Device());
     Span<Vector4ui> dVertexIndexRanges;
-    MemAlloc::AllocateMultiData(std::tie(dVertexIndexRanges),
+    MemAlloc::AllocateMultiData(Tie(dVertexIndexRanges),
                                 tempMem,
                                 {batchCount});
 
@@ -277,9 +280,7 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
                                                   ranges[INDICES_ATTRIB_INDEX][0],
                                                   ranges[INDICES_ATTRIB_INDEX][1]));
     }
-    queue.MemcpyAsync(dVertexIndexRanges,
-                      Span<const Vector4ui>(hVertexIndexRanges.cbegin(),
-                                            hVertexIndexRanges.end()));
+    queue.MemcpyAsync(dVertexIndexRanges, Span<const Vector4ui>(hVertexIndexRanges));
 
     uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
     using namespace std::string_view_literals;
@@ -319,9 +320,9 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
     Span<Matrix4x4> dTransformations;
     Span<Matrix4x4> dInvTransformations;
     DeviceLocalMemory tempMem(*queue.Device());
-    MemAlloc::AllocateMultiData(std::tie(dVertexRanges,
-                                         dTransformations,
-                                         dInvTransformations),
+    MemAlloc::AllocateMultiData(Tie(dVertexRanges,
+                                    dTransformations,
+                                    dInvTransformations),
                                 tempMem,
                                 {batchCount, batchCount, batchCount});
 
@@ -404,8 +405,8 @@ PrimGroupSkinnedTriangle::PrimGroupSkinnedTriangle(uint32_t primGroupId,
 
 void PrimGroupSkinnedTriangle::CommitReservations()
 {
-    GenericCommit(std::tie(dPositions, dTBNRotations, dUVs,
-                           dIndexList, dSkinWeights, dSkinIndices),
+    GenericCommit(Tie(dPositions, dTBNRotations, dUVs,
+                      dIndexList, dSkinWeights, dSkinIndices),
                   {1, 1, 1, 1, 1, 0});
 
     soa.positions = ToConstSpan(dPositions);
@@ -424,12 +425,12 @@ PrimAttributeInfoList PrimGroupSkinnedTriangle::AttributeInfo() const
     using enum AttributeIsArray;
     static const PrimAttributeInfoList LogicList =
     {
-        PrimAttributeInfo(POSITION,     MRayDataType<MR_VECTOR_3>(),    IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(NORMAL,       MRayDataType<MR_QUATERNION>(),  IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(UV0,          MRayDataType<MR_VECTOR_2>(),    IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(WEIGHT,       MRayDataType<MR_UNORM_4x8>(),   IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(WEIGHT_INDEX, MRayDataType<MR_VECTOR_4UC>(),  IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(INDEX,        MRayDataType<MR_VECTOR_3UI>(),  IS_SCALAR, MR_MANDATORY)
+        PrimAttributeInfo(POSITION,     MRayDataTypeRT(MR_VECTOR_3),    IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(NORMAL,       MRayDataTypeRT(MR_QUATERNION),  IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(UV0,          MRayDataTypeRT(MR_VECTOR_2),    IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(WEIGHT,       MRayDataTypeRT(MR_UNORM_4x8),   IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(WEIGHT_INDEX, MRayDataTypeRT(MR_VECTOR_4UC),  IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(INDEX,        MRayDataTypeRT(MR_VECTOR_3UI),  IS_SCALAR, MR_MANDATORY)
     };
     return LogicList;
 }
@@ -513,13 +514,13 @@ void PrimGroupSkinnedTriangle::PushAttribute(PrimBatchKey idStart, PrimBatchKey 
 
 void PrimGroupSkinnedTriangle::Finalize(const GPUQueue& queue)
 {
-        size_t batchCount = this->itemRanges.size();
+    size_t batchCount = this->itemRanges.size();
     std::vector<Vector4ui> hVertexIndexRanges;
     hVertexIndexRanges.reserve(batchCount);
 
     DeviceLocalMemory tempMem(*queue.Device());
     Span<Vector4ui> dVertexIndexRanges;
-    MemAlloc::AllocateMultiData(std::tie(dVertexIndexRanges),
+    MemAlloc::AllocateMultiData(Tie(dVertexIndexRanges),
                                 tempMem,
                                 {batchCount});
 
@@ -531,9 +532,7 @@ void PrimGroupSkinnedTriangle::Finalize(const GPUQueue& queue)
                                                   ranges[INDICES_ATTRIB_INDEX][0],
                                                   ranges[INDICES_ATTRIB_INDEX][1]));
     }
-    queue.MemcpyAsync(dVertexIndexRanges,
-                      Span<const Vector4ui>(hVertexIndexRanges.cbegin(),
-                                            hVertexIndexRanges.end()));
+    queue.MemcpyAsync(dVertexIndexRanges, Span<const Vector4ui>(hVertexIndexRanges));
 
     uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
     using namespace std::string_view_literals;

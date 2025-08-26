@@ -3,8 +3,6 @@
 #include "MetaLight.h"
 #include "SurfaceComparators.h"
 
-#include "Core/DeviceVisit.h"
-
 #include "Device/GPUSystem.hpp"
 
 template<class MetaLightArray, LightGroupC LightGroup, TransformGroupC TransformGroup>
@@ -163,7 +161,7 @@ MR_HF_DEF
 SampleT<Vector3> MetaLightViewT<V, ST>::SampleSolidAngle(RNGDispenser& rng,
                                                          const Vector3& distantPoint) const
 {
-    return DeviceVisit(light, [&](auto&& l) -> SampleT<Vector3>
+    return Visit(light, [&](auto&& l) -> SampleT<Vector3>
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -178,7 +176,7 @@ Float MetaLightViewT<V, ST>::PdfSolidAngle(const MetaHit& hit,
                                            const Vector3& distantPoint,
                                            const Vector3& dir) const
 {
-    return DeviceVisit(light, [=](auto&& l) -> Float
+    return Visit(light, [=](auto&& l) -> Float
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -198,7 +196,7 @@ template<class V, class ST>
 MR_HF_DEF
 uint32_t MetaLightViewT<V, ST>::SampleSolidAngleRNCount() const
 {
-    return DeviceVisit(light, [](auto&& l) -> uint32_t
+    return Visit(light, [](auto&& l) -> uint32_t
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -211,7 +209,7 @@ template<class V, class ST>
 MR_HF_DEF
 SampleT<Ray> MetaLightViewT<V, ST>::SampleRay(RNGDispenser& rng) const
 {
-    return DeviceVisit(light, [&](auto&& l) -> SampleT<Ray>
+    return Visit(light, [&](auto&& l) -> SampleT<Ray>
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -224,7 +222,7 @@ template<class V, class ST>
 MR_HF_DEF
 Float MetaLightViewT<V, ST>::PdfRay(const Ray& ray) const
 {
-    return DeviceVisit(light, [&](auto&& l) -> Float
+    return Visit(light, [&](auto&& l) -> Float
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -237,7 +235,7 @@ template<class V, class ST>
 MR_HF_DEF
 uint32_t MetaLightViewT<V, ST>::SampleRayRNCount() const
 {
-    return DeviceVisit(light, [](auto&& l) -> uint32_t
+    return Visit(light, [](auto&& l) -> uint32_t
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -252,7 +250,7 @@ Spectrum MetaLightViewT<V, ST>::EmitViaHit(const Vector3& wO,
                                            const MetaHit& hit,
                                            const RayCone& rayCone) const
 {
-    return DeviceVisit(light, [=, this](auto&& l) -> Spectrum
+    return Visit(light, [=, this](auto&& l) -> Spectrum
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -278,7 +276,7 @@ Spectrum MetaLightViewT<V, ST>::EmitViaSurfacePoint(const Vector3& wO,
                                                     const Vector3& surfacePoint,
                                                     const RayCone& rayCone) const
 {
-    return DeviceVisit(light, [&, this](auto&& l) -> Spectrum
+    return Visit(light, [&, this](auto&& l) -> Spectrum
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -291,7 +289,7 @@ template<class V, class ST>
 MR_HF_DEF
 bool MetaLightViewT<V, ST>::IsPrimitiveBackedLight() const
 {
-    return DeviceVisit(light, [](auto&& l) -> bool
+    return Visit(light, [](auto&& l) -> bool
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -413,8 +411,8 @@ void MetaLightArrayT<TLT...>::AddBatchGeneric(const GenericGroupLightT& lg,
     auto Call = [&](auto* tuple) -> void
     {
         using TupleType = std::remove_pointer_t<decltype(tuple)>;
-        using LGType = std::tuple_element_t<0, TupleType>;
-        using TGType = std::tuple_element_t<1, TupleType>;
+        using LGType = TypePackElement<0, TupleType>;
+        using TGType = TypePackElement<1, TupleType>;
 
         if(LGType::TypeName() == lg.Name() &&
            TGType::TypeName() == tg.Name())
@@ -427,14 +425,14 @@ void MetaLightArrayT<TLT...>::AddBatchGeneric(const GenericGroupLightT& lg,
         else uncalled++;
     };
 
-    std::apply([&](auto... x)
+    Apply(TLGroupPtrTuple{}, [&](auto... x)
     {
         // Parameter pack expansion
         (
             (void)Call(x),
             ...
         );
-    }, TLGroupPtrTuple{});
+    });
 
     if(uncalled == GroupCount)
     {
@@ -516,7 +514,7 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
     Span<PrimitiveKey>    dPKList;
     Span<TransformKey>    dTKList;
     DeviceLocalMemory tempMem(*queue.Device());
-    MemAlloc::AllocateMultiData(std::tie(dLKList, dPKList, dTKList),
+    MemAlloc::AllocateMultiData(Tie(dLKList, dPKList, dTKList),
                                 tempMem,
                                 {totalLightCount,
                                  totalLightCount,
@@ -527,10 +525,10 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
     uint32_t hashCount = Math::DivideUp(tableElemCount, 4u);
 
     // Do the internal allocation as well
-    MemAlloc::AllocateMultiData(std::tie(dPrimSoA, dLightSoA, dTransSoA,
-                                         dMetaPrims, dMetaTContexts, dMetaLights,
-                                         dTableHashes, dTableKeys, dTableValues,
-                                         dSpectrumConverter),
+    MemAlloc::AllocateMultiData(Tie(dPrimSoA, dLightSoA, dTransSoA,
+                                    dMetaPrims, dMetaTContexts, dMetaLights,
+                                    dTableHashes, dTableKeys, dTableValues,
+                                    dSpectrumConverter),
                                 memory,
                                 {primExpandedRanges.size(),
                                  primExpandedRanges.size(),

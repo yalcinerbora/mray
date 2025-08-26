@@ -8,6 +8,8 @@
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"     // IWYU pragma: keep
 #include "Device/GPUAlgRadixSort.h"
+#include "Device/GPUAlgBinaryPartition.h"
+#include "Device/GPUAlgGeneric.h"
 
 static constexpr auto INVALID_LOCATION = std::numeric_limits<uint32_t>::max();
 static constexpr auto FIND_SPLITS_TPB = 512u;
@@ -214,27 +216,27 @@ RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
 
     if(isResultsInHostVisible)
     {
-        MemAlloc::AllocateMultiData(std::tie(dKeys[0], dKeys[1],
-                                             dIndices[0], dIndices[1],
-                                             dTempMemory),
+        MemAlloc::AllocateMultiData(Tie(dKeys[0], dKeys[1],
+                                        dIndices[0], dIndices[1],
+                                        dTempMemory),
                                     deviceMem,
                                     {rayCount, rayCount,
                                      rayCount, rayCount,
                                      totalTempMemSize});
 
-        MemAlloc::AllocateMultiData(std::tie(hPartitionCount,
-                                             hPartitionKeys,
-                                             hPartitionStartOffsets),
+        MemAlloc::AllocateMultiData(Tie(hPartitionCount,
+                                        hPartitionKeys,
+                                        hPartitionStartOffsets),
                                     hostMem,
                                     {1, maxPartitionCount,
                                     maxPartitionCount + 1});
     }
     else
     {
-        MemAlloc::AllocateMultiData(std::tie(dKeys[0], dKeys[1],
-                                             dIndices[0], dIndices[1],
-                                             dTempMemory, dPartitionKeys,
-                                             dPartitionStartOffsets),
+        MemAlloc::AllocateMultiData(Tie(dKeys[0], dKeys[1],
+                                        dIndices[0], dIndices[1],
+                                        dTempMemory, dPartitionKeys,
+                                        dPartitionStartOffsets),
                                     deviceMem,
                                     {rayCount, rayCount,
                                      rayCount, rayCount,
@@ -242,7 +244,7 @@ RayPartitioner::InitialBuffers RayPartitioner::Start(uint32_t rayCountIn,
                                      maxPartitionCount,
                                      maxPartitionCount + 1});
 
-        MemAlloc::AllocateMultiData(std::tie(hPartitionCount),
+        MemAlloc::AllocateMultiData(Tie(hPartitionCount),
                                     hostMem, {1});
     }
 

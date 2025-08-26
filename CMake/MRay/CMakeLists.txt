@@ -16,7 +16,9 @@ set(SRC_TRACER
     ${CURRENT_SOURCE_DIR}/TracerThread.cpp)
 
 set(SRC_COMMON
-    ${CURRENT_SOURCE_DIR}/main.cpp)
+    ${CURRENT_SOURCE_DIR}/main.cpp
+    # Expose readme to the IDE for editing
+    ${MRAY_SOURCE_DIRECTORY}/../README.md)
 
 # TODO: Move this somwhere better?
 # (TracerLib/DLL, Visor.dll, MRay.exe both use these)

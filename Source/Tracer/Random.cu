@@ -80,7 +80,7 @@ RNGGroupIndependent::RNGGroupIndependent(uint32_t genCount,
     , currentRange(0, generatorCount)
     , deviceMem(gpuSystem.AllGPUs(), 2_MiB, 32_MiB)
 {
-    MemAlloc::AllocateMultiData(std::tie(dBackupStates, dMainStates),
+    MemAlloc::AllocateMultiData(Tie(dBackupStates, dMainStates),
                                 deviceMem,
                                 {generatorCount, generatorCount});
 

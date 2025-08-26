@@ -127,13 +127,13 @@ class IndexLookupTable
             : *loc;
         size_t hashPackSize = Math::DivideUp(allocSize, size_t(4));
 
-        MemAlloc::AllocateMultiData(std::tie(hashes, keys, values),
+        MemAlloc::AllocateMultiData(Tie(hashes, keys, values),
                                     mem,
                                     {hashPackSize, allocSize, allocSize});
         Clear();
     }
 
-    std::pair<const uint32_t*, bool> Insert(IndexTriplet key, uint32_t value);
+    Pair<const uint32_t*, bool> Insert(IndexTriplet key, uint32_t value);
 };
 
 struct MeshProcessorThread

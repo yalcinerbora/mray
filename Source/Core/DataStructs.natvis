@@ -1,27 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
-	<Type Name="StaticVector&lt;*&gt;">
-		<DisplayString>{{ count = {count}, N = {$T2} }}</DisplayString>
-		<Expand>
-			<ArrayItems>
-				<Size>count</Size>
-				<ValuePointer>($T1*)storage</ValuePointer>
-			</ArrayItems>
-		</Expand>
+    <Type Name="StaticVector&lt;*&gt;">
+        <DisplayString>{{ count = {count}, N = {$T2} }}</DisplayString>
+        <Expand>
+            <ArrayItems>
+                <Size>count</Size>
+                <ValuePointer>($T1*)storage</ValuePointer>
+            </ArrayItems>
+        </Expand>
 
-	</Type>
+    </Type>
 
-	<Type Name="Vector&lt;2,*&gt;">
-		<DisplayString>{{ {vector[0]}, {vector[1]} }}</DisplayString>
-	</Type>
+    <Type Name="Vector&lt;2,*&gt;">
+        <DisplayString>{{ {vector[0]}, {vector[1]} }}</DisplayString>
+    </Type>
 
-	<Type Name="Vector&lt;3,*&gt;">
-		<DisplayString>{{ {vector[0]}, {vector[1]}, {vector[2]} }}</DisplayString>
-	</Type>
+    <Type Name="Vector&lt;3,*&gt;">
+        <DisplayString>{{ {vector[0]}, {vector[1]}, {vector[2]} }}</DisplayString>
+    </Type>
 
-	<Type Name="Vector&lt;4,*&gt;">
-		<DisplayString>{{ {vector[0]}, {vector[1]}, {vector[2]}, vector[3]} }}</DisplayString>
-	</Type>
+    <Type Name="Vector&lt;4,*&gt;">
+        <DisplayString>{{ {vector[0]}, {vector[1]}, {vector[2]}, vector[3]} }}</DisplayString>
+    </Type>
 
 </AutoVisualizer>

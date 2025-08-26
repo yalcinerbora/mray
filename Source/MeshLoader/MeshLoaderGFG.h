@@ -2,7 +2,7 @@
 
 #include "EntryPoint.h"
 #include <gfg/GFGFileLoader.h>
-#include <fstream>
+#include <iosfwd>
 
 class MeshFileGFG;
 

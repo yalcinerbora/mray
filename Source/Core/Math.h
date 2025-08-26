@@ -129,7 +129,7 @@ namespace Math
     template<FloatC T> MR_PF_DECL T FMA(T, T, T) noexcept;
     template<FloatC T> MR_PF_DECL T FMod(T, T) noexcept;
     template<FloatC T> MR_PF_DECL auto ModF(T) noexcept -> std::array<T, 2>;
-    template<FloatC T> MR_PF_DECL auto ModFInt(T) noexcept -> std::pair<IntegralSister<T>, T>;
+    template<FloatC T> MR_PF_DECL auto ModFInt(T) noexcept -> Pair<IntegralSister<T>, T>;
     template<FloatC T> MR_PF_DECL T Pow(T, T) noexcept;
     // For vector types, we add as we needed in generic code,
     // Or friction is good here. When implementing cost of the routine
@@ -628,7 +628,7 @@ MR_PF_DEF T ArcTan(T x) noexcept
         return std::atan(x);
     // GPU Code path
     #else
-        if constexpr(std::is_same_v<T, float>)  return atan(x);
+        if constexpr(std::is_same_v<T, float>)  return atanf(x);
         if constexpr(std::is_same_v<T, double>) return atan(x);
     #endif
 }
@@ -663,7 +663,7 @@ MR_PF_DEF T ArcTan2(T y, T x) noexcept
         return std::atan2(y, x);
     // GPU Code path
     #else
-        if constexpr(std::is_same_v<T, float>)  return atan2(y, x);
+        if constexpr(std::is_same_v<T, float>)  return atan2f(y, x);
         if constexpr(std::is_same_v<T, double>) return atan2(y, x);
     #endif
 }
@@ -1258,10 +1258,10 @@ MR_PF_DEF auto ModF(T x) noexcept -> std::array<T, 2>
 }
 
 template<FloatC T>
-MR_PF_DEF auto ModFInt(T x) noexcept -> std::pair<IntegralSister<T>, T>
+MR_PF_DEF auto ModFInt(T x) noexcept -> Pair<IntegralSister<T>, T>
 {
     const auto& [i, f] = ModF(x);
-    return std::pair(static_cast<IntegralSister<T>>(i), f);
+    return Pair(static_cast<IntegralSister<T>>(i), T(f));
 }
 
 template<FloatC T>

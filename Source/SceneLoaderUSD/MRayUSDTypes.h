@@ -1,17 +1,17 @@
 #pragma once
 
 #include <vector>
-#include <variant>
 #include <map>
 
 #include <pxr/usd/usd/prim.h>
 
 #include "Core/Definitions.h"
 #include "Core/Matrix.h"        // IWYU pragma: keep
+#include "Core/Variant.h"
 
 struct MRayUSDPrimSurface
 {
-    using SubGeomMaterials = std::vector<std::pair<uint32_t, pxr::SdfPath>>;
+    using SubGeomMaterials = std::vector<Pair<uint32_t, pxr::SdfPath>>;
     //
     bool                cullFace = false;
     pxr::UsdPrim        surfacePrim;
@@ -35,6 +35,6 @@ struct MRayUSDFallbackMaterial
     MRayColorSpaceEnum colorSpace = MRayColorSpaceEnum::MR_DEFAULT;
 };
 
-using MRayUSDBoundMaterial = std::variant<pxr::UsdPrim, MRayUSDFallbackMaterial>;
+using MRayUSDBoundMaterial = Variant<pxr::UsdPrim, MRayUSDFallbackMaterial>;
 using MRayUSDMaterialMap = std::map<pxr::UsdPrim, MRayUSDBoundMaterial>;
 

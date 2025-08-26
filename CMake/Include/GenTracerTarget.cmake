@@ -49,7 +49,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.cu
         ${CURRENT_SOURCE_DIR}/PrimitivesDefault.h
         ${CURRENT_SOURCE_DIR}/PrimitivesDefault.hpp
-        ${CURRENT_SOURCE_DIR}/PrimitivesDefault.cpp)
+        ${CURRENT_SOURCE_DIR}/PrimitivesDefault.cu)
 
     set(SRC_TRANSFORMS
         ${CURRENT_SOURCE_DIR}/TransformC.h
@@ -85,6 +85,7 @@ function(gen_tracer_target)
 
     set(SRC_ACCELLERATORS
         ${CURRENT_SOURCE_DIR}/AcceleratorC.h
+        ${CURRENT_SOURCE_DIR}/AcceleratorCommon.cu
         ${CURRENT_SOURCE_DIR}/AcceleratorWork.h
         ${CURRENT_SOURCE_DIR}/AcceleratorWork.kt.h
         ${CURRENT_SOURCE_DIR}/AcceleratorWorkI.h
@@ -137,6 +138,8 @@ function(gen_tracer_target)
     set(SRC_COMMON
         ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
         ${CURRENT_SOURCE_DIR}/TracerTypes.h
+        ${CURRENT_SOURCE_DIR}/GenericGroup.cpp
+        ${CURRENT_SOURCE_DIR}/GenericGroup.hpp
         ${CURRENT_SOURCE_DIR}/GenericGroup.h
         ${CURRENT_SOURCE_DIR}/TracerBase.h
         ${CURRENT_SOURCE_DIR}/TracerBase.cpp)
@@ -180,8 +183,10 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/ColorConverter.cu
         ${CURRENT_SOURCE_DIR}/TextureFilter.cu
         ${CURRENT_SOURCE_DIR}/PrimitiveDefaultTriangle.cu
+        ${CURRENT_SOURCE_DIR}/PrimitivesDefault.cu
         ${CURRENT_SOURCE_DIR}/TransformsDefault.cu
         ${CURRENT_SOURCE_DIR}/LightsDefault.cu
+        ${CURRENT_SOURCE_DIR}/AcceleratorCommon.cu
         ${CURRENT_SOURCE_DIR}/AcceleratorLinear.cu
         ${CURRENT_SOURCE_DIR}/AcceleratorLBVH.cu
         ${CURRENT_SOURCE_DIR}/TexViewRenderer.cu

@@ -9,8 +9,12 @@
 #include "Tracer.h"
 #include "RequestedTypes.h"
 #include "RequestedRenderers.h"
+#include "SurfaceView.h"
+
+#include "Core/Variant.h"
 
 #include "Tracer/TextureView.hpp"
+#include "Tracer/GenericGroup.hpp"
 
 #include "Device/GPUAlgReduce.h"
 
@@ -18,7 +22,7 @@ TypeGeneratorPack Tracer::GLOBAL_TYPE_GEN = {};
 
 void Tracer::AddPrimGenerators(Map<std::string_view, PrimGenerator>& map)
 {
-    using Args = PackedTypes<uint32_t, const GPUSystem&>;
+    using Args = TypePack<uint32_t, const GPUSystem&>;
 
     Args*           resolver0 = nullptr;
     PrimGTypes*     resolver1 = nullptr;
@@ -30,7 +34,7 @@ void Tracer::AddPrimGenerators(Map<std::string_view, PrimGenerator>& map)
 
 void Tracer::AddTransformGenerators(Map<std::string_view, TransGenerator>& map)
 {
-    using Args = PackedTypes<uint32_t, const GPUSystem&>;
+    using Args = TypePack<uint32_t, const GPUSystem&>;
 
     Args*               resolver0 = nullptr;
     TransformGTypes*    resolver1 = nullptr;
@@ -42,8 +46,8 @@ void Tracer::AddTransformGenerators(Map<std::string_view, TransGenerator>& map)
 
 void Tracer::AddLightGenerators(Map<std::string_view, LightGenerator>& map)
 {
-    using Args = PackedTypes<uint32_t, const GPUSystem&, const TextureViewMap&,
-                             const TextureMap&, GenericGroupPrimitiveT&>;
+    using Args = TypePack<uint32_t, const GPUSystem&, const TextureViewMap&,
+                          const TextureMap&, GenericGroupPrimitiveT&>;
 
     Args*               resolver0 = nullptr;
     LightGTypes*        resolver1 = nullptr;
@@ -55,7 +59,7 @@ void Tracer::AddLightGenerators(Map<std::string_view, LightGenerator>& map)
 
 void Tracer::AddCamGenerators(Map<std::string_view, CamGenerator>& map)
 {
-    using Args = PackedTypes<uint32_t, const GPUSystem&>;
+    using Args = TypePack<uint32_t, const GPUSystem&>;
 
     Args*       resolver0 = nullptr;
     CamGTypes*  resolver1 = nullptr;
@@ -67,8 +71,8 @@ void Tracer::AddCamGenerators(Map<std::string_view, CamGenerator>& map)
 
 void Tracer::AddMaterialGenerators(Map<std::string_view, MatGenerator>& map)
 {
-    using Args = PackedTypes<uint32_t, const GPUSystem&,
-                             const TextureViewMap&, const TextureMap&>;
+    using Args = TypePack<uint32_t, const GPUSystem&,
+                          const TextureViewMap&, const TextureMap&>;
 
     Args*       resolver0 = nullptr;
     MatGTypes*  resolver1 = nullptr;
@@ -80,8 +84,8 @@ void Tracer::AddMaterialGenerators(Map<std::string_view, MatGenerator>& map)
 
 void Tracer::AddMediumGenerators(Map<std::string_view, MedGenerator>& map)
 {
-    using Args = PackedTypes<uint32_t, const GPUSystem&,
-                             const TextureViewMap&, const TextureMap&>;
+    using Args = TypePack<uint32_t, const GPUSystem&,
+                          const TextureViewMap&, const TextureMap&>;
 
     Args*       resolver0 = nullptr;
     MedGTypes*  resolver1 = nullptr;
@@ -104,9 +108,9 @@ static void AddAccelGeneratorsGeneric(Map<AcceleratorType, BaseAccelGenerator>& 
                                      const AccelGroupGenMap&,
                                      const AccelWorkGenMap&>);
 
-    using GroupGenArgs = PackedTypes<uint32_t, ThreadPool&, const GPUSystem&,
-                                     const GenericGroupPrimitiveT&,
-                                     const AccelWorkGenMap&>;
+    using GroupGenArgs = TypePack<uint32_t, ThreadPool&, const GPUSystem&,
+                                  const GenericGroupPrimitiveT&,
+                                  const AccelWorkGenMap&>;
     using AccelGTypes = typename AcceleratorPack::GroupTypes;
     GroupGenArgs*   groupResolver0 = nullptr;
     AccelGTypes*    groupResolver1 = nullptr;
@@ -120,7 +124,7 @@ static void AddAccelGeneratorsGeneric(Map<AcceleratorType, BaseAccelGenerator>& 
 
     // Works
     auto& workMapGlobal = workMap.emplace(t, AccelWorkGenMap()).first->second;
-    using WorkGenArgs = PackedTypes<const AcceleratorGroupI&, const GenericGroupTransformT&>;
+    using WorkGenArgs = TypePack<const AcceleratorGroupI&, const GenericGroupTransformT&>;
     using AccelWTypes = typename AcceleratorPack::WorkTypes;
     WorkGenArgs* workResolver0 = nullptr;
     AccelWTypes* workResolver1 = nullptr;
@@ -168,9 +172,9 @@ void Tracer::AddRendererGenerators(Map<std::string_view, RendererAttributeInfoLi
                                    Map<std::string_view, RendererGenerator>& map,
                                    Map<std::string_view, RenderWorkPack>& workMap)
 {
-    using Args = PackedTypes<const RenderImagePtr&, TracerView,
-                             ThreadPool&, const GPUSystem&,
-                             const RenderWorkPack&>;
+    using Args = TypePack<const RenderImagePtr&, TracerView,
+                          ThreadPool&, const GPUSystem&,
+                          const RenderWorkPack&>;
 
     Args* resolver0 = nullptr;
     RendererTypeList* resolver1 = nullptr;

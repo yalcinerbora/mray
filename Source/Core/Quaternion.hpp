@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/Math.h"
 #include "Quaternion.h"
 
 template<FloatC T>
@@ -197,7 +198,7 @@ MR_PF_DEF Vector<3, T> Quat<T>::ApplyInvRotation(const Vector<3, T>& vtor) const
 template<FloatC T>
 MR_PF_DEF bool Quat<T>::HasNaN() const noexcept
 {
-    return v.HasNaN();
+    return !Math::IsFinite(v);
 }
 
 template<FloatC T>
@@ -445,7 +446,7 @@ Quat<T> TransformGen::ToSpaceQuat(const Vector<3, T>& xIn,
                         x[1] - y[0]);
         }
     }
-    q *= T{0.5} * Math::RSqrt(t);
+    q *= T{0.5} * Math::RSqrtMax(t);
     q = q.Normalize();
     q = q.Conjugate();
     return q;

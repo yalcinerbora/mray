@@ -3,12 +3,14 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
+#include "Core/Definitions.h"
 #include "Core/Timer.h"
 #include "Core/TypeNameGenerators.h"
 #include "Core/Error.h"
 #include "Core/ThreadPool.h"
 
 #include "Common/JsonCommon.h" // IWYU pragma: keep
+#include "TransientPool/TransientPool.h"
 
 static constexpr RendererId INVALID_RENDERER_ID = RendererId(std::numeric_limits<uint32_t>::max());
 
@@ -169,50 +171,88 @@ MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPa
         uint32_t attribIndex = 0;
         for(const auto& attrib : attributes)
         {
-            using enum GenericAttributeInfo::E;
             using enum AttributeIsArray;
-            if(std::get<IS_ARRAY_INDEX>(attrib) == IS_ARRAY)
+            if(attrib.isArray == IS_ARRAY)
                 return MRayError("Config read \"{}\": Array renderer attributes "
                                  "are not supported yet",
                                  configJsonPath);
 
-            AttributeOptionality optionality = std::get<OPTIONALITY_INDEX>(attrib);
-            std::string_view name = std::get<LOGIC_INDEX>(attrib);
-            MRayDataTypeRT type = std::get<LAYOUT_INDEX>(attrib);
+            AttributeOptionality optionality = attrib.isOptional;
+            std::string_view name = attrib.name;
+            MRayDataTypeRT dataType = attrib.dataType;
 
-            MRayError e = std::visit([&, this](auto&& t) -> MRayError
+            // Find the item in the json file
+            using enum AttributeOptionality;
+            auto loc = rendererNode.find(name);
+            if(optionality != MR_OPTIONAL && loc == rendererNode.end())
+                return MRayError("Config read \"{}\": Mandatory variable \"{}\" "
+                                    "for \"{}\" is not found in config file",
+                                    configJsonPath, name, rName);
+            if(loc == rendererNode.end()) return MRayError::OK;
+
+            size_t count = 0;
+            if(dataType.Name() == MRayDataEnum::MR_STRING)
+                count = loc->get<std::string_view>().size();
+            else
+                count = 1;
+
+            TransientData tData = AllocateTransientData(dataType, count);
+            tData.ReserveAll();
+
+            if(dataType.Name() == MRayDataEnum::MR_STRING)
             {
-                using enum AttributeOptionality;
-                using MRDataType = std::remove_cvref_t<decltype(t)>;
-                using T = MRDataType::Type;
-                auto loc = rendererNode.find(name);
-                if(optionality != MR_OPTIONAL && loc == rendererNode.end())
-                    return MRayError("Config read \"{}\": Mandatory variable \"{}\" "
-                                     "for \"{}\" is not found in config file",
-                                     configJsonPath, name, rName);
-                if(loc == rendererNode.end()) return MRayError::OK;
-
-                T in = loc->get<T>();
-                if constexpr(MRDataType::Name == MRayDataEnum::MR_STRING)
+                std::string_view in = loc->get<std::string_view>();
+                Span<char> out = tData.AccessAsString();
+                std::copy(in.cbegin(), in.cend(), out.begin());
+            }
+            else
+            {
+                dataType.SwitchCase([&](auto&& t)
                 {
-                    TransientData data(std::in_place_type_t<T>{}, in.size());
-                    data.ReserveAll();
-                    Span<char> out = data.AccessAsString();
-                    std::copy(in.cbegin(), in.cend(), out.begin());
-                    tracer->PushRendererAttribute(currentRenderer, attribIndex,
-                                                  std::move(data));
-                }
-                else
-                {
-                    TransientData data(std::in_place_type_t<T>{}, 1);
-                    data.Push(Span<const T>(&in, 1));
-                    tracer->PushRendererAttribute(currentRenderer, attribIndex,
-                                                  std::move(data));
-                }
-                return MRayError::OK;
-            }, type);
+                    using MRDataType = std::remove_cvref_t<decltype(t)>;
+                    using T = MRDataType::Type;
+                    auto s = tData.AccessAs<T>();
+                    s.front() = loc->get<T>();
+                });
+            }
+            tracer->PushRendererAttribute(currentRenderer, attribIndex,
+                                          std::move(tData));
 
-            if(e) return e;
+            // MRayError e = dataType.SwitchCase([&, this](auto&& t) -> MRayError
+            // {
+            //     using enum AttributeOptionality;
+            //     using MRDataType = std::remove_cvref_t<decltype(t)>;
+            //     using T = MRDataType::Type;
+            //     auto loc = rendererNode.find(name);
+            //     if(optionality != MR_OPTIONAL && loc == rendererNode.end())
+            //         return MRayError("Config read \"{}\": Mandatory variable \"{}\" "
+            //                          "for \"{}\" is not found in config file",
+            //                          configJsonPath, name, rName);
+            //     if(loc == rendererNode.end()) return MRayError::OK;
+
+            //     T in = loc->get<T>();
+            //     if constexpr(MRDataType::Name == MRayDataEnum::MR_STRING)
+            //     {
+            //         TransientData data(std::in_place_type_t<T>{}, in.size());
+            //         data.ReserveAll();
+            //         Span<char> out = data.AccessAsString();
+            //         std::copy(in.cbegin(), in.cend(), out.begin());
+            //         tracer->PushRendererAttribute(currentRenderer, attribIndex,
+            //                                       std::move(data));
+            //     }
+            //     else
+            //     {
+            //         TransientData data(std::in_place_type_t<T>{}, 1);
+            //         data.Push(Span<const T>(&in, 1));
+            //         tracer->PushRendererAttribute(currentRenderer, attribIndex,
+            //                                       std::move(data));
+            //     }
+            //     return MRayError::OK;
+            // });
+            // if(e) return e;
+
+
+
             attribIndex++;
         }
     }
@@ -927,10 +967,10 @@ void TracerThread::DisplayTypeAttributes(std::string_view typeName)
         MRAY_LOG("--------------------------------------------------------");
         for(const auto& a : attribInfo)
         {
-            std::string logic = std::get<GenericAttributeInfo::LOGIC_INDEX>(a);
-            MRayDataTypeRT layout = std::get<GenericAttributeInfo::LAYOUT_INDEX>(a);
-            AttributeIsArray isArray = std::get<GenericAttributeInfo::IS_ARRAY_INDEX>(a);
-            AttributeOptionality isOptional = std::get<GenericAttributeInfo::OPTIONALITY_INDEX>(a);
+            std::string logic = a.name;
+            MRayDataTypeRT layout = a.dataType;
+            AttributeIsArray isArray = a.isArray;
+            AttributeOptionality isOptional = a.isOptional;
 
             MRAY_LOG("{:<16} | {:<16} | {:<6s} | {:<9s}",
                      logic,
@@ -948,10 +988,10 @@ void TracerThread::DisplayTypeAttributes(std::string_view typeName)
         MRAY_LOG("--------------------------------------------------------");
         for(const auto& a : attribInfo)
         {
-            PrimitiveAttributeLogic logic = std::get<GenericAttributeInfo::LOGIC_INDEX>(a);
-            MRayDataTypeRT layout = std::get<GenericAttributeInfo::LAYOUT_INDEX>(a);
-            AttributeIsArray isArray = std::get<GenericAttributeInfo::IS_ARRAY_INDEX>(a);
-            AttributeOptionality isOptional = std::get<GenericAttributeInfo::OPTIONALITY_INDEX>(a);
+            PrimitiveAttributeLogic logic = a.logic;
+            MRayDataTypeRT layout = a.dataType;
+            AttributeIsArray isArray = a.isArray;
+            AttributeOptionality isOptional = a.isOptional;
 
             MRAY_LOG("{:<16} | {:<16} | {:<6s} | {:<9s}",
                      PrimAttributeStringifier::ToString(logic),
@@ -970,12 +1010,12 @@ void TracerThread::DisplayTypeAttributes(std::string_view typeName)
                  "---------------------------------------");
         for(const auto& a : attribInfo)
         {
-            std::string logic = std::get<TexturedAttributeInfo::LOGIC_INDEX>(a);
-            MRayDataTypeRT layout = std::get<TexturedAttributeInfo::LAYOUT_INDEX>(a);
-            AttributeIsArray isArray = std::get<TexturedAttributeInfo::IS_ARRAY_INDEX>(a);
-            AttributeOptionality isOptional = std::get<TexturedAttributeInfo::OPTIONALITY_INDEX>(a);
-            AttributeTexturable isTexturable = std::get<TexturedAttributeInfo::TEXTURABLE_INDEX>(a);
-            AttributeIsColor isColor = std::get<TexturedAttributeInfo::COLORIMETRY_INDEX>(a);
+            std::string logic = a.name;
+            MRayDataTypeRT layout = a.dataType;
+            AttributeIsArray isArray = a.isArray;
+            AttributeOptionality isOptional = a.isOptional;
+            AttributeTexturable isTexturable = a.isTexturable;
+            AttributeIsColor isColor = a.isColor;
 
             std::string_view texturability;
             switch(isTexturable)

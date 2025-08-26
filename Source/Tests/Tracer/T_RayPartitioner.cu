@@ -3,6 +3,7 @@
 #include <random>
 
 #include "Device/GPUAlgGeneric.h"
+#include "Device/GPUAlgBinaryPartition.h"
 #include "Device/GPUSystem.hpp"
 
 #include "Tracer/RayPartitioner.h"
@@ -23,7 +24,7 @@ void SimulateBasicPathTracer()
     DeviceMemory testMemory(system.AllGPUs(), 16_MiB, 256_MiB);
     Span<uint8_t> dIsRayAliveBuffer;
     Span<CommonKey> dHitKeyBuffer;
-    MemAlloc::AllocateMultiData(std::tie(dIsRayAliveBuffer, dHitKeyBuffer),
+    MemAlloc::AllocateMultiData(Tie(dIsRayAliveBuffer, dHitKeyBuffer),
                                 testMemory,
                                 {RayCount, RayCount});
     dIsRayAliveBuffer = dIsRayAliveBuffer.subspan(0, RayCount);

@@ -26,37 +26,33 @@ namespace LambertMatDetail
         static constexpr uint32_t SampleRNCount = 2;
 
         private:
-        const AlbedoMap             albedoTex;
-        const OptionalNormalMap&    normalMapTex;
+        const Surface&              surface;
+        Spectrum                    albedo;
+        Optional<Vector3>           optNormal;
         MediumKeyPair               mediumKeys;
 
         public:
         MR_GF_DECL
         LambertMaterial(const SpectrumConverter& sTransContext,
+                        const Surface& surface,
                         const DataSoA& soa, MaterialKey mk);
 
         MR_GF_DECL
         SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
-                                       const Surface& surface,
                                        RNGDispenser& dispenser) const;
-        MR_GF_DECL Float    Pdf(const Ray& wI,
-                                const Vector3& wO,
-                                const Surface& surface) const;
+        MR_GF_DECL Float    Pdf(const Ray& wI, const Vector3& wO) const;
 
-        MR_GF_DECL Spectrum Evaluate(const Ray& wI,
-                                     const Vector3& wO,
-                                     const Surface& surface) const;
+        MR_GF_DECL Spectrum Evaluate(const Ray& wI, const Vector3& wO) const;
         MR_GF_DECL bool     IsEmissive() const;
-        MR_GF_DECL Spectrum Emit(const Vector3& wO,
-                                 const Surface& surf) const;
-        MR_GF_DECL bool     IsAllTexturesAreResident(const Surface& surface) const;
-        MR_GF_DECL Float    Specularity(const Surface&) const;
+        MR_GF_DECL Spectrum Emit(const Vector3& wO) const;
+        MR_GF_DECL Float    Specularity() const;
+        MR_GF_DECL
+        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO) const;
 
         MR_GF_DECL
-        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO,
-                                           const Surface&) const;
+        static bool         IsAllTexturesAreResident(const Surface&, const DataSoA&,
+                                                     MaterialKey);
     };
-
 }
 
 namespace ReflectMatDetail
@@ -76,32 +72,28 @@ namespace ReflectMatDetail
         static constexpr uint32_t SampleRNCount = 0;
 
         private:
+        const Surface& surface;
         MediumKeyPair  mediumKeys;
 
         public:
         MR_GF_DECL
         ReflectMaterial(const SpectrumConverter& sTransContext,
+                        const Surface& surface,
                         const DataSoA& soa, MaterialKey mk);
 
         MR_GF_DECL
         SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
-                                           const Surface& surface,
-                                           RNGDispenser& dispenser) const;
-        MR_GF_DECL Float    Pdf(const Ray& wI,
-                                    const Vector3& wO,
-                                    const Surface& surface) const;
-        MR_GF_DECL Spectrum Evaluate(const Ray& wI,
-                                     const Vector3& wO,
-                                     const Surface& surface) const;
+                                       RNGDispenser& dispenser) const;
+        MR_GF_DECL Float    Pdf(const Ray& wI, const Vector3& wO) const;
+        MR_GF_DECL Spectrum Evaluate(const Ray& wI, const Vector3& wO) const;
         MR_GF_DECL bool     IsEmissive() const;
-        MR_GF_DECL Spectrum Emit(const Vector3& wO,
-                                 const Surface& surf) const;
-        MR_GF_DECL bool     IsAllTexturesAreResident(const Surface& surface) const;
-        MR_GF_DECL Float    Specularity(const Surface&) const;
-
+        MR_GF_DECL Spectrum Emit(const Vector3& wO) const;
+        MR_GF_DECL Float    Specularity() const;
         MR_GF_DECL
-        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO,
-                                           const Surface&) const;
+        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO) const;
+        MR_GF_DECL
+        static bool         IsAllTexturesAreResident(const Surface&, const DataSoA&,
+                                                     MaterialKey);
     };
 }
 
@@ -124,6 +116,7 @@ namespace RefractMatDetail
         static constexpr uint32_t SampleRNCount = 0;
 
         private:
+        const Surface&  surface;
         MediumKeyPair   mediumKeys;
         Spectrum        frontIoR;
         Spectrum        backIoR;
@@ -131,28 +124,24 @@ namespace RefractMatDetail
         public:
         MR_GF_DECL
         RefractMaterial(const SpectrumConverter& sTransContext,
+                        const Surface& surface,
                         const DataSoA& soa, MaterialKey mk);
 
         MR_GF_DECL
         SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
-                                       const Surface& surface,
                                        RNGDispenser& dispenser) const;
-        MR_GF_DECL Float    Pdf(const Ray& wI,
-                                const Vector3& wO,
-                                const Surface& surface) const;
+        MR_GF_DECL Float    Pdf(const Ray& wI, const Vector3& wO) const;
 
-        MR_GF_DECL Spectrum Evaluate(const Ray& wI,
-                                     const Vector3& wO,
-                                     const Surface& surface) const;
+        MR_GF_DECL Spectrum Evaluate(const Ray& wI, const Vector3& wO) const;
         MR_GF_DECL bool     IsEmissive() const;
-        MR_GF_DECL Spectrum Emit(const Vector3& wO,
-                                 const Surface& surf) const;
-        MR_GF_DECL bool     IsAllTexturesAreResident(const Surface& surface) const;
-        MR_GF_DECL Float    Specularity(const Surface&) const;
+        MR_GF_DECL Spectrum Emit(const Vector3& wO) const;
+        MR_GF_DECL Float    Specularity() const;
+        MR_GF_DECL
+        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO) const;
 
         MR_GF_DECL
-        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO,
-                                           const Surface&) const;
+        static bool         IsAllTexturesAreResident(const Surface&, const DataSoA&,
+                                                     MaterialKey);
     };
 }
 
@@ -183,49 +172,42 @@ namespace UnrealMatDetail
         static constexpr uint32_t SampleRNCount = 3;
 
         private:
-        const AlbedoMap             albedoTex;
-        const OptionalNormalMap&    normalMapTex;
-        const FloatMap              roughnessTex;
-        const FloatMap              specularTex;
-        const FloatMap              metallicTex;
-
-        MediumKeyPair               mediumKeys;
+        const Surface&      surface;
+        Spectrum            albedo;
+        Optional<Vector3>   optNormal;
+        Float               roughness;
+        Float               specular;
+        Float               metallic;
+        MediumKeyPair       mediumKeys;
 
         MR_GF_DECL
-        Float MISRatio(Float metallic, Float specular, Float avgAlbedo) const;
+        Float MISRatio(Float avgAlbedo) const;
         MR_GF_DECL
-        Spectrum CalculateF0(Spectrum albedo, Float metallic, Float specular) const;
+        Spectrum CalculateF0() const;
         MR_GF_DECL
         Float ConvertProbHToL(Float VdH, Float pdfH) const;
-        MR_GF_DECL
-        std::tuple<Float, Float, Float, Spectrum>
-        FetchData(const Surface&) const;
 
         public:
         MR_GF_DECL
         UnrealMaterial(const SpectrumConverter& sTransContext,
+                       const Surface& surface,
                        const DataSoA& soa, MaterialKey mk);
 
         MR_GF_DECL
         SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
-                                       const Surface& surface,
                                        RNGDispenser& dispenser) const;
-        MR_GF_DECL Float    Pdf(const Ray& wI,
-                                const Vector3& wO,
-                                const Surface& surface) const;
+        MR_GF_DECL Float    Pdf(const Ray& wI, const Vector3& wO) const;
 
-        MR_GF_DECL Spectrum Evaluate(const Ray& wI,
-                                     const Vector3& wO,
-                                     const Surface& surface) const;
+        MR_GF_DECL Spectrum Evaluate(const Ray& wI, const Vector3& wO) const;
         MR_GF_DECL bool     IsEmissive() const;
-        MR_GF_DECL Spectrum Emit(const Vector3& wO,
-                                 const Surface& surf) const;
-        MR_GF_DECL bool     IsAllTexturesAreResident(const Surface& surface) const;
-        MR_GF_DECL Float    Specularity(const Surface&) const;
+        MR_GF_DECL Spectrum Emit(const Vector3& wO) const;
+        MR_GF_DECL Float    Specularity() const;
+        MR_GF_DECL
+        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO) const;
 
         MR_GF_DECL
-        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO,
-                                           const Surface&) const;
+        static bool         IsAllTexturesAreResident(const Surface&, const DataSoA&,
+                                                     MaterialKey);
     };
 }
 

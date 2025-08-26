@@ -1,5 +1,6 @@
 #include "SceneLoaderMRay.h"
 
+#include "Core/Math.h"
 #include "Core/TracerI.h"
 #include "Core/Log.h"
 #include "Core/Timer.h"
@@ -9,9 +10,11 @@
 #include "Core/ThreadPool.h"
 #include "Core/Profiling.h"
 
+#include "Core/Types.h"
 #include "ImageLoader/EntryPoint.h"
 #include "MeshLoader/EntryPoint.h"
 #include "MeshLoaderJson.h"
+#include "TransientPool/TransientPool.h"
 
 #include <nlohmann/json.hpp>
 #include <filesystem>
@@ -76,10 +79,9 @@ AttributeCountList GenericFindAttributeCounts(std::vector<AttributeCountList>& a
         uint32_t attribIndex = 0;
         for(const auto& l : list)
         {
-            using enum TransAttributeInfo::E;
-            std::string_view name = std::get<LOGIC_INDEX>(l);
-            AttributeOptionality optional = std::get<OPTIONALITY_INDEX>(l);
-            AttributeIsArray isArray = std::get<IS_ARRAY_INDEX>(l);
+            std::string_view name = l.name;
+            AttributeOptionality optional = l.isOptional;
+            AttributeIsArray isArray = l.isArray;
 
             size_t entityAttribCount = 0;
             if(isArray == AttributeIsArray::IS_ARRAY &&
@@ -120,14 +122,7 @@ std::vector<TransientData> GenericAttributeLoad(const AttributeCountList& totalC
     result.reserve(list.size());
 
     for(size_t i = 0; i < totalCounts.size(); i++)
-    {
-        std::visit([&](auto&& dataType)
-        {
-            using T = std::remove_cvref_t<decltype(dataType)>::Type;
-            result.emplace_back(std::in_place_type_t<T>{}, totalCounts[i]);
-        },
-        std::get<GenericAttributeInfo::LAYOUT_INDEX>(list[i]));
-    }
+        result.push_back(AllocateTransientData(list[i].dataType, totalCounts[i]));
 
     // Now data is set we can load
     for(const JsonNode& node : nodes)
@@ -135,12 +130,11 @@ std::vector<TransientData> GenericAttributeLoad(const AttributeCountList& totalC
         uint32_t i = 0;
         for(const auto& l : list)
         {
-            using enum GenericAttributeInfo::E;
-            std::string_view name = std::get<LOGIC_INDEX>(l);
-            AttributeOptionality optional = std::get<OPTIONALITY_INDEX>(l);
-            AttributeIsArray isArray = std::get<IS_ARRAY_INDEX>(l);
+            std::string_view name = l.name;
+            AttributeOptionality optional = l.isOptional;
+            AttributeIsArray isArray = l.isArray;
 
-            std::visit([&](auto&& dataType)
+            l.dataType.SwitchCase([&](auto&& dataType)
             {
                 using T = std::remove_cvref_t<decltype(dataType)>::Type;
                 if(isArray == AttributeIsArray::IS_ARRAY &&
@@ -169,8 +163,7 @@ std::vector<TransientData> GenericAttributeLoad(const AttributeCountList& totalC
                     T data = node.AccessData<T>(name);
                     result[i].Push(Span<const T>(&data, 1));
                 }
-            },
-            std::get<LAYOUT_INDEX>(l));
+            });
             i++;
         }
     }
@@ -197,22 +190,32 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
 
     for(size_t i = 0; i < totalCounts.size(); i++)
     {
-        auto texturability = std::get<TexturedAttributeInfo::TEXTURABLE_INDEX>(list[i]);
-        std::visit([&](auto&& dataType)
+        auto texturability = list[i].isTexturable;
+        using enum AttributeTexturable;
+        size_t count = (texturability == MR_TEXTURE_ONLY)
+                        ? 0
+                        : totalCounts[i];
+        TransientData tData = AllocateTransientData(list[i].dataType, count);
+        result.push_back(TexturedAttributeData
         {
-            using T = std::remove_cvref_t<decltype(dataType)>::Type;
-            using enum AttributeTexturable;
-            auto initData = TexturedAttributeData
-            {
-                .data = TransientData(std::in_place_type_t<T>{},
-                                      (texturability == MR_TEXTURE_ONLY)
-                                        ? 0
-                                        : totalCounts[i]),
-                .textures = std::vector<Optional<TextureId>>()
-            };
-            result.push_back(std::move(initData));
-        },
-        std::get<TexturedAttributeInfo::LAYOUT_INDEX>(list[i]));
+            .data = std::move(tData),
+            .textures = std::vector<Optional<TextureId>>()
+        });
+
+        // list[i].dataType.SwitchCase([&](auto&& dataType)
+        // {
+        //     using T = std::remove_cvref_t<decltype(dataType)>::Type;
+        //     using enum AttributeTexturable;
+        //     auto initData = TexturedAttributeData
+        //     {
+        //         .data = TransientData(std::in_place_type_t<T>{},
+        //                               (texturability == MR_TEXTURE_ONLY)
+        //                                 ? 0
+        //                                 : totalCounts[i]),
+        //         .textures = std::vector<Optional<TextureId>>()
+        //     };
+        //     result.push_back(std::move(initData));
+        // });
     }
 
     // Now data is set we can load
@@ -221,11 +224,10 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
         uint32_t i = 0;
         for(const auto& l : list)
         {
-            using enum TexturedAttributeInfo::E;
-            std::string_view name = std::get<LOGIC_INDEX>(l);
-            AttributeOptionality optional = std::get<OPTIONALITY_INDEX>(l);
-            AttributeIsArray isArray = std::get<IS_ARRAY_INDEX>(l);
-            AttributeTexturable texturability = std::get<TEXTURABLE_INDEX>(l);
+            std::string_view name = l.name;
+            AttributeOptionality optional = l.isOptional;
+            AttributeIsArray isArray = l.isArray;
+            AttributeTexturable texturability = l.isTexturable;
 
             // Base checks
             if(isArray == AttributeIsArray::IS_ARRAY)
@@ -263,7 +265,7 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
             // TODO: Share functionality,  this is copy pase code
             if(texturability == AttributeTexturable::MR_CONSTANT_ONLY)
             {
-                std::visit([&](auto&& dataType)
+                l.dataType.SwitchCase([&](auto&& dataType)
                 {
                     using T = std::remove_cvref_t<decltype(dataType)>::Type;
                     if(isArray == AttributeIsArray::IS_ARRAY &&
@@ -292,14 +294,13 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                         T data = node.AccessData<T>(name);
                         result[i].data.Push(Span<const T>(&data, 1));
                     }
-                },
-                std::get<LAYOUT_INDEX>(l));
+                });
                 assert(result[i].data.IsFull());
             }
             //  Now the hairy part
             if(texturability == AttributeTexturable::MR_TEXTURE_OR_CONSTANT)
             {
-                std::visit([&](auto&& dataType)
+                l.dataType.SwitchCase([&](auto&& dataType)
                 {
                     using T = std::remove_cvref_t<decltype(dataType)>::Type;
                     Variant<SceneTexId, T> texturable = node.AccessTexturableData<T>(name);
@@ -315,8 +316,7 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                         result[i].textures.emplace_back(std::nullopt);
                         result[i].data.Push(Span<const T>(&std::get<T>(texturable), 1));
                     }
-                },
-                std::get<LAYOUT_INDEX>(l));
+                });
             }
             i++;
         }
@@ -331,8 +331,7 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
         uint32_t i = 0;
         for(const auto& l : list)
         {
-            using enum TexturedAttributeInfo::E;
-            AttributeTexturable texturability = std::get<TEXTURABLE_INDEX>(l);
+            AttributeTexturable texturability = l.isTexturable;
             if(texturability == AttributeTexturable::MR_TEXTURE_ONLY)
             {
                 assert(result[i].data.IsEmpty());
@@ -380,13 +379,15 @@ void LoadPrimitive(TracerI& tracer,
     // The solution here is to rely on assimp's tangent/bitangent generation capabilities
     // and use it. On the other hand, for in json triangle primitives compute it on the
     // class.
+    bool warnDegenerateTangents = false;
+
     for(uint32_t attribIndex = 0; attribIndex < attributeList.size();
         attribIndex++)
     {
         const auto& attribute = attributeList[attribIndex];
-        PrimitiveAttributeLogic attribLogic = std::get<PrimAttributeInfo::LOGIC_INDEX>(attribute);
-        AttributeOptionality optionality = std::get<PrimAttributeInfo::OPTIONALITY_INDEX>(attribute);
-        MRayDataTypeRT groupsLayout = std::get<PrimAttributeInfo::LAYOUT_INDEX>(attribute);
+        PrimitiveAttributeLogic attribLogic = attribute.logic;
+        AttributeOptionality optionality = attribute.isOptional;
+        MRayDataTypeRT groupsLayout = attribute.dataType;
         MRayDataTypeRT filesLayout = meshFileView->AttributeLayout(attribLogic);
 
         // Is this data available?
@@ -424,7 +425,7 @@ void LoadPrimitive(TracerI& tracer,
             Span<const Vector3> bitangents = bData.AccessAs<const Vector3>();
             Span<const Vector3> normals = nData.AccessAs<const Vector3>();
 
-            for(size_t i = 0; i < normalCount; i++)
+            for(uint32_t i = 0; i < normalCount; i++)
             {
                 using Math::Normalize;
                 Vector3 t = Normalize(tangents[i]);
@@ -432,10 +433,20 @@ void LoadPrimitive(TracerI& tracer,
                 Vector3 n = Normalize(normals[i]);
                 // If the tangents are left-handed,
                 // convert them to right-handed
-                if(Math::Dot(Math::Cross(t, b), n) < Float(0))
+                if(Math::Dot(Math::Cross(b, n), t) < Float(0))
                     t = -t;
                 auto [newT, newB] = Graphics::GSOrthonormalize(t, b, n);
-                Quaternion q = TransformGen::ToSpaceQuat(newT, newB, n);
+                Quaternion q;
+                if(!(Math::IsFinite(newT) && Math::IsFinite(newB)))
+                {
+                    warnDegenerateTangents = true;
+                    // If we fail randomly generate space
+                    b = Graphics::OrthogonalVector(n);
+                    t = Math::Cross(b, n);
+                    q = TransformGen::ToSpaceQuat(t, b, n);
+                }
+                else q = TransformGen::ToSpaceQuat(newT, newB, n);
+
                 quats.Push(Span<const Quaternion>(&q, 1));
             }
             assert(quats.IsFull());
@@ -462,6 +473,14 @@ void LoadPrimitive(TracerI& tracer,
                             tracer.TypeName(groupId),
                             MRayDataTypeStringifier::ToString(groupsLayout.Name()));
         }
+    }
+
+    if(warnDegenerateTangents)
+    {
+        MRAY_WARNING_LOG("Mesh File{:s}:[{:d}] has degenerate tangents. "
+                         "tbn matrix is arbitrarily generated. If mesh attached "
+                         "to a normal map it may not look right!",
+                         meshFileView->Name(), meshFileView->InnerIndex());
     }
 }
 
@@ -493,9 +512,7 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
     const GenericAttributeInfo& info = list.front();
     for(const auto& n : nodes)
     {
-        bool isArray = (std::get<GenericAttributeInfo::IS_ARRAY_INDEX>(info) ==
-                        AttributeIsArray::IS_ARRAY);
-
+        bool isArray = (info.isArray == AttributeIsArray::IS_ARRAY);
         std::string_view layout = n.CommonData<std::string_view>(LAYOUT);
         if(layout == LAYOUT_TRS)
         {
@@ -532,7 +549,7 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
                                                 ? sL.value().AccessAs<Vector3>()
                                                 : Span<const Vector3>();
 
-                for(size_t i = 0; i < tSpan.size(); i++)
+                for(uint32_t i = 0; i < tSpan.size(); i++)
                 {
                     Vector3 t = (tSpan.empty()) ? tSpan[i] : Vector3::Zero();
                     Vector3 r = (rSpan.empty()) ? rSpan[i] : Vector3::Zero();
@@ -738,9 +755,9 @@ void SceneLoaderMRay::DryRunNodesForTex(std::vector<SceneTexId>& textureIds,
         for(const auto& node : n.second)
         for(const auto& att : texAttributes)
         {
-            AttributeTexturable texturable = std::get<MatAttributeInfo::TEXTURABLE_INDEX>(att);
-            AttributeOptionality optional = std::get<MatAttributeInfo::OPTIONALITY_INDEX>(att);
-            std::string_view name = std::get<MatAttributeInfo::LOGIC_INDEX>(att);
+            AttributeTexturable texturable = att.isTexturable;
+            AttributeOptionality optional = att.isOptional;
+            std::string_view name = att.name;
             if(texturable == AttributeTexturable::MR_CONSTANT_ONLY)
                 continue;
 
@@ -759,14 +776,14 @@ void SceneLoaderMRay::DryRunNodesForTex(std::vector<SceneTexId>& textureIds,
             }
             else if(texturable == AttributeTexturable::MR_TEXTURE_OR_CONSTANT)
             {
-                MRayDataTypeRT dataType = std::get<MatAttributeInfo::LAYOUT_INDEX>(att);
-                std::visit([&node, name, &textureIds](auto&& dataType)
+                MRayDataTypeRT dataType = att.dataType;
+                dataType.SwitchCase([&node, name, &textureIds](auto&& dataType)
                 {
                     using T = std::remove_cvref_t<decltype(dataType)>::Type;
                     auto value = node.AccessTexturableData<T>(name);
                     if(std::holds_alternative<SceneTexId>(value))
                         textureIds.push_back(std::get<SceneTexId>(value));
-                }, dataType);
+                });
             }
         }
     }
@@ -865,7 +882,7 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
             size_t localCount = end - start;
             using ItDiff = decltype(nodes.cbegin())::difference_type;
             auto startConv = static_cast<ItDiff>(start);
-            auto nodeRange = Span<const JsonNode>(nodes.cbegin() + startConv, localCount);
+            auto nodeRange = Span<const JsonNode>(nodes.data() + startConv, localCount);
             IdList generatedIds;
             try
             {
@@ -876,7 +893,7 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
                     auto& groupList = *groupEntityList;
                     Pair<GroupIdType, IdType> value(groupId,
                                                     generatedIds[localI]);
-                    groupList[i] = std::make_pair(nodes[i].Id(), value);
+                    groupList[i] = Pair(nodes[i].Id(), value);
                 }
 
                 // Commit barrier
@@ -932,7 +949,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
     static const ProfilerAnnotation _("LoadTextures");
     auto annotation = _.AnnotateScope();
 
-    using TextureIdList = std::vector<std::pair<SceneTexId, TextureId>>;
+    using TextureIdList = std::vector<Pair<SceneTexId, TextureId>>;
 
     // Construct Image Loader
     std::shared_ptr<ImageLoaderI> imgLoader = CreateImageLoader();
@@ -1074,7 +1091,7 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
                 }
 
                 auto& texIdList = *texIdListPtr;
-                texIdList[i] = std::make_pair(sceneTexId, tId);
+                texIdList[i] = Pair(sceneTexId, tId);
             }
 
             // Barrier code is invoked, and all textures are allocated
@@ -1197,13 +1214,12 @@ void SceneLoaderMRay::LoadMediums(TracerI& tracer, ErrorList& exceptions)
                 attribIndex++)
             {
                 using enum AttributeTexturable;
-                const auto IS_TEX_INDEX = TexturedAttributeInfo::TEXTURABLE_INDEX;
                 auto& data = dataOut[attribIndex];
                 MediumId idStart = ids.front();
                 MediumId idEnd = ids.back();
                 auto range = CommonIdRange(std::bit_cast<CommonId>(idStart),
                                            std::bit_cast<CommonId>(idEnd));
-                if(std::get<IS_TEX_INDEX>(list[attribIndex]) == MR_CONSTANT_ONLY)
+                if(list[attribIndex].isTexturable == MR_CONSTANT_ONLY)
                     tracer.PushMediumAttribute(groupId, range, attribIndex,
                                                std::move(data.data));
                 else
@@ -1292,13 +1308,12 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
                 attribIndex++)
             {
                 using enum AttributeTexturable;
-                const auto IS_TEX_INDEX = TexturedAttributeInfo::TEXTURABLE_INDEX;
                 auto& data = dataOut[attribIndex];
                 MaterialId idStart = ids.front();
                 MaterialId idEnd = ids.back();
                 auto range = CommonIdRange(std::bit_cast<CommonId>(idStart),
                                            std::bit_cast<CommonId>(idEnd));
-                if(std::get<IS_TEX_INDEX>(list[attribIndex]) == MR_CONSTANT_ONLY)
+                if(list[attribIndex].isTexturable == MR_CONSTANT_ONLY)
                     tracer.PushMatAttribute(groupId, range, attribIndex,
                                             std::move(data.data));
                 else
@@ -1677,13 +1692,12 @@ void SceneLoaderMRay::LoadLights(TracerI& tracer, ErrorList& exceptions)
                 attribIndex++)
             {
                 using enum AttributeTexturable;
-                const auto IS_TEX_INDEX = TexturedAttributeInfo::TEXTURABLE_INDEX;
                 auto& data = dataOut[attribIndex];
                 LightId idStart = ids.front();
                 LightId idEnd = ids.back();
                 auto range = CommonIdRange(std::bit_cast<CommonId>(idStart),
                                            std::bit_cast<CommonId>(idEnd));
-                if(std::get<IS_TEX_INDEX>(list[attribIndex]) == MR_CONSTANT_ONLY)
+                if(list[attribIndex].isTexturable == MR_CONSTANT_ONLY)
                     tracer.PushLightAttribute(groupId, range, attribIndex,
                                               std::move(data.data));
                 else
@@ -1730,16 +1744,16 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
             const auto& node = definitions[i];
             const auto idNode = node.at(NodeNames::ID);
             ItemLocation itemLoc;
-            std::get<ARRAY_INDEX>(itemLoc) = i;
+            get<ARRAY_INDEX>(itemLoc) = i;
             if(!idNode.is_array())
             {
-                std::get<INNER_INDEX>(itemLoc) = 0;
+                get<INNER_INDEX>(itemLoc) = 0;
                 result.emplace(idNode.get<uint32_t>(), itemLoc);
             }
             else for(uint32_t j = 0; j < idNode.size(); j++)
             {
                 const auto& id = idNode[j];
-                std::get<INNER_INDEX>(itemLoc) = j;
+                get<INNER_INDEX>(itemLoc) = j;
                 result.emplace(id.get<uint32_t>(), itemLoc);
             }
         }
@@ -1847,9 +1861,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                             "located in \"{:s}\"",
                             id, listName);
         const auto& location =  it->second;
-        uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
-        uint32_t innerIndex = std::get<INNER_INDEX>(location);
-
+        auto [arrayIndex, innerIndex] = location;
         auto node = JsonNode(sceneJsonIn[listName][arrayIndex], innerIndex);
         //std::string type = Annotate(std::string(node.Type()));
         std::string type = std::string(node.Type());
@@ -1875,8 +1887,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     {
         for(uint8_t i = 0; i < s.pairCount; i++)
         {
-            uint32_t matId = std::get<SurfaceStruct::MATERIAL_INDEX>(s.matPrimBatchPairs[i]);
-            uint32_t primId = std::get<SurfaceStruct::PRIM_INDEX>(s.matPrimBatchPairs[i]);
+            uint32_t matId = get<SurfaceStruct::MATERIAL_INDEX>(s.matPrimBatchPairs[i]);
+            uint32_t primId = get<SurfaceStruct::PRIM_INDEX>(s.matPrimBatchPairs[i]);
             PushToTypeMapping(materialNodes, matHT, matId, MATERIAL_LIST);
             PushToTypeMapping(primNodes, primHT, primId, PRIMITIVE_LIST);
             PushToTypeMapping(transformNodes, transformHT,
@@ -1910,8 +1922,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                             "located in \"{:s}\"",
                             l.lightId, LIGHT_LIST);
         const auto& location = lightLoc->second;
-        uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
-        uint32_t innerIndex = std::get<INNER_INDEX>(location);
+        uint32_t arrayIndex = get<ARRAY_INDEX>(location);
+        uint32_t innerIndex = get<INNER_INDEX>(location);
 
         auto node = JsonNode(sceneJson[LIGHT_LIST][arrayIndex], innerIndex);
         std::string_view lightTypeName = node.Type();
@@ -1928,7 +1940,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                                 "located in \"{:s}\". Requested by Light({:d})",
                                 primId, PRIMITIVE_LIST, l.lightId);
 
-            uint32_t primListIndex = std::get<ARRAY_INDEX>(primLoc->second);
+            uint32_t primListIndex = get<ARRAY_INDEX>(primLoc->second);
             std::string_view primTypeName = sceneJson[PRIMITIVE_LIST]
                                                      [primListIndex]
                                                      [TYPE].get<std::string_view>();
@@ -1989,8 +2001,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                             "located in {:s}",
                             uint32_t(t), TEXTURE_LIST);
         const auto& location = it->second;
-        uint32_t arrayIndex = std::get<ARRAY_INDEX>(location);
-        uint32_t innerIndex = std::get<INNER_INDEX>(location);
+        uint32_t arrayIndex = get<ARRAY_INDEX>(location);
+        uint32_t innerIndex = get<INNER_INDEX>(location);
         auto node = JsonNode(sceneJson[TEXTURE_LIST][arrayIndex], innerIndex);
         // TODO: Add support for 3D textures.
         textureNodes.emplace_back(t, std::move(node));
@@ -2047,11 +2059,11 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
 
         auto LessThan = [](const auto& lhs, const auto& rhs)
         {
-            return std::get<0>(lhs) < std::get<0>(rhs);
+            return get<0>(lhs) < get<0>(rhs);
         };
         auto Equal = [](const auto& lhs, const auto& rhs)
         {
-            return std::get<0>(lhs) == std::get<0>(rhs);
+            return get<0>(lhs) == get<0>(rhs);
         };
         std::sort(textureNodes.begin(), textureNodes.end(), LessThan);
         auto last = std::unique(textureNodes.begin(), textureNodes.end(), Equal);
@@ -2079,8 +2091,8 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
             static constexpr size_t PI = SurfaceStruct::PRIM_INDEX;
             static constexpr size_t MI = SurfaceStruct::MATERIAL_INDEX;
 
-            PrimBatchId pId = primMappings.map.at(std::get<PI>(surf.matPrimBatchPairs[i])).second;
-            MaterialId mId = matMappings.map.at(std::get<MI>(surf.matPrimBatchPairs[i])).second;
+            PrimBatchId pId = primMappings.map.at(get<PI>(surf.matPrimBatchPairs[i])).second;
+            MaterialId mId = matMappings.map.at(get<MI>(surf.matPrimBatchPairs[i])).second;
             Optional<TextureId> tId;
             if(surf.alphaMaps[i].has_value())
                 tId = texMappings.at(surf.alphaMaps[i].value());
@@ -2099,7 +2111,7 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
             cullFace
         };
         SurfaceId mRaySurf = tracer.CreateSurface(surfParams);
-        mRaySurfaces.push_back(std::pair(surfaceId++, mRaySurf));
+        mRaySurfaces.push_back(Pair(surfaceId++, mRaySurf));
     }
 }
 
@@ -2125,7 +2137,7 @@ void SceneLoaderMRay::CreateLightSurfaces(TracerI& tracer, const std::vector<Lig
 
         LightSurfaceParams lSurfParams = SurfStructToSurfParams(surf);
         LightSurfaceId mRaySurf = tracer.CreateLightSurface(lSurfParams);
-        mRayLightSurfaces.push_back(std::pair(lightSurfaceId++, mRaySurf));
+        mRayLightSurfaces.push_back(Pair(lightSurfaceId++, mRaySurf));
     }
     mRayBoundaryLightSurface = tracer.SetBoundarySurface(SurfStructToSurfParams(boundary));
 }
@@ -2147,7 +2159,7 @@ void SceneLoaderMRay::CreateCamSurfaces(TracerI& tracer, const std::vector<Camer
             cId, tId, mId
         };
         CamSurfaceId mRaySurf = tracer.CreateCameraSurface(cSurfParams);
-        mRayCamSurfaces.push_back(std::pair(camSurfaceId++, mRaySurf));
+        mRayCamSurfaces.push_back(Pair(camSurfaceId++, mRaySurf));
     }
 }
 
@@ -2343,7 +2355,7 @@ TracerIdPack SceneLoaderMRay::MoveIdPack(double durationMS)
         .surfaces = std::move(mRaySurfaces),
         .camSurfaces = std::move(mRayCamSurfaces),
         .lightSurfaces = std::move(mRayLightSurfaces),
-        .boundarySurface = std::pair(0, mRayBoundaryLightSurface),
+        .boundarySurface = Pair(0u, mRayBoundaryLightSurface),
         .loadTimeMS = durationMS
     };
 }

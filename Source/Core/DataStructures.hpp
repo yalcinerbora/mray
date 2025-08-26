@@ -73,8 +73,9 @@ Optional<V> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
 template <LookupKeyC K, class V, std::unsigned_integral H,
           uint32_t VECL, LookupStrategyC<H, K> S>
 MR_HF_DECL
-std::pair<const V*, bool> LookupTable<K, V, H, VECL, S>::Insert(const K& k, const V& v) const
+Pair<const V*, bool> LookupTable<K, V, H, VECL, S>::Insert(const K& k, const V& v) const
 {
+    using P = Pair<const V*, bool>;
     uint32_t tableSize = static_cast<uint32_t>(keys.size());
     uint32_t hashPackCount = static_cast<uint32_t>(hashes.size());
     H hashVal = S::Hash(k);
@@ -97,7 +98,7 @@ std::pair<const V*, bool> LookupTable<K, V, H, VECL, S>::Insert(const K& k, cons
             // keys are equal, check them only if the hashes are equal.
             // If true, return the old val
             if(hashVal == hashChunk[i] && keys[globalIndex] == k)
-                return std::pair(&values[globalIndex], false);
+                return P(&values[globalIndex], false);
 
             // If empty, this means linear probe chain is fully iterated
             // and we did not find the value return null
@@ -107,7 +108,7 @@ std::pair<const V*, bool> LookupTable<K, V, H, VECL, S>::Insert(const K& k, cons
                 values[globalIndex] = v;
                 keys[globalIndex] = k;
                 hashes[vectorIndex] = hashChunk;
-                return std::pair(&values[globalIndex], true);
+                return P(&values[globalIndex], true);
             }
         }
         index += VL - innerIndex;
@@ -116,7 +117,7 @@ std::pair<const V*, bool> LookupTable<K, V, H, VECL, S>::Insert(const K& k, cons
     }
 
     assert(false && "HT Full!");
-    return std::pair(nullptr, false);
+    return P(nullptr, false);
 }
 
 template<class T, size_t N>

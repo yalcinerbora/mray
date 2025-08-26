@@ -1,5 +1,5 @@
 #pragma once
-// IWYU pragma: private; include "DeviceMemory.h"
+// IWYU pragma: private, include "DeviceMemory.h"
 
 /**
 

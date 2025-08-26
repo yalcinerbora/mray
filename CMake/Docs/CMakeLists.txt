@@ -18,6 +18,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 mray_check_pip_package(PACKAGE_NAME sphinx)
 mray_check_pip_package(PACKAGE_NAME furo)
 mray_check_pip_package(PACKAGE_NAME myst-parser)
+mray_check_pip_package(PACKAGE_NAME sphinxcontrib-mermaid)
 
 set(MRAY_DOCS_OUT_DIRECTORY ${MRAY_BIN_DIRECTORY}/Docs)
 set(MRAY_DOCS_FILTER_FOLDER Docs)
@@ -31,7 +32,10 @@ set(MRAY_DOCS_SRC
     ${MRAY_DOCS_DIRECTORY}/conf.py
     ${MRAY_DOCS_DIRECTORY}/index.md
 
+    # Markdowns
     ${MRAY_DOCS_DIRECTORY}/scene/scene.md
+    #
+    ${MRAY_DOCS_DIRECTORY}/tracer/tracer.md
 
     # Statics
     ${MRAY_DOCS_DIRECTORY}/_static/cBox.frag

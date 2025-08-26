@@ -136,7 +136,7 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
 
     // Allocate
     size_t instanceCount = instanceOffsets.back();
-    MemAlloc::AllocateMultiData(std::tie(dLeafs, dAABBs),
+    MemAlloc::AllocateMultiData(Tie(dLeafs, dAABBs),
                                 accelMem,
                                 {instanceCount, instanceCount});
     // Write leafs and transformed aabbs to the array
@@ -163,7 +163,7 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
     size_t tempMemSize = DeviceAlgorithms::ReduceTMSize<AABB3>(dAABBs.size(), queue);
     Span<AABB3> dReducedAABB;
     Span<Byte> dTemp;
-    MemAlloc::AllocateMultiData(std::tie(dTemp, dReducedAABB),
+    MemAlloc::AllocateMultiData(Tie(dTemp, dReducedAABB),
                                 stackMem, {tempMemSize, 1});
 
     DeviceAlgorithms::Reduce(Span<AABB3,1>(dReducedAABB), dTemp,
@@ -193,7 +193,7 @@ void BaseAcceleratorLinear::AllocateForTraversal(size_t maxRayCount)
 
     rayPartitioner = RayPartitioner(gpuSystem, static_cast<uint32_t>(maxRayCount),
                                     static_cast<uint32_t>(maxPartitionCount));
-    MemAlloc::AllocateMultiData(std::tie(dTraversalStack), stackMem, {maxRayCount});
+    MemAlloc::AllocateMultiData(Tie(dTraversalStack), stackMem, {maxRayCount});
 }
 
 void BaseAcceleratorLinear::CastRays(// Output

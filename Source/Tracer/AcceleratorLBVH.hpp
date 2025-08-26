@@ -434,8 +434,8 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     // Copy device
     Span<Vector2ui> dConcreteLeafRanges;
     Span<PrimRangeArray> dConcretePrimRanges;
-    MemAlloc::AllocateMultiData(std::tie(dConcreteLeafRanges,
-                                         dConcretePrimRanges),
+    MemAlloc::AllocateMultiData(Tie(dConcreteLeafRanges,
+                                    dConcretePrimRanges),
                                 tempMem,
                                 {this->concreteLeafRanges.size(),
                                  ppResult.concretePrimRanges.size()});
@@ -464,17 +464,17 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     uint32_t totalLeafCount = this->concreteLeafRanges.back()[1];
     uint32_t totalNodeCount = hConcreteNodeRangesVec.back()[1];
     // Copy these host vectors to GPU
-    MemAlloc::AllocateMultiData(std::tie(dCullFaceFlags,
-                                         dAlphaMaps,
-                                         dLightOrMatKeys,
-                                         dPrimitiveRanges,
-                                         dTransformKeys,
-                                         dLeafs,
-                                         dNodes,
-                                         dNodeAABBs,
-                                         dAllLeafs,
-                                         dAllNodes,
-                                         dAllNodeAABBs),
+    MemAlloc::AllocateMultiData(Tie(dCullFaceFlags,
+                                    dAlphaMaps,
+                                    dLightOrMatKeys,
+                                    dPrimitiveRanges,
+                                    dTransformKeys,
+                                    dLeafs,
+                                    dNodes,
+                                    dNodeAABBs,
+                                    dAllLeafs,
+                                    dAllNodes,
+                                    dAllNodeAABBs),
                                 mem,
                                 {this->InstanceCount(), this->InstanceCount(),
                                  this->InstanceCount(), this->InstanceCount(),
@@ -595,8 +595,8 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         // the instance leaf ranges itself, since we cannot reuse an accelerator
         // for primitives that require "per_primitive_transform"
         auto iLeafRange = this->instanceLeafRanges;
-        auto localInstanceLeafRanges = Span<const Vector2ui>(iLeafRange.cbegin() + workInstanceRange[0],
-                                                             iLeafRange.cbegin() + workInstanceRange[1]);
+        auto localInstanceLeafRanges = Span(std::to_address(iLeafRange.cbegin()),
+                                            workInstanceRange[1] - workInstanceRange[0]);
         hLeafSegmentRanges.reserve(localInstanceLeafRanges.size() + 1);
         hLeafSegmentRanges.push_back(0);
         for(const Vector2ui& range : localInstanceLeafRanges)
@@ -605,8 +605,8 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         // Node Segments
         // Do the same logic to the nodes as well
         const auto& iNodeRange = instanceNodeRanges;
-        auto localInstanceNodeRanges = Span<const Vector2ui>(iNodeRange.cbegin() + workInstanceRange[0],
-                                                             iNodeRange.cbegin() + workInstanceRange[1]);
+        auto localInstanceNodeRanges = Span(std::to_address(iNodeRange.cbegin()),
+                                            workInstanceRange[1] - workInstanceRange[0]);
 
         hNodeSegmentRanges.reserve(localInstanceNodeRanges.size() + 1);
         hNodeSegmentRanges.push_back(0);
@@ -670,11 +670,11 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
      });
     DeviceMemory tempMem({queue.Device()}, total, total << 1);
     // TODO: The memory can be further aliased thus; reduced in size.
-    MemAlloc::AllocateMultiData(std::tie(dTemp, dLeafSegmentRanges,
-                                         dNodeSegmentRanges, dAccelAABBs,
-                                         dPrimCenters, dLeafAABBs,
-                                         dMortonCodes[0], dMortonCodes[1],
-                                         dIndices[0], dIndices[1]),
+    MemAlloc::AllocateMultiData(Tie(dTemp, dLeafSegmentRanges,
+                                    dNodeSegmentRanges, dAccelAABBs,
+                                    dPrimCenters, dLeafAABBs,
+                                    dMortonCodes[0], dMortonCodes[1],
+                                    dIndices[0], dIndices[1]),
                                 tempMem,
                                 {tempMemSize,
                                  processedAccelCount + 1,
@@ -743,7 +743,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
             BLOCK_PER_INSTANCE,
             processedAccelCount,
             typename TransformGroupIdentity::DataSoA{},
-            this->pg.SoA()
+            static_cast<const PG&>(this->pg).SoA()
         );
     }
     // We don't have segmented reduce atm.
@@ -785,7 +785,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
             BLOCK_PER_INSTANCE,
             processedAccelCount,
             typename TransformGroupIdentity::DataSoA{},
-            this->pg.SoA()
+            static_cast<const PG&>(this->pg).SoA()
 
         );
     }

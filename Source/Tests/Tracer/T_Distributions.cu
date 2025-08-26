@@ -68,8 +68,8 @@ struct DistTester2D
         Span<Vector2> dRandomNumbers;
         Span<Float> dFunction;
         DeviceMemory mem({&system.BestDevice()}, 32_MiB, 128_MiB);
-        MemAlloc::AllocateMultiData(std::tie(dFunction, dRandomNumbers,
-                                             dOutSamples, dOutPdfs),
+        MemAlloc::AllocateMultiData(Tie(dFunction, dRandomNumbers,
+                                        dOutSamples, dOutPdfs),
                                     mem,
                                     {sizeLinear, sampleCount, sampleCount, sampleCount});
         queue.MemcpyAsync(dFunction, Span<const Float>(hFunction.cbegin(), hFunction.cend()));
@@ -79,11 +79,8 @@ struct DistTester2D
         distGroup.Construct(id, dFunction, queue);
 
         Span<const Dist2D> dists = distGroup.DeviceDistributions();
-        EXPECT_EQ(dists.size(), 1);
-
-        queue.MemcpyAsync(dRandomNumbers,
-                          Span<const Vector2>(hRandomNumbers.cbegin(),
-                                              hRandomNumbers.cend()));
+        EXPECT_EQ(dists.size(), 1u);
+        queue.MemcpyAsync(dRandomNumbers, Span<const Vector2>(hRandomNumbers));
 
         queue.IssueWorkKernel<KCSampleDist<Dist2D, DoUV>>
         (

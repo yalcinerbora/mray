@@ -24,7 +24,7 @@ R"(#pragma once
 // ================= //
 //     Primitives    //
 // ================= //
-using PrimGTypes = PackedTypes
+using PrimGTypes = TypePack
 <
 {}
 >;
@@ -32,7 +32,7 @@ using PrimGTypes = PackedTypes
 // ================= //
 //     Materials     //
 // ================= //
-using MatGTypes = PackedTypes
+using MatGTypes = TypePack
 <
 {}
 >;
@@ -40,7 +40,7 @@ using MatGTypes = PackedTypes
 // ================= //
 //     Transforms    //
 // ================= //
-using TransformGTypes = PackedTypes
+using TransformGTypes = TypePack
 <
 {}
 >;
@@ -48,7 +48,7 @@ using TransformGTypes = PackedTypes
 // ================= //
 //      Cameras      //
 // ================= //
-using CamGTypes = PackedTypes
+using CamGTypes = TypePack
 <
 {}
 >;
@@ -56,7 +56,7 @@ using CamGTypes = PackedTypes
 // ================= //
 //      Mediums      //
 // ================= //
-using MedGTypes = PackedTypes
+using MedGTypes = TypePack
 <
 {}
 >;
@@ -64,7 +64,7 @@ using MedGTypes = PackedTypes
 // ================= //
 //      Lights       //
 // ================= //
-using LightGTypes = PackedTypes
+using LightGTypes = TypePack
 <
 {}
 >;
@@ -81,11 +81,11 @@ template <class Base, template<class> class Group>
 using DefaultAccelTypePack = AccelTypePack
 <
     Base,
-    PackedTypes
+    TypePack
     <
     {}
     >,
-    PackedTypes
+    TypePack
     <
     {}
     >
@@ -117,7 +117,7 @@ R"(#pragma once
 template <class Renderer>
 using EmptyRendererWorkTypes = RenderWorkTypePack
 <
-    Renderer, PackedTypes<>, PackedTypes<>, PackedTypes<>
+    Renderer, TypePack<>, TypePack<>, TypePack<>
 >;
 
 template <class Renderer,
@@ -128,29 +128,29 @@ using RendererWorkTypes = RenderWorkTypePack
 <
     Renderer,
     // RenderWork
-    PackedTypes
+    TypePack
     <
     {}
     >,
     // Lights
-    PackedTypes
+    TypePack
     <
     {}
     >,
     // And finally Camera
-    PackedTypes
+    TypePack
     <
     {}
     >
 >;
 
-using RendererTypeList = PackedTypes
+using RendererTypeList = TypePack
 <
 {}
 >;
 
 // Currently empty
-using RendererWorkTypesList = PackedTypes
+using RendererWorkTypesList = TypePack
 <
 {}
 >;

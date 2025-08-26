@@ -45,7 +45,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
         }
         Span<Vector3> nSpan = data.AccessAs<Vector3>();
         // Calculate normals
-        for(size_t i = 0; i < primCount; i++)
+        for(uint32_t i = 0; i < primCount; i++)
         {
             Vector3ui index = iSpan[i];
 
@@ -85,7 +85,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
     if(uvs.has_value())
     {
         Span<Vector2> uvSpan = uvs.value().AccessAs<Vector2>();
-        for(size_t i = 0; i < primCount; i++)
+        for(uint32_t i = 0; i < primCount; i++)
         {
             Vector3ui index = iSpan[i];
             Vector3 n0 = nSpan[index[0]];
@@ -121,7 +121,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
 
         }
         // Normalize and calculate bitangent
-        for(size_t i = 0; i < attribCount; i++)
+        for(uint32_t i = 0; i < attribCount; i++)
         {
             tSpan[i] = Math::Normalize(tSpan[i]);
             bSpan[i] = Math::Cross(nSpan[i], tSpan[i]);
@@ -130,7 +130,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
     // Just put random orthogonal spaces
     else
     {
-        for(size_t i = 0; i < attribCount; i++)
+        for(uint32_t i = 0; i < attribCount; i++)
         {
             Vector3 n = normals.value().AccessAs<Vector3>()[i];
             Vector3 t = Graphics::OrthogonalVector(n);
@@ -235,11 +235,11 @@ MRayDataTypeRT JsonTriangle::AttributeLayout(PrimitiveAttributeLogic attribLogic
        attribLogic == PrimitiveAttributeLogic::NORMAL ||
        attribLogic == PrimitiveAttributeLogic::TANGENT ||
        attribLogic == PrimitiveAttributeLogic::BITANGENT)
-        return MRayDataTypeRT(MRayDataType<MR_VECTOR_3>());
+        return MRayDataTypeRT(MR_VECTOR_3);
     else if(attribLogic == PrimitiveAttributeLogic::UV0)
-        return MRayDataTypeRT(MRayDataType<MR_VECTOR_2>());
+        return MRayDataTypeRT(MR_VECTOR_2);
     else if(attribLogic == PrimitiveAttributeLogic::INDEX)
-        return MRayDataTypeRT(MRayDataType<MR_VECTOR_3UI>());
+        return MRayDataTypeRT(MR_VECTOR_3UI);
     else
         throw MRayError("Unknown attribute logic!");
 }
@@ -317,8 +317,8 @@ MRayDataTypeRT JsonSphere::AttributeLayout(PrimitiveAttributeLogic attribLogic) 
     using enum PrimitiveAttributeLogic;
     switch(attribLogic)
     {
-        case POSITION:  return MRayDataTypeRT(MRayDataType<MR_VECTOR_3>());
-        case RADIUS:    return MRayDataTypeRT(MRayDataType<MR_FLOAT>());
+        case POSITION:  return MRayDataTypeRT(MR_VECTOR_3);
+        case RADIUS:    return MRayDataTypeRT(MR_FLOAT);
         default:        throw MRayError("Unknown attribute logic!");
     }
 }

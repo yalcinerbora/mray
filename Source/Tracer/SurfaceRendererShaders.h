@@ -255,7 +255,7 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
         auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
         Vector3 wO = rayIn.Dir();
         wO = Math::Normalize(tContext.InvApplyN(wO));
-        auto raySample = mat.SampleBxDF(-wO, surf, rng);
+        auto raySample = mat.SampleBxDF(-wO, rng);
 
         Spectrum refl;
         if(!Math::IsFinite(raySample.value.reflectance) || Math::IsNaN(raySample.pdf))

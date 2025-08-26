@@ -538,8 +538,8 @@ void LightGroupPrim<PG>::CommitReservations()
 {
     // TODO: Wasting 32x memory cost due to "Bit" is not a type
     // Change this later
-    this->GenericCommit(std::tie(dRadiances, dPrimRanges,
-                                 dIsTwoSidedFlags),
+    this->GenericCommit(Tie(dRadiances, dPrimRanges,
+                            dIsTwoSidedFlags),
                         {0, 0, 0});
 
     auto dIsTwoSidedFlagsIn = Bitspan<uint32_t>(dIsTwoSidedFlags);
@@ -560,7 +560,7 @@ LightAttributeInfoList LightGroupPrim<PG>::AttributeInfo() const
     using enum AttributeIsColor;
     static const LightAttributeInfoList LogicList =
     {
-        LightAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+        LightAttributeInfo("radiance", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
                            MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR)
     };
     return LogicList;
@@ -706,7 +706,7 @@ LightGroupSkysphere<CC>::LightGroupSkysphere(uint32_t groupId,
 template <CoordConverterC CC>
 void LightGroupSkysphere<CC>::CommitReservations()
 {
-    this->GenericCommit(std::tie(dRadiances), {0});
+    this->GenericCommit(Tie(dRadiances), {0});
     radianceFieldTextures = std::vector<const GenericTexture*>(this->TotalItemCount(), nullptr);
     soa.dRadiances = ToConstSpan(dRadiances);
     soa.sceneDiameter = sceneDiameter;
@@ -722,7 +722,7 @@ LightAttributeInfoList LightGroupSkysphere<CC>::AttributeInfo() const
     using enum AttributeIsColor;
     static const MatAttributeInfoList LogicList =
     {
-        MatAttributeInfo("radiance", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+        MatAttributeInfo("radiance", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
                          MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR)
     };
     return LogicList;

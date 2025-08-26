@@ -232,13 +232,13 @@ MR_PF_DEF Matrix3x3 Color::GenXYZToRGB(const Primaries& p) noexcept
 
 MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
 {
-    using ColorspacePrimaryList = std::array<Pair<MRayColorSpaceEnum, Primaries>,
+    using ColorspacePrimaryList = std::array<Tuple<MRayColorSpaceEnum, Primaries>,
                                              static_cast<size_t>(MRayColorSpaceEnum::MR_END)>;
 
     using enum MRayColorSpaceEnum;
     constexpr ColorspacePrimaryList PRIM_LIST =
     {
-        Pair<MRayColorSpaceEnum, Primaries>
+        Tuple<MRayColorSpaceEnum, Primaries>
         {
             MR_ACES2065_1,
             Primaries
@@ -249,7 +249,7 @@ MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
                 .xyWhite    = ACESWhitepoint
             }
         },
-        Pair<MRayColorSpaceEnum, Primaries>
+        Tuple<MRayColorSpaceEnum, Primaries>
         {
             MR_ACES_CG,
             Primaries
@@ -260,7 +260,7 @@ MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
                 .xyWhite    = ACESWhitepoint
             }
         },
-        Pair<MRayColorSpaceEnum, Primaries>
+        Tuple<MRayColorSpaceEnum, Primaries>
         {
             MR_REC_709,
             Primaries
@@ -271,7 +271,7 @@ MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
                 .xyWhite    = D65Whitepoint
             }
         },
-        Pair<MRayColorSpaceEnum, Primaries>
+        Tuple<MRayColorSpaceEnum, Primaries>
         {
             MR_REC_2020,
             Primaries
@@ -282,7 +282,7 @@ MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
                 .xyWhite    = D65Whitepoint
             }
         },
-        Pair<MRayColorSpaceEnum, Primaries>
+        Tuple<MRayColorSpaceEnum, Primaries>
         {
             MR_DCI_P3,
             Primaries
@@ -293,7 +293,7 @@ MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
                 .xyWhite    = D65Whitepoint
             }
         },
-        Pair<MRayColorSpaceEnum, Primaries>
+        Tuple<MRayColorSpaceEnum, Primaries>
         {
             MR_ADOBE_RGB,
             Primaries
@@ -304,7 +304,7 @@ MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
                 .xyWhite    = D65Whitepoint
             }
         },
-        Pair<MRayColorSpaceEnum, Primaries>
+        Tuple<MRayColorSpaceEnum, Primaries>
         {
             MR_DEFAULT,
             Primaries
@@ -322,7 +322,7 @@ MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
     auto loc = std::find_if(PRIM_LIST.cbegin(), PRIM_LIST.cend(),
                             [E](const auto& primPair)
     {
-        return primPair.first == E;
+        return get<0>(primPair) == E;
     });
 
     // When constexpr, directly read the location.
@@ -330,13 +330,13 @@ MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
     // since UB is an error on constexpr context.
     if(std::is_constant_evaluated())
     {
-        return loc->second;
+        return get<1>(*loc);
     }
     else
     {
         if(loc != PRIM_LIST.cend())
         {
-            return loc->second;
+            return get<1>(*loc);
         }
 
         #ifndef MRAY_DEVICE_CODE_PATH

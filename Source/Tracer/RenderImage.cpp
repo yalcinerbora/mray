@@ -252,8 +252,8 @@ bool RenderImage::Resize(const Vector2ui& extentIn)
 
     uint32_t totalPixCount = extent.Multiply();
 
-    MemAlloc::AllocateMultiData(std::tie(dPixelsR, dPixelsG,
-                                         dPixelsB, dWeights),
+    MemAlloc::AllocateMultiData(Tie(dPixelsR, dPixelsG,
+                                    dPixelsB, dWeights),
                                 deviceMemory,
                                 {totalPixCount, totalPixCount,
                                  totalPixCount, totalPixCount});
@@ -261,8 +261,8 @@ bool RenderImage::Resize(const Vector2ui& extentIn)
     dPixelsAll = Span<Float>(dPixelsR.data(), allSizeDevice);
 
     // Reallocate host buffer
-    MemAlloc::AllocateMultiData(std::tie(hPixelsR, hPixelsG,
-                                         hPixelsB, hWeights),
+    MemAlloc::AllocateMultiData(Tie(hPixelsR, hPixelsG,
+                                    hPixelsB, hWeights),
                                 stagingMemory,
                                 {totalPixCount, totalPixCount,
                                  totalPixCount, totalPixCount});

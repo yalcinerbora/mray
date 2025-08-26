@@ -65,7 +65,7 @@ static constexpr auto OPTIX_SHADERS_FOLDER = "OptiXShaders";
 
 auto OptiXAccelDetail::ShaderTypeNames::operator<=>(const ShaderTypeNames& t) const
 {
-    return std::tuple(primName, transformName) <=> std::tuple(t.primName, t.transformName);
+    return Tuple(primName, transformName) <=> Tuple(t.primName, t.transformName);
 }
 
 Expected<std::vector<char>>
@@ -277,7 +277,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     size_t algoTempMemSize = std::max(DeviceAlgorithms::ExclusiveScanTMSize<uint32_t>(totalInstanceCount + 1, queue),
                                       DeviceAlgorithms::ReduceTMSize<AABB3>(totalInstanceCount, queue));
-    MemAlloc::AllocateMultiData(std::tie(dLeafAABBs,  dTraversableHandles,
+    MemAlloc::AllocateMultiData(Tie(dLeafAABBs,  dTraversableHandles,
                                          dInstanceMatrices, dSBTCounts, dFlags,
                                          dInstanceBuildData, dSBTOffsets,
                                          dScanOrReduceTempMem, dReducedAABB),
@@ -298,7 +298,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     for(const auto& accGroup : generatedAccels)
     {
         using Base = AcceleratorGroupOptixI;
-        Base* aGroup = static_cast<Base*>(accGroup.second.get());
+        Base* aGroup = dynamic_cast<Base*>(accGroup.second.get());
         size_t localCount = instanceOffsets[i + 1] - instanceOffsets[i];
         size_t offset = instanceOffsets[i];
         // Get required parameters for IAS construction
@@ -365,7 +365,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     Span<Byte> dNonCompactAccelMem;
     Span<Byte> dNonCompactAccelTempMem;
     DeviceMemory accelTempMem({queue.Device()}, totalTempAccelMemSize, totalTempAccelMemSize << 1);
-    MemAlloc::AllocateMultiData(std::tie(dNonCompactAccelMem,
+    MemAlloc::AllocateMultiData(Tie(dNonCompactAccelMem,
                                          dNonCompactAccelTempMem,
                                          dCompactSize),
                                 accelTempMem,
@@ -416,7 +416,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     queue.Barrier().Wait();
 
     // Finally do the persistent allocation
-    MemAlloc::AllocateMultiData(std::tie(dLaunchArgPack, dAccelMemory,
+    MemAlloc::AllocateMultiData(Tie(dLaunchArgPack, dAccelMemory,
                                          dHitRecords, dEmptyRecords,
                                          dGlobalInstanceInvTransforms,
                                          dGlobalTraversableHandles),
@@ -445,7 +445,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     for(const auto& accGroup : generatedAccels)
     {
         using Base = AcceleratorGroupOptixI;
-        const Base* aGroup = static_cast<const Base*>(accGroup.second.get());
+        const Base* aGroup = dynamic_cast<const Base*>(accGroup.second.get());
         uint32_t recordStartOffset = static_cast<uint32_t>(hAllHitRecords.size());
         // Get the shader names
         auto hitRecords = aGroup->GetHitRecords();
@@ -475,8 +475,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
 
     //
     queue.MemcpyAsync(dHitRecords, ToConstSpan(Span(hAllHitRecords)));
-    queue.MemcpyAsync(dEmptyRecords, ToConstSpan(Span(hEmptyRecords.cbegin(),
-                                                      hEmptyRecords.cend())));
+    queue.MemcpyAsync(dEmptyRecords, ToConstSpan(Span(hEmptyRecords)));
     // Finally set the table and GG
     commonCastSBT = {};
     // RG

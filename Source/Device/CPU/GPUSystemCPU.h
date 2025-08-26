@@ -1,6 +1,6 @@
 
 #pragma once
-// IWYU pragma: private; include "GPUSystem.h"
+// IWYU pragma: private, include "GPUSystem.h"
 
 #include <vector>
 #include <mutex>
@@ -175,6 +175,7 @@ class GPUQueueCPU
     template<uint32_t TPB, class WrappedKernel>
     MR_HF_DECL void IssueInternal(std::string_view name,
                                   uint32_t totalWorkCount,
+                                  uint32_t blockSize,
                                   WrappedKernel&& kernel) const;
 
     private:
@@ -576,8 +577,8 @@ void GPUQueueCPU::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
     size_t actualInStride = (inputByteStride == 0) ? sizeof(T) : inputByteStride;
     size_t actualOutStride = (outputByteStride == 0) ? sizeof(T) : outputByteStride;
 
-    size_t elemCountIn = Math::DivideUp(regionFrom.size_bytes(), actualInStride);
-    assert(elemCountIn == Math::DivideUp(regionTo.size_bytes(), actualOutStride));
+    size_t elemCountIn = Math::DivideUp(size_t(regionFrom.size_bytes()), actualInStride);
+    assert(elemCountIn == Math::DivideUp(size_t(regionTo.size_bytes()), actualOutStride));
 
     // Strip down to bytes, since copy is strided
     Byte* toPtr = reinterpret_cast<Byte*>(regionTo.data());

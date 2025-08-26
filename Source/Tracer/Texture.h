@@ -9,6 +9,7 @@
 #include "TextureCommon.h"
 
 class GenericTextureI;
+struct TracerSurfRef;
 
 // Generic Texture type
 class alignas(8u) GenericTexture
@@ -76,7 +77,7 @@ class alignas(8u) GenericTexture
     //
     GenericTextureView  View(TextureReadMode mode) const;
     bool                HasRWView() const;
-    SurfRefVariant      RWView(uint32_t mipLevel);
+    TracerSurfRef       RWView(uint32_t mipLevel);
     bool                IsBlockCompressed() const;
 
     const GPUDevice&    Device() const;

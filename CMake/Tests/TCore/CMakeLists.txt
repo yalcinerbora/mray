@@ -4,6 +4,7 @@ set(SRC_COMMON
     ${CURRENT_SOURCE_DIR}/T_GraphicsFunctions.cpp
     ${CURRENT_SOURCE_DIR}/T_Math.cpp
     ${CURRENT_SOURCE_DIR}/T_MPMCQueue.cpp
+    ${CURRENT_SOURCE_DIR}/T_Types.cpp
 )
 
 source_group("" FILES ${SRC_COMMON})

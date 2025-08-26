@@ -425,8 +425,8 @@ void DistributionGroupPwC2D::Commit()
     Span<Float> dCDFsY;
     Span<DistributionPwC<1>> dDistsX;
     Span<DistributionPwC<1>> dDistsY;
-    MemAlloc::AllocateMultiData(std::tie(dCDFsX, dCDFsY, dDistsX,
-                                         dDistsY, dDistributions),
+    MemAlloc::AllocateMultiData(Tie(dCDFsX, dCDFsY, dDistsX,
+                                    dDistsY, dDistributions),
                                 memory,
                                 {totalSizes[0], totalSizes[1],
                                  totalSizes[2], totalSizes[3],

@@ -1,6 +1,8 @@
 #include "TextureMemory.h"
 #include "ColorConverter.h"
+#include "SurfaceView.h"
 
+#include "Core/Definitions.h"
 #include "Core/GraphicsFunctions.h"
 #include "Core/Timer.h"
 #include "Core/Vector.h"
@@ -13,6 +15,8 @@
 #ifdef MRAY_GPU_BACKEND_CPU
     #include "Device/GPUSystem.hpp"
 #endif
+
+TexClampParameters::~TexClampParameters() = default;
 
 namespace TexDetail
 {
@@ -54,7 +58,7 @@ class Concept : public GenericTextureI
                                     const TextureExtent<3>& size) const override;
     GenericTextureView  View(TextureReadMode mode) const override;
     bool                HasRWView() const override;
-    SurfRefVariant      RWView(uint32_t mipLevel) override;
+    TracerSurfRef       RWView(uint32_t mipLevel) override;
     bool                IsBlockCompressed() const override;
 };
 
@@ -287,7 +291,7 @@ bool Concept<T>::HasRWView() const
 }
 
 template<class T>
-SurfRefVariant Concept<T>::RWView(uint32_t mipLevel)
+TracerSurfRef Concept<T>::RWView(uint32_t mipLevel)
 {
     // If not supported return monostate
     if constexpr(T::Dims != 2 || T::IsBlockCompressed)
@@ -390,28 +394,44 @@ TextureReadMode DetermineReadMode(MRayPixelTypeRT pixelType,
 
 bool FindNormIntegers(MRayPixelTypeRT pixelType)
 {
-    return std::visit([](auto&& v) -> bool
-    {
-        using VisitedType = std::remove_cvref_t<decltype(v)>;
-        constexpr auto Enum = VisitedType::Name;
-        using PixType = typename VisitedType::Type;
-        using enum MRayPixelEnum;
-        if constexpr(Enum == MRayPixelEnum::MR_BC6H_SFLOAT ||
-                     Enum == MRayPixelEnum::MR_BC6H_UFLOAT)
-            return false;
-        else if constexpr(VisitedType::IsBCPixel)
-            return true;
-        else if constexpr(VectorC<PixType>)
-            return std::is_integral_v<typename PixType::InnerType>;
-        else
-            return std::is_integral_v<PixType>;
-    }, pixelType);
+    // Below code is cool and all but slow to compile
+    // (~130 ms) so we yolo check.
+    MRayPixelEnum pixEnum = pixelType.Name();
+    using enum MRayPixelEnum;
+    bool result = (pixEnum == MR_BC6H_SFLOAT ||
+                   pixEnum == MR_BC6H_UFLOAT ||
+                   pixEnum == MR_R_FLOAT     ||
+                   pixEnum == MR_RG_FLOAT    ||
+                   pixEnum == MR_RGB_FLOAT   ||
+                   pixEnum == MR_RGBA_FLOAT  ||
+                   pixEnum == MR_R_HALF      ||
+                   pixEnum == MR_RG_HALF     ||
+                   pixEnum == MR_RGB_HALF    ||
+                   pixEnum == MR_RGBA_HALF);
+    return !result;
+
+    // return pixelType.SwitchCase([](auto&& v) -> bool
+    // {
+    //     using VisitedType = std::remove_cvref_t<decltype(v)>;
+    //     constexpr auto Enum = VisitedType::Name;
+    //     using PixType = typename VisitedType::Type;
+    //     using enum MRayPixelEnum;
+    //     if constexpr(Enum == MRayPixelEnum::MR_BC6H_SFLOAT ||
+    //                  Enum == MRayPixelEnum::MR_BC6H_UFLOAT)
+    //         return false;
+    //     else if constexpr(VisitedType::IsBCPixel)
+    //         return true;
+    //     else if constexpr(VectorC<PixType>)
+    //         return std::is_integral_v<typename PixType::InnerType>;
+    //     else
+    //         return std::is_integral_v<PixType>;
+    // });
 }
 
 void TextureMemory::ConvertColorspaces()
 {
     ColorConverter colorConv(gpuSystem);
-    std::vector<MipArray<SurfRefVariant>> texSurfs;
+    std::vector<MipArray<TracerSurfRef>> texSurfs;
     std::vector<ColorConvParams> colorConvParams;
     std::vector<GenericTexture*> bcTextures;
 
@@ -447,7 +467,7 @@ void TextureMemory::ConvertColorspaces()
             };
             colorConvParams.push_back(p);
 
-            MipArray<SurfRefVariant> mips;
+            MipArray<TracerSurfRef> mips;
             for(uint8_t i = 0; i < p.mipCount; i++)
                 mips[i] = t.RWView(i);
 
@@ -467,7 +487,7 @@ void TextureMemory::ConvertColorspaces()
 
 void TextureMemory::GenerateMipmaps()
 {
-    std::vector<MipArray<SurfRefVariant>> texSurfs;
+    std::vector<MipArray<TracerSurfRef>> texSurfs;
     std::vector<MipGenParams> mipGenParams;
     texSurfs.reserve(textures.GetMap().size());
     mipGenParams.reserve(textures.GetMap().size());
@@ -484,7 +504,7 @@ void TextureMemory::GenerateMipmaps()
         };
         mipGenParams.push_back(p);
 
-        MipArray<SurfRefVariant> mips;
+        MipArray<TracerSurfRef> mips;
         for(uint16_t i = 0; i < p.mipCount; i++)
             mips[i] = t.RWView(i);
 
@@ -514,7 +534,8 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
     gpuIndex %= 1;// gpuSystem.SystemDevices().size();
     const GPUDevice& device = gpuSystem.SystemDevices()[gpuIndex];
 
-    TexClampParameters tClampParams = {Vector2ui(size), 0, 0, false, SurfRefVariant()};
+    TexClampParameters tClampParams;
+    tClampParams.inputMaxRes = Vector2ui(size);
     uint32_t newMipCount = mipCount;
     Vector<D, uint32_t> newSize = size;
     if constexpr(D == 2)
@@ -554,14 +575,10 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
             texClampBufferSize = Math::Max(texClampBufferSize, total);
         }
         // Create the clamp params
-        tClampParams = TexClampParameters
-        {
-            .inputMaxRes = size,
-            .filteredMipLevel = uint16_t(filteredMip),
-            .ignoredMipCount = uint16_t(ignoredMipCount),
-            .willBeFiltered = willBeFiltered,
-            .surface = SurfRefVariant()
-        };
+        tClampParams.inputMaxRes = size;
+        tClampParams.filteredMipLevel = uint16_t(filteredMip);
+        tClampParams.ignoredMipCount = uint16_t(ignoredMipCount);
+        tClampParams.willBeFiltered = willBeFiltered;
         newMipCount = uint32_t(mipCountI);
 
         // Expand mip count if generate mipmaps is requested
@@ -577,29 +594,32 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
     p.eResolve = inputParams.edgeResolve;
     p.interp = inputParams.interpolation;
     p.normIntegers = FindNormIntegers(inputParams.pixelType);
-    TextureId texId = std::visit([&](auto&& v) -> TextureId
-    {
-        using enum MRayPixelEnum;
-        using ArgType = std::remove_cvref_t<decltype(v)>;
-        using Type = typename ArgType::Type;
-        if constexpr(D != 3 || !IsBlockCompressedPixel<Type>)
+    TextureId texId = inputParams.pixelType.SwitchCase
+    (
+        [&, tcParams = &tClampParams](auto&& v) -> TextureId
         {
-            TextureId id = TextureId(texCounter.fetch_add(1));
-            auto loc = textures.try_emplace(id, std::in_place_type_t<Texture<D, Type>>{},
-                                            inputParams.colorSpace, inputParams.gamma,
-                                            inputParams.isColor,
-                                            inputParams.pixelType, device, p);
+            using enum MRayPixelEnum;
+            using ArgType = std::remove_cvref_t<decltype(v)>;
+            using Type = typename ArgType::Type;
+            if constexpr(D != 3 || !IsBlockCompressedPixel<Type>)
+            {
+                TextureId id = TextureId(texCounter.fetch_add(1));
+                auto loc = textures.try_emplace(id, std::in_place_type_t<Texture<D, Type>>{},
+                                                inputParams.colorSpace, inputParams.gamma,
+                                                inputParams.isColor,
+                                                inputParams.pixelType, device, p);
 
-            TextureReadMode rm = DetermineReadMode(inputParams.pixelType,
-                                                   inputParams.readMode);
-            textureViews.try_emplace(id, loc.first->second.View(rm));
-            // Save the clamp parameters as well
-            texClampParams.try_emplace(id, std::move(tClampParams));
+                TextureReadMode rm = DetermineReadMode(inputParams.pixelType,
+                                                       inputParams.readMode);
+                textureViews.try_emplace(id, loc.first->second.View(rm));
+                // Save the clamp parameters as well
+                texClampParams.try_emplace(id, std::move(*tcParams));
 
-            return id;
+                return id;
+            }
+            else throw MRayError("3D Block compressed textures are not supported!");
         }
-        else throw MRayError("3D Block compressed textures are not supported!");
-    }, inputParams.pixelType);
+);
 
     return texId;
 }
@@ -738,19 +758,19 @@ void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
         auto dataSpan = ToConstSpan(data.AccessAs<Byte>());
 
         // Utilize the TexClampParameters
-        clampParams.surface = tex.RWView(0);
-
+        // We need to extend the lifetime of this surface
+        // Utilize this struct to extent the lifetime of the surface
+        clampParams.surface = std::make_unique<TracerSurfRef>(tex.RWView(0));
         tex.SetMipToLoaded(mipLevel);
 
         // Order is important here
         // Multiple threads can call this function
         // So we need to lock the queue issue
         std::lock_guard _{texClampMutex};
-
         // Fist copy to staging device buffer
         queue.MemcpyAsync(texClampBufferSpan, dataSpan);
         // Issue the filter
-        mipGenFilter->ClampImageFromBuffer(clampParams.surface,
+        mipGenFilter->ClampImageFromBuffer(*clampParams.surface,
                                            ToConstSpan(texClampBufferSpan),
                                            Vector2ui(tex.Extents()), size,
                                            queue);
@@ -789,8 +809,8 @@ void TextureMemory::Finalize()
     if(texClampBufferSize > 0)
         texClampBuffer = DeviceLocalMemory(gpuSystem.BestDevice());
     // Destroy the surface objects due to clamping op
-    for(auto&[_, cp] : texClampParams.GetMap())
-        cp.surface = SurfRefVariant();
+    for(auto& [_, cp] : texClampParams.GetMap())
+        cp.surface.reset();
 
     Timer t;
     t.Start();

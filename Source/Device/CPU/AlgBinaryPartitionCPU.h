@@ -1,5 +1,5 @@
 #pragma once
-// IWYU pragma: private; include "AlgBinaryPartition.h"
+// IWYU pragma: private, include "AlgBinaryPartition.h"
 #include "Core/Definitions.h"
 #include "Core/System.h"
 #include "Core/Types.h"

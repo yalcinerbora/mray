@@ -1,4 +1,6 @@
 #include "MediumsDefault.h"
+#include "GenericGroup.hpp"
+
 #include "Core/TypeNameGenerators.h"
 
 #ifdef MRAY_GPU_BACKEND_CPU
@@ -93,7 +95,7 @@ MediumGroupHomogeneous::MediumGroupHomogeneous(uint32_t groupId,
 
 void MediumGroupHomogeneous::CommitReservations()
 {
-    GenericCommit(std::tie(dSigmaA, dSigmaS, dEmission, dPhaseVal),
+    GenericCommit(Tie(dSigmaA, dSigmaS, dEmission, dPhaseVal),
                   {0, 0, 0, 0});
 
     soa = DataSoA(ToConstSpan(dSigmaA), ToConstSpan(dSigmaS),
@@ -109,13 +111,13 @@ MediumAttributeInfoList MediumGroupHomogeneous::AttributeInfo() const
     using enum AttributeIsColor;
     static const MatAttributeInfoList LogicList =
     {
-        MatAttributeInfo("sigmaA", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+        MatAttributeInfo("sigmaA", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
                          MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
-        MatAttributeInfo("sigmaS", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+        MatAttributeInfo("sigmaS", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
                          MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
-        MatAttributeInfo("emission", MRayDataType<MR_VECTOR_3>(), IS_SCALAR,
+        MatAttributeInfo("emission", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
                          MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
-        MatAttributeInfo("hgPhase", MRayDataType<MR_FLOAT>(), IS_SCALAR,
+        MatAttributeInfo("hgPhase", MRayDataTypeRT(MR_FLOAT), IS_SCALAR,
                          MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
     };
     return LogicList;

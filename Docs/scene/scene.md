@@ -1,5 +1,0 @@
-# MRay Scene Format
-
-
-
-Test

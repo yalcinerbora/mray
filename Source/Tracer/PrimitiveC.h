@@ -7,6 +7,7 @@
 #include "Core/TypeFinder.h"
 
 #include "Device/GPUSystemForward.h"
+#include "Device/GPUAlgForward.h"
 
 #include "TracerTypes.h"
 #include "TransformsDefault.h"
@@ -219,6 +220,35 @@ constexpr auto AcquireTransformContextGenerator();
 #define MRAY_PRIM_TGEN_FUNCTION(PG, TG) \
     AcquireTransformContextGenerator<PG, TG>()
 
+struct UnionAABB3Functor
+{
+    MR_PF_DECL
+    AABB3 operator()(const AABB3& l, const AABB3& r) const noexcept
+    {
+        return l.Union(r);
+    }
+};
+
+template<PrimitiveGroupC PG>
+class AABBFetchFunctor
+{
+    typename PG::DataSoA pData;
+
+    public:
+    AABBFetchFunctor(typename PG::DataSoA pd)
+        : pData(pd)
+    {}
+
+    MR_PF_DECL
+    AABB3 operator()(PrimitiveKey k) const noexcept
+    {
+        using Prim = typename PG:: template Primitive<>;
+        Prim prim(TransformContextIdentity{}, pData, k);
+        AABB3 aabb = prim.GetAABB();
+        return aabb;
+    }
+};
+
 template<PrimitiveGroupC PG, TransformGroupC TG>
 struct PrimTransformContextType
 {
@@ -241,12 +271,19 @@ class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeI
                                        const GPUSystem& sys,
                                        size_t allocationGranularity = 16_MiB,
                                        size_t initialReservationSize = 64_MiB);
-
-    virtual void        ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
-                                             const std::vector<Matrix4x4>& batchTransformations,
-                                             const GPUQueue& deviceQueue) = 0;
-    virtual Vector2ui   BatchRange(PrimBatchKey) const = 0;
-    virtual size_t      TotalPrimCount() const = 0;
+    //
+    virtual void ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
+                                      const std::vector<Matrix4x4>& batchTransformations,
+                                      const GPUQueue& deviceQueue) = 0;
+    virtual void SegmentedTransformReduceAABBs(Span<AABB3> dConcreteAABBs,
+                                               Span<Byte> dTransformSegReduceTM,
+                                               Span<const PrimitiveKey> dAllLeafs,
+                                               Span<const uint32_t> dConcreteLeafOffsets,
+                                               const GPUQueue& queue) const = 0;
+    //
+    virtual Vector2ui           BatchRange(PrimBatchKey) const = 0;
+    virtual size_t              TotalPrimCount() const = 0;
+    virtual PrimTransformType   TransformLogicRT() const = 0;
 };
 
 using PrimGroupPtr           = std::unique_ptr<GenericGroupPrimitiveT>;
@@ -255,14 +292,21 @@ template<class Child>
 class GenericGroupPrimitive : public GenericGroupPrimitiveT
 {
     public:
-                        GenericGroupPrimitive(uint32_t groupId,
-                                              const GPUSystem& sys,
-                                              size_t allocationGranularity = 16_MiB,
-                                              size_t initialReservationSize = 64_MiB);
-    void                ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
-                                             const std::vector<Matrix4x4>& batchTransformations,
-                                             const GPUQueue& deviceQueue) override;
+            GenericGroupPrimitive(uint32_t groupId,
+                                  const GPUSystem& sys,
+                                  size_t allocationGranularity = 16_MiB,
+                                  size_t initialReservationSize = 64_MiB);
+    void    ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
+                                 const std::vector<Matrix4x4>& batchTransformations,
+                                 const GPUQueue& deviceQueue) override;
+    void    SegmentedTransformReduceAABBs(Span<AABB3> dConcreteAABBs,
+                                          Span<Byte> dTransformSegReduceTM,
+                                          Span<const PrimitiveKey> dAllLeafs,
+                                          Span<const uint32_t> dConcreteLeafOffsets,
+                                          const GPUQueue& queue) const override;
+    //
     std::string_view    Name() const override;
+    PrimTransformType   TransformLogicRT() const override;
 };
 
 template<TransformContextC TransContextType = TransformContextIdentity>
@@ -405,9 +449,39 @@ inline void GenericGroupPrimitive<C>::ApplyTransformations(const std::vector<Pri
 }
 
 template<class C>
+void GenericGroupPrimitive<C>::SegmentedTransformReduceAABBs(Span<AABB3> dConcreteAABBs,
+                                                             Span<Byte> dTransformSegReduceTM,
+                                                             Span<const PrimitiveKey> dAllLeafs,
+                                                             Span<const uint32_t> dConcreteLeafOffsets,
+                                                             const GPUQueue& queue) const
+{
+    if constexpr(!std::is_same_v<C, PrimGroupEmpty>)
+    {
+        using namespace DeviceAlgorithms;
+        SegmentedTransformReduce<AABB3, PrimitiveKey>
+        (
+            dConcreteAABBs,
+            dTransformSegReduceTM,
+            dAllLeafs,
+            dConcreteLeafOffsets,
+            AABB3::Negative(),
+            queue,
+            UnionAABB3Functor(),
+            AABBFetchFunctor<C>(static_cast<const C&>(*this).SoA())
+        );
+    }
+}
+
+template<class C>
 std::string_view GenericGroupPrimitive<C>::Name() const
 {
     return C::TypeName();
+}
+
+template<class C>
+PrimTransformType GenericGroupPrimitive<C>::TransformLogicRT() const
+{
+    return C::TransformLogic;
 }
 
 template<TransformContextC TC>

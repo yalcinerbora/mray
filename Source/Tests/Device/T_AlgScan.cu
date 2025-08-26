@@ -27,7 +27,7 @@ void MultiScanTest(const GPUSystem& system)
 
     Span<Value> dInputs;
     Span<Value> dOutputs;
-    MemAlloc::AllocateMultiData(std::tie(dInputs, dOutputs),
+    MemAlloc::AllocateMultiData(Tie(dInputs, dOutputs),
                                 mem, {ElementCount, ElementCount});
 
     std::vector<Value> hInputs(ElementCount, Value(0));
@@ -84,7 +84,7 @@ void ExclusiveScanTest(const GPUSystem& system)
     Span<Value> dOutputs;
     Span<Byte> dTempMem;
     size_t tempMemSize = DeviceAlgorithms::ExclusiveScanTMSize<Value>(ElementCount, queue);
-    MemAlloc::AllocateMultiData(std::tie(dInputs, dOutputs, dTempMem),
+    MemAlloc::AllocateMultiData(Tie(dInputs, dOutputs, dTempMem),
                                 mem, {ElementCount, ElementCount, tempMemSize});
 
     std::vector<Value> hInputs(ElementCount, Value(0));

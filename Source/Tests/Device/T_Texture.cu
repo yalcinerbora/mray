@@ -157,7 +157,7 @@ TYPED_TEST(GPUTextureTest, Copy)
 
     DeviceLocalMemory mem(system.BestDevice());
     Span<uint8_t> dTrueFalseBuffer;
-    MemAlloc::AllocateMultiData(std::tie(dTrueFalseBuffer), mem,
+    MemAlloc::AllocateMultiData(Tie(dTrueFalseBuffer), mem,
                                 {total});
     dTrueFalseBuffer = dTrueFalseBuffer.subspan(0, total);
 

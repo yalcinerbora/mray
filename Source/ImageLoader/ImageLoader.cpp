@@ -13,14 +13,14 @@ bool ProgressCallbackOIIO(void* progressPercentData, float portion)
 
 Expected<std::string_view> ImageLoader::ImageTypeToExtension(ImageType type)
 {
-    using namespace std::literals;
+    using namespace std::string_view_literals;
     switch(type)
     {
-        case ImageType::PNG: return ".png";
-        case ImageType::JPG: return ".jpg";
-        case ImageType::BMP: return ".bmp";
-        case ImageType::HDR: return ".hdr";
-        case ImageType::EXR: return ".exr";
+        case ImageType::PNG: return ".png"sv;
+        case ImageType::JPG: return ".jpg"sv;
+        case ImageType::BMP: return ".bmp"sv;
+        case ImageType::HDR: return ".hdr"sv;
+        case ImageType::EXR: return ".exr"sv;
         default: return MRayError("Unknown image type");
     }
 }

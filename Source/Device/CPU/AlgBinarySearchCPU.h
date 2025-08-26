@@ -1,8 +1,9 @@
 #pragma once
-// IWYU pragma: private; include "AlgBinarySearch.h"
+// IWYU pragma: private, include "AlgBinarySearch.h"
 
 #include "Core/Definitions.h"
 #include "Core/Types.h"
+#include "Core/Span.h"
 
 namespace mray::host::algorithms
 {

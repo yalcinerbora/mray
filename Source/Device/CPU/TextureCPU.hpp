@@ -40,7 +40,7 @@ TextureViewCPU<D, QT> TextureCPU_Normal<D, T>::View() const
     const Byte* const* byteData = reinterpret_cast<const Byte* const*>(&dataPtr);
     static constexpr auto PixelEnum = static_cast<MRayPixelEnum>(PixelTypeToEnum::template Find<PaddedChannelType>);
     return TextureViewCPU<D, QT>(byteData, &texParams,
-                                 MRayPixelTypeRT(MRayPixelType<PixelEnum>()));
+                                 MRayPixelTypeRT(PixelEnum));
 }
 
 template<uint32_t D, class T>
@@ -60,7 +60,7 @@ TextureViewCPU<D, QT> TextureCPU_Normal<D, T>::View() const
         const Byte* const* byteData = reinterpret_cast<const Byte* const*>(&dataPtr);
         static constexpr auto PixelEnum = static_cast<MRayPixelEnum>(PixelTypeToEnum::template Find<PaddedChannelType>);
         return TextureViewCPU<D, QT>(byteData, &texParams,
-                                     MRayPixelTypeRT(MRayPixelType<PixelEnum>()));
+                                     MRayPixelTypeRT(PixelEnum));
     }
     else
     {

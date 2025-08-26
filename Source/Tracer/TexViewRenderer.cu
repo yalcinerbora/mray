@@ -1,5 +1,4 @@
 #include "TexViewRenderer.h"
-#include "TracerBase.h"
 #include "TextureView.hpp"  // IWYU pragma: keep
 
 #include "Device/GPUSystem.hpp"
@@ -334,7 +333,7 @@ TexViewRenderer::StaticAttributeInfo()
     using enum AttributeOptionality;
     return AttribInfoList
     {
-        {"totalSPP", MRayDataType<MR_UINT32>{}, IS_SCALAR, MR_MANDATORY}
+        {"totalSPP", MRayDataTypeRT(MR_UINT32), IS_SCALAR, MR_MANDATORY}
     };
 }
 

@@ -108,17 +108,17 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
         [](const auto& pair)
         {
             const auto& [_, agBase] = pair;
-            auto& ag = static_cast<AcceleratorGroupEmbreeI&>(*agBase);
+            auto& ag = dynamic_cast<AcceleratorGroupEmbreeI&>(*agBase);
             return ag.HitRecordCount();
         }
     );
     size_t totalRecordCount = groupHitRecordOffsets.back();
 
-    MemAlloc::AllocateMultiData(std::tie(hInstanceBatchStartOffsets,
-                                         hInstanceHRStartOffsets,
-                                         hAllHitRecordPtrs,
-                                         hGlobalInstanceInvTransforms,
-                                         hGlobalSceneHandles),
+    MemAlloc::AllocateMultiData(Tie(hInstanceBatchStartOffsets,
+                                    hInstanceHRStartOffsets,
+                                    hAllHitRecordPtrs,
+                                    hGlobalInstanceInvTransforms,
+                                    hGlobalSceneHandles),
                                 allMem,
                                 {instanceOffsets.size(), totalInstanceCount + 1,
                                 totalRecordCount, totalInstanceCount,
@@ -138,7 +138,7 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
     uint32_t accelI = 0;
     for(const auto& [_, agBase] : this->generatedAccels)
     {
-        auto& ag = static_cast<AcceleratorGroupEmbreeI&>(*agBase);
+        auto& ag = dynamic_cast<AcceleratorGroupEmbreeI&>(*agBase);
 
         size_t hrStart = groupHitRecordOffsets[accelI];
         size_t hrEnd = groupHitRecordOffsets[accelI + 1];
@@ -157,7 +157,7 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
                                         queue);
         ag.OffsetAccelKeyInRecords(uint32_t(instanceOffsets[accelI]));
         queue.Barrier().Wait();
-        for(size_t i = 0; i < localHandles.size(); i++)
+        for(uint32_t i = 0; i < localHandles.size(); i++)
         {
             auto g = rtcNewGeometry(embreeContext.device, RTC_GEOMETRY_TYPE_INSTANCE);
             rtcSetGeometryInstancedScene(g, localHandles[i]);

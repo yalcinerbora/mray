@@ -186,7 +186,7 @@ enum class FlagBitsDX9 : uint32_t
     // (so no counting mistake)
     DDSD_PIXELFORMAT    = Bit::RequiredBitsToRepresent(0x1000u) - 1,
     DDSD_MIPMAPCOUNT    = Bit::RequiredBitsToRepresent(0x20000u) - 1,
-    DDSD_LINEARSIZE	    = Bit::RequiredBitsToRepresent(0x80000u) - 1,
+    DDSD_LINEARSIZE     = Bit::RequiredBitsToRepresent(0x80000u) - 1,
     DDSD_DEPTH          = Bit::RequiredBitsToRepresent(0x800000u) - 1,
     END
 };
@@ -252,31 +252,31 @@ Expected<Pair<ColorSpacePack, MRayPixelTypeRT>> ReadPixelTypeDDS_DX10(const Head
         // BC1
         case BC1_TYPELESS:
         case BC1_UNORM:
-        case BC1_UNORM_SRGB: result.second = MRayPixelType<MR_BC1_UNORM>{}; break;
+        case BC1_UNORM_SRGB: result.second = MRayPixelTypeRT(MR_BC1_UNORM); break;
         // BC2
         case BC2_TYPELESS:
         case BC2_UNORM:
-        case BC2_UNORM_SRGB: result.second = MRayPixelType<MR_BC2_UNORM>{}; break;
+        case BC2_UNORM_SRGB: result.second = MRayPixelTypeRT(MR_BC2_UNORM); break;
         // BC3
         case BC3_TYPELESS:
         case BC3_UNORM:
-        case BC3_UNORM_SRGB: result.second = MRayPixelType<MR_BC3_UNORM>{}; break;
+        case BC3_UNORM_SRGB: result.second = MRayPixelTypeRT(MR_BC3_UNORM); break;
         // BC4
         case BC4_TYPELESS:
-        case BC4_UNORM:      result.second = MRayPixelType<MR_BC4_UNORM>{}; break;
-        case BC4_SNORM:      result.second = MRayPixelType<MR_BC4_SNORM>{}; break;
+        case BC4_UNORM:      result.second = MRayPixelTypeRT(MR_BC4_UNORM); break;
+        case BC4_SNORM:      result.second = MRayPixelTypeRT(MR_BC4_SNORM); break;
         // BC5
         case BC5_TYPELESS:
-        case BC5_UNORM:      result.second = MRayPixelType<MR_BC5_UNORM>{}; break;
-        case BC5_SNORM:      result.second = MRayPixelType<MR_BC5_SNORM>{}; break;
+        case BC5_UNORM:      result.second = MRayPixelTypeRT(MR_BC5_UNORM); break;
+        case BC5_SNORM:      result.second = MRayPixelTypeRT(MR_BC5_SNORM); break;
         // BC6
         case BC6H_TYPELESS:
-        case BC6H_UF16:      result.second = MRayPixelType<MR_BC6H_UFLOAT>{}; break;
-        case BC6H_SF16:      result.second = MRayPixelType<MR_BC6H_SFLOAT>{}; break;
+        case BC6H_UF16:      result.second = MRayPixelTypeRT(MR_BC6H_UFLOAT); break;
+        case BC6H_SF16:      result.second = MRayPixelTypeRT(MR_BC6H_SFLOAT); break;
         // BC7
         case BC7_TYPELESS:
         case BC7_UNORM:
-        case BC7_UNORM_SRGB: result.second = MRayPixelType<MR_BC7_UNORM>{}; break;
+        case BC7_UNORM_SRGB: result.second = MRayPixelTypeRT(MR_BC7_UNORM); break;
         // Technically not an error yet (we will delegate to the OIIO
         // then it will fail if format is not supported)
         default: return MRayError::OK;
@@ -329,21 +329,21 @@ Expected<Pair<ColorSpacePack, MRayPixelTypeRT>> ReadPixelTypeDDS_DX9(const Heade
     {
         using enum MRayPixelEnum;
         // BC1
-        case BC1_FOURCC:    result.second = MRayPixelType<MR_BC1_UNORM>{}; break;
+        case BC1_FOURCC:    result.second = MRayPixelTypeRT(MR_BC1_UNORM); break;
         // BC2
         case BC2_FOURCC_0:
-        case BC2_FOURCC_1:  result.second = MRayPixelType<MR_BC2_UNORM>{}; break;
+        case BC2_FOURCC_1:  result.second = MRayPixelTypeRT(MR_BC2_UNORM); break;
         // BC3
         case BC3_FOURCC_0:
-        case BC3_FOURCC_1:  result.second = MRayPixelType<MR_BC3_UNORM>{}; break;
+        case BC3_FOURCC_1:  result.second = MRayPixelTypeRT(MR_BC3_UNORM); break;
         // BC3
         case BC4U_FOURCC_0:
-        case BC4U_FOURCC_1: result.second = MRayPixelType<MR_BC4_UNORM>{}; break;
-        case BC4S_FOURCC:   result.second = MRayPixelType<MR_BC4_SNORM>{}; break;
+        case BC4U_FOURCC_1: result.second = MRayPixelTypeRT(MR_BC4_UNORM); break;
+        case BC4S_FOURCC:   result.second = MRayPixelTypeRT(MR_BC4_SNORM); break;
         // BC3
         case BC5U_FOURCC_0:
-        case BC5U_FOURCC_1: result.second = MRayPixelType<MR_BC5_UNORM>{}; break;
-        case BC5S_FOURCC:   result.second = MRayPixelType<MR_BC5_SNORM>{}; break;
+        case BC5U_FOURCC_1: result.second = MRayPixelTypeRT(MR_BC5_UNORM); break;
+        case BC5S_FOURCC:   result.second = MRayPixelTypeRT(MR_BC5_SNORM); break;
         // For other fancy types (Yuv etc.) delegate to OIIO
         default: return MRayError::OK;
     };
@@ -359,9 +359,9 @@ MRayPixelTypeRT ConvertToSigned(MRayPixelTypeRT pt)
     switch(e)
     {
         using enum MRayPixelEnum;
-        case MR_BC4_UNORM:      return MRayPixelType<MR_BC4_SNORM>{};
-        case MR_BC5_UNORM:      return MRayPixelType<MR_BC5_SNORM>{};
-        case MR_BC6H_UFLOAT:    return MRayPixelType<MR_BC6H_SFLOAT>{};
+        case MR_BC4_UNORM:      return MRayPixelTypeRT(MR_BC4_SNORM);
+        case MR_BC5_UNORM:      return MRayPixelTypeRT(MR_BC5_SNORM);
+        case MR_BC6H_UFLOAT:    return MRayPixelTypeRT(MR_BC6H_SFLOAT);
         default:                return pt;
     }
 }
@@ -387,7 +387,6 @@ constexpr uint32_t CalculateBCBytesPerBlock()
             return 0;
     }
 }
-
 Pair<Vector2ui, uint32_t> MipSizeToBlockSize(MRayPixelTypeRT pf, const Vector2ui& mipSize)
 {
     static constexpr uint32_t BLOCK_SIZE = 4;
@@ -395,11 +394,11 @@ Pair<Vector2ui, uint32_t> MipSizeToBlockSize(MRayPixelTypeRT pf, const Vector2ui
     // From here
     // https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dx-graphics-dds-pguide
     // 8 bytes or 16 bytes
-    uint32_t bytesPerBlock = std::visit([](auto&& p) -> uint32_t
+    uint32_t bytesPerBlock = pf.SwitchCase([](auto&& p) -> uint32_t
     {
         using T = std::remove_cvref_t<decltype(p)>;
         return CalculateBCBytesPerBlock<T::Name>();
-    }, pf);
+    });
 
     Pair<Vector2ui, uint32_t> result;
     result.first = Math::DivideUp(mipSize, Vector2ui(BLOCK_SIZE));
@@ -590,10 +589,10 @@ Expected<ImageHeader> ImageFileDDS::ReadHeader()
                                         ddsHeader.dwHeight, 1u);
 
     // Calculate the color space and pixel
-    Expected<Pair<ColorSpacePack, MRayPixelTypeRT>> r;
-    r = (headerDX10)
-            ? ReadPixelTypeDDS_DX10(*headerDX10)
-            : ReadPixelTypeDDS_DX9(ddsHeader);
+    using HeaderResult = Expected<Pair<ColorSpacePack, MRayPixelTypeRT>>;
+    HeaderResult r = (headerDX10)
+                    ? ReadPixelTypeDDS_DX10(*headerDX10)
+                    : ReadPixelTypeDDS_DX9(ddsHeader);
     // Delegate to the OIIO
     if(r.has_error()) return r.error();
 
@@ -635,7 +634,7 @@ Expected<Image> ImageFileDDS::ReadImage()
             bytePerBlock
         ] = MipSizeToBlockSize(header.pixelType, mipSize);
 
-        TransientData data = std::visit([&](auto&& p) -> TransientData
+        TransientData data = header.pixelType.SwitchCase([&](auto&& p) -> TransientData
         {
             using T = std::remove_cvref_t<decltype(p)>;
             constexpr uint32_t BC_BLOCK_SIZE = CalculateBCBytesPerBlock<T::Name>();
@@ -644,7 +643,7 @@ Expected<Image> ImageFileDDS::ReadImage()
                 return TransientData(std::in_place_type_t<Byte[BC_BLOCK_SIZE]>{}, blockTotal);
             else
                 return TransientData(std::in_place_type_t<Byte>{}, 0);
-        }, header.pixelType);
+        });
         data.ReserveAll();
         auto dataSpan = data.AccessAs<Byte>();
         ddsFile.read(reinterpret_cast<char*>(dataSpan.data()),

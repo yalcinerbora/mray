@@ -541,8 +541,8 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
     // By definition LBVH has n-1 nodes
     size_t nodeCount = Math::Max(instanceCount - 1u, size_t(1));
 
-    MemAlloc::AllocateMultiData(std::tie(dLeafKeys, dLeafAABBs,
-                                         dNodes, dBoundingBoxes),
+    MemAlloc::AllocateMultiData(Tie(dLeafKeys, dLeafAABBs,
+                                    dNodes, dBoundingBoxes),
                                 accelMem,
                                 {instanceCount, instanceCount,
                                 nodeCount, nodeCount});
@@ -605,11 +605,11 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         instanceCount * sizeof(uint32_t)
         });
     DeviceMemory tempMem({queue.Device()}, total, total << 1);
-    MemAlloc::AllocateMultiData(std::tie(dTemp, dSceneAABB,
-                                         dLeafSegmentRange, dNodeSegmentRange,
-                                         dAABBCenters,
-                                         dIndices[0], dIndices[1],
-                                         dMortonCodes[0], dMortonCodes[1]),
+    MemAlloc::AllocateMultiData(Tie(dTemp, dSceneAABB,
+                                    dLeafSegmentRange, dNodeSegmentRange,
+                                    dAABBCenters,
+                                    dIndices[0], dIndices[1],
+                                    dMortonCodes[0], dMortonCodes[1]),
                                 tempMem,
                                 {tmSize, 1, 2, 2,
                                 instanceCount, instanceCount,
@@ -751,7 +751,7 @@ void BaseAcceleratorLBVH::AllocateForTraversal(size_t maxRayCount)
 
     rayPartitioner = RayPartitioner(gpuSystem, static_cast<uint32_t>(maxRayCount),
                                     static_cast<uint32_t>(maxPartitionCount));
-    MemAlloc::AllocateMultiData(std::tie(dBitStacks, dPrevNodeIndices),
+    MemAlloc::AllocateMultiData(Tie(dBitStacks, dPrevNodeIndices),
                                 stackMem, {maxRayCount, maxRayCount});
 }
 

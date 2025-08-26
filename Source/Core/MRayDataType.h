@@ -15,7 +15,7 @@
 #include "Ray.h"        // IWYU pragma: keep
 #include "AABB.h"       // IWYU pragma: keep
 
-#include <string>
+#include <functional>
 
 // This implementation is quite taxing on compilation times.
 // It is used to "automatically" create switch/case statements
@@ -87,7 +87,7 @@ namespace MRayDataDetail
         typename M:: template ETPair<MRayDataEnum::MR_SNORM_4x8,    SNorm4x8>,
         typename M:: template ETPair<MRayDataEnum::MR_SNORM_2x16,   SNorm2x16>,
 
-        typename M:: template ETPair<MRayDataEnum::MR_STRING,       std::string>,
+        typename M:: template ETPair<MRayDataEnum::MR_STRING,       std::string_view>,
         typename M:: template ETPair<MRayDataEnum::MR_BOOL,         bool>
     >;
 
@@ -187,13 +187,6 @@ struct MRayPixelType
                                                 : PixelSize / 3 * 4;
 };
 
-template<MRayDataEnum L, MRayDataEnum R>
-constexpr bool operator==(MRayDataType<L>,
-                          MRayDataType<R>)
-{
-    return L == R;
-}
-
 template<MRayPixelEnum E>
 template<class T>
 requires (std::is_integral_v<T> || std::is_floating_point_v<T>)
@@ -226,144 +219,162 @@ constexpr bool MRayPixelType<E>::FindIsSigned()
     return std::is_signed_v<typename T::InnerType>;
 }
 
-template<MRayPixelEnum L, MRayPixelEnum R>
-constexpr bool operator==(MRayPixelType<L>,
-                          MRayPixelType<R>)
+namespace DataTypeDetail
 {
-    return L == R;
+
+template<uint32_t I>
+using UIntTConst = std::integral_constant<uint32_t, I>;
+
+template<class EnumType, template<auto> class DataType, class Func, uint32_t O>
+auto StampIfOverEnum(UIntTConst<O>, Func&& F, unsigned int name) -> decltype(auto)
+{
+    constexpr uint32_t STAMP_COUNT = 16;
+    constexpr uint32_t VSize = uint32_t(EnumType::MR_END);
+    [[maybe_unused]] int invokeCount = 0;
+    // TODO: Check this at godbolt for code generation.
+    #define COND_INVOKE(I)                                  \
+        if constexpr(MRAY_IS_DEBUG) invokeCount++;          \
+        if constexpr(VSize > (I + O))                       \
+        if(name == O + I)                                   \
+        {                                                   \
+            return std::invoke                              \
+            (                                               \
+                std::forward<Func>(F),                      \
+                DataType<static_cast<EnumType>(I + O)>{}    \
+            );                                              \
+        }
+    // End COND_INVOKE
+    COND_INVOKE(0)
+    COND_INVOKE(1)
+    COND_INVOKE(2)
+    COND_INVOKE(3)
+    COND_INVOKE(4)
+    COND_INVOKE(5)
+    COND_INVOKE(6)
+    COND_INVOKE(7)
+    COND_INVOKE(8)
+    COND_INVOKE(9)
+    COND_INVOKE(10)
+    COND_INVOKE(11)
+    COND_INVOKE(12)
+    COND_INVOKE(13)
+    COND_INVOKE(14)
+    COND_INVOKE(15)
+    #undef COND_INVOKE
+    assert(invokeCount == STAMP_COUNT && "Invalid Visit implementation, "
+            "add more\"COND_INVOKE\"s");
+    if constexpr(VSize > O + STAMP_COUNT)
+        return StampIfOverEnum<EnumType, DataType>
+        (
+            UIntTConst<O + STAMP_COUNT>{},
+            std::forward<Func>(F), name
+        );
+    MRAY_UNREACHABLE;
 }
 
-// Lets see how good are the compilers are
-// This is used to generate switch/case code
-// For type reading on scene loader
-using MRayDataTypeBase = Variant
-<
-    MRayDataType<MRayDataEnum::MR_INT8>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_2C>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_3C>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_4C>,
-
-    MRayDataType<MRayDataEnum::MR_INT16>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_2S>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_3S>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_4S>,
-
-    MRayDataType<MRayDataEnum::MR_INT32>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_2I>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_3I>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_4I>,
-
-    MRayDataType<MRayDataEnum::MR_INT64>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_2L>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_3L>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_4L>,
-
-    MRayDataType<MRayDataEnum::MR_UINT8>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_2UC>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_3UC>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_4UC>,
-
-    MRayDataType<MRayDataEnum::MR_UINT16>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_2US>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_3US>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_4US>,
-
-    MRayDataType<MRayDataEnum::MR_UINT32>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_2UI>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_3UI>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_4UI>,
-
-    MRayDataType<MRayDataEnum::MR_UINT64>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_2UL>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_3UL>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_4UL>,
-
-    MRayDataType<MRayDataEnum::MR_FLOAT>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_2>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_3>,
-    MRayDataType<MRayDataEnum::MR_VECTOR_4>,
-
-    MRayDataType<MRayDataEnum::MR_QUATERNION>,
-    MRayDataType<MRayDataEnum::MR_MATRIX_4x4>,
-    MRayDataType<MRayDataEnum::MR_MATRIX_3x3>,
-    MRayDataType<MRayDataEnum::MR_AABB3>,
-    MRayDataType<MRayDataEnum::MR_RAY>,
-
-    MRayDataType<MRayDataEnum::MR_UNORM_4x8>,
-    MRayDataType<MRayDataEnum::MR_UNORM_2x16>,
-    MRayDataType<MRayDataEnum::MR_SNORM_4x8>,
-    MRayDataType<MRayDataEnum::MR_SNORM_2x16>,
-
-    MRayDataType<MRayDataEnum::MR_STRING>,
-    MRayDataType<MRayDataEnum::MR_BOOL>
-
-    // TODO: Report MSVC about the excessive recursion
-    // Adding more types makes the code unable to compile.
->;
-
-using MRayPixelTypeBase = Variant
-<
-    MRayPixelType<MRayPixelEnum::MR_R8_UNORM>,
-    MRayPixelType<MRayPixelEnum::MR_RG8_UNORM>,
-    MRayPixelType<MRayPixelEnum::MR_RGB8_UNORM>,
-    MRayPixelType<MRayPixelEnum::MR_RGBA8_UNORM>,
-
-    MRayPixelType<MRayPixelEnum::MR_R16_UNORM>,
-    MRayPixelType<MRayPixelEnum::MR_RG16_UNORM>,
-    MRayPixelType<MRayPixelEnum::MR_RGB16_UNORM>,
-    MRayPixelType<MRayPixelEnum::MR_RGBA16_UNORM>,
-
-    MRayPixelType<MRayPixelEnum::MR_R8_SNORM>,
-    MRayPixelType<MRayPixelEnum::MR_RG8_SNORM>,
-    MRayPixelType<MRayPixelEnum::MR_RGB8_SNORM>,
-    MRayPixelType<MRayPixelEnum::MR_RGBA8_SNORM>,
-
-    MRayPixelType<MRayPixelEnum::MR_R16_SNORM>,
-    MRayPixelType<MRayPixelEnum::MR_RG16_SNORM>,
-    MRayPixelType<MRayPixelEnum::MR_RGB16_SNORM>,
-    MRayPixelType<MRayPixelEnum::MR_RGBA16_SNORM>,
-
-    MRayPixelType<MRayPixelEnum::MR_R_HALF>,
-    MRayPixelType<MRayPixelEnum::MR_RG_HALF>,
-    MRayPixelType<MRayPixelEnum::MR_RGB_HALF>,
-    MRayPixelType<MRayPixelEnum::MR_RGBA_HALF>,
-
-    MRayPixelType<MRayPixelEnum::MR_R_FLOAT>,
-    MRayPixelType<MRayPixelEnum::MR_RG_FLOAT>,
-    MRayPixelType<MRayPixelEnum::MR_RGB_FLOAT>,
-    MRayPixelType<MRayPixelEnum::MR_RGBA_FLOAT>,
-
-    MRayPixelType<MRayPixelEnum::MR_BC1_UNORM>,
-    MRayPixelType<MRayPixelEnum::MR_BC2_UNORM>,
-    MRayPixelType<MRayPixelEnum::MR_BC3_UNORM>,
-    MRayPixelType<MRayPixelEnum::MR_BC4_UNORM>,
-    MRayPixelType<MRayPixelEnum::MR_BC4_SNORM>,
-    MRayPixelType<MRayPixelEnum::MR_BC5_UNORM>,
-    MRayPixelType<MRayPixelEnum::MR_BC5_SNORM>,
-    MRayPixelType<MRayPixelEnum::MR_BC6H_UFLOAT>,
-    MRayPixelType<MRayPixelEnum::MR_BC6H_SFLOAT>,
-    MRayPixelType<MRayPixelEnum::MR_BC7_UNORM>
->;
-
-struct MRayDataTypeRT : public MRayDataTypeBase
+template<class EnumType, template<auto> class DataType, class Func>
+auto SwitchCaseAsIfStatements(Func&& F, unsigned int name) -> decltype(auto)
 {
+    return StampIfOverEnum<EnumType, DataType>
+    (
+        UIntTConst<0u>{},
+        std::forward<Func>(F), name
+    );
+}
+
+}
+
+struct MRayDataTypeRT
+{
+    private:
+    MRayDataEnum name;
+
+    public:
     using enum MRayDataEnum;
-    MRayDataEnum  Name() const;
-    size_t        Size() const;
-    size_t        Alignment() const;
 
-    using MRayDataTypeBase::MRayDataTypeBase;
+    constexpr MRayDataEnum  Name() const;
+    size_t                  Size() const;
+    size_t                  Alignment() const;
+
+    constexpr           MRayDataTypeRT() = default;
+    constexpr explicit  MRayDataTypeRT(MRayDataEnum e);
+
+    //
+    template<class Func>
+    constexpr auto SwitchCase(Func&&) const -> decltype(auto);
+    constexpr bool operator==(MRayDataTypeRT other) const;
 };
 
-struct MRayPixelTypeRT : public MRayPixelTypeBase
+struct MRayPixelTypeRT
 {
-    using enum MRayPixelEnum;
-    MRayPixelEnum     Name() const;
-    size_t            ChannelCount() const;
-    bool              IsBlockCompressed() const;
-    bool              IsSigned() const;
-    size_t            PixelSize() const;
-    size_t            PaddedPixelSize() const;
+    private:
+    MRayPixelEnum name;
 
-    using MRayPixelTypeBase::MRayPixelTypeBase;
+    public:
+    using enum MRayPixelEnum;
+
+    constexpr MRayPixelEnum Name() const;
+    size_t                  ChannelCount() const;
+    bool                    IsBlockCompressed() const;
+    bool                    IsSigned() const;
+    size_t                  PixelSize() const;
+    size_t                  PaddedPixelSize() const;
+
+    // Constructors & Destructor
+    constexpr           MRayPixelTypeRT() = default;
+    constexpr explicit  MRayPixelTypeRT(MRayPixelEnum e);
+
+    template<class Func>
+    constexpr auto SwitchCase(Func&&) const -> decltype(auto);
+    constexpr bool operator==(MRayPixelTypeRT other) const;
 };
+
+constexpr MRayDataTypeRT::MRayDataTypeRT(MRayDataEnum e)
+    : name(e)
+{}
+
+constexpr MRayDataEnum MRayDataTypeRT::Name() const
+{
+    return name;
+}
+
+template<class Func>
+constexpr auto MRayDataTypeRT::SwitchCase(Func&& F) const -> decltype(auto)
+{
+    assert(name < MRayDataEnum::MR_END);
+    return DataTypeDetail::SwitchCaseAsIfStatements<MRayDataEnum, MRayDataType>
+    (
+        std::forward<Func>(F),
+        static_cast<unsigned int>(name)
+    );
+}
+
+constexpr bool MRayDataTypeRT::operator==(MRayDataTypeRT other) const
+{
+    return name == other.name;
+}
+
+constexpr MRayPixelTypeRT::MRayPixelTypeRT(MRayPixelEnum e)
+    : name(e)
+{}
+
+constexpr MRayPixelEnum MRayPixelTypeRT::Name() const
+{
+    return name;
+}
+
+template<class Func>
+constexpr auto MRayPixelTypeRT::SwitchCase(Func&& F) const -> decltype(auto)
+{
+    assert(name < MRayPixelEnum::MR_END);
+    return DataTypeDetail::SwitchCaseAsIfStatements<MRayPixelEnum, MRayPixelType>
+    (
+        std::forward<Func>(F),
+        static_cast<unsigned int>(name)
+    );
+}
+
+constexpr bool MRayPixelTypeRT ::operator==(MRayPixelTypeRT other) const
+{
+    return name == other.name;
+}

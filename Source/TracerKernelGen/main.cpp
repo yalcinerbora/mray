@@ -400,7 +400,7 @@ void FilterAndGenIncludes(pmr::string& includes,
 
 void GenMetaLightTemplates(pmr::string& result, const LinePack& lp)
 {
-    static constexpr auto META_LIGHT_TEMPLATE_FMT = "PackedTypes<{}, {}>"sv;
+    static constexpr auto META_LIGHT_TEMPLATE_FMT = "TypePack<{}, {}>"sv;
     result.reserve(4096);
     //
     for(const auto& l : lp.lights)
