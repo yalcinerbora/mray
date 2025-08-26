@@ -326,7 +326,7 @@ async function InitGL()
     // Create the shaders
     // TODO: We async fetch the shader to make it flexible
     // In future we may load shaders specific to the used system (mobile/pc etc.)
-    let ptShaderSource = await FetchShader('/_static/cBox.frag');
+    let ptShaderSource = await FetchShader('_static/cBox.frag');
     accumImageShader = CreateProgramGL(PPGenericVert, AccumImgFrag);
     pathTraceShader = CreateProgramGL(PPGenericVert, ptShaderSource);
 
@@ -356,7 +356,15 @@ async function InitGL()
 
 async function FetchShader(fName)
 {
-    const response = await fetch(fName);
+    function DecorateWithPrefix(fName)
+    {
+        // Use this sphinx stuff for relative fetch
+        const body = document.body;
+        return (body.getAttribute('data-content_root') || '/') + fName;
+    }
+
+    const absFName = DecorateWithPrefix(fName)
+    const response = await fetch(absFName);
     if(!response.ok)
     {
         throw new Error(`Response status: ${response.status}`);
