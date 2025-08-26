@@ -42,7 +42,7 @@ html_js_files  = [
 html_favicon = '_static/mray_cbox.png'
 
 # Change the base url for local development / deployment
-# TODO: This is not dynamic
+# TODO: This is not dynamic and does not work?
 if os.environ.get('GITHUB_ACTIONS'):
     html_baseurl = 'https://yalcinerbora.github.io/mray/'
 else:
