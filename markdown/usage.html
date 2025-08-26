@@ -1,0 +1,740 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Usage &#8212; MRay Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=c0bcb9f8" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'markdown/usage';</script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="../_static/cBox.js?v=1f99daba"></script>
+    <script src="../_static/mray_mermaid_init.js?v=367958fb"></script>
+    <link rel="canonical" href="/Docs/markdown/usage.html" />
+    <link rel="icon" href="../_static/mray_cbox.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Glossary" href="glossary.html" />
+    <link rel="prev" title="Building" href="building.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+<canvas id="glcanvas" class="cBox" style="display:none;"></canvas>
+<img id="staticImg" class="cBox" style="display:block;" src="/_static/mray_cbox.png">
+
+<script>InitGL();</script></div>
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">MRay Documentation</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    MRay Documentation
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="building.html">Building</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">MRay Internals</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="projectLayout.html">Project Layout</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="tracer/tracer.html">Tracer</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="tracer/design.html">Tracer Design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tracer/defaultTypes.html">Default Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tracer/extending.html">Extending the Tracer</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Scene Formats</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="scene/mrayScene.html">MRay Scene Format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scene/usdScene.html">USD Scene Support</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+<a href="https://github.com/yalcinerbora/mray" target="_blank"
+   class="btn btn-sm btn-source-repository-button"
+   title="Source repository"
+   data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+
+</a>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/markdown/usage.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Usage</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#configuration-files">Configuration Files</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#tracer-config">Tracer Config</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#render-config">Render Config</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#visor-config">Visor Config</a></li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="usage">
+<h1>Usage<a class="headerlink" href="#usage" title="Link to this heading">#</a></h1>
+<p>A sample ‘working directory` is available which contains example configuration and scene files. You can install it from <a class="reference external" href="https://drive.google.com/file/d/1XaVyLcHrGB35qv1rpVHtiP7sUmS9HYEZ/view?usp=sharing">here</a>.</p>
+<p>After build is complete, run either of these commands from the downloaded directory:</p>
+<blockquote>
+<div><p>/path/to/MRay.exe visor -r 1920x1080 -s Scenes/CrySponza/crySponza.json  –tConf tracerConfig.json –rConf renderConfig.json –vConf visorConfig.json</p>
+</div></blockquote>
+<p>Which will run the interactive renderer over the classic Crytek’s Sponza scene.</p>
+<p>Some simple shortcuts:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">M</span></code> toggles the top bar.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">N</span></code> toggles the bottom bar.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Numpad</span> <span class="pre">6</span></code> and <code class="docutils literal notranslate"><span class="pre">Numpad</span> <span class="pre">4</span></code> changes the scene’s camera.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Numpad</span> <span class="pre">9</span></code> and <code class="docutils literal notranslate"><span class="pre">Numpad</span> <span class="pre">7</span></code> changes the renderer.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Numpad</span> <span class="pre">3</span></code> and <code class="docutils literal notranslate"><span class="pre">Numpad</span> <span class="pre">1</span></code> renderer specific logic 0.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Numpad</span> <span class="pre">+</span></code> and <code class="docutils literal notranslate"><span class="pre">Numpad</span> <span class="pre">-</span></code> renderer specific logic 1.</p></li>
+</ul>
+<p>For example; <code class="docutils literal notranslate"><span class="pre">Numpad</span> <span class="pre">3</span></code> and <code class="docutils literal notranslate"><span class="pre">Numpad</span> <span class="pre">1</span></code> in “SurfaceRenderer” toggle between AO/Furnace Test/Normal/Position… sub-renderers.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">[</span></code> and <code class="docutils literal notranslate"><span class="pre">]</span></code> changes the movement scheme (FPS-like or Modelling software-like input). <code class="docutils literal notranslate"><span class="pre">WASD</span></code> to move left mouse button + mouse movement to travel through the scene. Holding <code class="docutils literal notranslate"><span class="pre">left</span> <span class="pre">shift</span></code> will increase the speed.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Numpad</span> <span class="pre">5</span></code> locks/unlocks the movement keys so that you don’t reset a long render by mistake.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">P</span></code> pauses the rendering, <code class="docutils literal notranslate"><span class="pre">O</span></code> starts/stops the rendering.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Escape</span></code> closes the window and terminates the process.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">G</span></code> saves the current image as an SDR Image.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">H</span></code> saves the current image as an HDR Image.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Numpad</span> <span class="pre">,</span></code> print the current camera orientation to the stdout.</p></li>
+</ul>
+<p>If you want to generate an image without the GUI run:</p>
+<blockquote>
+<div><p>$ /path/to/MRay.exe run -r 1920x1080 -s Scenes/CrySponza/crySponza.json  –tConf tracerConfig.json –rConf renderConfig.json</p>
+</div></blockquote>
+<p>You can feed visor config to the <code class="docutils literal notranslate"><span class="pre">run</span></code> sub-command, it will just ignore the argument. There are no shortcuts for the <code class="docutils literal notranslate"><span class="pre">run</span></code> sub-command, it will terminate rendering when renderer deemed it is finished (via its own configuration parameters such as <code class="docutils literal notranslate"><span class="pre">totalSPP</span></code> field).</p>
+<p>You can check parameters of all commands via:</p>
+<blockquote>
+<div><p>$ /path/to/MRay.exe –help-all</p>
+</div></blockquote>
+<p>Or options of specific commands by:</p>
+<blockquote>
+<div><p>$ /path/to/MRay.exe subcommand_name -h</p>
+</div></blockquote>
+<section id="configuration-files">
+<h2>Configuration Files<a class="headerlink" href="#configuration-files" title="Link to this heading">#</a></h2>
+<p>MRay system uses config files to reduce command line arguments since most of the arguments are required to be explicit. All configuration files are jsonc similar to <a class="reference internal" href="scene/mrayScene.html"><span class="std std-doc">MRay scene files</span></a>.</p>
+<section id="tracer-config">
+<h3>Tracer Config<a class="headerlink" href="#tracer-config" title="Link to this heading">#</a></h3>
+<p>Tracer config has two mandatory fields that are called <code class="docutils literal notranslate"><span class="pre">TracerDLL</span></code> and <code class="docutils literal notranslate"><span class="pre">Parameters</span></code>.</p>
+<div class="pst-scrollable-table-container"><table class="table table-center" id="id1">
+<caption><span class="caption-text">Tracer DLL Struct</span><a class="headerlink" href="#id1" title="Link to this table">#</a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>name</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Path to the .dll (.so) file in the system. OS specific lookup rules will apply.</p></td>
+</tr>
+<tr class="row-odd"><td><p>construct</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Mangled function name that constructs the tracer</p></td>
+</tr>
+<tr class="row-even"><td><p>destruct</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Mangled function name that destroys the tracer</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="pst-scrollable-table-container"><table class="table table-center" id="id2">
+<caption><span class="caption-text">Params Struct</span><a class="headerlink" href="#id2" title="Link to this table">#</a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>seed</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Meta seed that will be used to construct multiple RNGs. How would it be used depens on other parameters (such as <code class="docutils literal notranslate"><span class="pre">samplerType</span></code>) and the renderer.</p></td>
+</tr>
+<tr class="row-odd"><td><p>acceleratorType</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sup>1</sup></p></td>
+<td><p>explicit</p></td>
+<td><p>Type of the accelerator(s) that will be constructed and used.</p></td>
+</tr>
+<tr class="row-even"><td><p>samplerType</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Hint to the tracer’s renderer how many discrete ‘things’ should be processed at once. For path tracer, the ‘things’ are paths. For texture view renderer, it is pixels.</p></td>
+</tr>
+<tr class="row-odd"><td><p>clampTexRes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Automatically resize textures if size is greater than this value. Aspect ratio is preserved.</p></td>
+</tr>
+<tr class="row-even"><td><p>globalTexColorSpace</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sup>2</sup></p></td>
+<td><p>explicit</p></td>
+<td><p>Automatically convert textures to this color space while loading. Renderer</p></td>
+</tr>
+<tr class="row-odd"><td><p>genMipmaps</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Automatically generate mipmaps for textures. Actual mipmaps of a texture has precedence.</p></td>
+</tr>
+<tr class="row-even"><td><p>mipGenFilter</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">struct</span></code><sup>3</sup></p></td>
+<td><p>explicit</p></td>
+<td><p>Filter of the mipmap generator.</p></td>
+</tr>
+<tr class="row-odd"><td><p>filmFilter</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">struct</span></code><sup>3</sup></p></td>
+<td><p>explicit</p></td>
+<td><p>Filter of the image reconstruction filter.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="footer-block docutils container">
+<p>[1]: <code class="docutils literal notranslate"><span class="pre">Linear</span></code>, <code class="docutils literal notranslate"><span class="pre">BVH</span></code> or <code class="docutils literal notranslate"><span class="pre">Hardware</span></code></p>
+<p>[2]: <code class="docutils literal notranslate"><span class="pre">ACES2065_1</span></code>, <code class="docutils literal notranslate"><span class="pre">ACES_CG</span></code>, <code class="docutils literal notranslate"><span class="pre">REC_709</span></code>, <code class="docutils literal notranslate"><span class="pre">REC_2020</span></code>, <code class="docutils literal notranslate"><span class="pre">DCI_P3</span></code> or<code class="docutils literal notranslate"><span class="pre">ADOBE_RGB</span></code></p>
+<p>[3]: A struct with ‘radius’ field (<code class="docutils literal notranslate"><span class="pre">float</span></code>) and a ‘type’ field (<code class="docutils literal notranslate"><span class="pre">string</span></code>) as either <code class="docutils literal notranslate"><span class="pre">Box</span></code>, <code class="docutils literal notranslate"><span class="pre">Tent</span></code>, <code class="docutils literal notranslate"><span class="pre">Gaussian</span></code>, <code class="docutils literal notranslate"><span class="pre">Mitchell-Netravali</span></code>. Radius unit is in pixels.</p>
+</div>
+<hr class="docutils" />
+<p><code class="docutils literal notranslate"><span class="pre">Linear</span></code> creates basically nothing, and intersections will be resolved by <strong>linear search</strong>. Only usefull for debugging purposes. <code class="docutils literal notranslate"><span class="pre">BVH</span></code> creates a hardware-agnostic LBVH accelerator, which is not competitive in terms of performance. It should be used when underlying hardware does not provide hardware-accelerated ray tracing capabilities. <code class="docutils literal notranslate"><span class="pre">Hardware</span></code> enables hardware-accelerated ray tracing and it should be used in general. For CPU Tracer, <code class="docutils literal notranslate"><span class="pre">Hardware</span></code> means running ray tracing via Embree which provides a sophisticated SIMD ray casting implementation.</p>
+</section>
+<section id="render-config">
+<h3>Render Config<a class="headerlink" href="#render-config" title="Link to this heading">#</a></h3>
+<p>Render config has two fields, <code class="docutils literal notranslate"><span class="pre">initialName</span></code> field (<code class="docutils literal notranslate"><span class="pre">string</span></code> type) which selects the renderer during initialization time. This field must match a valid renderer type name that is supported by a Tracer. Other field; the <code class="docutils literal notranslate"><span class="pre">Renderers</span></code> field, is a struct of structs each struct name inside this struct of structs must match renderer type name. Each struct’s field is renderer parameter dependent. An example render config file is given below:</p>
+<div class="literal-block-wrapper docutils container" id="rconfig-list">
+<div class="code-block-caption"><span class="caption-text">Render Config example</span><a class="headerlink" href="#rconfig-list" title="Link to this code">#</a></div>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// This renderer will be loaded</span>
+<span class="w">    </span><span class="c1">// You can change this field and load different</span>
+<span class="w">    </span><span class="c1">// renderer during load time.</span>
+<span class="w">    </span><span class="s2">&quot;initialName&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;PathTracerRGB&quot;</span><span class="p">,</span>
+
+<span class="w">    </span><span class="s2">&quot;Renderers&quot;</span><span class="o">:</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">//=======================//</span>
+<span class="w">        </span><span class="c1">//     Texture View      //</span>
+<span class="w">        </span><span class="c1">//=======================//</span>
+<span class="w">        </span><span class="s2">&quot;TexView&quot;</span><span class="o">:</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="s2">&quot;totalSPP&quot;</span><span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="mf">65536</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="c1">//=======================//</span>
+<span class="w">        </span><span class="c1">//   Surface Renderer    //</span>
+<span class="w">        </span><span class="c1">//=======================//</span>
+<span class="w">        </span><span class="s2">&quot;Surface&quot;</span><span class="o">:</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="s2">&quot;totalSPP&quot;</span><span class="w">             </span><span class="o">:</span><span class="w"> </span><span class="mf">256</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;doStochasticFilter&quot;</span><span class="w">   </span><span class="o">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;tMaxAORatio&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mf">0.1</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;renderType&quot;</span><span class="w">  </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;AmbientOcclusion&quot;</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="c1">//=======================//</span>
+<span class="w">        </span><span class="c1">//    RGB Path Tracer    //</span>
+<span class="w">        </span><span class="c1">//=======================//</span>
+<span class="w">        </span><span class="s2">&quot;PathTracerRGB&quot;</span><span class="o">:</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="s2">&quot;totalSPP&quot;</span><span class="w">       </span><span class="o">:</span><span class="w"> </span><span class="mf">32</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;burstSize&quot;</span><span class="w">      </span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;renderMode&quot;</span><span class="w">     </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Throughput&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;sampleMode&quot;</span><span class="w">     </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;WithNEEAndMIS&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;rrRange&quot;</span><span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">20</span><span class="p">],</span>
+<span class="w">            </span><span class="s2">&quot;neeSamplerType&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Uniform&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<p>This approach ease development cycle and reduces file count when you implement/test different renderers. You can only change <code class="docutils literal notranslate"><span class="pre">initialName</span></code> field to switch renderers.</p>
+</section>
+<section id="visor-config">
+<h3>Visor Config<a class="headerlink" href="#visor-config" title="Link to this heading">#</a></h3>
+<p>Visor config has two mandatory fields that are called <code class="docutils literal notranslate"><span class="pre">VisorDLL</span></code> and <code class="docutils literal notranslate"><span class="pre">VisorOptions</span></code>.</p>
+<div class="pst-scrollable-table-container"><table class="table table-center" id="id3">
+<caption><span class="caption-text">Visor DLL Struct</span><a class="headerlink" href="#id3" title="Link to this table">#</a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>name</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Path to the .dll (.so) file in the system. OS specific lookup rules will apply.</p></td>
+</tr>
+<tr class="row-odd"><td><p>construct</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Mangled function name that constructs the tracer</p></td>
+</tr>
+<tr class="row-even"><td><p>destruct</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Mangled function name that destroys the tracer</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="pst-scrollable-table-container"><table class="table table-center" id="id4">
+<caption><span class="caption-text">VisorOptions Struct</span><a class="headerlink" href="#id4" title="Link to this table">#</a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>commandBufferSize</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Static size of visor command buffer. Used to send commands to the tracer.</p></td>
+</tr>
+<tr class="row-odd"><td><p>responseBufferSize</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Static size of tracer response buffer. It is used by tracer to respond to the visor’s commands.</p></td>
+</tr>
+<tr class="row-even"><td><p>enforceIGPU</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Force to use integrated GPU instead of first capable GPU.</p></td>
+</tr>
+<tr class="row-odd"><td><p>displayHDR</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Try to tone map / display the tracer’s output as HDR image. Ignored if current device (swap chain) is not HDR-capable.</p></td>
+</tr>
+<tr class="row-even"><td><p>windowSize</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vec2ui</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Initial window size of the visor.</p></td>
+</tr>
+<tr class="row-odd"><td><p>realTime</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Instead of letting the windowing system to trigger window draw event, continuously render window as fast as possible.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr class="docutils" />
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="building.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Building</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="glossary.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Glossary</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#configuration-files">Configuration Files</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#tracer-config">Tracer Config</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#render-config">Render Config</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#visor-config">Visor Config</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Bora Yalciner
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025, Bora Yalciner.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

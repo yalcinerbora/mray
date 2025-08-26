@@ -1,0 +1,4 @@
+myst_parser
+sphinxcontrib.mermaid
+sphinx_copybutton
+sphinx_book_theme

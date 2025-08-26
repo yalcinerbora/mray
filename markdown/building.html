@@ -1,0 +1,703 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Building &#8212; MRay Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=c0bcb9f8" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'markdown/building';</script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="../_static/cBox.js?v=1f99daba"></script>
+    <script src="../_static/mray_mermaid_init.js?v=367958fb"></script>
+    <link rel="canonical" href="/Docs/markdown/building.html" />
+    <link rel="icon" href="../_static/mray_cbox.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Usage" href="usage.html" />
+    <link rel="prev" title="MRay Documentation" href="../index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+<canvas id="glcanvas" class="cBox" style="display:none;"></canvas>
+<img id="staticImg" class="cBox" style="display:block;" src="/_static/mray_cbox.png">
+
+<script>InitGL();</script></div>
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">MRay Documentation</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../index.html">
+                    MRay Documentation
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Building</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">MRay Internals</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="projectLayout.html">Project Layout</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="tracer/tracer.html">Tracer</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="tracer/design.html">Tracer Design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tracer/defaultTypes.html">Default Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tracer/extending.html">Extending the Tracer</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Scene Formats</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="scene/mrayScene.html">MRay Scene Format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scene/usdScene.html">USD Scene Support</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+<a href="https://github.com/yalcinerbora/mray" target="_blank"
+   class="btn btn-sm btn-source-repository-button"
+   title="Source repository"
+   data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+
+</a>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/markdown/building.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Building</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#user-responsible-dependencies">User-Responsible Dependencies</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#common">Common</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#windows">Windows</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#linux-apt-package-names">Linux (apt package names)</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#automatically-managed-libraries">Automatically managed libraries</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#cmake-build">CMake Build</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#cmake-flags">CMake Flags</a></li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="building">
+<h1>Building<a class="headerlink" href="#building" title="Link to this heading">#</a></h1>
+<p>Building the project is as streamlined as possible. However; it is still cumbersome to my taste. System dependencies are minimized, and only cpp compiler, CMake, git and device compiler (CUDA) should be provided by the system. Rest will be downloaded and built automatically. Unfortunately, this mandates working internet connection while building the binaries for the first time.</p>
+<p>You do not need <code class="docutils literal notranslate"><span class="pre">--recursive</span></code> flag while cloning the repository. For automatic dependency downloading and building, system relies on CMake’s ‘ExternalProject_Add’ functionality.</p>
+<section id="user-responsible-dependencies">
+<h2>User-Responsible Dependencies<a class="headerlink" href="#user-responsible-dependencies" title="Link to this heading">#</a></h2>
+<p>As stated above, most of the dependencies are handled by the build system itself via CMake external projects. User is responsible for some system libraries:</p>
+<section id="common">
+<h3>Common<a class="headerlink" href="#common" title="Link to this heading">#</a></h3>
+<ul class="simple">
+<li><p>CMake (mimimum v3.26). A recent version of CMake should suffice. Tested with v3.30.0.</p></li>
+<li><p>Git. Version should not matter (hopefully)</p></li>
+<li><p>C++20 compliant (except for modules) C++ compiler. Only tested with latest MSVC, Clang-18/19 and gcc-13 (gcc-13 has quite a bit of warnings which are not fixed yet).</p></li>
+<li><p>CUDA Installation. Version 12 and above is recommended.</p></li>
+<li><p>Nvidia OptiX (minimum v8.0) installation (Required for HW accelerated ray tracing, which is strongly recommended)</p></li>
+<li><p>For documentation, a python installation with these packages are required:</p>
+<ul>
+<li><p>Sphinx</p></li>
+<li><p>myst_parser</p></li>
+<li><p>sphinx_book_theme</p></li>
+<li><p>sphinx_copybutton</p></li>
+</ul>
+</li>
+</ul>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>There is a bug on recent CUDA v12.9 which prevents compilation of the std::optional with 16-byte aligned types. This is only the case for MSVC-STL. Up until then v12.6 is recommended for MSVC builds.</p>
+</div>
+</section>
+<section id="windows">
+<h3>Windows<a class="headerlink" href="#windows" title="Link to this heading">#</a></h3>
+<p>Besides the common packages, building the project in Windows should not require and extra packages. Vulkan-SDK is recommended for validation layer for debugging. We do not auto build/install the entire vulkan sdk but only the headers and the loader.</p>
+</section>
+<section id="linux-apt-package-names">
+<h3>Linux (apt package names)<a class="headerlink" href="#linux-apt-package-names" title="Link to this heading">#</a></h3>
+<ul class="simple">
+<li><p>xorg-dev (for Visor, dependency of glfw)</p></li>
+<li><p>libx11-dev (for Visor, dependency of glfw)</p></li>
+</ul>
+</section>
+</section>
+<section id="automatically-managed-libraries">
+<h2>Automatically managed libraries<a class="headerlink" href="#automatically-managed-libraries" title="Link to this heading">#</a></h2>
+<p>These libraries are automatically managed by the build system (uncommon libraries have their link):</p>
+<ul class="simple">
+<li><p>fmt</p></li>
+<li><p>nlohmann_json</p></li>
+<li><p>assimp</p></li>
+<li><p><a class="reference external" href="https://github.com/yalcinerbora/GFGFileFormat">gfg</a></p></li>
+<li><p>spdlog</p></li>
+<li><p>CLI11</p></li>
+<li><p>glfw [1]</p></li>
+<li><p>vulkan_headers [1]</p></li>
+<li><p>vulkan_loader [1]</p></li>
+<li><p>imgui [1]</p></li>
+<li><p>SLang [1]</p></li>
+<li><p>googletest [2]</p></li>
+<li><p>OIIO</p>
+<ul>
+<li><p>zlib</p></li>
+<li><p>OpenEXR-imath</p></li>
+<li><p>OpenEXR</p></li>
+<li><p>libtiff</p></li>
+<li><p>libjpeg-turbo</p></li>
+<li><p>libpng</p></li>
+<li><p>OpenColorIO</p>
+<ul>
+<li><p>expat</p></li>
+<li><p>minizip_ng</p></li>
+<li><p>yaml-cpp</p></li>
+<li><p>pystring</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>OpenUSD [3]</p>
+<ul>
+<li><p>oneTBB</p></li>
+</ul>
+</li>
+<li><p>tracy [4]</p></li>
+<li><p>Embree [5]</p></li>
+</ul>
+<div class="footer-block docutils container">
+<p>[1]: Only when Visor is built.</p>
+<p>[2]: Only when Tests are built.</p>
+<p>[3]: Only when OpenUSD support is enabled.</p>
+<p>[4]: Only when tracy support is enabled.</p>
+<p>[5]: Only when CPU-backend is built and <code class="docutils literal notranslate"><span class="pre">MRAY_ENABLE_HW_ACCELERATION</span></code> CMake variable is set.</p>
+</div>
+<hr class="docutils" />
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p class="rubric" id="why-automatic-management-i-have-most-of-these-libraries-can-t-i-use-these">Why automatic management? I have most of these libraries, can’t I use these?</p>
+<p>Unfortunately you. W it is <strong>37 GB</strong> of stuff.</p>
+</div>
+</section>
+<section id="cmake-build">
+<h2>CMake Build<a class="headerlink" href="#cmake-build" title="Link to this heading">#</a></h2>
+<p>Build system is somewhat principled. External projects will be installed into <code class="docutils literal notranslate"><span class="pre">Ext</span></code> folder in the project’s root directory. <code class="docutils literal notranslate"><span class="pre">Lib</span></code> directory will contain built packages in a platform/configuration specific manner.</p>
+<p>We recommend CMake output directory <code class="docutils literal notranslate"><span class="pre">Bin/CMake</span></code> but it should work with any out-of-source build location <strong>inside the project’s root directory</strong>. Final binaries and shaders (if applicable) will be written <code class="docutils literal notranslate"><span class="pre">Bin/{platform_name}/{configuration}</span></code>. This is your installation as well. You can directly copy the contents of this folder if you like (You can delete the <code class="docutils literal notranslate"><span class="pre">.lib</span></code> / <code class="docutils literal notranslate"><span class="pre">.a</span></code> files).</p>
+<p>Only tested <code class="docutils literal notranslate"><span class="pre">ninja</span></code> and <code class="docutils literal notranslate"><span class="pre">Visual</span> <span class="pre">Studio</span> <span class="pre">Solution</span></code> platform configurations.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>While configuring the project, you need to set <code class="docutils literal notranslate"><span class="pre">CMAKE_C_COMPILER</span></code> as well as a <code class="docutils literal notranslate"><span class="pre">CMAKE_CXX_COMPILER</span></code>. Although project does not use any pure C code, this flag will be propagated to the external projects that are written in C (such as libtiff). You may need to set <code class="docutils literal notranslate"><span class="pre">CMAKE_CUDA_COMPILER</span></code> on Linux platforms if nvcc is not in your <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p>
+</div>
+<section id="cmake-flags">
+<h3>CMake Flags<a class="headerlink" href="#cmake-flags" title="Link to this heading">#</a></h3>
+<div class="pst-scrollable-table-container"><table class="table table-center" id="id1">
+<caption><span class="caption-text">CMake Parameters of the Build System</span><a class="headerlink" href="#id1" title="Link to this table">#</a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">CMAKE_CUDA_ACHITECTURES</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sup>1</sup></p></td>
+<td><p>“native”</p></td>
+<td><p>Select the CUDA SM level for compilation.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_BUILD_DOCS</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>off</p></td>
+<td><p>Generate documentation build project.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_BUILD_TESTS</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>off</p></td>
+<td><p>Generate test projects (default: false).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_BUILD_VISOR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>on</p></td>
+<td><p>Enable Visor project. Visor is real-time image viewer/tone mapper for the renderer (for interactive rendering.)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_ENABLE_USD</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>off</p></td>
+<td><p>Enable OpenUSD support. MRay will try to load the USD scene. (<strong>Experimental</strong>)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_ENABLE_HW_ACCELERATION</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>off</p></td>
+<td><p>Enables GPU Hardware acceleration for ray tracing. CMake script look common locations for the required.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_ENABLE_PCH</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>off</p></td>
+<td><p>Enable precompiled headers. It does not benefit the build much since the main bottleneck is nvcc which do not support precompiled headers.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_EXPORT_COMPILE_COMMANDS</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>on</p></td>
+<td><p>Exports compile commands for lsp and include-what-you-use purposes.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_DEVICE_BACKEND</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sup>2</sup></p></td>
+<td><p>“MRAY_GPU_BACKEND_CUDA”</p></td>
+<td><p>Select the device backend. Currently only CUDA is supported. Hopefully we will add more backends in future.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_HOST_ARCH</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sup>3</sup></p></td>
+<td><p>“MRAY_HOST_ARCH_BASIC”</p></td>
+<td><p>Hint the compiler for the underlying host architecture.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_BUILD_HOST_BACKEND</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>off</p></td>
+<td><p>Creates a CPU target that emulates GPU via custom thread pool. Since it runs GPU-optimized code, its performance may not competitive (compared to other CPU-based renderers).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_DISABLE_DEVICE_BACKEND</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>off</p></td>
+<td><p>Do not create build targets for selected device backend. This flag makes sense only in conjunction with <code class="docutils literal notranslate"><span class="pre">MRAY_BUILD_HOST_BACKEND</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_SANITIZER_MODE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sup>4</sup></p></td>
+<td><p>“address”</p></td>
+<td><p>Mode of the SanitizeR build configuration. Supported values differ depending on the cpp compiler. For MSVC: only “address” is supported. For gcc and clang: all supported -fsanitize modes should be available (default: “address”).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_ENABLE_TRACY</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>off</p></td>
+<td><p>Enable tracy profiling support. MRay.exe will accept -p flag for profiling.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MRAY_COMPILE_OPTIX_AS_PTX</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">boolean</span></code></p></td>
+<td><p>off</p></td>
+<td><p>Compile OptiX shim layer shaders as PTX. This may be useful sometimes when shaders fails to compile with optixir.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="footer-block docutils container">
+<p>[1]: <code class="docutils literal notranslate"><span class="pre">native</span></code>, <code class="docutils literal notranslate"><span class="pre">52</span></code>, <code class="docutils literal notranslate"><span class="pre">60</span></code>, <code class="docutils literal notranslate"><span class="pre">61</span></code>, <code class="docutils literal notranslate"><span class="pre">70</span></code>, <code class="docutils literal notranslate"><span class="pre">72</span></code>, <code class="docutils literal notranslate"><span class="pre">75</span></code>, <code class="docutils literal notranslate"><span class="pre">86</span></code>, <code class="docutils literal notranslate"><span class="pre">89</span></code>, <code class="docutils literal notranslate"><span class="pre">90</span></code>, <code class="docutils literal notranslate"><span class="pre">all</span></code> or <code class="docutils literal notranslate"><span class="pre">all-major</span></code></p>
+<p>[2]: <code class="docutils literal notranslate"><span class="pre">MRAY_GPU_BACKEND_CUDA</span></code></p>
+<p>[3]: <code class="docutils literal notranslate"><span class="pre">MRAY_HOST_ARCH_BASIC</span></code>, <code class="docutils literal notranslate"><span class="pre">MRAY_HOST_ARCH_AVX2</span></code> or <code class="docutils literal notranslate"><span class="pre">MRAY_HOST_ARCH_AVX512</span></code></p>
+<p>[4]: <code class="docutils literal notranslate"><span class="pre">address</span></code>, <code class="docutils literal notranslate"><span class="pre">undefined</span></code>, <code class="docutils literal notranslate"><span class="pre">memory</span></code> or <code class="docutils literal notranslate"><span class="pre">thread</span></code></p>
+</div>
+<hr class="docutils" />
+<p>We recommend enabling <code class="docutils literal notranslate"><span class="pre">MRAY_ENABLE_HW_ACCELERATION</span></code> to utilize GPU’s native ray tracing capabilities. When it is enabled and <code class="docutils literal notranslate"><span class="pre">MRAY_DEVICE_BACKEND</span></code> is “MRAY_GPU_BACKEND_CUDA”, you may need to set <code class="docutils literal notranslate"><span class="pre">OPTIX_INSTALL_DIR</span></code> CMake configuration parameter as well (i.e. <code class="docutils literal notranslate"><span class="pre">C:/ProgramData/NVIDIA</span> <span class="pre">Corporation/OptiX</span> <span class="pre">SDK</span> <span class="pre">8.1.0</span></code>). ‘FindOptiX.cmake’ script will try to find OptiX automatically via looking at default installation locations.</p>
+<p>After configuring the project, you need to first run <code class="docutils literal notranslate"><span class="pre">MRayExternal</span></code> project/target. This target will generate automatically managed libraries/executables. After that, building the solution (Visual Studio) or running the “all” target (Ninja) will generate the binaries.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><code class="docutils literal notranslate"><span class="pre">MRayExternal</span></code> target specifically exempt from the “all” target. It takes considerable amount of time (especially in Windows) just to check if the target is up to date. You need to explicitly build this target first and re-run it when you change the configuration that requires additional dependencies.</p>
+<p>Additionally, you need to run <code class="docutils literal notranslate"><span class="pre">MRayExternal</span></code> for both “Release” and “Debug” configurations. There is a 3rd configuration “SanitizeR” which compiles the project with a sanitizer support by checking <code class="docutils literal notranslate"><span class="pre">MRAY_SANITIZER_MODE</span></code> CMake parameter. SanitizeR compiled with most of the optimizations and uses Release target’s external dependencies.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">MRay Documentation</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="usage.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Usage</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#user-responsible-dependencies">User-Responsible Dependencies</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#common">Common</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#windows">Windows</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#linux-apt-package-names">Linux (apt package names)</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#automatically-managed-libraries">Automatically managed libraries</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#cmake-build">CMake Build</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#cmake-flags">CMake Flags</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Bora Yalciner
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025, Bora Yalciner.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

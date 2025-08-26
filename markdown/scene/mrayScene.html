@@ -1,0 +1,1175 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>MRay Scene Format &#8212; MRay Documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/sphinx-book-theme.css?v=eba8b062" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=c0bcb9f8" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'markdown/scene/mrayScene';</script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="../../_static/cBox.js?v=1f99daba"></script>
+    <script src="../../_static/mray_mermaid_init.js?v=367958fb"></script>
+    <link rel="canonical" href="/Docs/markdown/scene/mrayScene.html" />
+    <link rel="icon" href="../../_static/mray_cbox.png"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="USD Scene Support" href="usdScene.html" />
+    <link rel="prev" title="Extending the Tracer" href="../tracer/extending.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+<canvas id="glcanvas" class="cBox" style="display:none;"></canvas>
+<img id="staticImg" class="cBox" style="display:block;" src="/_static/mray_cbox.png">
+
+<script>InitGL();</script></div>
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">MRay Documentation</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+ <script>
+ document.write(`
+   <button class="btn search-button-field search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <span class="search-button__default-text">Search</span>
+    <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+   </button>
+ `);
+ </script></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="../../index.html">
+                    MRay Documentation
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../building.html">Building</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../usage.html">Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">MRay Internals</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../projectLayout.html">Project Layout</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tracer/tracer.html">Tracer</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tracer/design.html">Tracer Design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tracer/defaultTypes.html">Default Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tracer/extending.html">Extending the Tracer</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Scene Formats</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">MRay Scene Format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usdScene.html">USD Scene Support</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+<a href="https://github.com/yalcinerbora/mray" target="_blank"
+   class="btn btn-sm btn-source-repository-button"
+   title="Source repository"
+   data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+
+</a>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../_sources/markdown/scene/mrayScene.md" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.md</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script>
+
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>MRay Scene Format</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#type-group-declarations">Type-Group Declarations</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#textures">Textures</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#transforms">Transforms</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#primitives">Primitives</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#materials-mediums">Materials &amp; Mediums</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#lights">Lights</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#definitions">Definitions</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#boundary">Boundary</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#surfaces">Surfaces</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#implicit-instancing">Implicit Instancing</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#example-surface-list">Example Surface List</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#light-surfaces">Light Surfaces</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#camera-surfaces">Camera Surfaces</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#caveats">Caveats</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#example">Example</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="mray-scene-format">
+<h1>MRay Scene Format<a class="headerlink" href="#mray-scene-format" title="Link to this heading">#</a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>All of these definitions are in active development. These may change in future.</p>
+</div>
+<p>MRay scene format is a simple scene format that only supports non-animated scenes (hopefully it will be added in future). The text format is <code class="docutils literal notranslate"><span class="pre">jasonc</span></code> (json with comment extensions) but trailing commas are not supported.</p>
+<p>The design of the scene format follows declaration/definition style of implementation. Inside the file, there will be “Type-Group” declarations (for Primitives, Materials etc.) and Surface definitions (logical combination of these type groups).</p>
+<section id="type-group-declarations">
+<h2>Type-Group Declarations<a class="headerlink" href="#type-group-declarations" title="Link to this heading">#</a></h2>
+<p>Scene file supports total of 7 type-groups which are <code class="docutils literal notranslate"><span class="pre">Cameras</span></code>, <code class="docutils literal notranslate"><span class="pre">Lights</span></code>, <code class="docutils literal notranslate"><span class="pre">Mediums</span></code>, <code class="docutils literal notranslate"><span class="pre">Transforms</span></code>, <code class="docutils literal notranslate"><span class="pre">Textures</span></code>, <code class="docutils literal notranslate"><span class="pre">Materials</span></code> and <code class="docutils literal notranslate"><span class="pre">Primitives</span></code>. All of these
+lists must be present in a scene file. If any of the type-groups are not used, it’s list then be defined as empty. An example type-group list is given below.</p>
+<div class="literal-block-wrapper docutils container" id="td-list">
+<div class="code-block-caption"><span class="caption-text">Type-group deceleration list example, “Materials”</span><a class="headerlink" href="#td-list" title="Link to this code">#</a></div>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="c1">// An example list of Material Declarations</span>
+<span class="s2">&quot;Materials&quot;</span><span class="o">:</span>
+<span class="p">[</span>
+<span class="w">    </span><span class="c1">// Struct that defines a single material</span>
+<span class="w">    </span><span class="p">{</span>
+
+<span class="w">        </span><span class="s2">&quot;id&quot;</span><span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;type&quot;</span><span class="w">  </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Lambert&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;albedo&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">]</span><span class="w">     </span><span class="c1">// Non-textured, perfectly green albedo</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="c1">// Multiple materials on a single struct (useful for mentally grouping materials)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="s2">&quot;id&quot;</span><span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">],</span><span class="w">       </span><span class="c1">// Ids must be unique throughout the material definitions.</span>
+<span class="w">        </span><span class="s2">&quot;type&quot;</span><span class="w">  </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Lambert&quot;</span><span class="w">     </span><span class="c1">// Type must be common in a struct</span>
+<span class="w">        </span><span class="s2">&quot;albedo&quot;</span><span class="o">:</span>
+<span class="w">        </span><span class="p">[</span>
+<span class="w">            </span><span class="p">{</span><span class="s2">&quot;texture&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">},</span><span class="w">     </span><span class="c1">// If type is a struct, it must be a texture</span>
+<span class="w">            </span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5</span><span class="p">]</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">        </span><span class="s2">&quot;normal&quot;</span><span class="o">:</span><span class="w">               </span><span class="c1">// Lambert material support optional normal map</span>
+<span class="w">        </span><span class="p">[</span>
+<span class="w">            </span><span class="s2">&quot;-&quot;</span><span class="p">,</span><span class="w">                </span><span class="c1">// &quot;-&quot; means empty</span>
+<span class="w">            </span><span class="p">{</span><span class="s2">&quot;texture&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">}</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">...</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<p>Each type-group list is a list of structs each struct defines one or more item.
+Multiple structs can define multiple items. In example above, there are total of three <code class="docutils literal notranslate"><span class="pre">Lambert</span></code> materials (items) divided into 2 structs. Grouping the types into structs does not matter in MRay’s eyes, it is only for the user to group the data. This list could’ve defined different types (i.e, a specular material).</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Only single type-group list (Primitives, Materials, Medium etc.) per type-group must be present on a single scene file.</p>
+</div>
+<p>All structs in a type-group must define an unsigned integer <code class="docutils literal notranslate"><span class="pre">id</span></code> field (can be an array) and <code class="docutils literal notranslate"><span class="pre">type</span></code> field (must be a string). Internally, MRay will groups these according to their <code class="docutils literal notranslate"><span class="pre">type</span></code> field. <code class="docutils literal notranslate"><span class="pre">id</span></code> field is used to internally reference types inside the scene. Rest of the fields depend on the MRays implementation of the types (please check the <a class="reference internal" href="../tracer/tracer.html#default-tracer-types"><span class="std std-ref">Default Tracer Types</span></a>).</p>
+<p>You can define as many structs in these arrays as you want. Only the used structs will be loaded according to the <a class="reference internal" href="#definitions"><em>surface definitions</em></a></p>
+<p>Below are types that does not exactly match the tracer’s types or different parameters that are required for the system to work. For example; primitives can be defined inline according to their parameter. However; this is impractical for large triangle meshes. Instead, you can refer primitives from common file formats.</p>
+<section id="textures">
+<h3>Textures<a class="headerlink" href="#textures" title="Link to this heading">#</a></h3>
+<p>Textures are the backbone of any rendering system. You can declare textures with the parameter’s defined below.</p>
+<div class="pst-scrollable-table-container"><table class="table table-center" id="id1">
+<caption><span class="caption-text">Texture fields and explanation</span><a class="headerlink" href="#id1" title="Link to this table">#</a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>id</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">uint32_t</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>As explained above, used as a reference throughout the scene</p></td>
+</tr>
+<tr class="row-odd"><td><p>file</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Path of the texture.</p></td>
+</tr>
+<tr class="row-even"><td><p>channels</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sup>1</sup></p></td>
+<td><p>texture’s channel count</p></td>
+<td><p>Used channels of the texture.</p></td>
+</tr>
+<tr class="row-odd"><td><p>asSigned</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
+<td><p>false</p></td>
+<td><p>Do signed conversion to the value, given value is UNORM but it should be read as SNORM.</p></td>
+</tr>
+<tr class="row-even"><td><p>isColor</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
+<td><p>true</p></td>
+<td><p>This texture value represents a color and must be color space converted.</p></td>
+</tr>
+<tr class="row-odd"><td><p>interpolation</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sup>2</sup></p></td>
+<td><p>“Linear”</p></td>
+<td><p>Texture interpolation mode, applied to both across pixels and across mip levels.</p></td>
+</tr>
+<tr class="row-even"><td><p>edgeResolve</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sup>3</sup></p></td>
+<td><p>“Wrap”</p></td>
+<td><p>When a texture query is out-of-bounds, it is resolved via this parameter.</p></td>
+</tr>
+<tr class="row-odd"><td><p>colorSpace</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sup>4</sup></p></td>
+<td><p>“Default”<sup>5</sup></p></td>
+<td><p>Overrides texture file’s color space if available.</p></td>
+</tr>
+<tr class="row-even"><td><p>readMode</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sub>6</sub></p></td>
+<td><p>“Passthrough”</p></td>
+<td><p>Simple read mode of the texture, useful for DDS textures, 2-channel normal maps</p></td>
+</tr>
+<tr class="row-odd"><td><p>gamma</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p>1.0</p></td>
+<td><p>Overrides gamma value of the texture.</p></td>
+</tr>
+<tr class="row-even"><td><p>ignoreResClamp</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
+<td><p>false</p></td>
+<td><p>Ignore Tracer’s tex clamp parameter. Useful for HDR boundary maps</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="footer-block docutils container">
+<p>[1]: <code class="docutils literal notranslate"><span class="pre">r</span></code>, <code class="docutils literal notranslate"><span class="pre">g</span></code>, <code class="docutils literal notranslate"><span class="pre">b</span></code>, <code class="docutils literal notranslate"><span class="pre">a</span></code>, <code class="docutils literal notranslate"><span class="pre">rg</span></code>, <code class="docutils literal notranslate"><span class="pre">rgb</span></code> or <code class="docutils literal notranslate"><span class="pre">rgba</span></code></p>
+<p>[2]: <code class="docutils literal notranslate"><span class="pre">Nearest</span></code> or <code class="docutils literal notranslate"><span class="pre">Linear</span></code></p>
+<p>[3]: <code class="docutils literal notranslate"><span class="pre">Wrap</span></code>, <code class="docutils literal notranslate"><span class="pre">Clamp</span></code> or <code class="docutils literal notranslate"><span class="pre">Mirror</span></code></p>
+<p>[4]: <code class="docutils literal notranslate"><span class="pre">ACES2065_1</span></code>, <code class="docutils literal notranslate"><span class="pre">ACES_CG</span></code>, <code class="docutils literal notranslate"><span class="pre">REC_709</span></code>, <code class="docutils literal notranslate"><span class="pre">REC_2020</span></code>, <code class="docutils literal notranslate"><span class="pre">DCI_P3</span></code> or <code class="docutils literal notranslate"><span class="pre">ADOBE_RGB</span></code></p>
+<p>[5]: If texture has a color space, it will be used. If not, the texture is assumed to be MRay’s configured color space. A Warning will be generated during load time.</p>
+<p>[6]: <code class="docutils literal notranslate"><span class="pre">Passthrough</span></code>, <code class="docutils literal notranslate"><span class="pre">Drop1</span></code>, <code class="docutils literal notranslate"><span class="pre">Drop2</span></code>, <code class="docutils literal notranslate"><span class="pre">Drop3</span></code>, <code class="docutils literal notranslate"><span class="pre">To3C_TsNormalBasic</span></code> or <code class="docutils literal notranslate"><span class="pre">To3C_TsNormalCoOcta</span></code></p>
+</div>
+<hr class="docutils" />
+<p>Channel parameter makes the loading system to load only these channels. Due to hardware limitations 3-channel textures may be padded as a 4-channel texture (which is the case of all desktop GPUs AFAIK.)</p>
+<p>Texture may be automatically clamped to a certain resolution (modified via Tracer configuration parameter). This is an ad-hoc solution when GPU texture memory is not large enough for scene to fit. This mode may be undesired for certain textures (such as HDR maps). <code class="docutils literal notranslate"><span class="pre">ignoreResClamp</span></code> parameter overrides that behavior.</p>
+<p>Scene loader will load mipmaps if given file contains them. If not mipmaps are automatically generated in initialization-time according to the Tracer’s parameters.</p>
+<p><strong>Supported Texture Formats:</strong></p>
+<ul class="simple">
+<li><p>Through OIIO:</p>
+<ul>
+<li><p>JPEG</p></li>
+<li><p>PNG</p></li>
+<li><p>TIFF</p></li>
+<li><p>OpenEXR</p></li>
+<li><p>DDS (If file’s data is <strong>not</strong> block-compressed)</p></li>
+<li><p>HDR</p></li>
+</ul>
+</li>
+<li><p>Internal:</p>
+<ul>
+<li><p>DDS (If file’s data is block-compressed)</p></li>
+</ul>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>MRay does not de-duplicate textures according to their <code class="docutils literal notranslate"><span class="pre">file</span></code> / <code class="docutils literal notranslate"><span class="pre">channel</span></code> parameters. If used, each texture with given <code class="docutils literal notranslate"><span class="pre">id</span></code> will be loaded into memory.</p>
+</div>
+</section>
+<section id="transforms">
+<h3>Transforms<a class="headerlink" href="#transforms" title="Link to this heading">#</a></h3>
+<p>Just like any other MRay type, transforms are also customizable. Most of the time given transform types would suffice. The transforms are specifically designed to be extensible for refining transforms of large instanced types (hair curves for example). Although only basic transform functionality is currently provided.</p>
+<p>Below table is only for default types <code class="docutils literal notranslate"><span class="pre">Single</span></code> or <code class="docutils literal notranslate"><span class="pre">Multi</span></code>. If loader does not detect these, it will fallback to the common loading scheme and expects exact layout/name of the Type’s attribute list. <code class="docutils literal notranslate"><span class="pre">Identity</span></code> is also supported then all attributes in the struct will be ignored</p>
+<div class="pst-scrollable-table-container"><table class="table table-center" id="id2">
+<caption><span class="caption-text">Transform fields and explanation</span><a class="headerlink" href="#id2" title="Link to this table">#</a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>id</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">uint32_t</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Id of the transform.</p></td>
+</tr>
+<tr class="row-odd"><td><p>type</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Type of the transform. Must be either <code class="docutils literal notranslate"><span class="pre">Identity</span></code>, <code class="docutils literal notranslate"><span class="pre">Single</span></code> or <code class="docutils literal notranslate"><span class="pre">Multi</span></code> currently.</p></td>
+</tr>
+<tr class="row-even"><td><p>layout</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sup>1</sup></p></td>
+<td><p>explicit</p></td>
+<td><p>Structure layout of the transformation</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="footer-block docutils container">
+<p>[1]: <code class="docutils literal notranslate"><span class="pre">trs</span></code>, <code class="docutils literal notranslate"><span class="pre">matrix</span></code></p>
+</div>
+<hr class="docutils" />
+<p>Internally, transforms are stored as 4x4 transformation matrices. For simple scenes, user may want to explicitly define simple transform, rotate and scale sequences. To this end, user can use <code class="docutils literal notranslate"><span class="pre">trs</span></code> (transform, rotate and scale) parameter. <code class="docutils literal notranslate"><span class="pre">trs</span></code> will require <code class="docutils literal notranslate"><span class="pre">translate</span></code>, <code class="docutils literal notranslate"><span class="pre">rotate</span></code> and <code class="docutils literal notranslate"><span class="pre">scale</span></code>fields must be present on the struct. All these fields need to be a vector of 3 floats. <code class="docutils literal notranslate"><span class="pre">rotate</span></code> represents euler angles. These combined in an implicit order: <code class="docutils literal notranslate"><span class="pre">translate</span></code> * <code class="docutils literal notranslate"><span class="pre">rotZ</span></code> * <code class="docutils literal notranslate"><span class="pre">rotY</span></code> * <code class="docutils literal notranslate"><span class="pre">rotX</span></code> * <code class="docutils literal notranslate"><span class="pre">scale</span></code> * <code class="docutils literal notranslate"><span class="pre">T</span></code>, where <code class="docutils literal notranslate"><span class="pre">T</span></code> is the transformed type. (We do use OpenGL-style matrix calculations, meaning application order will start from <code class="docutils literal notranslate"><span class="pre">scale</span></code> and goes leftwards).</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">layout</span></code>filed is <code class="docutils literal notranslate"><span class="pre">matrix</span></code>, a <code class="docutils literal notranslate"><span class="pre">matrix</span></code> field must be present on the struct. <code class="docutils literal notranslate"><span class="pre">matrix</span></code> field should have series of 16 floats which are assumed to compose a row-major 4 by 4 matrix.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Multi-transform is currently under development and may not work properly.</p>
+</div>
+</section>
+<section id="primitives">
+<h3>Primitives<a class="headerlink" href="#primitives" title="Link to this heading">#</a></h3>
+<p>MRay scene format supports inline primitives and file-backed primitives. The term primitive is different from the internal primitive term. Scene <code class="docutils literal notranslate"><span class="pre">Primitive</span></code> term analogous to the <code class="docutils literal notranslate"><span class="pre">Primitive</span> <span class="pre">Batch</span></code> term of the MRay. So each primitive in the scene defines one or more MRay primitive.</p>
+<div class="pst-scrollable-table-container"><table class="table table-center" id="id3">
+<caption><span class="caption-text">Primitive fields and explanation</span><a class="headerlink" href="#id3" title="Link to this table">#</a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>id</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">uint32_t</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Id of the transform.</p></td>
+</tr>
+<tr class="row-odd"><td><p>type</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Type of the primitive</p></td>
+</tr>
+<tr class="row-even"><td><p>tag</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code><sup>1</sup></p></td>
+<td><p>explicit</p></td>
+<td><p>Tag field which will be used to determine the loading process.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="footer-block docutils container">
+<p>[1]: <code class="docutils literal notranslate"><span class="pre">nodeSphere</span></code>, <code class="docutils literal notranslate"><span class="pre">nodeTriangle</span></code>, <code class="docutils literal notranslate"><span class="pre">nodeTriangleIndexed</span></code>, <code class="docutils literal notranslate"><span class="pre">assimp</span></code> or <code class="docutils literal notranslate"><span class="pre">gfg</span></code></p>
+</div>
+<hr class="docutils" />
+<div class="pst-scrollable-table-container"><table class="table table-center" id="id4">
+<caption><span class="caption-text">Extra fields when the tag is <code class="docutils literal notranslate"><span class="pre">assimp</span></code> or <code class="docutils literal notranslate"><span class="pre">gfg</span></code></span><a class="headerlink" href="#id4" title="Link to this table">#</a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>file</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>If primitive is file-backed, it will be fetched from this path.</p></td>
+</tr>
+<tr class="row-odd"><td><p>innerIndex</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">uint32_t</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>If file format supports multiple primitives, innerIndex<sup>th</sup> primitive will be loaded</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="pst-scrollable-table-container"><table class="table table-center" id="id5">
+<caption><span class="caption-text">Extra fields when tag is <code class="docutils literal notranslate"><span class="pre">nodeTriangle</span></code> <code class="docutils literal notranslate"><span class="pre">nodeTriangleIndexed</span></code></span><a class="headerlink" href="#id5" title="Link to this table">#</a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>index</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vec3ui</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>If load mode is <code class="docutils literal notranslate"><span class="pre">nodeTriangleIndices</span></code>, this field represent vertex indices. Ignored if the <code class="docutils literal notranslate"><span class="pre">tag</span></code> is <code class="docutils literal notranslate"><span class="pre">nodeTriangle</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>position</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vec3f</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>vertex-position of the primitive(triangle mesh)</p></td>
+</tr>
+<tr class="row-even"><td><p>normal</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vec3f</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>vertex-normal</p></td>
+</tr>
+<tr class="row-odd"><td><p>uv</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vec2f</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="pst-scrollable-table-container"><table class="table table-center" id="id6">
+<caption><span class="caption-text">Extra fields when tag is <code class="docutils literal notranslate"><span class="pre">nodeSphere</span></code></span><a class="headerlink" href="#id6" title="Link to this table">#</a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>radius</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Sphere radius.</p></td>
+</tr>
+<tr class="row-odd"><td><p>center</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">vec3f</span></code></p></td>
+<td><p>explicit</p></td>
+<td><p>Sphere center point.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Unlike other types, primitive has slightly different meaning. Since most of the primitive data is implicitly batched (triangle mesh for example). Each primitive field must define batched primitives. For example, if you want to define a single triangle, you need to define it inside arrays.</p>
+<p><strong>Supported File Formats:</strong></p>
+<ul class="simple">
+<li><p>Through Assimp: <a class="reference external" href="https://the-asset-importer-lib-documentation.readthedocs.io/en/latest/about/introduction.html">Please check assimp website.</a></p></li>
+<li><p>GFG (GFG is self developed simple file format)</p></li>
+</ul>
+</section>
+<section id="materials-mediums">
+<h3>Materials &amp; Mediums<a class="headerlink" href="#materials-mediums" title="Link to this heading">#</a></h3>
+<p>In addition to their common responsibility, materials also define medium boundaries. Each material struct
+optionally define <code class="docutils literal notranslate"><span class="pre">mediumFront</span></code> <code class="docutils literal notranslate"><span class="pre">mediumBack</span></code> fields (each refer to a medium via its <code class="docutils literal notranslate"><span class="pre">id</span></code>). If these fields
+are not defined, both are assumed to be the boundary medium (see <a class="reference internal" href="#boundary"><span class="std std-ref">Boundary</span></a>). To create an arbitrary volume field on the scene, a medium needs to be encapsulated via a primitive and a material (a surface). It is users responsibility to correctly define such fields so that medium information propagated correctly.</p>
+<div class="admonition error">
+<p class="admonition-title">Error</p>
+<p>TODO: Add a figure to explain the statement above.</p>
+</div>
+</section>
+<section id="lights">
+<h3>Lights<a class="headerlink" href="#lights" title="Link to this heading">#</a></h3>
+<p>Lights can be either analytic or primitive-backed. For primitive-backed lights its <code class="docutils literal notranslate"><span class="pre">type</span></code> must be <code class="docutils literal notranslate"><span class="pre">Primitive</span></code> and <code class="docutils literal notranslate"><span class="pre">primitive</span></code> field must be present with a valid primitive id.</p>
+</section>
+</section>
+<section id="definitions">
+<h2>Definitions<a class="headerlink" href="#definitions" title="Link to this heading">#</a></h2>
+<p>There are total of three definition arrays. These are <code class="docutils literal notranslate"><span class="pre">Surfaces</span></code>, <code class="docutils literal notranslate"><span class="pre">CameraSurfaces</span></code>
+and <code class="docutils literal notranslate"><span class="pre">LightSurfaces</span></code>. Every surface defined in these arrays will be loaded and displayed.</p>
+<section id="boundary">
+<h3>Boundary<a class="headerlink" href="#boundary" title="Link to this heading">#</a></h3>
+<p>Boundary is a special surface that must be defined in all scenes. It defines default <code class="docutils literal notranslate"><span class="pre">medium</span></code> (medium that
+occupies every empty space between surfaces.), boundary <code class="docutils literal notranslate"><span class="pre">light</span></code> and its <code class="docutils literal notranslate"><span class="pre">transform</span></code>. Boundary light with
+this specific transform will be triggered when a ray misses the scene.</p>
+</section>
+<section id="surfaces">
+<h3>Surfaces<a class="headerlink" href="#surfaces" title="Link to this heading">#</a></h3>
+<p>Surfaces are defined inside the <code class="docutils literal notranslate"><span class="pre">Surfaces</span></code> array. Each surface can be composed of multiple <code class="docutils literal notranslate"><span class="pre">primitive</span></code> / <code class="docutils literal notranslate"><span class="pre">material</span></code> pairs and and an optional <code class="docutils literal notranslate"><span class="pre">transform</span></code> field. If transform field is not present identity transform
+is assumed.</p>
+<p>Additionally, surface fields optionally define <code class="docutils literal notranslate"><span class="pre">cullFace</span></code> and <code class="docutils literal notranslate"><span class="pre">alphaMap</span></code> fields. <code class="docutils literal notranslate"><span class="pre">alphaMap</span></code> field can either
+be <code class="docutils literal notranslate"><span class="pre">&quot;-&quot;</span></code> or refer to a valid texture that is a single-channel texture (i.e, its <code class="docutils literal notranslate"><span class="pre">channels</span></code> field must be either <code class="docutils literal notranslate"><span class="pre">r</span></code>, <code class="docutils literal notranslate"><span class="pre">g</span></code>, <code class="docutils literal notranslate"><span class="pre">b</span></code> or <code class="docutils literal notranslate"><span class="pre">a</span></code>).</p>
+<section id="implicit-instancing">
+<h4>Implicit Instancing<a class="headerlink" href="#implicit-instancing" title="Link to this heading">#</a></h4>
+<p>MRay natively supports implicit instancing. Given a <code class="docutils literal notranslate"><span class="pre">primitive</span></code> (or multiple primitives) field in a surface definition, MRay will create single accelerator (acceleration structure) if and only if the primitive type is
+tagged as <code class="docutils literal notranslate"><span class="pre">'LOCALLY_CONSTANT_TRANSFORM'</span></code> inside the MRay itself (not in the scene definition). Each MRay primitive type supports either <code class="docutils literal notranslate"><span class="pre">'LOCALLY_CONSTANT_TRANSFORM'</span></code> or <code class="docutils literal notranslate"><span class="pre">'PER_PRIMITIVE_TRANSFORM'</span></code>.</p>
+<p>As an example, the default <code class="docutils literal notranslate"><span class="pre">(P)Triangle</span></code> type is tagged with ‘LOCALLY_CONSTANT_TRANSFORM’ since it does not store any data to transform each primitive individually. However, <code class="docutils literal notranslate"><span class="pre">(P)TriangleSkinned</span></code> type represents a bone-hierarchy transformable triangles and it is tagged with ‘PER_PRIMITIVE_TRANSFORM’ (it requires per-vertex bone index and bone weight data).</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">(P)Triangle</span></code> id with different transforms will result in a single accelerator. However; when <code class="docutils literal notranslate"><span class="pre">(P)TriangleSkinned</span></code> primitive encountered with different transforms, multiple accelerators will
+be generated for each surface definition. This is due to classic inverse transform application to the traversed ray can be applied for <code class="docutils literal notranslate"><span class="pre">(P)Triangle</span></code> but not for <code class="docutils literal notranslate"><span class="pre">(P)TriangleSkinned</span></code>.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>Only single-level instancing is supported. You cannot encapsulate primitive / material pairs as a single surface
+then use it inside another surface definition.</p>
+</div>
+</section>
+<section id="example-surface-list">
+<h4>Example Surface List<a class="headerlink" href="#example-surface-list" title="Link to this heading">#</a></h4>
+<p>Synopsis of a surface definition list can be seen below.</p>
+<div class="literal-block-wrapper docutils container" id="sd-list">
+<div class="code-block-caption"><span class="caption-text">Surface definition list example</span><a class="headerlink" href="#sd-list" title="Link to this code">#</a></div>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="c1">// An example list of Surface definitions</span>
+<span class="s2">&quot;Surfaces&quot;</span><span class="o">:</span>
+<span class="p">[</span>
+<span class="w">    </span><span class="c1">// Single tuple, single accelerator is generated for this transform / primitive pair.</span>
+<span class="w">    </span><span class="c1">// Iff primitive type is tagged with &#39;LOCALLY_CONSTANT_TRANSFORM&#39; (inside the MRay)</span>
+<span class="w">    </span><span class="p">{</span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">5</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">},</span>
+<span class="w">    </span><span class="c1">// As stated above, this can be automatically instanced.</span>
+<span class="w">    </span><span class="p">{</span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">5</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">},</span>
+<span class="w">    </span><span class="c1">// You can group primitives in to a single acceleration structure. Up to 8</span>
+<span class="w">    </span><span class="c1">// primitives are supported in a single surface definition.</span>
+<span class="w">    </span><span class="p">{</span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">5</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">],</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">3</span><span class="p">]},</span>
+<span class="w">    </span><span class="c1">// This may be instanced as well (given primitive is tagged with &#39;LOCALLY_CONSTANT_TRANSFORM&#39;)</span>
+<span class="w">    </span><span class="p">{</span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">3</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">11</span><span class="p">,</span><span class="w"> </span><span class="mf">12</span><span class="p">,</span><span class="w"> </span><span class="mf">13</span><span class="p">,</span><span class="w"> </span><span class="mf">14</span><span class="p">],</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">3</span><span class="p">]},</span>
+<span class="w">    </span><span class="c1">// If primitives should be two-sided, you need to explicitly state &quot;cullFace&quot; parameter</span>
+<span class="w">    </span><span class="c1">// &quot;cullFace&quot; parameter must be define per primitive / material pair (i.e, check the alpha mapped</span>
+<span class="w">    </span><span class="c1">// surface below).</span>
+<span class="w">    </span><span class="p">{</span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">5</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;cullFace&quot;</span><span class="o">:</span><span class="w"> </span><span class="kc">false</span><span class="p">},</span>
+<span class="w">    </span><span class="c1">// If primitives require alpha maps you can define it with &quot;alphaMap&quot; parameter.</span>
+<span class="w">    </span><span class="c1">// &quot;-&quot; represents empty.</span>
+<span class="w">    </span><span class="p">{</span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">],</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">11</span><span class="p">,</span><span class="w"> </span><span class="mf">12</span><span class="p">],</span><span class="w"> </span><span class="s2">&quot;alphaMap&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;-&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="s2">&quot;texture&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">2</span><span class="p">}]},</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+<section id="light-surfaces">
+<h3>Light Surfaces<a class="headerlink" href="#light-surfaces" title="Link to this heading">#</a></h3>
+<p>Light surfaces more or less similar to the actual surfaces. However; they are in a separate field to do a renderer specific grouping (such as creating light sampler). Unlike surfaces, light surfaces do not support packed lights. Each light needs to have its own surface definition (<code class="docutils literal notranslate"><span class="pre">light</span></code> field must be an integer, not an array). Lights can also have <code class="docutils literal notranslate"><span class="pre">transform</span></code> field. Optionally, <code class="docutils literal notranslate"><span class="pre">medium</span></code> field can be defined when this light is inside a medium.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Analytical Lights are “invisible” since MRay does not generate accelerator for them. For some renderers (i.e. a path tracer <strong>without</strong> NEE) these lights may not contribute to the scene’s lighting.</p>
+</div>
+<p>When a light is primitive-backed same surface instantiation rules apply to it. A primitive-backed light surface with same light id and different transform will be implicitly instantiated.</p>
+</section>
+<section id="camera-surfaces">
+<h3>Camera Surfaces<a class="headerlink" href="#camera-surfaces" title="Link to this heading">#</a></h3>
+<p>Camera surfaces are also separate and has the same semantics of light surfaces.</p>
+</section>
+</section>
+<section id="caveats">
+<h2>Caveats<a class="headerlink" href="#caveats" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>You can not include other json files and compose scenes. It may be available in future versions.</p></li>
+<li><p>Admittedly, integer id system can be cumbersome for human editing. In future, we may define a name field (<code class="docutils literal notranslate"><span class="pre">string</span></code>) and expose a preprocess facility to hash these strings as ids.</p></li>
+</ul>
+</section>
+<section id="example">
+<h2>Example<a class="headerlink" href="#example" title="Link to this heading">#</a></h2>
+<p>Here is an example Cornell Box scene. Comments further explain certain capabilities and fallbacks of scene format.</p>
+<div class="literal-block-wrapper docutils container" id="cornell-box-js">
+<div class="code-block-caption"><span class="caption-text">Cornell Box full scene definition in MRay format.</span><a class="headerlink" href="#cornell-box-js" title="Link to this code">#</a></div>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// MRay is a simple scene format, and does not stored represent</span>
+<span class="w">    </span><span class="c1">// scale information. Consistency of the values are user&#39;s responsibility.</span>
+<span class="w">    </span><span class="c1">//</span>
+<span class="w">    </span><span class="c1">//</span>
+<span class="w">    </span><span class="c1">// Although, Declarations / Definitions are in order for this file, it is not required.</span>
+<span class="w">    </span><span class="s2">&quot;Cameras&quot;</span><span class="o">:</span>
+<span class="w">    </span><span class="p">[{</span>
+<span class="w">        </span><span class="s2">&quot;id&quot;</span><span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;type&quot;</span><span class="w">  </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Pinhole&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;isFovX&quot;</span><span class="o">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;fov&quot;</span><span class="w">   </span><span class="o">:</span><span class="w"> </span><span class="mf">19.5</span><span class="p">,</span>
+<span class="w">        </span><span class="c1">// Output image resolution is not defined in a scene file. It should match</span>
+<span class="w">        </span><span class="c1">// the aspect ratio of the camera.</span>
+<span class="w">        </span><span class="s2">&quot;aspect&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;planes&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0.005</span><span class="p">,</span><span class="w"> </span><span class="mf">90.0</span><span class="p">],</span>
+
+<span class="w">        </span><span class="c1">// These initial transform values are on top of the given</span>
+<span class="w">        </span><span class="c1">// camera surface definition&#39;s transform.</span>
+<span class="w">        </span><span class="c1">// First, this transform is applied.</span>
+<span class="w">        </span><span class="s2">&quot;gaze&quot;</span><span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">],</span>
+<span class="w">        </span><span class="s2">&quot;position&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="mf">6.8</span><span class="p">],</span>
+<span class="w">        </span><span class="s2">&quot;up&quot;</span><span class="w">      </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">]</span>
+<span class="w">    </span><span class="p">}],</span>
+
+<span class="w">    </span><span class="s2">&quot;Lights&quot;</span><span class="w"> </span><span class="o">:</span>
+<span class="w">    </span><span class="p">[</span>
+<span class="w">        </span><span class="c1">// Black Background</span>
+<span class="w">        </span><span class="c1">// &quot;Null&quot; light is identity type of light (similar to identity transform).</span>
+<span class="w">        </span><span class="c1">// It does not emit anything and does not geometry definitions.</span>
+<span class="w">        </span><span class="c1">// This only makes sense to use as a boundary light.</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;id&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;type&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Null&quot;</span><span class="p">},</span>
+<span class="w">        </span><span class="c1">// Ceiling Light</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="s2">&quot;id&quot;</span><span class="w">       </span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span>
+<span class="w">            </span><span class="c1">// Primitive-backed light</span>
+<span class="w">            </span><span class="s2">&quot;type&quot;</span><span class="w">     </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Primitive&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">            </span><span class="c1">// Radiance value does not have a unit.</span>
+<span class="w">            </span><span class="c1">// Radiance could&#39;ve been texture-backed. In this case,</span>
+<span class="w">            </span><span class="c1">// its syntax would be:</span>
+<span class="w">            </span><span class="c1">// &quot;radiance&quot; : {&quot;texture&quot;: 99}</span>
+<span class="w">            </span><span class="s2">&quot;radiance&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">68</span><span class="p">,</span><span class="w"> </span><span class="mf">48</span><span class="p">,</span><span class="w"> </span><span class="mf">16</span><span class="p">]</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">],</span>
+
+<span class="w">    </span><span class="s2">&quot;Mediums&quot;</span><span class="w"> </span><span class="o">:</span>
+<span class="w">    </span><span class="p">[</span>
+<span class="w">        </span><span class="c1">// Identity type Medium. It neither absorbs or scatter</span>
+<span class="w">        </span><span class="c1">// light.</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;id&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;type&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Vacuum&quot;</span><span class="p">}</span>
+<span class="w">    </span><span class="p">],</span>
+
+<span class="w">    </span><span class="s2">&quot;Transforms&quot;</span><span class="w"> </span><span class="o">:</span>
+<span class="w">    </span><span class="p">[</span>
+<span class="w">        </span><span class="c1">// Identity type Transform. Internally MRay will optimize transformations</span>
+<span class="w">        </span><span class="c1">// (i.e. the transformations will be noop instead of multiplying with an</span>
+<span class="w">        </span><span class="c1">// identity matrix)</span>
+<span class="w">        </span><span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;type&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Identity&quot;</span><span class="p">},</span>
+<span class="w">        </span><span class="c1">//</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Here we define arrayed struct. This single struct defines 8</span>
+<span class="w">            </span><span class="c1">// transformations at once.</span>
+<span class="w">            </span><span class="s2">&quot;id&quot;</span><span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">3</span><span class="p">,</span><span class="w"> </span><span class="mf">4</span><span class="p">,</span><span class="w"> </span><span class="mf">5</span><span class="p">,</span><span class="w"> </span><span class="mf">7</span><span class="p">,</span><span class="w"> </span><span class="mf">9</span><span class="p">,</span><span class="w"> </span><span class="mf">10</span><span class="p">],</span><span class="w"> </span><span class="c1">// Ids must be unique, but it can be any 32-bit integer value</span>
+<span class="w">            </span><span class="c1">// Type must be a single value throughout a struct.</span>
+<span class="w">            </span><span class="s2">&quot;type&quot;</span><span class="w">  </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Single&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="c1">// In this case layout is matrix, you can&#39;t mix-match layouts in a single struct</span>
+<span class="w">            </span><span class="s2">&quot;layout&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;matrix&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="c1">// Array size of this field must match array size of &#39;id&#39; field.</span>
+<span class="w">            </span><span class="s2">&quot;matrix&quot;</span><span class="o">:</span>
+<span class="w">            </span><span class="p">[</span>
+<span class="w">                </span><span class="c1">// Floor</span>
+<span class="w">                </span><span class="p">[</span>
+<span class="w">                    </span><span class="c1">// Row-major ordering</span>
+<span class="w">                    </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">    </span><span class="c1">// Row 1</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">    </span><span class="c1">// Row 2</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">    </span><span class="c1">// Row 3</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="w">     </span><span class="c1">// Row 4</span>
+<span class="w">                </span><span class="p">],</span>
+<span class="w">                </span><span class="c1">// Ceiling</span>
+<span class="w">                </span><span class="p">[</span>
+<span class="w">                    </span><span class="mf">2</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">2</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span>
+<span class="w">                </span><span class="p">],</span>
+<span class="w">                </span><span class="c1">// Left</span>
+<span class="w">                </span><span class="p">[</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">1</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">1</span><span class="p">,</span>
+<span class="w">                    </span><span class="o">-</span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">1</span>
+<span class="w">                </span><span class="p">],</span>
+<span class="w">                </span><span class="c1">// Right</span>
+<span class="w">                </span><span class="p">[</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span>
+<span class="w">                </span><span class="p">],</span>
+<span class="w">                </span><span class="c1">// Back</span>
+<span class="w">                </span><span class="p">[</span>
+<span class="w">                    </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">1</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">1</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">1</span>
+<span class="w">                </span><span class="p">],</span>
+<span class="w">                </span><span class="c1">// Front</span>
+<span class="w">                </span><span class="p">[</span>
+<span class="w">                    </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">1</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">  </span><span class="mf">1</span>
+<span class="w">                </span><span class="p">],</span>
+<span class="w">                </span><span class="c1">// Left Sphere</span>
+<span class="w">                </span><span class="p">[</span>
+<span class="w">                    </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">0.335439</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.3</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">0.291415</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span>
+<span class="w">                </span><span class="p">],</span>
+<span class="w">                </span><span class="c1">// Right Sphere</span>
+<span class="w">                </span><span class="p">[</span>
+<span class="w">                    </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.328631</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.3</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">0.374592</span><span class="p">,</span>
+<span class="w">                    </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span>
+<span class="w">                </span><span class="p">]</span>
+<span class="w">            </span><span class="p">]</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Light</span>
+<span class="w">            </span><span class="s2">&quot;id&quot;</span><span class="w">       </span><span class="o">:</span><span class="w"> </span><span class="mf">6</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;type&quot;</span><span class="w">     </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Single&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;layout&quot;</span><span class="w">   </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;trs&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="s2">&quot;translate&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="o">-</span><span class="mf">0.005</span><span class="p">,</span><span class="w"> </span><span class="mf">1.999</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">0.03</span><span class="p">],</span>
+<span class="w">            </span><span class="s2">&quot;rotate&quot;</span><span class="w">   </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">90</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">],</span>
+<span class="w">            </span><span class="s2">&quot;scale&quot;</span><span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0.47</span><span class="p">,</span><span class="w"> </span><span class="mf">0.38</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">]</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">],</span>
+
+<span class="w">    </span><span class="s2">&quot;Materials&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Diffuse Materials</span>
+<span class="w">        </span><span class="s2">&quot;id&quot;</span><span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">],</span>
+<span class="w">        </span><span class="s2">&quot;type&quot;</span><span class="w">  </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Lambert&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;albedo&quot;</span><span class="o">:</span>
+<span class="w">        </span><span class="p">[</span>
+<span class="w">            </span><span class="p">[</span><span class="mf">0.6300</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0650</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0500</span><span class="p">],</span><span class="w">   </span><span class="c1">// Materials fields can be texture-backed too (similar syntax of &#39;radiance&#39; field of a light)</span>
+<span class="w">            </span><span class="p">[</span><span class="mf">0.14</span><span class="p">,</span><span class="w"> </span><span class="mf">0.45</span><span class="p">,</span><span class="w"> </span><span class="mf">0.091</span><span class="p">],</span>
+<span class="w">            </span><span class="p">[</span><span class="mf">0.725</span><span class="p">,</span><span class="w"> </span><span class="mf">0.71</span><span class="p">,</span><span class="w"> </span><span class="mf">0.68</span><span class="p">]</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">    </span><span class="p">}],</span>
+
+<span class="w">    </span><span class="s2">&quot;Primitives&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Unit Plane</span>
+<span class="w">        </span><span class="c1">// Inline primitive. In this case primitive is &#39;Triangle&#39; it must be batched primitive.</span>
+<span class="w">        </span><span class="c1">// So a single id represents two triangles.</span>
+<span class="w">        </span><span class="s2">&quot;id&quot;</span><span class="w">      </span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;type&quot;</span><span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Triangle&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;tag&quot;</span><span class="w">     </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;nodeTriangleIndexed&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="c1">// The size of these fields can be arbitrarily large</span>
+<span class="w">        </span><span class="c1">// and all of it will be loaded in to the memory.</span>
+<span class="w">        </span><span class="c1">// So if &#39;index&#39; field uses only subset of the data, there can</span>
+<span class="w">        </span><span class="c1">// be a memory waste.</span>
+<span class="w">        </span><span class="c1">//</span>
+<span class="w">        </span><span class="c1">// If &quot;tag&quot; were &quot;nodeTriangle&quot;, these fields would&#39;ve been multiple of 3.</span>
+<span class="w">        </span><span class="c1">// Each consecutive three vertices would have defined a triangle.</span>
+<span class="w">        </span><span class="s2">&quot;position&quot;</span><span class="o">:</span>
+<span class="w">        </span><span class="p">[</span>
+<span class="w">            </span><span class="p">[</span><span class="o">-</span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="o">-</span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">],</span>
+<span class="w">            </span><span class="p">[</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w">  </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="o">-</span><span class="mf">0.5</span><span class="p">,</span><span class="w">  </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">]</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="s2">&quot;normal&quot;</span><span class="o">:</span>
+<span class="w">        </span><span class="p">[</span>
+<span class="w">            </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">],</span>
+<span class="w">            </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">]</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="s2">&quot;uv&quot;</span><span class="o">:</span>
+<span class="w">        </span><span class="p">[</span>
+<span class="w">            </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">],</span>
+<span class="w">            </span><span class="p">[</span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">]</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="c1">// Since  this is indexed triangle, this field must be multiple of three (more specifically</span>
+<span class="w">        </span><span class="c1">// it must be array of vector of three integers).</span>
+<span class="w">        </span><span class="s2">&quot;index&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">3</span><span class="p">]]</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Sphere</span>
+<span class="w">        </span><span class="s2">&quot;id&quot;</span><span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;type&quot;</span><span class="w">  </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Sphere&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;tag&quot;</span><span class="w">   </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;nodeSphere&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;radius&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0.3</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;center&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">]</span>
+<span class="w">    </span><span class="p">}],</span>
+
+<span class="w">    </span><span class="c1">// Cornell Box scene does not use any textures, however this field must be present in the file.</span>
+<span class="w">    </span><span class="s2">&quot;Textures&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[],</span>
+
+<span class="w">    </span><span class="c1">//================================================//</span>
+<span class="w">    </span><span class="c1">//        Actual Scene Related Declarations       //</span>
+<span class="w">    </span><span class="c1">//================================================//</span>
+<span class="w">    </span><span class="s2">&quot;Boundary&quot;</span><span class="w"> </span><span class="o">:</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="s2">&quot;medium&quot;</span><span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;light&quot;</span><span class="w">     </span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;transform&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mf">0</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="s2">&quot;Surfaces&quot;</span><span class="o">:</span>
+<span class="w">    </span><span class="p">[</span>
+<span class="w">        </span><span class="c1">// Floor</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w">  </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">},</span><span class="w">  </span><span class="c1">// Implicitly back face culling is on and</span>
+<span class="w">                                                            </span><span class="c1">// alpha map is not present on this surface.</span>
+<span class="w">        </span><span class="c1">// Ceiling</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w">  </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">},</span>
+<span class="w">        </span><span class="c1">// Back Wall</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w">  </span><span class="mf">5</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">},</span>
+<span class="w">        </span><span class="c1">// Left Wall</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w">  </span><span class="mf">3</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">},</span>
+<span class="w">        </span><span class="c1">// Right Wall</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w">  </span><span class="mf">4</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">},</span>
+<span class="w">        </span><span class="c1">// Front Wall</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w">  </span><span class="mf">7</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">},</span>
+<span class="w">        </span><span class="c1">// Spheres</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w">  </span><span class="mf">9</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">3</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">10</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;material&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">4</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;primitive&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">}</span>
+<span class="w">    </span><span class="p">],</span>
+
+<span class="w">    </span><span class="s2">&quot;LightSurfaces&quot;</span><span class="o">:</span><span class="w"> </span><span class="p">[{</span><span class="s2">&quot;light&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;transform&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">6</span><span class="p">}],</span><span class="w"> </span><span class="c1">// Light has special transform but its</span>
+<span class="w">                                                     </span><span class="c1">// medium is implicitly &quot;Boundary.medium&quot;</span>
+<span class="w">                                                     </span><span class="c1">// since it is not explicitly defined.</span>
+<span class="w">    </span><span class="s2">&quot;CameraSurfaces&quot;</span><span class="o">:</span><span class="p">[{</span><span class="s2">&quot;camera&quot;</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">}]</span><span class="w">                 </span><span class="c1">// Camera does not define its transform,</span>
+<span class="w">                                                     </span><span class="c1">// so it is identity matrix.</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../tracer/extending.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Extending the Tracer</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="usdScene.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">USD Scene Support</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#type-group-declarations">Type-Group Declarations</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#textures">Textures</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#transforms">Transforms</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#primitives">Primitives</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#materials-mediums">Materials &amp; Mediums</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#lights">Lights</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#definitions">Definitions</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#boundary">Boundary</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#surfaces">Surfaces</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#implicit-instancing">Implicit Instancing</a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#example-surface-list">Example Surface List</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#light-surfaces">Light Surfaces</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#camera-surfaces">Camera Surfaces</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#caveats">Caveats</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#example">Example</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Bora Yalciner
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025, Bora Yalciner.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
