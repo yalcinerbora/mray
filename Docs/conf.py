@@ -6,6 +6,8 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+import os
+
 # TODO: Fetch this from CMake like "release"
 #project = 'MRay'
 copyright = '%Y, Bora Yalciner'
@@ -14,7 +16,8 @@ author = 'Bora Yalciner'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 extensions = ['myst_parser',
               'sphinxcontrib.mermaid',
-              'sphinx_copybutton']
+              'sphinx_copybutton',
+              "sphinx.ext.githubpages"]
 templates_path = ['_templates']
 exclude_patterns = []
 
@@ -37,7 +40,12 @@ html_js_files  = [
 ]
 
 html_favicon = '_static/mray_cbox.png'
-html_baseurl = '/Docs/'
+
+# Change the base url for local development / deployment
+if os.environ.get('GITHUB_ACTIONS'):
+    html_baseurl = 'https://yalcinerbora.github.io/mray/'
+else:
+    html_baseurl = ''
 
 html_theme_options = {
     "repository_url": "https://github.com/yalcinerbora/mray",
