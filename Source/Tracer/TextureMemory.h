@@ -4,6 +4,7 @@
 
 #include "Device/GPUSystemForward.h"
 #include "Device/GPUTypes.h"
+#include "Device/GPUTexture.h"
 
 #include "TransientPool/TransientPool.h"
 

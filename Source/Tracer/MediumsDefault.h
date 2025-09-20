@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MediumC.h"
+#include "SpectrumC.h"
 #include "Random.h"
 #include "Texture.h"
 
@@ -30,7 +31,7 @@ namespace MediumDetail
         public:
         using enum HomogeneousMediumData::I;
         using DataSoA = EmptyType;
-        using SpectrumConverter = typename SpectrumConverterContextIdentity::Converter;
+        using SpectrumConverter = typename SpectrumContextIdentity::Converter;
 
         static constexpr uint32_t SampleScatteringRNCount = 0;
 
@@ -51,12 +52,12 @@ namespace MediumDetail
         Spectrum        Emission(const Vector3& uv) const noexcept;
     };
 
-    template <class SpectrumTransformer = SpectrumConverterContextIdentity>
+    template <class SpectrumContext = SpectrumContextIdentity>
     class MediumHomogeneous
     {
         public:
         using DataSoA = HomogeneousMediumData;
-        using SpectrumConverter = typename SpectrumTransformer::Converter;
+        using SpectrumConverter = typename SpectrumContext::Converter;
         using enum HomogeneousMediumData::I;
 
         static constexpr uint32_t SampleScatteringRNCount = 2;
@@ -90,7 +91,7 @@ class MediumGroupVacuum : public GenericGroupMedium<MediumGroupVacuum>
     public:
     using DataSoA   = EmptyType;
 
-    template<class STContext = SpectrumConverterContextIdentity>
+    template<class STContext = SpectrumContextIdentity>
     using Medium  = MediumDetail::MediumVacuum;
 
     public:
@@ -142,7 +143,7 @@ class MediumGroupHomogeneous : public GenericGroupMedium<MediumGroupHomogeneous>
     public:
     using DataSoA   = MediumDetail::HomogeneousMediumData;
 
-    template<class STContext = SpectrumConverterContextIdentity>
+    template<class STContext = SpectrumContextIdentity>
     using Medium  = MediumDetail::MediumHomogeneous<STContext>;
 
     private:

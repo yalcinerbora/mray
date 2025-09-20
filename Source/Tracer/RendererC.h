@@ -145,7 +145,7 @@ concept RendererC = requires(RendererType rt,
     // These parameters are work related.
     // (Not used but exposed for future use maybe?)
     typename RendererType::RayStateList;
-    typename RendererType::SpectrumConverterContext;
+    typename RendererType::SpectrumContext;
     // Host side things
     typename RendererType::AttribInfoList;
 

@@ -34,30 +34,6 @@ TextureCPU_Normal<D, T>::TextureCPU_Normal(const GPUDeviceCPU& device,
 }
 
 template<uint32_t D, class T>
-TextureCPU_Normal<D, T>::TextureCPU_Normal(TextureCPU_Normal&& other) noexcept
-    : gpu(other.gpu)
-    , texParams(other.texParams)
-    , size(other.size)
-    , alignment(other.alignment)
-    , allocated(other.allocated)
-{}
-
-template<uint32_t D, class T>
-TextureCPU_Normal<D, T>& TextureCPU_Normal<D, T>::operator=(TextureCPU_Normal&& other) noexcept
-{
-    assert(&other != this);
-    gpu = other.gpu;
-    texParams = other.texParams;
-    allocated = other.allocated;
-    size = other.size;
-    alignment = other.alignment;
-    return *this;
-}
-
-template<uint32_t D, class T>
-TextureCPU_Normal<D, T>::~TextureCPU_Normal() = default;
-
-template<uint32_t D, class T>
 RWTextureRefCPU<D, T> TextureCPU_Normal<D, T>::GenerateRWRef(uint32_t mipLevel)
 {
     if(mipLevel >= texParams.mipCount)

@@ -23,7 +23,8 @@ struct BCColorConvParams
 };
 using BCColorConvParamList = std::array<BCColorConvParams, BC_TEX_PER_BATCH>;
 
-// Order is important here
+// Order is important here, this must match the enum order of "MrayColorSpaceEnum"
+// which will be used as such: "get<static_cast<int>(MR_ACES2065_1)>"
 template <MRayColorSpaceEnum E>
 using ConverterList = Tuple
 <
@@ -36,7 +37,8 @@ using ConverterList = Tuple
 >;
 
 // TODO: This cannot be alised or clang throws fatal error
-// Report.
+// Report (we have had using Tuple = std::tuple<...>, now Tuple is a class
+// so this error would not trigger but still we should report it to llvm).
 static constexpr auto ConverterLists = Tuple
 (
     ConverterList<MRayColorSpaceEnum::MR_ACES2065_1>{},
@@ -933,6 +935,13 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
     hTextureViews.reserve(textures.size());
     size_t totalTexSize = textures.size();
 
+    // TODO: We assume every texture has its own color space.
+    // If "ExtractLuminance" is called after colorspace conversion
+    // routine, we can get away with selecting the conversion function
+    // from host instead of template-generated if/else "InvokeAt" routine
+    // which may be faster? Investigate.
+    //
+    // PS: The InvokeAt will be pulled to the host side instead of GPU side.
     for(const GenericTexture* t : textures)
     {
         if(!t)

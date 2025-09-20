@@ -41,7 +41,8 @@ namespace SpanDetail
     template <class T, uint32_t Extent>
     struct SSpan
     {
-        T* MRAY_RESTRICT ptr;
+        T* MRAY_RESTRICT          ptr;
+        static constexpr uint32_t count = Extent;
     };
 
     // This is not available until C++23
@@ -77,7 +78,7 @@ class Span : public std::conditional_t<Extent == DynamicExtent,
 
     public:
     // Constructors & Destructor
-    constexpr                   Span() requires(IsDynamic);
+    constexpr           Span() requires(IsDynamic);
     // Ptr and Size
     explicit constexpr  Span(T* data, size_t size) noexcept;
     explicit constexpr  Span(NonConstType* data, size_t size) noexcept requires(IsConstPtr);

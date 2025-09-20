@@ -10,7 +10,6 @@
 
 #include "T_TextureTypes.h"
 
-
 template <uint32_t D, class T>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void CheckCheckerboardPattern(Span<uint8_t> dResults,

@@ -93,40 +93,43 @@ double AtomicAdd(double& t, double v)
     #endif
 }
 
-template<>
+template<class T>
 MR_GF_DEF
-Vector2 AtomicAdd(Vector2& t, Vector2 v)
+Vector<2, T> AtomicAdd(Vector<2, T>& t, Vector<2, T> v)
 {
     #ifdef __CUDA_ARCH__
-        static_assert(std::is_same_v<Float, float>,
-                      "\"Float\" must be 32-bit for "
-                      "this function! (TODO)");
-        Vector2 r;
-        #if __CUDA_ARCH__ >= 900
-            auto* tp = reinterpret_cast<float2*>(&t);
-            auto vv = float2{v[0], v[1]};
-            float2 out = atomicAdd(tp, vv);
-            r[0] = out.x;
-            r[1] = out.y;
-        #else
+        Vector<2, T> r;
+        if constexpr(std::is_same_v<T, float>)
+        {
+            #if __CUDA_ARCH__ >= 900
+                auto* tp = reinterpret_cast<float2*>(&t);
+                auto vv = float2{v[0], v[1]};
+                float2 out = atomicAdd(tp, vv);
+                r[0] = out.x;
+                r[1] = out.y;
+            #else
+                // Emulate with 2 atomics
+                r[0] = AtomicAdd(t[0], v[0]);
+                r[1] = AtomicAdd(t[1], v[1]);
+            #endif
+        }
+        else
+        {
             // Emulate with 2 atomics
             r[0] = AtomicAdd(t[0], v[0]);
             r[1] = AtomicAdd(t[1], v[1]);
-        #endif
+        }
         return r;
     #else
         return t + v;
     #endif
 }
 
-template<>
+template<class T>
 MR_GF_DEF
-Vector3 AtomicAdd(Vector3& t, Vector3 v)
+Vector<3, T> AtomicAdd(Vector<3, T>& t, Vector<3, T> v)
 {
-    static_assert(std::is_same_v<Float, float>,
-                  "\"Float\" must be 32-bit for this function! (TODO)");
-
-    Vector3 r;
+    Vector<3, T> r;
     // Emulate with 3 atomics
     r[0] = AtomicAdd(t[0], v[0]);
     r[1] = AtomicAdd(t[1], v[1]);
@@ -134,30 +137,37 @@ Vector3 AtomicAdd(Vector3& t, Vector3 v)
     return r;
 }
 
-template<>
+template<class T>
 MR_GF_DEF
-Vector4 AtomicAdd(Vector4& t, Vector4 v)
+Vector<4, T> AtomicAdd(Vector<4, T>& t, Vector<4, T> v)
 {
     #ifdef __CUDA_ARCH__
-        static_assert(std::is_same_v<Float, float>,
-                      "\"Float\" must be 32-bit for "
-                      "this function! (TODO)");
-        Vector4 r;
-        #if __CUDA_ARCH__ >= 900
-            auto* tp = reinterpret_cast<float4*>(&t);
-            auto vv = float4{v[0], v[1], v[2], v[3]};
-            float4 out = atomicAdd(tp, vv);
-            r[0] = out.x;
-            r[1] = out.y;
-            r[2] = out.z;
-            r[3] = out.w;
-        #else
-            // Emulate with 4 atomics
+        Vector<4, T> r;
+        if constexpr(std::is_same_v<T, float>)
+        {
+            #if __CUDA_ARCH__ >= 900
+                auto* tp = reinterpret_cast<float4*>(&t);
+                auto vv = float4{v[0], v[1], v[2], v[3]};
+                float4 out = atomicAdd(tp, vv);
+                r[0] = out.x;
+                r[1] = out.y;
+                r[2] = out.z;
+                r[3] = out.w;
+            #else
+                // Emulate with 4 atomics
+                r[0] = AtomicAdd(t[0], v[0]);
+                r[1] = AtomicAdd(t[1], v[1]);
+                r[2] = AtomicAdd(t[2], v[2]);
+                r[3] = AtomicAdd(t[3], v[3]);
+            #endif
+        }
+        else
+        {
             r[0] = AtomicAdd(t[0], v[0]);
             r[1] = AtomicAdd(t[1], v[1]);
             r[2] = AtomicAdd(t[2], v[2]);
             r[3] = AtomicAdd(t[3], v[3]);
-        #endif
+        }
         return r;
     #else
         return t + v;

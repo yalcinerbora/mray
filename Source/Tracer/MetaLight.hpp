@@ -264,7 +264,11 @@ Spectrum MetaLightViewT<V, ST>::EmitViaHit(const Vector3& wO,
             else
             {
                 HitType hitIn = hit.template AsVector<HitType::Dims>();
-                return sConv.Convert(l.EmitViaHit(wO, hitIn, rayCone));
+                // Lights are constructed with identity spectrum converter context
+                // since we need wavelength information for spectral rendering.
+                // Here we cast back to Vector3, last element is phony anyway.
+                Spectrum rgbRadiance = l.EmitViaHit(wO, hitIn, rayCone);
+                return sConv.ConvertRadiance(Vector3(rgbRadiance));
             }
         }
     });
@@ -281,7 +285,12 @@ Spectrum MetaLightViewT<V, ST>::EmitViaSurfacePoint(const Vector3& wO,
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
             return Spectrum::Zero();
-        else return sConv.Convert(l.EmitViaSurfacePoint(wO, surfacePoint, rayCone));
+        else
+        {
+            // See the comment above
+            Spectrum rgbRadiance = l.EmitViaSurfacePoint(wO, surfacePoint, rayCone);
+            return sConv.ConvertRadiance(Vector3(rgbRadiance));
+        }
     });
 }
 

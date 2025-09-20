@@ -8,6 +8,9 @@
 #include "Core/Types.h"
 #include "Device/GPUTypes.h"
 #include <cuda.h>
+#include <vector_types.h>
+#include <surface_types.h>
+#include <texture_types.h>
 
 namespace mray::cuda
 {

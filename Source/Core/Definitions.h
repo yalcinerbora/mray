@@ -56,7 +56,11 @@
 
 #if defined MRAY_GPU_BACKEND_CUDA
 
-    #include <cuda_runtime.h>
+    // Instead of cuda_runtime we include this to minimize
+    // inclusion time. We just need __device__ __host__ etc attributes.
+    // This is a header that we can include
+    // unlike <host_defines.h> with minimal side inclusions.
+    #include <device_types.h>
 
     #define MRAY_HYBRID __host__ __device__
     #define MRAY_GPU __device__
@@ -197,6 +201,37 @@
     #define MRAY_UNREACHABLE __assume(0)
 #endif
 
+// For hybrid functions near fatal errors should come from this.
+// Due to HIP does not have trap capabilities (as far as I understand,
+// AMD only provides full fatal crash of the entire **process** (not the device
+// context etc.). CUDA does support trap intrinsic which only crash the context.
+// (Although, recovering from that is almost impossible)
+//
+// On CPU side we just throw and hope somebody catches the error
+MR_HF_DEF void HybridTerminateOrTrap(const char* const info = nullptr)
+{
+    // We conditionally print the info since
+    // it affects register allocation.
+    // (only on GPU). On CPU we just throw.
+    #ifndef MRAY_DEVICE_CODE_PATH
+        throw std::exception(info);
+    #elif defined MRAY_DEVICE_CODE_PATH_CUDA
+        if constexpr(MRAY_IS_DEBUG)
+            printf("%s\n", info);
+        __trap();
+
+    #elif defined MRAY_DEVICE_CODE_PATH_HIP
+        if constexpr(MRAY_IS_DEBUG)
+            printf("%s\n", info);
+        abort();
+
+    #elif defined MRAY_DEVICE_CODE_PATH_CPU
+        throw std::exception(info);
+
+    #endif
+    //
+    MRAY_UNREACHABLE;
+}
 
 // TODO: Should come from build system
 #define MRAY_SPECTRA_PER_SPECTRUM 4
@@ -264,8 +299,8 @@ using Float = float;
 // Aliasing the byte here
 using Byte = std::byte;
 
-
-class EmptyType{};
+// Empty type is useful sometimes, so we define it here.
+class EmptyType {};
 
 // Idea is from here,
 // https://stackoverflow.com/questions/47495384/default-lambda-as-templated-parameter-of-a-function
@@ -277,7 +312,6 @@ struct EmptyFunctor
 
 // Common enumerations that many
 // internal libraries require
-
 enum class MRayDataEnum : uint16_t
 {
     MR_INT8,

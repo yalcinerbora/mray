@@ -303,7 +303,7 @@ template<size_t I, class... Types>
 using VariantAlternative = VariantDetail::VariantAlternative<I, Types...>;
 
 template<class T>
-static constexpr auto VariantSize = VariantDetail::VariantSizeV<T>::value;
+inline constexpr auto VariantSize = VariantDetail::VariantSizeV<T>::value;
 
 template <class... Ts>
 using UniqueVariant = typename VariantDetail::TypePackToVariant<UniqueTypePack<Ts...>>::Type;

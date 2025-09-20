@@ -174,41 +174,27 @@ concept ArrayLikeC = requires(T t, Span<const typename T::InnerType, T::Dims> sp
 };
 
 // Vector Concept
-// TODO: Check a better way to do this
+// https://stackoverflow.com/a/54182690
 template<class T>
-concept VectorC = (std::is_same_v<T, Vector2>   ||
-                   std::is_same_v<T, Vector3>   ||
-                   std::is_same_v<T, Vector4>   ||
-                   std::is_same_v<T, Vector2f>  ||
-                   std::is_same_v<T, Vector3f>  ||
-                   std::is_same_v<T, Vector4f>  ||
-                   std::is_same_v<T, Vector2d>  ||
-                   std::is_same_v<T, Vector3d>  ||
-                   std::is_same_v<T, Vector4d>  ||
-                   std::is_same_v<T, Vector2i>  ||
-                   std::is_same_v<T, Vector3i>  ||
-                   std::is_same_v<T, Vector4i>  ||
-                   std::is_same_v<T, Vector2ui> ||
-                   std::is_same_v<T, Vector3ui> ||
-                   std::is_same_v<T, Vector4ui> ||
-                   std::is_same_v<T, Vector2l>  ||
-                   std::is_same_v<T, Vector2ul> ||
-                   std::is_same_v<T, Vector3ul> ||
-                   std::is_same_v<T, Vector2s>  ||
-                   std::is_same_v<T, Vector2us> ||
-                   std::is_same_v<T, Vector3s>  ||
-                   std::is_same_v<T, Vector3us> ||
-                   std::is_same_v<T, Vector4s>  ||
-                   std::is_same_v<T, Vector4us> ||
-                   std::is_same_v<T, Vector2c>  ||
-                   std::is_same_v<T, Vector2uc> ||
-                   std::is_same_v<T, Vector3c>  ||
-                   std::is_same_v<T, Vector3uc> ||
-                   std::is_same_v<T, Vector4c>  ||
-                   std::is_same_v<T, Vector4uc>);
+concept VectorC = requires(T x)
+{
+    // Abuse CTAD
+    //
+    // Important! If you want to use this on your class, this is not a generic
+    // implementation. We abuse CTAD, and if this class had deduction guide(s),
+    // this would fail to filter some of the constructors i.e.:
+    //
+    //  template<class T>
+    //  Vector(T) -> Vector<3, T>;
+    //
+    // (Weird example for the vector but you get the idea)
+    //
+    { Vector{x} } -> std::same_as<T>;
+};
+static_assert(!VectorC<Float>, "This should not work");
 
 template<class T>
-concept FloatVectorC = (VectorC<T> && std::is_same_v<typename T::InnerType, Float>);
+concept FloatVectorC = (VectorC<T> && std::floating_point<typename T::InnerType>);
 
 template<class T>
 concept IntegralVectorC = (VectorC<T> && !FloatVectorC<T>);

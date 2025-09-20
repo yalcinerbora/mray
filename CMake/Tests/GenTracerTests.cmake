@@ -12,6 +12,7 @@ function(gen_tracer_test)
     set(SRC_COMMON
         ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
         ${CURRENT_SOURCE_DIR}/T_Random.cu
+        ${CURRENT_SOURCE_DIR}/T_Spectrum.cu
         ${CURRENT_SOURCE_DIR}/T_Filters.cu
         ${CURRENT_SOURCE_DIR}/T_RayPartitioner.cu
         ${CURRENT_SOURCE_DIR}/T_DefaultTriangle.cu
@@ -19,8 +20,7 @@ function(gen_tracer_test)
         ${CURRENT_SOURCE_DIR}/T_Distributions.cu
         ${CURRENT_SOURCE_DIR}/T_Materials.cu
         ${CURRENT_SOURCE_DIR}/T_StreamingTexture.cu
-        ${CURRENT_SOURCE_DIR}/T_RayCone.cu
-    )
+        ${CURRENT_SOURCE_DIR}/T_RayCone.cu)
 
     source_group("" FILES ${SRC_COMMON})
 
@@ -30,6 +30,7 @@ function(gen_tracer_test)
         ${GEN_TRACER_TEST_BACKEND}
         SOURCE_FILES
         ${CURRENT_SOURCE_DIR}/T_Random.cu
+        ${CURRENT_SOURCE_DIR}/T_Spectrum.cu
         ${CURRENT_SOURCE_DIR}/T_Filters.cu
         ${CURRENT_SOURCE_DIR}/T_RayPartitioner.cu
         ${CURRENT_SOURCE_DIR}/T_DefaultTriangle.cu
@@ -38,11 +39,14 @@ function(gen_tracer_test)
         ${CURRENT_SOURCE_DIR}/T_Materials.cu
         ${CURRENT_SOURCE_DIR}/T_StreamingTexture.cu
         ${CURRENT_SOURCE_DIR}/T_RayCone.cu
+        ${CURRENT_SOURCE_DIR}/T_Color.cu
     )
 
     set(TARGET_FULL_NAME "TTracer${GEN_TRACER_TEST_NAME}")
     set(TRACER_TARGET_FULL_NAME "Tracer${GEN_TRACER_TEST_NAME}")
+
     add_executable(${TARGET_FULL_NAME} ${SRC_COMMON})
+    set_target_properties(${TARGET_FULL_NAME} PROPERTIES OUTPUT_NAME "T_Tracer${GEN_TRACER_TEST_NAME}")
 
     target_link_libraries(${TARGET_FULL_NAME} PRIVATE
                           ${TRACER_TARGET_FULL_NAME}

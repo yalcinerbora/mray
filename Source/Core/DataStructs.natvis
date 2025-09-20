@@ -12,6 +12,19 @@
 
     </Type>
 
+    <Type Name="Span&lt;*&gt;">
+        <Intrinsic Name="data" Expression="ptr" />
+        <Intrinsic Name="size" Expression="count" />
+        <Intrinsic Name="size_bytes" Expression="size() * sizeof($T1)" />
+        <DisplayString>{{ size = {size()} }}</DisplayString>
+        <Expand>
+            <ArrayItems>
+                <Size>size()</Size>
+                <ValuePointer>data()</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+
     <Type Name="Vector&lt;2,*&gt;">
         <DisplayString>{{ {vector[0]}, {vector[1]} }}</DisplayString>
     </Type>

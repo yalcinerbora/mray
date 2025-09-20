@@ -102,6 +102,8 @@ void GPUQueueCUDA::IssueBlockKernel(std::string_view name,
         p.blockSize,
         p.sharedMemSize
     );
+    blockCount = Math::Min(blockCount, p.gridSize);
+
     //
     using namespace CudaKernelCalls;
     Kernel<<<blockCount, p.blockSize, p.sharedMemSize, stream>>>
@@ -134,6 +136,7 @@ void GPUQueueCUDA::IssueBlockLambda(std::string_view name,
         p.blockSize,
         p.sharedMemSize
     );
+    blockCount = Math::Min(blockCount, p.gridSize);
 
     KernelCallLambdaCUDA<Lambda, Bounds>
     <<<blockCount, p.blockSize, p.sharedMemSize, stream>>>
@@ -210,6 +213,7 @@ void GPUQueueCUDA::DeviceIssueBlockKernel(std::string_view name,
         p.blockSize,
         p.sharedMemSize
     );
+    blockCount = Math::Min(blockCount, p.gridSize);
 
     Kernel<<<blockCount, p.blockSize, p.sharedMemSize, stream>>>
     (
@@ -237,6 +241,7 @@ void GPUQueueCUDA::DeviceIssueBlockLambda(std::string_view name,
         p.blockSize,
         p.sharedMemSize
     );
+    blockCount = Math::Min(blockCount, p.gridSize);
 
     KernelCallLambdaCUDA<Lambda, Bounds>
     <<<blockCount, p.blockSize, p.sharedMemSize, stream>>>

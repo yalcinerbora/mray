@@ -10,6 +10,7 @@ set(SRC_COMMON
 source_group("" FILES ${SRC_COMMON})
 
 add_executable(TCore ${SRC_COMMON})
+set_target_properties(TCore PROPERTIES OUTPUT_NAME T_Core)
 
 target_link_libraries(TCore PRIVATE
                       CoreLib

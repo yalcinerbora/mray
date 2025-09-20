@@ -6,11 +6,11 @@
 namespace LambertMatDetail
 {
 
-template <class SpectrumTransformer>
+template <class SpectrumContext>
 MR_GF_DEF
-LambertMaterial<SpectrumTransformer>::LambertMaterial(const SpectrumConverter& specTransformer,
-                                                      const Surface& surface,
-                                                      const DataSoA& soa, MaterialKey mk)
+LambertMaterial<SpectrumContext>::LambertMaterial(const SpectrumConverter& specTransformer,
+                                                  const Surface& surface,
+                                                  const DataSoA& soa, MaterialKey mk)
     : surface(surface)
     , mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {
@@ -21,9 +21,9 @@ LambertMaterial<SpectrumTransformer>::LambertMaterial(const SpectrumConverter& s
     if(normalTex) optNormal = (*normalTex)(surface.uv, surface.dpdx, surface.dpdy);
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
+SampleT<BxDFResult> LambertMaterial<SC>::SampleBxDF(const Vector3&,
                                                     RNGDispenser& dispenser) const
 {
     using Distribution::Common::SampleCosDirection;
@@ -67,9 +67,9 @@ SampleT<BxDFResult> LambertMaterial<ST>::SampleBxDF(const Vector3&,
     };
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Float LambertMaterial<ST>::Pdf(const Ray& wI, const Vector3&) const
+Float LambertMaterial<SC>::Pdf(const Ray& wI, const Vector3&) const
 {
     using Distribution::Common::PDFCosDirection;
     Vector3 wILocal = surface.shadingTBN.ApplyRotation(wI.Dir());
@@ -79,9 +79,9 @@ Float LambertMaterial<ST>::Pdf(const Ray& wI, const Vector3&) const
     return Math::Max(pdf, Float(0));
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Spectrum LambertMaterial<ST>::Evaluate(const Ray& wI, const Vector3&) const
+Spectrum LambertMaterial<SC>::Evaluate(const Ray& wI, const Vector3&) const
 {
     // Check normal Mapping
     Quaternion toTangentSpace = surface.shadingTBN;
@@ -98,38 +98,38 @@ Spectrum LambertMaterial<ST>::Evaluate(const Ray& wI, const Vector3&) const
     return nDotL * albedo * MathConstants::InvPi<Float>();
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-bool LambertMaterial<ST>::IsEmissive() const
+bool LambertMaterial<SC>::IsEmissive() const
 {
     return false;
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Spectrum LambertMaterial<ST>::Emit(const Vector3&) const
+Spectrum LambertMaterial<SC>::Emit(const Vector3&) const
 {
     return Spectrum::Zero();
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Float LambertMaterial<ST>::Specularity() const
+Float LambertMaterial<SC>::Specularity() const
 {
     return Float(0);
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-RayConeSurface LambertMaterial<ST>::RefractRayCone(const RayConeSurface& r,
+RayConeSurface LambertMaterial<SC>::RefractRayCone(const RayConeSurface& r,
                                                    const Vector3&) const
 {
     return r;
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-bool LambertMaterial<ST>::IsAllTexturesAreResident(const Surface& s, const DataSoA& soa,
+bool LambertMaterial<SC>::IsAllTexturesAreResident(const Surface& s, const DataSoA& soa,
                                                    MaterialKey mk)
 {
     const auto& albedoTex = soa.dAlbedo[mk.FetchIndexPortion()];
@@ -146,18 +146,18 @@ bool LambertMaterial<ST>::IsAllTexturesAreResident(const Surface& s, const DataS
 namespace ReflectMatDetail
 {
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-ReflectMaterial<ST>::ReflectMaterial(const SpectrumConverter&,
+ReflectMaterial<SC>::ReflectMaterial(const SpectrumConverter&,
                                      const Surface& surface,
                                      const DataSoA& soa, MaterialKey mk)
     : surface(surface)
     , mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {}
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wO,
+SampleT<BxDFResult> ReflectMaterial<SC>::SampleBxDF(const Vector3& wO,
                                                     RNGDispenser&) const
 {
     // It is less operations to convert the normal to local space
@@ -182,53 +182,53 @@ SampleT<BxDFResult> ReflectMaterial<ST>::SampleBxDF(const Vector3& wO,
     };
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Float ReflectMaterial<ST>::Pdf(const Ray&, const Vector3&) const
+Float ReflectMaterial<SC>::Pdf(const Ray&, const Vector3&) const
 {
     // We can not sample this
     return Float(0);
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Spectrum ReflectMaterial<ST>::Evaluate(const Ray&, const Vector3&) const
+Spectrum ReflectMaterial<SC>::Evaluate(const Ray&, const Vector3&) const
 {
     return Spectrum(1);
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-bool ReflectMaterial<ST>::IsEmissive() const
+bool ReflectMaterial<SC>::IsEmissive() const
 {
     return false;
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Spectrum ReflectMaterial<ST>::Emit(const Vector3&) const
+Spectrum ReflectMaterial<SC>::Emit(const Vector3&) const
 {
     return Spectrum::Zero();
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Float ReflectMaterial<ST>::Specularity() const
+Float ReflectMaterial<SC>::Specularity() const
 {
     return Float(1);
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-RayConeSurface ReflectMaterial<ST>::RefractRayCone(const RayConeSurface& r,
+RayConeSurface ReflectMaterial<SC>::RefractRayCone(const RayConeSurface& r,
                                                    const Vector3&) const
 {
     return r;
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-bool ReflectMaterial<ST>::IsAllTexturesAreResident(const Surface&, const DataSoA&,
+bool ReflectMaterial<SC>::IsAllTexturesAreResident(const Surface&, const DataSoA&,
                                                    MaterialKey)
 {
     return true;
@@ -239,9 +239,9 @@ bool ReflectMaterial<ST>::IsAllTexturesAreResident(const Surface&, const DataSoA
 namespace RefractMatDetail
 {
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-RefractMaterial<ST>::RefractMaterial(const SpectrumConverter& sTransContext,
+RefractMaterial<SC>::RefractMaterial(const SpectrumConverter& sTransContext,
                                      const Surface& surface,
                                      const DataSoA& soa, MaterialKey mk)
     : surface(surface)
@@ -257,9 +257,9 @@ RefractMaterial<ST>::RefractMaterial(const SpectrumConverter& sTransContext,
     backIoR = CoeffsToIoR(soa.dBackCauchyCoeffs[mk.FetchIndexPortion()]);
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wO,
+SampleT<BxDFResult> RefractMaterial<SC>::SampleBxDF(const Vector3& wO,
                                                     RNGDispenser& rng) const
 {
     Float fromEta, toEta;
@@ -315,45 +315,45 @@ SampleT<BxDFResult> RefractMaterial<ST>::SampleBxDF(const Vector3& wO,
     };
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Float RefractMaterial<ST>::Pdf(const Ray&, const Vector3&) const
+Float RefractMaterial<SC>::Pdf(const Ray&, const Vector3&) const
 {
     // We can not sample this
     return Float(0);
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Spectrum RefractMaterial<ST>::Evaluate(const Ray&, const Vector3&) const
+Spectrum RefractMaterial<SC>::Evaluate(const Ray&, const Vector3&) const
 {
     return Spectrum(1);
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-bool RefractMaterial<ST>::IsEmissive() const
+bool RefractMaterial<SC>::IsEmissive() const
 {
     return false;
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Spectrum RefractMaterial<ST>::Emit(const Vector3&) const
+Spectrum RefractMaterial<SC>::Emit(const Vector3&) const
 {
     return Spectrum::Zero();
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Float RefractMaterial<ST>::Specularity() const
+Float RefractMaterial<SC>::Specularity() const
 {
     return Float(1);
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-RayConeSurface RefractMaterial<ST>::RefractRayCone(const RayConeSurface& rayConeSurfIn,
+RayConeSurface RefractMaterial<SC>::RefractRayCone(const RayConeSurface& rayConeSurfIn,
                                                    const Vector3& wO) const
 {
     auto Rotate2D_UL = [](Vector2 v, Float alpha) -> std::array<Vector2, 2>
@@ -470,9 +470,9 @@ RayConeSurface RefractMaterial<ST>::RefractRayCone(const RayConeSurface& rayCone
     return result;
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-bool RefractMaterial<ST>::IsAllTexturesAreResident(const Surface&, const DataSoA&,
+bool RefractMaterial<SC>::IsAllTexturesAreResident(const Surface&, const DataSoA&,
                                                    MaterialKey)
 {
     return true;
@@ -483,9 +483,9 @@ bool RefractMaterial<ST>::IsAllTexturesAreResident(const Surface&, const DataSoA
 namespace UnrealMatDetail
 {
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Float UnrealMaterial<ST>::MISRatio(Float avgAlbedo) const
+Float UnrealMaterial<SC>::MISRatio(Float avgAlbedo) const
 {
     // This function returns diffuse selection probability
     // Diffuse part
@@ -497,18 +497,18 @@ Float UnrealMaterial<ST>::MISRatio(Float avgAlbedo) const
     return (total == Float(0)) ? Float(0) : integralDiffuse / total;
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Float UnrealMaterial<ST>::ConvertProbHToL(Float VdH, Float pdfH) const
+Float UnrealMaterial<SC>::ConvertProbHToL(Float VdH, Float pdfH) const
 {
     // VNDFGGXSmithPDF returns sampling of H Vector
     // convert it to sampling probability of L Vector
     return (VdH == Float(0)) ? Float(0) : (pdfH / (Float(4) * VdH));
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Spectrum UnrealMaterial<ST>::CalculateF0() const
+Spectrum UnrealMaterial<SC>::CalculateF0() const
 {
     // https://blog.selfshadow.com/publications/s2012-shading-course/burley/s2012_pbs_disney_brdf_notes_v3.pdf
     // Utilizing proposed specular value to blend base color with specular parameter
@@ -517,11 +517,11 @@ Spectrum UnrealMaterial<ST>::CalculateF0() const
     return Math::Lerp(Spectrum(specOut), albedo, metallic);
 }
 
-template <class SpectrumTransformer>
+template <class SpectrumContext>
 MR_GF_DEF
-UnrealMaterial<SpectrumTransformer>::UnrealMaterial(const SpectrumConverter& specTransformer,
-                                                    const Surface& surface,
-                                                    const DataSoA& soa, MaterialKey mk)
+UnrealMaterial<SpectrumContext>::UnrealMaterial(const SpectrumConverter& specTransformer,
+                                                const Surface& surface,
+                                                const DataSoA& soa, MaterialKey mk)
     : surface(surface)
     , mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {
@@ -541,9 +541,9 @@ UnrealMaterial<SpectrumTransformer>::UnrealMaterial(const SpectrumConverter& spe
     }
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
+SampleT<BxDFResult> UnrealMaterial<SC>::SampleBxDF(const Vector3& wO,
                                                    RNGDispenser& dispenser) const
 {
     static constexpr int DIFFUSE = 0;
@@ -655,9 +655,9 @@ SampleT<BxDFResult> UnrealMaterial<ST>::SampleBxDF(const Vector3& wO,
     };
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Float UnrealMaterial<ST>::Pdf(const Ray& wI,
+Float UnrealMaterial<SC>::Pdf(const Ray& wI,
                               const Vector3& wO) const
 {
     using namespace Distribution;
@@ -696,9 +696,9 @@ Float UnrealMaterial<ST>::Pdf(const Ray& wI,
     return result;
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI, const Vector3& wO) const
+Spectrum UnrealMaterial<SC>::Evaluate(const Ray& wI, const Vector3& wO) const
 {
     using namespace Distribution;
     // Get the data first
@@ -755,23 +755,23 @@ Spectrum UnrealMaterial<ST>::Evaluate(const Ray& wI, const Vector3& wO) const
     return diffuseTerm + specularTerm;
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-bool UnrealMaterial<ST>::IsEmissive() const
+bool UnrealMaterial<SC>::IsEmissive() const
 {
     return false;
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Spectrum UnrealMaterial<ST>::Emit(const Vector3&) const
+Spectrum UnrealMaterial<SC>::Emit(const Vector3&) const
 {
     return Spectrum::Zero();
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-Float UnrealMaterial<ST>::Specularity() const
+Float UnrealMaterial<SC>::Specularity() const
 {
     // TODO: This should be in spectrum converter, for RGB factor will
     // be 0.33..3, but for other it will be 0.25
@@ -779,17 +779,17 @@ Float UnrealMaterial<ST>::Specularity() const
     return Float(1) - MISRatio(avgAlbedo);
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-RayConeSurface UnrealMaterial<ST>::RefractRayCone(const RayConeSurface& r,
+RayConeSurface UnrealMaterial<SC>::RefractRayCone(const RayConeSurface& r,
                                                   const Vector3&) const
 {
     return r;
 }
 
-template <class ST>
+template <class SC>
 MR_GF_DEF
-bool UnrealMaterial<ST>::IsAllTexturesAreResident(const Surface& surface,
+bool UnrealMaterial<SC>::IsAllTexturesAreResident(const Surface& surface,
                                                   const DataSoA& soa,
                                                   MaterialKey mk)
 {

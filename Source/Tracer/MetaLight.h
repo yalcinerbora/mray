@@ -237,7 +237,7 @@ class MetaLightArrayT
     using VariantPrimSoA = UniqueVariant<typename TypePackElement<0, TransformLightTuple>::PrimGroup::DataSoA...>;
     using VariantTransformSoA = UniqueVariant<typename TypePackElement<1, TransformLightTuple>::DataSoA...>;
     //
-    using IdentitySConverter = typename SpectrumConverterContextIdentity::Converter;
+    using IdentitySConverter = typename SpectrumContextIdentity::Converter;
     //
     using TLGroupPtrTuple = Tuple<TransformLightTuple*...>;
     // We will memcpy the SoA's these must be implicit lifetime types.

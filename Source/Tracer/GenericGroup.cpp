@@ -183,7 +183,6 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<TextureId> texIds,
                             "a correct type for, Attribute {:d}",
                             this->Name(), this->groupId,
                             static_cast<CommonKey>(texId), attributeIndex);
-            return std::vector<TracerTexView<D, T>>{};
         }
         result.push_back(std::get<ViewType>(view));
     }

@@ -110,7 +110,8 @@ namespace SurfRDetail
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MR_HF_DECL
     void WorkFunctionCommon(const Prim&, const Material&, const Surface&,
-                            const RayConeSurface&, const TContext&, RNGDispenser&,
+                            const RayConeSurface&, const TContext&,
+                            const SpectrumConverterIdentity&, RNGDispenser&,
                             const RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>& params,
                             RayIndex rayIndex);
 
@@ -118,13 +119,15 @@ namespace SurfRDetail
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     MR_HF_DECL
     void WorkFunctionFurnaceOrAO(const Prim&, const Material&, const Surface&,
-                                 const RayConeSurface&, const TContext&, RNGDispenser&,
+                                 const RayConeSurface&, const TContext&,
+                                 const SpectrumConverterIdentity&, RNGDispenser&,
                                  const RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>& params,
                                  RayIndex rayIndex);
 
     template<LightC Light, LightGroupC LG, TransformGroupC TG>
     MR_HF_DECL
     void LightWorkFunctionCommon(const Light&, RNGDispenser&,
+                                 const SpectrumConverterIdentity&,
                                  const RenderLightWorkParams<GlobalState, RayStateCommon, LG, TG>& params,
                                  RayIndex rayIndex);
 
@@ -135,7 +138,8 @@ template<PrimitiveC Prim, MaterialC Material,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MR_HF_DEF
 void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface& surf,
-                                     const RayConeSurface&, const TContext& tContext, RNGDispenser&,
+                                     const RayConeSurface&, const TContext& tContext,
+                                     const SpectrumConverterIdentity&, RNGDispenser&,
                                      const RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>& params,
                                      RayIndex rayIndex)
 {
@@ -242,7 +246,8 @@ template<PrimitiveC Prim, MaterialC Material,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
 MR_HF_DEF
 void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, const Surface& surf,
-                                          const RayConeSurface&, const TContext& tContext, RNGDispenser& rng,
+                                          const RayConeSurface&, const TContext& tContext,
+                                          const SpectrumConverterIdentity&, RNGDispenser& rng,
                                           const RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>& params,
                                           RayIndex rayIndex)
 {
@@ -305,6 +310,7 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
 template<LightC Light, LightGroupC LG, TransformGroupC TG>
 MR_HF_DEF
 void SurfRDetail::LightWorkFunctionCommon(const Light&, RNGDispenser&,
+                                          const SpectrumConverterIdentity&,
                                           const RenderLightWorkParams<GlobalState,
                                                                       RayStateCommon, LG, TG>& params,
                                           RayIndex rayIndex)

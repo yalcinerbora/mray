@@ -8,7 +8,7 @@ template<RendererC R, uint32_t I, PrimitiveGroupC PG,
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG, TG> params)
 {
-    using SpectrumConv  = typename R::SpectrumConverterContext;
+    using SpectrumConv  = typename R::SpectrumContext;
     // Define the types
     // First, this kernel uses a transform context.
     // This will be used to transform the primitive.
@@ -58,9 +58,11 @@ void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG, TG> p
         RayCone rayCone = params.in.dRayCones[rIndex].Advance(tMM[1]);
 
         // Get instantiation of converter
-        // TODO: Add spectrum related stuff, this should not be
-        // default constructed
-        typename SpectrumConv::Converter specConverter;
+        using SpecConverter = typename SpectrumConv::Converter;
+        // Converter is per ray, since it needs wavelengths of
+        // the current trace, which is accessed by rIndex.
+        SpecConverter specConverter = R::GenSpectrumConverter(params.globalState, rIndex);
+
         // Create transform context
         TransContext tContext = GenerateTransformContext(params.transSoA,
                                                          params.primSoA,
@@ -80,7 +82,7 @@ void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG, TG> p
                                  std::bit_cast<MaterialKey>(keys.lightOrMatKey));
         // Call the function
         WorkFunction(primitive, material, surface, rayConeSurface,
-                     tContext, rng, params, rIndex);
+                     tContext, specConverter, rng, params, rIndex);
         // All Done!
     }
 }
@@ -90,7 +92,7 @@ template<RendererC R, uint32_t I, LightGroupC LG, TransformGroupC TG,
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParamsR<R, I, LG, TG> params)
 {
-    using SpectrumConv = typename R::SpectrumConverterContext;
+    using SpectrumConv = typename R::SpectrumContext;
     //
     using PG = typename LG::PrimGroup;
     // Define the types
@@ -135,7 +137,7 @@ void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParamsR<R, I, LG,
         auto light = Light(specConverter, primitive, params.lightSoA, lKey);
 
         // Call the function
-        WorkFunction(light, rng, params, rIndex);
+        WorkFunction(light, rng, specConverter, params, rIndex);
         // All Done!
     }
 }

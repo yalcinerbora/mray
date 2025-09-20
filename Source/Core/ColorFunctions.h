@@ -3,7 +3,6 @@
 #include "Vector.h"
 #include "Matrix.h"
 #include "Types.h"
-#include "Error.h"
 
 namespace Color
 {
@@ -28,6 +27,14 @@ namespace Color
 
     MR_PF_DECL Vector3   YxyToXYZ(const Vector3& yXY) noexcept;
 
+    template<std::floating_point F>
+    MR_PF_DECL Vector<3, F> XYZToCIELab(const Vector<3, F>& xyz,
+                                        const Vector<3, F>& whitepoint) noexcept;
+
+    template<std::floating_point F>
+    MR_PF_DECL Vector<3, F> CIELabToXYZ(const Vector<3, F>& cieLab,
+                                        const Vector<3, F>& whitepoint) noexcept;
+
     MR_PF_DECL Matrix3x3 BradfordMatrix() noexcept;
 
     MR_PF_DECL Matrix3x3 InvBradfordMatrix() noexcept;
@@ -42,14 +49,60 @@ namespace Color
     // https://en.wikipedia.org/wiki/Standard_illuminant
     // Some whitepoints are commented out, current support
     // is only for a couple of color spaces
-    constexpr Vector2 D50Whitepoint = Vector2(0.34567, 0.35850);
-    constexpr Vector2 D55Whitepoint = Vector2(0.33242, 0.34743);
+    inline constexpr Vector2 D50Whitepoint = Vector2(0.34567, 0.35850);
+    inline constexpr Vector2 D55Whitepoint = Vector2(0.33242, 0.34743);
     // These are different
     // https://docs.acescentral.com/tb/white-point#comparison-of-the-aces-white-point-and-cie-d60
-    constexpr Vector2 D60Whitepoint = Vector2(0.32169, 0.33780);
-    constexpr Vector2 ACESWhitepoint = Vector2(0.32168, 0.33767);
-    constexpr Vector2 D65Whitepoint = Vector2(0.31272, 0.32903);
-    constexpr Vector2 D75Whitepoint = Vector2(0.29902, 0.31485);
+    inline constexpr Vector2 D60Whitepoint = Vector2(0.32169, 0.33780);
+    inline constexpr Vector2 ACESWhitepoint = Vector2(0.32168, 0.33767);
+    inline constexpr Vector2 D65Whitepoint = Vector2(0.31272, 0.32903);
+    inline constexpr Vector2 D75Whitepoint = Vector2(0.29902, 0.31485);
+
+    //
+    // Data from here: https://www.rit.edu/science/munsell-color-science-lab-educational-resources
+    // Now cie data[1] does not match this, so one of which is normalized maybe?
+    //
+    // [1]: https://cie.co.at/datatable/cie-1931-colour-matching-functions-2-degree-observer
+    inline constexpr Vector2ui CIE_1931_RANGE   = Vector2ui(360, 831);
+    inline constexpr Float CIE_1931_DELTA       = Float(1);
+    inline constexpr uint32_t CIE_1931_N        = CIE_1931_RANGE[1] - CIE_1931_RANGE[0];
+    // Data is on the CPP to reduce parsing maybe?
+    extern const std::array<Vector3, CIE_1931_N> CIE_1931_XYZ;
+    // Generated using this: https://draftdocs.acescentral.com/white-point/
+    // repo: https://github.com/ampas/aces-docs/blob/main/python/TB-2018-001/aces_wp.py
+    extern const std::array<Float, CIE_1931_N> D60_SPD;
+    extern const std::array<Float, CIE_1931_N> D65_SPD;
+    extern const std::array<Float, CIE_1931_N> D75_SPD;
+    // TODO: Where are these factors comes from?
+    // These are from here: https://github.com/mitsuba-renderer/rgb2spec
+    // (I've checked its not PWC integral, PWL(trapz) integral.
+    // So it must be something else?)
+    inline constexpr Float D60_SPD_NORM_FACTOR = Float(10536.3);
+    inline constexpr Float D65_SPD_NORM_FACTOR = Float(10566.864);
+    // TODO: Since I do not know how are these calculated and paper / refimpl
+    // do not have D75 whitepoint, setting it to D65 these are closeby so
+    // it should be fine I hope...
+    inline constexpr Float D75_SPD_NORM_FACTOR = D65_SPD_NORM_FACTOR;
+
+    // Ad-hoc fitted gaussian of full CIE 1931 Observer
+    // https://www.desmos.com/calculator/zepnypxnmd
+    inline constexpr Vector2 CIE_1931_MIS = Vector2(0.384615384615, 0.615384615385);
+    inline constexpr Vector2 CIE_1931_GAUSS_SIGMA = Vector2(25, 48);
+    inline constexpr Vector2 CIE_1931_GAUSS_MU = Vector2(452, 576);
+    static_assert(CIE_1931_MIS.Sum() == Float(1), "Wrong MIS Ratio for CIE_1931 Gaussians!");
+
+    const std::array<Float, CIE_1931_N>&
+    SelectIlluminantSPD(MRayColorSpaceEnum);
+
+    //
+    Float       SelectIlluminantSPDNormFactor(MRayColorSpaceEnum e);
+    Matrix3x3   SelectRGBToXYZMatrix(MRayColorSpaceEnum e);
+
+    static constexpr std::string_view LUT_FILE_CC = "MR_SPECTRA";
+    static constexpr std::string_view LUT_FILE_EXT = ".mrspectra";
+    // TODO: This should come from CMake, since build system uses it
+    // as well.
+    static constexpr std::string_view LUT_FOLDER_NAME = "SpectraLUT";
 
     MR_PF_DECL Primaries FindPrimaries(MRayColorSpaceEnum);
 
@@ -59,16 +112,18 @@ namespace Color
     template <MRayColorSpaceEnum E>
     class Colorspace
     {
-        private:
+        public:
         static constexpr Primaries Prims = FindPrimaries(E);
 
-        // Expose these for testing
-        public:
         static constexpr Matrix3x3 ToXYZMatrix = (E == MRayColorSpaceEnum::MR_DEFAULT)
             ? Matrix3x3::Identity()
             : (GenWhitepointMatrix(Prims.xyWhite, D65Whitepoint) * GenRGBToXYZ(Prims));
 
         static constexpr Matrix3x3 FromXYZMatrix = ToXYZMatrix.Inverse();
+
+        static constexpr Vector3 WhiteXYZ = GenWhitepointXYZ(Prims.xyWhite);
+
+        static constexpr auto Enum = E;
 
         public:
         Colorspace() = default;
@@ -177,6 +232,65 @@ MR_PF_DEF Vector3 Color::YxyToXYZ(const Vector3& yXY) noexcept
     Float y = yXY[0];
     Float z = (Float(1) - yXY[1] - yXY[2]) * yy;
     return Vector3(x, y, z);
+}
+
+template<std::floating_point F>
+MR_PF_DEF Vector<3, F> Color::XYZToCIELab(const Vector<3, F>& xyz,
+                                          const Vector<3, F>& whitepoint) noexcept
+{
+    // https://en.wikipedia.org/wiki/CIELAB_color_space
+    auto Func = [](F t)
+    {
+        constexpr F D = F(6) / F(29);
+        constexpr F DCube = D * D * D;
+        if(t > DCube)
+            return Math::Cbrt(t);
+        else
+        {
+            constexpr F Case2Factor = F(1) / (D * D * F(3));
+            constexpr F C = F(4) / F(29);
+            return t * Case2Factor + C;
+        }
+    };
+
+    F xN = Func(xyz[0] / whitepoint[0]);
+    F yN = Func(xyz[1] / whitepoint[1]);
+    F zN = Func(xyz[2] / whitepoint[2]);
+    F l = F(116) * yN - F(16);
+    F a = F(500) * (xN - yN);
+    F b = F(200) * (yN - zN);
+    return Vector<3, F>(l, a, b);
+}
+
+template<std::floating_point F>
+MR_PF_DEF Vector<3, F> Color::CIELabToXYZ(const Vector<3, F>& cieLab,
+                                          const Vector<3, F>& whitepoint) noexcept
+{
+    // https://en.wikipedia.org/wiki/CIELAB_color_space
+    auto FuncInv = [](F t)
+    {
+        constexpr F D = F(6) / F(29);
+        if(t > D)
+            return t * t * t;
+        else
+        {
+            constexpr F Case2Factor = F(3) * D * D;
+            constexpr F C = F(4) / F(29);
+            return t - C * Case2Factor;
+        }
+    };
+    constexpr F LFactor = F(1) / F(116);
+    constexpr F AFactor = F(1) / F(500);
+    constexpr F BFactor = F(1) / F(200);
+
+    F l = (cieLab[0] + F(16)) * LFactor;
+    F a = cieLab[1] * AFactor;
+    F b = cieLab[2] * BFactor;
+    //
+    F x = FuncInv(l + a)   * whitepoint[0];
+    F y = FuncInv(l)       * whitepoint[1];
+    F z = FuncInv(l - b)   * whitepoint[2];
+    return Vector<3, F>(x, y, z);
 }
 
 MR_PF_DEF Matrix3x3 Color::BradfordMatrix() noexcept
@@ -338,19 +452,8 @@ MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
         {
             return get<1>(*loc);
         }
-
-        #ifndef MRAY_DEVICE_CODE_PATH
-            // Throw as verbose as possible
-            throw MRayError("Unkown colorspace enumeration ({})! Enum should be "
-                            "\"{} <= E < {}\"",
-                            static_cast<uint32_t>(E), uint32_t(0),
-                            static_cast<uint32_t>(MR_END));
-        #elif defined MRAY_DEVICE_CODE_PATH_CUDA
-            // TODO: This is CUDA only
-            __trap();
-        #elif defined MRAY_DEVICE_CODE_PATH_HIP
-            abort();
-        #endif
+        HybridTerminateOrTrap("Unkown colorspace enumeration at "
+                              "\"Color::FindPrimaries\"!");
     }
     return Color::Primaries{};
 }

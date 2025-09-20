@@ -1,6 +1,8 @@
 #pragma once
 
+
 #include "Device/GPUTextureView.h"  // IWYU pragma: keep
+
 #include "TextureCommon.h"
 #include "SurfaceView.h"
 
@@ -23,7 +25,7 @@ Vector4 GenericRead(const Vector2ui& pixCoords,
 {
     Vector4 v = Visit
     (
-        std::as_const(surf),
+        surf,
         // Visitor
         [pixCoords](auto&& readSurf) -> Vector4
         {

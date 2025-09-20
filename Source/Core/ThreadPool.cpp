@@ -69,10 +69,10 @@ ThreadPool::ThreadPool(size_t queueSize)
     , completedTaskCount(0)
 {}
 
-ThreadPool::ThreadPool(uint32_t threadCount, size_t queueSize)
-    : ThreadPool(queueSize)
+ThreadPool::ThreadPool(InitParams p)
+    : ThreadPool(p.queueSize)
 {
-    RestartThreads(threadCount, ThreadInitFunction());
+    RestartThreads(p.threadCount, ThreadInitFunction());
 }
 
 ThreadPool::~ThreadPool()

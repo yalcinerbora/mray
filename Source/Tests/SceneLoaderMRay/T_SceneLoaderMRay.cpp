@@ -29,7 +29,7 @@ void SceneLoaderMRayTest::SetUp()
     unsigned int tCount = std::max(1u, std::thread::hardware_concurrency());
     pool = std::make_unique<ThreadPool>
     (
-        tCount,
+        typename ThreadPool::InitParams(tCount),
         [](std::thread::native_handle_type handle, uint32_t i)
         {
             RenameThread(handle, MRAY_FORMAT("{:03d}_[W]MRay", i));

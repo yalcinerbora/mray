@@ -76,6 +76,19 @@ MR_PF_DEF_V Matrix<N, T>::Matrix(const Matrix<M, T>& other) noexcept requires (M
 }
 
 template <unsigned int N, ArithmeticC T>
+template<std::convertible_to<T> C>
+MR_PF_DECL_V Matrix<N, T>::Matrix(const Matrix<N, C>& other)
+{
+    MRAY_UNROLL_LOOP
+    for(unsigned int i = 0; i < N; i++)
+    {
+        MRAY_UNROLL_LOOP
+        for(int j = 0; j < N; j++)
+            matrix[i * N + j] = T(other[i * N + j]);
+    }
+}
+
+template <unsigned int N, ArithmeticC T>
 MR_PF_DEF T& Matrix<N, T>::operator[](unsigned int i) noexcept
 {
     return matrix[i];

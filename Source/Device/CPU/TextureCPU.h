@@ -127,10 +127,10 @@ class TextureCPU_Normal
                         TextureCPU_Normal(const GPUDeviceCPU& device,
                                           const TextureInitParams<D>& p);
                         TextureCPU_Normal(const TextureCPU_Normal&) = delete;
-                        TextureCPU_Normal(TextureCPU_Normal&&) noexcept;
+                        TextureCPU_Normal(TextureCPU_Normal&&) noexcept = default;
     TextureCPU_Normal&  operator=(const TextureCPU_Normal&) = delete;
-    TextureCPU_Normal&  operator=(TextureCPU_Normal&&) noexcept;
-                        ~TextureCPU_Normal();
+    TextureCPU_Normal&  operator=(TextureCPU_Normal&&) noexcept = default;
+                        ~TextureCPU_Normal() = default;
 
     // Direct view conversion (simple case)
     template<class QT>
@@ -185,7 +185,7 @@ class TextureCPU_BC
     // Allocation related
     size_t  size        = 0;
     size_t  alignment   = 0;
-    bool    allocated = false;
+    bool    allocated   = false;
 
     protected:
     public:

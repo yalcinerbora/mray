@@ -27,6 +27,7 @@ set(SRC_INTERFACES
 set(SRC_MATH
     ${CURRENT_SOURCE_DIR}/AABB.h
     ${CURRENT_SOURCE_DIR}/AABB.hpp
+    ${CURRENT_SOURCE_DIR}/LinearAlg.h
     ${CURRENT_SOURCE_DIR}/Matrix.h
     ${CURRENT_SOURCE_DIR}/Matrix.hpp
     ${CURRENT_SOURCE_DIR}/Quaternion.h
@@ -51,6 +52,7 @@ set(SRC_TYPES
 set(SRC_UTILITY
     ${CURRENT_SOURCE_DIR}/Algorithm.h
     ${CURRENT_SOURCE_DIR}/ColorFunctions.h
+    ${CURRENT_SOURCE_DIR}/ColorFunctions.cpp
     ${CURRENT_SOURCE_DIR}/TypeNameGenerators.h
     ${CURRENT_SOURCE_DIR}/BitFunctions.h
     ${CURRENT_SOURCE_DIR}/MemAlloc.h

@@ -124,6 +124,12 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/Distributions.h
         ${CURRENT_SOURCE_DIR}/Distributions.cu)
 
+    set(SRC_SPECTRUM
+        ${CURRENT_SOURCE_DIR}/SpectrumContext.cu
+        ${CURRENT_SOURCE_DIR}/SpectrumContext.hpp
+        ${CURRENT_SOURCE_DIR}/SpectrumContext.h
+        ${CURRENT_SOURCE_DIR}/SpectrumC.h)
+
     set(SRC_UTILITY
         ${CURRENT_SOURCE_DIR}/Bitspan.h
         ${CURRENT_SOURCE_DIR}/RayPartitioner.h
@@ -157,6 +163,7 @@ function(gen_tracer_target)
         ${SRC_RENDERERS_TEX_VIEW}
         ${SRC_RENDERERS_SURFACE}
         ${SRC_RANDOM}
+        ${SRC_SPECTRUM}
         ${SRC_UTILITY}
         ${SRC_COMMON})
 
@@ -173,6 +180,7 @@ function(gen_tracer_target)
     source_group("Renderers" FILES ${SRC_RENDERERS})
     source_group("Renderers/Surface" FILES ${SRC_RENDERERS_SURFACE})
     source_group("Renderers/TexView" FILES ${SRC_RENDERERS_TEX_VIEW})
+    source_group("Spectrum" FILES ${SRC_SPECTRUM})
     source_group("Utility" FILES ${SRC_UTILITY})
     source_group("" FILES ${SRC_COMMON})
 
@@ -194,6 +202,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/Random.cu
         ${CURRENT_SOURCE_DIR}/Distributions.cu
         ${CURRENT_SOURCE_DIR}/RayPartitioner.cu
+        ${CURRENT_SOURCE_DIR}/SpectrumContext.cu
     )
 
     # Add sources for OptiX (Backend: CUDA, Enable HW Acceleration ON)

@@ -8,6 +8,8 @@ MRay: An interactive GPU-Based Renderer / Framework. MRay is extensible and perf
 > [!Note]
 > This readme is incomplete I will improve it in future. Please check the code and .json files for configuration and scene definition.
 
+[![MRay Docs](https://github.com/yalcinerbora/mray/actions/workflows/sphinx.yml/badge.svg)](https://github.com/yalcinerbora/mray/actions/workflows/sphinx.yml)
+
 ## Building
 
 ### Dependencies

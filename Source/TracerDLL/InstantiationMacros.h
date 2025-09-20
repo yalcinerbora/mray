@@ -11,7 +11,7 @@ static constexpr auto GetWorkFunction()
 {
     {
         using TC = typename PrimTransformContextType<PG, TG>::Result;
-        using M = typename MG:: template Material<typename R::SpectrumConverterContext>;
+        using M = typename MG:: template Material<typename R::SpectrumContext>;
         using P = typename PG:: template Primitive<TC>;
         using S = typename M::Surface;
         constexpr auto WF = R::template WorkFunctions<P, M, S, TC, PG, MG, TG>;
@@ -24,7 +24,7 @@ static constexpr auto GetLightWorkFunction()
     {
         using PG = typename LG::PrimGroup;
         using TC = typename PrimTransformContextType<PG, TG>::Result;
-        using L = typename LG::template Light<TC, typename R::SpectrumConverterContext>;
+        using L = typename LG::template Light<TC, typename R::SpectrumContext>;
         constexpr auto WF = R:: template LightWorkFunctions<L, LG, TG>;
         return get<I>(WF);
     }

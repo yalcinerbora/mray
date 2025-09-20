@@ -1,11 +1,12 @@
 #pragma once
 
 #include "PrimitiveC.h"
-#include "ParamVaryingData.h"
+#include "LightC.h"
+#include "SpectrumC.h"
 #include "TracerTypes.h"
+#include "ParamVaryingData.h"
 #include "Random.h"
 #include "Distributions.h"
-#include "LightC.h"
 #include "Bitspan.h"
 #include "ColorConverter.h"
 #include "Texture.h"
@@ -60,14 +61,14 @@ namespace LightDetail
     };
 
     // Meta Primitive Related Light
-    template<PrimitiveC PrimitiveT, class SpectrumTransformer = SpectrumConverterContextIdentity>
+    template<PrimitiveC PrimitiveT, class SpectrumContext = SpectrumContextIdentity>
     struct LightPrim
     {
-        using RadianceMap = typename SpectrumTransformer:: template RendererParamVaryingData<2>;
+        using RadianceMap = typename SpectrumContext:: template ParamVaryingRadiance<2>;
 
         public:
         using DataSoA           = LightData;
-        using SpectrumConverter = typename SpectrumTransformer::Converter;
+        using SpectrumConverter = typename SpectrumContext::Converter;
         using Primitive         = PrimitiveT;
         //
         static constexpr bool     IsPrimitiveBackedLight    = true;
@@ -108,14 +109,14 @@ namespace LightDetail
      // Meta Primitive Related Light
     template<CoordConverterC CoordConverter,
              TransformContextC TContext = TransformContextIdentity,
-             class SpectrumTransformer = SpectrumConverterContextIdentity>
+             class SpectrumContext = SpectrumContextIdentity>
     struct LightSkysphere
     {
-        using RadianceMap   = typename SpectrumTransformer:: template RendererParamVaryingData<2>;
+        using RadianceMap   = typename SpectrumContext:: template ParamVaryingRadiance<2>;
 
         public:
         using DataSoA           = LightSkysphereData;
-        using SpectrumConverter = typename SpectrumTransformer::Converter;
+        using SpectrumConverter = typename SpectrumContext::Converter;
         using Primitive         = EmptyPrimitive<TContext>;
         //
         static constexpr bool       IsPrimitiveBackedLight = false;
@@ -161,12 +162,12 @@ namespace LightDetail
     };
 
     template <TransformContextC TContext = TransformContextIdentity,
-              class SpectrumTransformer = SpectrumConverterContextIdentity>
+              class SpectrumContext = SpectrumContextIdentity>
     class LightNull
     {
         public:
         using DataSoA           = EmptyType;
-        using SpectrumConverter = typename SpectrumTransformer::Converter;
+        using SpectrumConverter = typename SpectrumContext::Converter;
         using Primitive         = EmptyPrimitive<TContext>;
         //
         static constexpr bool     IsPrimitiveBackedLight    = false;
@@ -226,7 +227,7 @@ class LightGroupPrim : public GenericGroupLight<LightGroupPrim<PrimGroupT>>
     using Primitive = typename PrimGroup:: template Primitive<TContext>;
     // Light Type
     template <class TransformContext = TransformContextIdentity,
-              class SpectrumConverterContext = SpectrumConverterContextIdentity>
+              class SpectrumConverterContext = SpectrumContextIdentity>
     using Light = typename LightDetail::LightPrim<Primitive<TransformContext>, SpectrumConverterContext>;
 
     private:
@@ -298,7 +299,7 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
     using Primitive     = EmptyPrimitive<TContext>;
     // Light Type
     template <class TransformContext = TransformContextIdentity,
-              class SpectrumConverterContext = SpectrumConverterContextIdentity>
+              class SpectrumConverterContext = SpectrumContextIdentity>
     using Light = typename LightDetail::LightSkysphere<CoordConverter, TransformContext, SpectrumConverterContext>;
 
     private:
@@ -369,8 +370,8 @@ class LightGroupNull : public GenericGroupLight<LightGroupNull>
     using Primitive = EmptyPrimitive<TContext>;
 
     template <class TContext = TransformContextIdentity,
-              class SpectrumTransformer = SpectrumConverterContextIdentity>
-    using Light = LightDetail::LightNull<TContext, SpectrumTransformer>;
+              class SpectrumContext = SpectrumContextIdentity>
+    using Light = LightDetail::LightNull<TContext, SpectrumContext>;
 
     private:
     const PrimGroup& primGroup;

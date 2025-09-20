@@ -40,7 +40,9 @@ function(gen_device_test)
 
     set(TARGET_FULL_NAME "TDevice${GEN_DEVICE_TEST_NAME}")
     set(DEVICE_TARGET_FULL_NAME "Device${GEN_DEVICE_TEST_NAME}")
+
     add_executable(${TARGET_FULL_NAME} ${SRC_COMMON})
+    set_target_properties(${TARGET_FULL_NAME} PROPERTIES OUTPUT_NAME "T_Device${GEN_DEVICE_TEST_NAME}")
 
     target_link_libraries(${TARGET_FULL_NAME} PRIVATE
                           ${DEVICE_TARGET_FULL_NAME}

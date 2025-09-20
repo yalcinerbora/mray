@@ -3,7 +3,10 @@
 void MRayError::AppendInfo(const std::string& s)
 {
     if(customInfo.empty())
+    {
+        type = MRayError::HAS_ERROR;
         customInfo = MRAY_FORMAT("{:s}", s);
+    }
     else
         customInfo += MRAY_FORMAT("|| {:s}", s);
 }

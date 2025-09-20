@@ -114,9 +114,13 @@ namespace Math
     template<FloatC T> MR_PF_DECL T SqrtMax(T) noexcept;
     template<FloatC T> MR_PF_DECL T RSqrt(T) noexcept;
     template<FloatC T> MR_PF_DECL T RSqrtMax(T) noexcept;
+    //
+    template<FloatC T> MR_PF_DECL T Cbrt(T) noexcept;
     // Graphics-related
     template<FloatC T> MR_PF_DECL T Lerp(T, T, T) noexcept;
     template<FloatC T> MR_PF_DECL T Smoothstep(T, T, T) noexcept;
+    template<FloatC T> MR_PF_DECL T InvSmoothstep(T t) noexcept;
+    template<FloatC T> MR_PF_DECL T InvSmoothstepApprox(T t) noexcept;
     // Misc.
     template<FloatC T> MR_PF_DECL bool IsNaN(T) noexcept;
     template<FloatC T> MR_PF_DECL bool IsInf(T) noexcept;
@@ -1081,6 +1085,25 @@ MR_PF_DEF T RSqrtMax(T x) noexcept
 }
 
 template<FloatC T>
+MR_PF_DEF T Cbrt(T x) noexcept
+{
+    if(std::is_constant_evaluated())
+    {
+        // TODO: Not accurate..
+        // https://stackoverflow.com/questions/18063755/computing-a-correctly-rounded-an-almost-correctly-rounded-floating-point-cubic
+        // Implement the njuffa here
+        return Pow(x, T(0.333333333333));
+    }
+    #ifndef MRAY_DEVICE_CODE_PATH
+        return std::cbrt(x);
+    #else
+        //
+        if constexpr(std::is_same_v<T, float>)  return cbrtf(x);
+        if constexpr(std::is_same_v<T, double>) return cbrt(x);
+    #endif
+}
+
+template<FloatC T>
 MR_PF_DEF T Lerp(T a, T b, T t) noexcept
 {
     assert(t >= T(0) && t <= T(1));
@@ -1093,7 +1116,38 @@ MR_PF_DEF T Smoothstep(T a, T b, T t) noexcept
     assert(t >= T(0) && t <= T(1));
     // https://en.wikipedia.org/wiki/Smoothstep
     t = Clamp((t - a) / (b - a), T{0}, T{1});
-    return t * t * (T{3} - T{2} *t);
+    return t * t * (T{3} - T{2} * t);
+}
+
+template<FloatC T>
+MR_PF_DEF T InvSmoothstep(T y) noexcept
+{
+    // It seems Smoothstep has analytic solution for its inverse.
+    // https://iquilezles.org/articles/ismoothstep/
+    assert(y >= T(0) && y <= T(1));
+    constexpr T FACTOR = T(1) / T(3);
+    return T(0.5) - Math::Sin(Math::ArcSin(T(1) - T(2) * y) * FACTOR);
+}
+
+template<FloatC T>
+MR_PF_DEF T InvSmoothstepApprox(T y) noexcept
+{
+    // Approximation does not give 0 and 1 directly,
+    // (function derivates at edges)
+    // this may be a problem, so we manually clamp here
+    if(y < MathConstants::Epsilon<T>()) return T(0);
+    if(y > T(1) - MathConstants::Epsilon) return T(1);
+
+    // Quite nice approximation,
+    // https://iradicator.com/fast-inverse-smoothstep/
+    assert(y >= T(0) && y <= T(1));
+    T yn = T(2) * y - T(1);
+    T absyn3 = Math::Abs(yn) * yn * yn;
+    T t = T(0.45) * yn + T(0.5) * yn * (absyn3 * absyn3 - T(0.9) * absyn3);
+    t -= (t * (T(4) * t * t - T(3)) + yn) / (T(12) * t * t - T(3));
+    // Second descend probably needed
+    t -= (t * (T(4) * t * t - T(3)) + yn) / (T(12) * t * t - T(3));
+    return t + T(0.5);
 }
 
 template<FloatC T>

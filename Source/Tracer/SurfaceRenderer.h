@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RendererC.h"
+#include "SpectrumC.h"
 #include "RayPartitioner.h"
 #include "SurfaceRendererShaders.h"
 
@@ -14,7 +15,7 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     static std::string_view TypeName();
     static AttribInfoList StaticAttributeInfo();
     //
-    using SpectrumConverterContext = SpectrumConverterContextIdentity;
+    using SpectrumContext = SpectrumContextIdentity;
     // Work States
     using GlobalStateList   = TypePack<SurfRDetail::GlobalState, SurfRDetail::GlobalState>;
     using RayStateList      = TypePack<SurfRDetail::RayStateCommon, SurfRDetail::RayStateAO>;
@@ -35,6 +36,11 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     };
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     static constexpr auto CamWorkFunctions = Tuple{};
+
+    // Spectrum Converter Generator
+    template<class GlobalState>
+    MR_HF_DECL
+    static SpectrumConverterIdentity GenSpectrumConverter(const GlobalState&, RayIndex rIndex);
 
     private:
     Options     currentOptions  = {};
@@ -130,3 +136,11 @@ using SurfaceRenderLightWork = RenderLightWork<R, LG, TG>;
 
 template<RendererC R, CameraGroupC CG, TransformGroupC TG>
 using SurfaceRenderCamWork = RenderCameraWork<R, CG, TG>;
+
+template<class GlobalState>
+MR_HF_DEF
+SpectrumConverterIdentity
+SurfaceRenderer::GenSpectrumConverter(const GlobalState&, RayIndex)
+{
+    return SpectrumConverterIdentity();
+}

@@ -180,13 +180,16 @@ GPUSystemCPU::GPUSystemCPU()
     uint32_t queueSize = Math::NextPowerOfTwo(std::thread::hardware_concurrency() * 128);
     localTP = std::make_unique<ThreadPool>
     (
-        std::thread::hardware_concurrency(),
+        typename ThreadPool::InitParams
+        {
+            .threadCount = std::thread::hardware_concurrency(),
+            .queueSize  = queueSize
+        },
         [](SystemThreadHandle handle, uint32_t id)
         {
             RenameThread(handle, MRAY_FORMAT("{:03d}_[G]MRay", id));
             ThreadInitFunction();
-        },
-        queueSize
+        }
     );
     // TODO: Check NUMA stuff:
     //  - Put a flag, to auto combine or split

@@ -20,21 +20,21 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
 
     public:
     // Constructors & Destructor
-    constexpr           Matrix() = default;
+    constexpr             Matrix() = default;
     template<std::convertible_to<T> C>
-    MR_PF_DECL_V explicit  Matrix(C) noexcept;
+    MR_PF_DECL_V explicit Matrix(C) noexcept;
     template<std::convertible_to<T> C>
-    MR_PF_DECL_V explicit  Matrix(Span<const C, N*N> data) noexcept;
+    MR_PF_DECL_V explicit Matrix(Span<const C, N*N> data) noexcept;
     template <class... Args>
-    MR_PF_DECL_V explicit  Matrix(const Args... dataList) noexcept
+    MR_PF_DECL_V explicit Matrix(const Args... dataList) noexcept
     requires (std::convertible_to<Args, T> && ...) && (sizeof...(Args) == N*N);
-
     template <class... Rows>
-    MR_PF_DECL_V explicit  Matrix(const Rows&... rows) noexcept
+    MR_PF_DECL_V explicit Matrix(const Rows&... rows) noexcept
     requires (std::is_same_v<Rows, Vector<N, T>> && ...) && (sizeof...(Rows) == N);
-
     template <unsigned int M>
-    MR_PF_DECL_V explicit  Matrix(const Matrix<M, T>&) noexcept requires (M > N);
+    MR_PF_DECL_V explicit Matrix(const Matrix<M, T>&) noexcept requires (M > N);
+    template<std::convertible_to<T> C>
+    MR_PF_DECL_V explicit Matrix(const Matrix<N, C>&);
 
     // Accessors
     MR_PF_DECL T&        operator[](unsigned int) noexcept;

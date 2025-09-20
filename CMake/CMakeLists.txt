@@ -72,7 +72,6 @@ if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA")
 
     set(CMAKE_CUDA_STANDARD 20)
     set(CMAKE_CUDA_STANDARD_REQUIRED True)
-    set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
     set(MRAY_PROJECT_GPU_LANGUAGES CUDA)
     set(MRAY_GPU_PLATFORM_NAME "CUDA")
 
@@ -197,6 +196,18 @@ cmake_path(GET CMAKE_CXX_COMPILER STEM MRAY_COMPILER_NAME)
 if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_CUDA")
     cmake_path(GET CMAKE_CUDA_COMPILER STEM MRAY_GPU_COMPILER_NAME)
     set(MRAY_GPU_COMPILER_VERSION ${CMAKE_CUDA_COMPILER_VERSION})
+
+    # We do not set the shared library when
+    # the CUDA version is later than 13
+    # since it has hybrid option which is not documented
+    # anywhere but nvcc warns that "shared" is deprecated.
+    #
+    # We will check "hybrid" later, currently it is defaulted to static
+    # which is fine I guess? Maybe extra binary on the DLL?
+    if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "13")
+        set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
+    endif()
+
 elseif(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
     cmake_path(GET CMAKE_HIP_COMPILER STEM MRAY_GPU_COMPILER_NAME)
     set(MRAY_GPU_COMPILER_VERSION ${CMAKE_HIP_COMPILER_VERSION})
@@ -243,8 +254,12 @@ if(MRAY_BUILD_VISOR)
     add_subdirectory(Visor)
 endif()
 
-# Generate Tracers
+# Generate Tracer executable (will be used by the tracers)
 add_subdirectory(TracerKernelGen)
+
+# Generate Spectra LUT routine executable (Jacob2019)
+add_subdirectory(SpectraLUTGen)
+
 # Skip device targets if disabled
 # It is for debugging reducing compile times
 # Thus, the parameter is inverted

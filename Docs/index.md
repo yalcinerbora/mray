@@ -1,7 +1,7 @@
 
 # MRay Documentation
 
-Welcome!!!!!
+Welcome to the MRay Dcoumentation!
 
 :::{important}
 

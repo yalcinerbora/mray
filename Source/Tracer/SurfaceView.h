@@ -1,8 +1,9 @@
 #pragma once
 
-#include "Core/Variant.h"
-#include "Device/GPUTextureView.h"
 #include "Device/GPUTexture.h"
+#include "Device/GPUTextureView.h"
+
+#include "Core/Variant.h"
 
 // TODO: YOLO variant is simplest implementation
 // hopefully compile times do not increase as much.
@@ -67,6 +68,10 @@ using SurfRefVariant = Variant
     RWTextureRef<2, Vector4s>
 >;
 
+// We do this just to forward declare
+// TODO: Inclusion of files due to GPU/CPU only code
+// is a mess currently. We need to restructure the headers etc.
+// hopefully sometime soon.
 struct TracerSurfView : public SurfViewVariant
 {
     using SurfViewVariant::SurfViewVariant;
@@ -77,5 +82,20 @@ struct TracerSurfRef : public SurfRefVariant
     using SurfRefVariant::SurfRefVariant;
 };
 
-static_assert(TracerSurfView::TD, "\"SurfViewVariant\" is GPU-facing."
+// This will create problem though, "VariantSize" could not
+// get resolved. We overload them
+namespace VariantDetail
+{
+    template<>
+    struct VariantSizeV<TracerSurfView>
+        : std::integral_constant<size_t, SurfViewVariant::TypeCount>
+    {};
+
+    template<>
+    struct VariantSizeV<TracerSurfRef>
+        : std::integral_constant<size_t, SurfRefVariant::TypeCount>
+    {};
+}
+
+static_assert(SurfViewVariant::TD, "\"SurfViewVariant\" is GPU-facing."
               " It's alternatives must be all trivially destructible");

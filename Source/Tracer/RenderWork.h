@@ -36,7 +36,6 @@ struct RenderWorkParams
     //
     using Inputs        = RenderWorkInputs;
     //
-    //Outputs     out;
     RayState    rayState;
     Inputs      in;
     GlobalState globalState;
@@ -315,7 +314,7 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
 {
     // Please check the kernel for details
     using TC = typename PrimTransformContextType<PG, TG>::Result;
-    using M = typename MG:: template Material<typename R::SpectrumConverterContext>;
+    using M = typename MG:: template Material<typename R::SpectrumContext>;
     using P = typename PG:: template Primitive<TC>;
     using S = typename M::Surface;
     static constexpr auto WF = R::template WorkFunctions<P, M, S, TC, PG, MG, TG>;
@@ -414,7 +413,7 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
     // Please check the kernel for details
     using PG    = typename LG::PrimGroup;
     using TC    = typename PrimTransformContextType<PG, TG>::Result;
-    using L     = typename LG::template Light<TC, typename R::SpectrumConverterContext>;
+    using L     = typename LG::template Light<TC, typename R::SpectrumContext>;
     static constexpr auto WF = R:: template LightWorkFunctions<L, LG, TG>;
 
     if constexpr(I >= WF.TypeCount)

@@ -9,6 +9,7 @@ set(SRC_COMMON
 source_group("" FILES ${SRC_COMMON})
 
 add_executable(TSceneLoaderMRay ${SRC_COMMON})
+set_target_properties(TSceneLoaderMRay PROPERTIES OUTPUT_NAME T_SceneLoaderMRay)
 
 target_link_libraries(TSceneLoaderMRay
                       PRIVATE

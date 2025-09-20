@@ -260,7 +260,21 @@ class ThreadPool
     using ThreadInitFunction = std::function<void(std::thread::native_handle_type, uint32_t)>;
     static constexpr uint32_t DefaultQueueSize = 512;
 
+    struct InitParams
+    {
+        uint32_t threadCount;
+        uint32_t queueSize = DefaultQueueSize;
+    };
+
     private:
+    // TODO: These are costly on top of that shared memory is costly
+    // and it has a bug on clang (see below) which does not generate some
+    // code.
+    // In the end we need to have a free list + a static arena allocator.
+    // (since MPMC queue size is static).
+    // It is not hard to implement anyway so we need to do it
+    // since sync_pool_resource uses a mutex over unsync_pool_resource
+    // which is lazy (it could've used a proper atomic stuff per pool etc.
     std::pmr::monotonic_buffer_resource     baseAllocator;
     std::pmr::synchronized_pool_resource    poolAllocator;
     //
@@ -281,11 +295,9 @@ class ThreadPool
     public:
     // Constructors & Destructor
                     ThreadPool(size_t queueSize = DefaultQueueSize);
-                    ThreadPool(uint32_t threadCount,
-                               size_t queueSize = DefaultQueueSize);
+                    ThreadPool(InitParams);
     template<ThreadInitFuncC InitFunction>
-                    ThreadPool(uint32_t threadCount, InitFunction&&,
-                               size_t queueSize = DefaultQueueSize);
+                    ThreadPool(InitParams, InitFunction&&);
                     ThreadPool(const ThreadPool&) = delete;
                     ThreadPool(ThreadPool&&) = delete;
     ThreadPool&     operator=(const ThreadPool&) = delete;
@@ -354,11 +366,10 @@ void TPCallable::operator()() const
 }
 
 template<ThreadInitFuncC InitFunction>
-ThreadPool::ThreadPool(uint32_t threadCount, InitFunction&& initFunction,
-                       size_t queueSize)
-    : ThreadPool(queueSize)
+ThreadPool::ThreadPool(InitParams p, InitFunction&& initFunction)
+    : ThreadPool(p.queueSize)
 {
-    RestartThreads(threadCount, initFunction);
+    RestartThreads(p.threadCount, std::forward<InitFunction>(initFunction));
 }
 
 template<ThreadInitFuncC InitFunction>

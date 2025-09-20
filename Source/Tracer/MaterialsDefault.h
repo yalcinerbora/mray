@@ -2,6 +2,7 @@
 
 #include "Texture.h"
 #include "MaterialC.h"
+#include "SpectrumC.h"
 #include "ParamVaryingData.h"
 #include "Random.h"
 
@@ -14,13 +15,13 @@ namespace LambertMatDetail
         Span<const MediumKeyPair>                       dMediumKeys;
     };
 
-    template <class SpectrumTransformer = SpectrumConverterContextIdentity>
+    template <class SpectrumContext = SpectrumContextIdentity>
     struct LambertMaterial
     {
         using Surface           = DefaultSurface;
         using OptionalNormalMap = Optional<TracerTexView<2, Vector3>>;
-        using AlbedoMap         = typename SpectrumTransformer:: template RendererParamVaryingData<2>;
-        using SpectrumConverter = typename SpectrumTransformer::Converter;
+        using AlbedoMap         = typename SpectrumContext:: template ParamVaryingAlbedo<2>;
+        using SpectrumConverter = typename SpectrumContext::Converter;
         using DataSoA           = LambertMatData;
         //
         static constexpr uint32_t SampleRNCount = 2;
@@ -62,11 +63,11 @@ namespace ReflectMatDetail
         Span<const MediumKeyPair>  dMediumKeys;
     };
 
-    template <class SpectrumTransformer = SpectrumConverterContextIdentity>
+    template <class SpectrumContext = SpectrumContextIdentity>
     struct ReflectMaterial
     {
         using Surface           = DefaultSurface;
-        using SpectrumConverter = typename SpectrumTransformer::Converter;
+        using SpectrumConverter = typename SpectrumContext::Converter;
         using DataSoA           = ReflectMatData;
         //
         static constexpr uint32_t SampleRNCount = 0;
@@ -106,11 +107,11 @@ namespace RefractMatDetail
         Span<const Vector3>         dBackCauchyCoeffs;
     };
 
-    template <class SpectrumTransformer = SpectrumConverterContextIdentity>
+    template <class SpectrumContext = SpectrumContextIdentity>
     struct RefractMaterial
     {
         using Surface           = DefaultSurface;
-        using SpectrumConverter = typename SpectrumTransformer::Converter;
+        using SpectrumConverter = typename SpectrumContext::Converter;
         using DataSoA           = RefractMatData;
         //
         static constexpr uint32_t SampleRNCount = 0;
@@ -159,12 +160,12 @@ namespace UnrealMatDetail
         Span<const MediumKeyPair>                       dMediumKeys;
     };
 
-    template <class SpectrumTransformer = SpectrumConverterContextIdentity>
+    template <class SpectrumContext = SpectrumContextIdentity>
     struct UnrealMaterial
     {
         using Surface           = DefaultSurface;
-        using AlbedoMap         = typename SpectrumTransformer:: template RendererParamVaryingData<2>;
-        using SpectrumConverter = typename SpectrumTransformer::Converter;
+        using AlbedoMap         = typename SpectrumContext:: template ParamVaryingAlbedo<2>;
+        using SpectrumConverter = typename SpectrumContext::Converter;
         using FloatMap          = ParamVaryingData<2, Float>;
         using OptionalNormalMap = Optional<TracerTexView<2, Vector3>>;
         using DataSoA           = UnrealMatData;
@@ -215,7 +216,7 @@ class MatGroupLambert final : public GenericGroupMaterial<MatGroupLambert>
 {
     public:
     using DataSoA   = LambertMatDetail::LambertMatData;
-    template<class STContext = SpectrumConverterContextIdentity>
+    template<class STContext = SpectrumContextIdentity>
     using Material  = LambertMatDetail::LambertMaterial<STContext>;
     using Surface   = typename Material<>::Surface;
 
@@ -273,7 +274,7 @@ class MatGroupReflect final : public GenericGroupMaterial<MatGroupReflect>
 {
     public:
     using DataSoA   = ReflectMatDetail::ReflectMatData;
-    template<class STContext = SpectrumConverterContextIdentity>
+    template<class STContext = SpectrumContextIdentity>
     using Material  = ReflectMatDetail::ReflectMaterial<STContext>;
     using Surface   = typename Material<>::Surface;
 
@@ -329,7 +330,7 @@ class MatGroupRefract final : public GenericGroupMaterial<MatGroupRefract>
 {
     public:
     using DataSoA   = RefractMatDetail::RefractMatData;
-    template<class STContext = SpectrumConverterContextIdentity>
+    template<class STContext = SpectrumContextIdentity>
     using Material  = RefractMatDetail::RefractMaterial<STContext>;
     using Surface   = typename Material<>::Surface;
 
@@ -387,7 +388,7 @@ class MatGroupUnreal final : public GenericGroupMaterial<MatGroupUnreal>
 {
     public:
     using DataSoA   = UnrealMatDetail::UnrealMatData;
-    template<class STContext = SpectrumConverterContextIdentity>
+    template<class STContext = SpectrumContextIdentity>
     using Material  = UnrealMatDetail::UnrealMaterial<STContext>;
     using Surface   = typename Material<>::Surface;
 

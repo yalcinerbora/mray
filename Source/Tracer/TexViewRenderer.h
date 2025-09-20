@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RendererC.h"
+#include "SpectrumC.h"
 
 class TexViewRenderer final : public RendererT<TexViewRenderer>
 {
@@ -10,7 +11,7 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
 
     using GlobalStateList   = TypePack<>;
     using RayStateList      = TypePack<>;
-    using SpectrumConverterContext = SpectrumConverterContextIdentity;
+    using SpectrumContext = SpectrumContextIdentity;
 
     template<PrimitiveC P, MaterialC M, class S, class TContext,
              PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
@@ -21,6 +22,11 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
 
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     static constexpr auto CamWorkFunctions = Tuple{};
+
+    // Spectrum Converter Generator
+    template<class GlobalState>
+    MR_HF_DECL
+    static SpectrumConverterIdentity GenSpectrumConverter(const GlobalState&, RayIndex rIndex);
 
     enum Mode
     {
