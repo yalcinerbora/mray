@@ -120,6 +120,7 @@ Error PassGenSpectraToRGB(// Output
     const Mat3F& XYZToRGB = convMatrices.xyzToRGB;
 
     // Grid stride loop
+    Vec3F localWhiteSum = Vec3F::Zero();
     for(uint32_t i = passRange[0]; i < passRange[1]; i++)
     {
         Vec3F xyz = Vec3F(cie1931_XYZ[i]);
@@ -128,10 +129,11 @@ Error PassGenSpectraToRGB(// Output
         spectraToRGB[i] = (XYZToRGB * xyz) * I * weight;
 
         Vec3F wpFraction = xyz * I * weight;
-        std::atomic_ref(whitepoint[0]).fetch_add(wpFraction[0]);
-        std::atomic_ref(whitepoint[1]).fetch_add(wpFraction[1]);
-        std::atomic_ref(whitepoint[2]).fetch_add(wpFraction[2]);
+        localWhiteSum += wpFraction;
     }
+    std::atomic_ref(whitepoint[0]).fetch_add(localWhiteSum[0]);
+    std::atomic_ref(whitepoint[1]).fetch_add(localWhiteSum[1]);
+    std::atomic_ref(whitepoint[2]).fetch_add(localWhiteSum[2]);
     return Error{.hasError = false};
 }
 
@@ -148,6 +150,10 @@ auto OptimizePolynomial(const Vec3F& rgb,
         Vec3F     coeffs;
         FloatType error;
     };
+
+    using Color::XYZToCIELab;
+    const Mat3F& RGBToXYZ = convMatrices.rgbToXYZ;
+    Vec3F rgbLab = XYZToCIELab<FloatType>(RGBToXYZ * rgb, whitepoint);
 
     auto EvaluateResidual = [&](Vec3F coeffs)
     {
@@ -172,19 +178,8 @@ auto OptimizePolynomial(const Vec3F& rgb,
             //
             integralResult += dSpectraToRGB[i] * s;
         }
-        using Color::XYZToCIELab;
-        // Colorspace "ToXYZ" function also converts to a common whitepoint
-        // (D65), but here we don't want I guess? So we just generate the
-        // matrix ourselves and multiply.
-        const Mat3F& RGBToXYZ = convMatrices.rgbToXYZ;
-
-        // TODO: We will lose precision here when FloatType is double.
-        // We only have generic "Float" (which is "float" by default)
-        // functions in Color namespace. Check if this reduction of accuracy
-        // is unacceptable.
         Vec3F diff = XYZToCIELab<FloatType>(RGBToXYZ * integralResult, whitepoint);
-        Vec3F residual = XYZToCIELab<FloatType>(RGBToXYZ * rgb, whitepoint);
-        return residual - diff;
+        return rgbLab - diff;
     };
     //
     Vec3F coeffs = initialGuess;
@@ -224,7 +219,7 @@ auto OptimizePolynomial(const Vec3F& rgb,
             Vec3F r0 = coeffs; r0[i] -= EPSILON;
             r0 = EvaluateResidual(r0);
 
-            Vec3F r1 = coeffs; r0[i] += EPSILON;
+            Vec3F r1 = coeffs; r1[i] += EPSILON;
             r1 = EvaluateResidual(r1);
 
             constexpr FloatType Factor = FloatType(0.5) / EPSILON;
@@ -611,7 +606,7 @@ int main(int argc, const char* argv[])
     uint32_t mode = 1;
     outFile.write(reinterpret_cast<const char*>(&mode), sizeof(uint32_t));
     // The actual data
-    outFile.write(reinterpret_cast<const char*>(outputLUT.data()),  outputLUT.size_bytes());
+    outFile.write(reinterpret_cast<const char*>(outputLUT.data()), outputLUT.size_bytes());
     // All Done!
 
     //for(uint32_t l = 0; l < 3; l++)

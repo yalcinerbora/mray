@@ -73,7 +73,7 @@ void TestJakob2019Pipeline(MRayColorSpaceEnum CS, WavelengthSampleMode MODE)
     std::array TEST_COLORS =
     {
         //Vector3(0.5, 0.5, 0.5)
-        Vector3(0.5, 0, 0)
+        Vector3(0.9, 0, 0)
 
         //Vector3(0, 0, 0),   // Black
         //Vector3(1, 1, 1),   // White
@@ -96,13 +96,13 @@ void TestJakob2019Pipeline(MRayColorSpaceEnum CS, WavelengthSampleMode MODE)
         TEST_COLORS[i] = Vector3(dist(rng), dist(rng), dist(rng));
 
 
-    // Initialize spectrum context
-    //GPUSystem gpuSystem;
-    ThreadPool tp(typename ThreadPool::InitParams(1));
-    GPUSystem gpuSystem(tp);
+    GPUSystem gpuSystem;
+    //ThreadPool tp(typename ThreadPool::InitParams(1));
+    //GPUSystem gpuSystem(tp);
 
     const GPUDevice& device = gpuSystem.BestDevice();
     const GPUQueue& queue = device.GetComputeQueue(0);
+    // Initialize spectrum context
     auto specContext = SpectrumContextJakob2019(CS, MODE, gpuSystem);
 
     static constexpr auto TOTAL_SAMPLE_COUNT = TEST_COLORS.size() * SAMPLE_COUNT;

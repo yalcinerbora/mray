@@ -737,9 +737,10 @@ constexpr auto Visit(VariantT&& v, Func&& f) -> decltype(auto)
 {
     using namespace VariantDetail;
     assert(v.Index() < VariantSize<std::remove_cvref_t<VariantT>>);
-    return IfElseVisitImpl(UIntTConst<0>{}, std::forward<VariantT>(v), std::forward<Func>(f));
+    // TODO: ICE on NVCC when if / else is used on color converter (only on GTX1080, old CC)
+    //return IfElseVisitImpl(UIntTConst<0>{}, std::forward<VariantT>(v), std::forward<Func>(f));
     // TODO: Enable / Disable this depending on the performance.
-    //return SwitchCaseVisitImpl(UIntTConst<0>{}, std::forward<VariantT>(v), std::forward<Func>(f));
+    return SwitchCaseVisitImpl(UIntTConst<0>{}, std::forward<VariantT>(v), std::forward<Func>(f));
 }
 
 template<class Func, class... Args>

@@ -368,21 +368,6 @@ SpectrumContextJakob2019::LoadSpectraLUT(MRayColorSpaceEnum globalColorSpace,
     }
 
     fences[otherI].Wait();
-
-    //for(uint32_t l = 0; l < 3; l++)
-    //for(uint32_t k = 0; k < 10; k++)
-    //for(uint32_t j = 0; j < 10; j++)
-    //for(uint32_t i = 0; i < 10; i++)
-    //{
-    //    Vector3 uv = (Vector3(i, j, k) + Vector3(0.5)) / Vector3(64);
-
-    //    Vector3 c = Vector3(outputTextures[l * 3 + 0].View<Float>()(uv),
-    //                        outputTextures[l * 3 + 1].View<Float>()(uv),
-    //                        outputTextures[l * 3 + 2].View<Float>()(uv));
-    //    MRAY_LOG("[{}][{}] = {:.9f}, {:.9f}, {:.9f}",
-    //             l, Vector3ui(i, j, k).AsArray(), c[0], c[1], c[2]);
-    //}
-
     return outputTextures;
 }
 
