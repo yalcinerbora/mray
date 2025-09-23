@@ -116,7 +116,7 @@ Spectrum Converter::ConvertAlbedo(const Vector3& rgb) const noexcept
     // and evaluation of the polynomial
     Vector3 coeffs = FetchCoeffs(maxI, uv);
     Spectrum result;
-    static constexpr auto WAVE_COUNT = SpectrumWaves::Dims;
+    static constexpr auto WAVE_COUNT = SpectraPerSpectrum;
     MRAY_UNROLL_LOOP_N(WAVE_COUNT)
     for(uint32_t i = 0; i < WAVE_COUNT; i++)
         result[i] = EvalPolynomial(coeffs, wavelengths[i]);

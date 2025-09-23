@@ -654,7 +654,7 @@ Optional<Spectrum> Common::RussianRoulette(Spectrum throughput,
     if(xi >= probability)
         return std::nullopt;
     else
-        return throughput * Float(1) / probability;
+        return throughput * (Float(1) / probability);
 }
 
 template<uint32_t N>
@@ -685,7 +685,7 @@ Spectrum Medium::WavesToSpectrumCauchy(const SpectrumWaves& waves,
 {
     Spectrum result;
     MRAY_UNROLL_LOOP
-    for(uint32_t i = 0; i < SpectrumWaves::Dims; i++)
+    for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
     {
         Float w2 = waves[i] * waves[i];
         Float w4 = w2 * w2;

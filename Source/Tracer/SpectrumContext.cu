@@ -164,8 +164,11 @@ Spectrum ConvertSpectraToRGBSingle(const Spectrum& value, const SpectrumWaves& w
     static constexpr Vector3 CIE_SUM = Vector3(CIE_1931_X_INTEGRAL,
                                                CIE_1931_Y_INTEGRAL,
                                                CIE_1931_Z_INTEGRAL);
-    static constexpr auto WEIGHT = Vector3(1) / (CIE_SUM * SPS);
-    xyzTotal *= WEIGHT;
+    static constexpr auto W_SINGLE = Vector3(1) / (CIE_SUM);
+    static constexpr auto W_MULTI = Vector3(1) / (CIE_SUM * SPS);
+    // Only compansate for that if the rays are not dispersed.
+    if(waves.IsDispersed()) xyzTotal *= W_SINGLE;
+    else                    xyzTotal *= W_MULTI;
 
     Spectrum result = Spectrum(sXYZToRGB * xyzTotal, 0);
     return result;

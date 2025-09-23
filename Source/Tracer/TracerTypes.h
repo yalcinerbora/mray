@@ -106,8 +106,23 @@ struct alignas(8) ImageCoordinate
 template <unsigned int SPS, std::floating_point T>
 using SpectrumT = Vector<SPS, T>;
 
+// TODO: CRTP
 template <unsigned int SPS, std::floating_point T>
-using SpectrumWavesT = Vector<SPS, T>;
+struct SpectrumWavesT : private Vector<SPS, T>
+{
+    using Base = Vector<SPS, T>;
+    static constexpr auto DISPERSED_WAVE = Float(-1);
+
+    // Imported Members
+    using Base::Base;
+    using Base::operator[];
+    using Base::operator=;
+    using Base::operator==;
+    using Base::operator!=;
+
+    MR_PF_DECL_V void DisperseSecondaryWaves();
+    MR_PF_DECL   bool IsDispersed() const;
+};
 
 // Actual spectrum for this compilation
 // For RGB values this should at least be 3
@@ -341,4 +356,23 @@ std::array<Vector3, 2> RayCone::Project(Vector3 f, Vector3 d) const noexcept
     Vector3 a1 = EllipseAxes(h1);
     Vector3 a2 = EllipseAxes(h2);
     return {a1, a2};
+}
+
+template <unsigned int SPS, std::floating_point T>
+MR_PF_DEF_V
+void SpectrumWavesT<SPS, T>::DisperseSecondaryWaves()
+{
+    MRAY_UNROLL_LOOP_N(SPS)
+    for(uint32_t i = 1; i < SPS; i++)
+        this->operator[](i) = DISPERSED_WAVE;
+}
+
+template <unsigned int SPS, std::floating_point T>
+MR_PF_DEF
+bool SpectrumWavesT<SPS, T>::IsDispersed() const
+{
+    if constexpr(SPS == 1) return false;
+    // Don't bother checking the rest if the second one is gone,
+    // all gone
+    else return this->operator[](1) == DISPERSED_WAVE;
 }
