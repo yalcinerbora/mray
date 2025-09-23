@@ -6,10 +6,11 @@
 #include "Device/GPUTexture.h"
 
 // TODO: Move this to a user facing system (user can set this via config etc.
-enum WavelengthSampleMode : uint32_t
+enum class WavelengthSampleMode : uint32_t
 {
     UNIFORM,
-    GAUSSIAN_MIS
+    GAUSSIAN_MIS,
+    PBRT_HYBERBOLIC
 };
 
 // Jakob2019 Spectrum to RGB
@@ -74,6 +75,7 @@ class SpectrumContextJakob2019
 
     public:
     using Converter = Jacob2019Detail::Converter;
+    using Data      = Jacob2019Detail::Data;
     // Texture-backed Data
     template<uint32_t DIMS>
     using ParamVaryingAlbedo = SpectralParamVaryingData<Converter, DIMS, false>;
@@ -88,6 +90,7 @@ class SpectrumContextJakob2019
     LUTTextureList          lutTextures;
     Jacob2019Detail::Data   data;
     WavelengthSampleMode    sampleMode;
+    MRayColorSpaceEnum      colorSpace;
 
     // Helpers
     LUTTextureList LoadSpectraLUT(MRayColorSpaceEnum globalColorSpace,
@@ -105,25 +108,25 @@ class SpectrumContextJakob2019
             ~SpectrumContextJakob2019() = default;
 
     // Methods...
-    Jacob2019Detail::Data Data() const;
+    Jacob2019Detail::Data GetData() const;
 
     //
     void SampleSpectrumWavelengths(// Output
                                    Span<SpectrumWaves> dWavelengths,
                                    Span<Spectrum> dThroughputs,
                                    // I-O
-                                   Span<BackupRNGState> dRNGStates,
+                                   Span<const RandomNumber> dRandomNumbers,
                                    // Constants
-                                   const GPUQueue& queue);
+                                   const GPUQueue& queue) const;
     void SampleSpectrumWavelengthsIndirect(// Output
                                            Span<SpectrumWaves> dWavelengths,
                                            Span<Spectrum> dThroughputs,
-                                           // I-O
-                                           Span<BackupRNGState> dRNGStates,
                                            // Input
+                                           Span<const RandomNumber> dRandomNumbers,
                                            Span<const RayIndex> dRayIndices,
                                            // Constants
-                                           const GPUQueue& queue);
+                                           const GPUQueue& queue) const;
+    uint32_t SampleSpectrumRNCount() const;
 
     //
     void ConvertSpectrumToRGB(// I-O
@@ -131,21 +134,35 @@ class SpectrumContextJakob2019
                               // Input
                               Span<const SpectrumWaves> dWavelengths,
                               // Constants
-                              const GPUQueue& queue);
+                              const GPUQueue& queue) const;
     void ConvertSpectrumToRGBIndirect(// I-O
                                       Span<Spectrum> dValues,
                                       // Input
                                       Span<const SpectrumWaves> dWavelengths,
                                       Span<const RayIndex> dRayIndices,
                                       // Constants
-                                      const GPUQueue& queue);
-
+                                      const GPUQueue& queue) const;
+    //
+    MRayColorSpaceEnum  ColorSpace() const;
+    size_t              GPUMemoryUsage() const;
 };
 
 inline Jacob2019Detail::Data
-SpectrumContextJakob2019::Data() const
+SpectrumContextJakob2019::GetData() const
 {
     return data;
+}
+
+inline MRayColorSpaceEnum
+SpectrumContextJakob2019::ColorSpace() const
+{
+    return colorSpace;
+}
+
+inline size_t
+SpectrumContextJakob2019::GPUMemoryUsage() const
+{
+    return texMem.Size();
 }
 
 #include "SpectrumContext.hpp"

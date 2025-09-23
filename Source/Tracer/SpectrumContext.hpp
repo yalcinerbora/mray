@@ -35,6 +35,25 @@ Converter::Converter(SpectrumWaves wavelengths,
 MR_GF_DEF
 Spectrum Converter::ConvertAlbedo(const Vector3& rgb) const noexcept
 {
+    auto EvalPolynomial = [](Vector3 coeffs, Float lambda)
+    {
+        Float t = Math::FMA(coeffs[0], lambda, coeffs[1]);
+        Float x = Math::FMA(t, lambda, coeffs[2]);
+        assert(Math::IsFinite(x));
+
+        Float denomRecip = Math::RSqrt(Math::FMA(x, x, Float(1)));
+        Float result = Math::FMA(Float(0.5) * x, denomRecip, Float(0.5));
+        return result;
+    };
+
+    // PBRT has this shortcut for grayscale values,
+    // I assume LUT fails? (But why exact comparison then?)
+    //
+    // Gray data assumed to have a flat response over wavelengths
+    if(rgb[0] == rgb[1] && rgb[1] == rgb[2])
+        return Spectrum(rgb[0]);
+
+
     uint32_t maxI = rgb.Maximum();
     Float maxChannel = rgb[maxI];
     Vector3 xyz = Vector3::Zero();
@@ -45,7 +64,6 @@ Spectrum Converter::ConvertAlbedo(const Vector3& rgb) const noexcept
                       rgb[(maxI + 2) % 3] * maxChannelFactor,
                       Float(0));
     }
-
 
     // Ok, we can do a binary search just like the paper
     // but binary search over 64 variables to fetch a texture feels costly.
@@ -97,27 +115,11 @@ Spectrum Converter::ConvertAlbedo(const Vector3& rgb) const noexcept
     // And finally, texture fetch for coefficients
     // and evaluation of the polynomial
     Vector3 coeffs = FetchCoeffs(maxI, uv);
-    //MRAY_LOG("{}", coeffs.AsArray());
-    //if(KernelCallParams().GlobalId() == 0)
-    //    printf("[%f, %f, %f]\n", coeffs[0], coeffs[1], coeffs[2]);
-
-
-    auto EvalPolynomial = [&coeffs](Float lambda)
-    {
-        Float t = Math::FMA(coeffs[0], lambda, coeffs[1]);
-        Float x = Math::FMA(t, lambda, coeffs[2]);
-        assert(Math::IsFinite(x));
-
-        Float denomRecip = Math::RSqrt(Math::FMA(x, x, Float(1)));
-        Float result = Math::FMA(Float(0.5) * x, denomRecip, Float(0.5));
-        return result;
-    };
-
     Spectrum result;
     static constexpr auto WAVE_COUNT = SpectrumWaves::Dims;
     MRAY_UNROLL_LOOP_N(WAVE_COUNT)
     for(uint32_t i = 0; i < WAVE_COUNT; i++)
-        result[i] = EvalPolynomial(wavelengths[i]);
+        result[i] = EvalPolynomial(coeffs, wavelengths[i]);
 
     return result;
 }

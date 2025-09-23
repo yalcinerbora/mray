@@ -2,6 +2,9 @@
 
 #include "RendererC.h"
 #include "SpectrumC.h"
+#include "Random.h"
+
+class SpectrumContextJakob2019;
 
 class TexViewRenderer final : public RendererT<TexViewRenderer>
 {
@@ -36,6 +39,7 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     struct Options
     {
         uint32_t totalSPP   = 32;
+        bool     isSpectral = false;
         Mode     mode       = SHOW_TEXTURES;
     };
 
@@ -48,8 +52,18 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     //
     bool        saveImage;
     //
-    std::vector<const GenericTexture*> textures;
-    std::vector<const GenericTextureView*> textureViews;
+    std::vector<const GenericTexture*>      textures;
+    std::vector<const GenericTextureView*>  textureViews;
+    // Spectral Mode related
+    std::unique_ptr<SpectrumContextJakob2019>   spectrumContext;
+    std::unique_ptr<RNGGroupIndependent>        rnGenerator;
+    DeviceMemory                                spectrumMem;
+    Span<Spectrum>                              dThroughputs;
+    Span<SpectrumWaves>                         dWavelengths;
+    Span<RandomNumber>                          dRandomNumbers;
+
+    void    RenderTextureAsData(const GPUQueue& processQueue);
+    void    RenderTextureAsSpectral(const GPUQueue& processQueue);
 
     public:
     // Constructors & Destructor

@@ -136,14 +136,11 @@ uint64_t GPUSemaphoreViewCUDA::ChangeToNextState()
 bool GPUSemaphoreViewCUDA::HostAcquire()
 {
     bool acquired = externalSemaphore->Acquire(acquireValue);
-    //MRAY_LOG("[Tracer]: Acquired Img {}", acquireValue);
     return acquired;
 }
 
 void GPUSemaphoreViewCUDA::HostRelease()
 {
-    //MRAY_LOG("[Tracer]: Released Img\n"
-    //         "----------------------");
     externalSemaphore->Release();
 }
 
@@ -246,7 +243,7 @@ const GPUQueueCUDA& GPUDeviceCUDA::GetTransferQueue() const
     return transferQueue;
 }
 
-GPUSystemCUDA::GPUSystemCUDA()
+GPUSystemCUDA::GPUSystemCUDA(bool logBanner)
     : nvtxDomain(nullptr)
 {
     if(globalGPUListPtr) throw MRayError("One process can only have "
@@ -281,18 +278,51 @@ GPUSystemCUDA::GPUSystemCUDA()
     // Nvtx is always active
     nvtxDomain = nvtxDomainCreateA("MRayCUDA");
 
-
     // All Fine Start Query Devices
     for(int i = 0; i < deviceCount; i++)
     {
         systemGPUs.emplace_back(i, nvtxDomain);
         systemGPUPtrs.push_back(&systemGPUs.back());
     }
-    // TODO: Do topology stuff here
+    // TODO: Do topology stuff here (basic MPI stuff)
     // handle selection etc. this is too
-    // primitive currently
-    // TODO: a design leak but what else you can do?
+    // primitive currently.
+
+    // TODO: A design leak but what else you can do?
+    // We need to call "cudaSetDevice(...)" for
+    // all the threads to properly initialize cuda calls
+    // for these (global thread pool).
+    // However; we can't send init function as a member function
+    // all the way out to the main function.
     globalGPUListPtr = &systemGPUs;
+
+    // Skip the banner if not requested
+    if(!logBanner) return;
+
+    std::string banner;
+    banner.reserve(1024);
+    bool isFirst = true;
+    for(const auto& gpu : systemGPUs)
+    {
+        if(!isFirst)
+        {
+            banner += "---------------------\n";
+            isFirst = false;
+        }
+
+        double memGiB = double(gpu.TotalMemory());
+        memGiB /= 1024.0;
+        memGiB /= 1024.0;
+        memGiB /= 1204.0;
+        banner += MRAY_FORMAT("Name      : {}\n"
+                              "CC        : {}\n"
+                              "Memory    : {:.3f} GiB\n"
+                              "---------------------\n",
+                              gpu.Name(),
+                              gpu.ComputeCapability(),
+                              memGiB);
+    }
+    MRAY_LOG("----Tracer-GPU(s)----\n{}\n", banner);
 }
 
 GPUSystemCUDA::~GPUSystemCUDA()

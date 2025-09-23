@@ -197,7 +197,7 @@ MRayError VisorCommand::Invoke()
             if(!visorSystem->MTRender())
                 break;
         }
-        MRAY_LOG("[Visor]: Terminating!");
+        MRAY_LOG("[Visor] : Terminating!");
     }
     catch(const MRayError& err)
     {

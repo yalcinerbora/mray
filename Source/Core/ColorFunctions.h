@@ -68,6 +68,11 @@ namespace Color
     inline constexpr uint32_t CIE_1931_N        = CIE_1931_RANGE[1] - CIE_1931_RANGE[0];
     // Data is on the CPP to reduce parsing maybe?
     extern const std::array<Vector3, CIE_1931_N> CIE_1931_XYZ;
+    // Generated via matlab, trapz
+    inline constexpr Float CIE_1931_X_INTEGRAL = Float(106.86540391770);
+    inline constexpr Float CIE_1931_Y_INTEGRAL = Float(106.85691492064);
+    inline constexpr Float CIE_1931_Z_INTEGRAL = Float(106.89194822846);
+
     // Generated using this: https://draftdocs.acescentral.com/white-point/
     // repo: https://github.com/ampas/aces-docs/blob/main/python/TB-2018-001/aces_wp.py
     extern const std::array<Float, CIE_1931_N> D60_SPD;

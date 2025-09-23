@@ -413,7 +413,7 @@ class GPUSystemCUDA
     protected:
     public:
     // Constructors & Destructor
-                        GPUSystemCUDA();
+                        GPUSystemCUDA(bool logBanner = false);
                         GPUSystemCUDA(const GPUSystemCUDA&) = delete;
                         GPUSystemCUDA(GPUSystemCUDA&&) = delete;
     GPUSystemCUDA&      operator=(const GPUSystemCUDA&) = delete;

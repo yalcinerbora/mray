@@ -652,7 +652,7 @@ void TracerThread::LoopWork()
         // Initial render config
         if(initialRenderConfig)
         {
-            MRAY_LOG("[Tracer]: Initial render config {}", initialRenderConfig.value());
+            MRAY_LOG("[Tracer]: Initial render config \"{}\"", initialRenderConfig.value());
             if(MRayError e = CreateRendererFromConfig(initialRenderConfig.value()))
             {
                 MRAY_ERROR_LOG("[Tracer]: Failed to Load Render Config\n"

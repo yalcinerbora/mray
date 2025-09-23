@@ -1,5 +1,6 @@
 #include "TexViewRenderer.h"
 #include "TextureView.hpp"  // IWYU pragma: keep
+#include "SpectrumContext.h"
 
 #include "Device/GPUSystem.hpp"
 
@@ -32,7 +33,9 @@ void KCColorTiles(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
 
 template<uint32_t C>
 MRAY_KERNEL
-void KCShowTexture(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
+void KCShowTexture(// Output
+                   MRAY_GRID_CONSTANT const ImageSpan imgSpan,
+                   // Constants
                    MRAY_GRID_CONSTANT const Vector2ui tileStart,
                    MRAY_GRID_CONSTANT const Vector2ui texResolution,
                    MRAY_GRID_CONSTANT const uint32_t mipIndex,
@@ -41,10 +44,9 @@ void KCShowTexture(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
     KernelCallParams kp;
 
     Vector2i regionSize = imgSpan.Extent();
-    int32_t totalPix = regionSize.Multiply();
+    uint32_t totalPix = uint32_t(regionSize.Multiply());
     // Loop over the output span
-    for(int32_t i = int32_t(kp.GlobalId());
-        i < totalPix; i += int32_t(kp.TotalSize()))
+    for(uint32_t i = kp.GlobalId(); i < totalPix; i += kp.TotalSize())
     {
         // Calculate uv coords
         Vector2i localIndexInt = imgSpan.LinearIndexTo2D(uint32_t(i));
@@ -83,6 +85,188 @@ void KCShowTexture(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
     }
 }
 
+template<uint32_t C>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCSampleTextureSpectral(// I-O
+                             MRAY_GRID_CONSTANT const Span<Spectrum> dThroughput,
+                             // Input
+                             MRAY_GRID_CONSTANT const Span<const SpectrumWaves> dWavelengths,
+                             // We need the tile info from the span we do not actually
+                             // use the ptrs.
+                             MRAY_GRID_CONSTANT const ImageSpan imgSpan,
+                             // Constants
+                             MRAY_GRID_CONSTANT const Vector2ui tileStart,
+                             MRAY_GRID_CONSTANT const Vector2ui texResolution,
+                             MRAY_GRID_CONSTANT const uint32_t mipIndex,
+                             MRAY_GRID_CONSTANT const GenericTextureView texView,
+                             MRAY_GRID_CONSTANT const Jacob2019Detail::Data data)
+{
+    KernelCallParams kp;
+    Vector2i regionSize = imgSpan.Extent();
+    uint32_t totalPix = uint32_t(regionSize.Multiply());
+    for(uint32_t i = kp.GlobalId(); i < totalPix; i += kp.TotalSize())
+    {
+        // Calculate uv coords
+        Vector2i localIndexInt = imgSpan.LinearIndexTo2D(i);
+        Vector2 localIndex = Vector2(localIndexInt);
+        Vector2 globalIndex = Vector2(tileStart) + localIndex + Vector2(0.5);
+        Vector2 uv = globalIndex / Vector2(texResolution);
+
+        // TODO: More texture types
+        Vector3 result;
+        if constexpr(C == 1)
+        {
+            // For single channel textures, show grayscale
+            const auto& view = std::get<TracerTexView<2, Float>>(texView);
+            result = Vector3(view(uv, Float(mipIndex)));
+        }
+        else if constexpr(C == 2)
+        {
+            const auto& view = std::get<TracerTexView<2, Vector<C, Float>>>(texView);
+            result = Vector3(view(uv, Float(mipIndex)), 0);
+        }
+        else if constexpr(C == 3)
+        {
+            const auto& view = std::get<TracerTexView<2, Vector<C, Float>>>(texView);
+            result = Vector3(view(uv, Float(mipIndex)));
+        }
+        else if constexpr(C == 4)
+        {
+            // Drop the last pixel
+            // TODO: change this to something else,
+            // We drop the last pixel since it will be considered as alpha
+            // if we send it to visor and it may be invisible
+            const auto& view = std::get<TracerTexView<2, Vector<C, Float>>>(texView);
+            result = Vector3(view(uv, Float(mipIndex)));
+        }
+
+        // Convert to the spectrum
+        using Converter = typename SpectrumContextJakob2019::Converter;
+        SpectrumWaves waves = dWavelengths[i];
+        auto converter = Converter(waves, data);
+        Spectrum s = converter.ConvertAlbedo(result);
+        Spectrum t = dThroughput[i];
+
+        // Multiply with the "1 / PDF"
+        // (we do not explicitly store PDFs yet (~32MiB extra memory))
+        dThroughput[i] = t * s;
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCSplatRGBToImageSpan(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
+                           MRAY_GRID_CONSTANT const Span<const Spectrum> dSpectrumAsRGB)
+{
+
+    KernelCallParams kp;
+
+    Vector2i regionSize = imgSpan.Extent();
+    uint32_t totalPix = uint32_t(regionSize.Multiply());
+    // Loop over the output span
+    for(uint32_t i = kp.GlobalId(); i < totalPix; i += kp.TotalSize())
+    {
+        Vector2i localIndexInt = imgSpan.LinearIndexTo2D(i);
+        imgSpan.StoreWeight(Float(1), localIndexInt);
+        imgSpan.StorePixel(Vector3(dSpectrumAsRGB[i]), localIndexInt);
+    }
+}
+
+
+void TexViewRenderer::RenderTextureAsData(const GPUQueue& processQueue)
+{
+    using namespace std::string_view_literals;
+
+    uint32_t curPixelCount = imageTiler.CurrentTileSize().Multiply();
+    auto texView = *textureViews[textureIndex];
+    uint32_t texChannelCount = FindTexViewChannelCount(texView);
+    auto KernelCall = [&, this]<uint32_t C>()
+    {
+        // Do not start writing to device side until copy is complete
+        // (device buffer is read fully)
+        processQueue.IssueWorkKernel<KCShowTexture<C>>
+        (
+            "KCShowTexture"sv,
+            DeviceWorkIssueParams{.workCount = curPixelCount},
+            //
+            imageTiler.GetTileSpan(),
+            imageTiler.LocalTileStart(),
+            imageTiler.FullResolution(),
+            mipIndex,
+            texView
+        );
+    };
+    switch(texChannelCount)
+    {
+        case 1: KernelCall.template operator()<1>(); break;
+        case 2: KernelCall.template operator()<2>(); break;
+        case 3: KernelCall.template operator()<3>(); break;
+        case 4: KernelCall.template operator()<4>(); break;
+    }
+}
+
+void TexViewRenderer::RenderTextureAsSpectral(const GPUQueue& processQueue)
+{
+    rnGenerator->SetupRange(this->imageTiler.Tile1DRange());
+
+    uint32_t perSampleRNCount = spectrumContext->SampleSpectrumRNCount();
+    Vector2ui rngDimRange = Vector2ui(0, perSampleRNCount);
+    rngDimRange[1] = spectrumContext->SampleSpectrumRNCount();
+
+    uint32_t curPixelCount = imageTiler.CurrentTileSize().Multiply();
+    auto dRandomNumbersLocal = dRandomNumbers.subspan(0, curPixelCount * perSampleRNCount);
+    auto dThroughputLocal = dThroughputs.subspan(0, curPixelCount);
+    auto dWavelengthsLocal = dWavelengths.subspan(0, curPixelCount);
+    // Generate random numbers
+    rnGenerator->GenerateNumbers(dRandomNumbers, rngDimRange,
+                                 processQueue);
+    // Sample spectrum
+    spectrumContext->SampleSpectrumWavelengths(dWavelengths, dThroughputs,
+                                               dRandomNumbers, processQueue);
+
+    // Sample texture
+    auto texView = *textureViews[textureIndex];
+    uint32_t texChannelCount = FindTexViewChannelCount(texView);
+    using namespace std::string_view_literals;
+    auto KernelCall = [&, this]<uint32_t C>()
+    {
+        processQueue.IssueWorkKernel<KCSampleTextureSpectral<C>>
+        (
+            "KCSampleTextureSpectral"sv,
+            DeviceWorkIssueParams{.workCount = curPixelCount},
+            //
+            dThroughputLocal,
+            dWavelengthsLocal,
+            //
+            imageTiler.GetTileSpan(),
+            imageTiler.LocalTileStart(),
+            imageTiler.FullResolution(),
+            mipIndex,
+            texView,
+            spectrumContext->GetData()
+        );
+    };
+    switch(texChannelCount)
+    {
+        case 1: KernelCall.template operator()<1>(); break;
+        case 2: KernelCall.template operator()<2>(); break;
+        case 3: KernelCall.template operator()<3>(); break;
+        case 4: KernelCall.template operator()<4>(); break;
+    }
+
+    // Convert to RGB
+    spectrumContext->ConvertSpectrumToRGB(dThroughputLocal, dWavelengthsLocal,
+                                          processQueue);
+    // Write these RGB to buffer
+    processQueue.IssueWorkKernel<KCSplatRGBToImageSpan>
+    (
+        "KCSplatRGBToImageSpan"sv,
+        DeviceWorkIssueParams{.workCount = curPixelCount},
+        //
+        imageTiler.GetTileSpan(),
+        ToConstSpan(dThroughputLocal)
+    );
+}
+
 TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
                                  TracerView tv,
                                  ThreadPool& tp,
@@ -90,6 +274,7 @@ TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
                                  const RenderWorkPack& wp)
     : RendererT(rb, wp, tv, s, tp)
     , saveImage(true)
+    , spectrumMem(gpuSystem.AllGPUs(), 4_MiB, 32_MiB, true)
 {
     // Pre-generate list
     textures.clear();
@@ -120,6 +305,9 @@ RendererOptionPack TexViewRenderer::CurrentAttributes() const
 
     result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
     result.attributes.back().Push(Span<const uint32_t>(&currentOptions.totalSPP, 1));
+    //
+    result.attributes.push_back(TransientData(std::in_place_type_t<bool>{}, 1));
+    result.attributes.back().Push(Span<const bool>(&currentOptions.isSpectral, 1));
 
     if constexpr(MRAY_IS_DEBUG)
     {
@@ -132,10 +320,14 @@ RendererOptionPack TexViewRenderer::CurrentAttributes() const
 void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
                                     TransientData data, const GPUQueue&)
 {
-    if(attributeIndex != 0)
-        throw MRayError("{} Unknown attribute index {}",
-                        TypeName(), attributeIndex);
-    newOptions.totalSPP = data.AccessAs<uint32_t>()[0];
+    switch(attributeIndex)
+    {
+        case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
+        case 1: newOptions.isSpectral = data.AccessAs<bool>()[0];   break;
+        //
+        default: throw MRayError("{} Unknown attribute index {}",
+                                 TypeName(), attributeIndex);
+    }
 }
 
 RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
@@ -147,6 +339,7 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     // does this move to a templated intermediate class
     // on the inheritance chain
     currentOptions = newOptions;
+    curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
     totalIterationCount = 0;
 
     // Skip if nothing to show
@@ -178,6 +371,7 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     // And mip size
     Vector2ui mipSize = Graphics::TextureMipSize(Vector2ui(t->Extents()), mipIndex);
 
+    // Setup Image Tiler
     RenderImageParams rIParams
     {
         .resolution = mipSize,
@@ -188,7 +382,32 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
                             tracerView.tracerParams.parallelizationHint,
                             Vector2ui::Zero());
 
-    curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
+
+
+    // Load spectral system if spectral mode is enabled
+    if(currentOptions.isSpectral && t->IsColor() == AttributeIsColor::IS_COLOR)
+    {
+        // Don't bother reloading context if colorspace is same
+        if(!spectrumContext || spectrumContext->ColorSpace() != curColorSpace)
+        {
+            using enum WavelengthSampleMode;
+            using SC = SpectrumContextJakob2019;
+            spectrumContext = std::make_unique<SC>(curColorSpace, UNIFORM, gpuSystem);
+        }
+
+        // Allocate sampling buffers
+        uint32_t maxRayCount = this->imageTiler.ConservativeTileSize().Multiply();
+        uint32_t sampleRNCount = spectrumContext->SampleSpectrumRNCount();
+        uint32_t maxRNCount = sampleRNCount * maxRayCount;
+        MemAlloc::AllocateMultiData(Tie(dThroughputs, dWavelengths, dRandomNumbers),
+                                    spectrumMem, {maxRayCount, maxRayCount, maxRNCount});
+
+        // Finally allocate RNG
+        using RNG = RNGGroupIndependent;
+        rnGenerator = std::make_unique<RNG>(mipSize.Multiply(), uint64_t(0),
+                                            gpuSystem, globalThreadPool);
+    }
+
     auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
     return RenderBufferInfo
     {
@@ -211,6 +430,7 @@ RendererOutput TexViewRenderer::DoRender()
     Timer timer; timer.Start();
     const GPUDevice& device = gpuSystem.BestDevice();
 
+    // Render nothing...
     if(textures.empty()) return {};
 
     using namespace std::string_view_literals;
@@ -236,31 +456,13 @@ RendererOutput TexViewRenderer::DoRender()
         }
         case Mode::SHOW_TEXTURES:
         {
-            auto texView = *textureViews[textureIndex];
-            uint32_t texChannelCount = FindTexViewChannelCount(texView);
-            auto KernelCall = [&, this]<uint32_t C>()
-            {
-                // Do not start writing to device side until copy is complete
-                // (device buffer is read fully)
-                processQueue.IssueWorkKernel<KCShowTexture<C>>
-                (
-                    "KCShowTexture"sv,
-                    DeviceWorkIssueParams{.workCount = curPixelCount},
-                    //
-                    imageTiler.GetTileSpan(),
-                    imageTiler.LocalTileStart(),
-                    imageTiler.FullResolution(),
-                    mipIndex,
-                    texView
-                );
-            };
-            switch(texChannelCount)
-            {
-                case 1: KernelCall.template operator()<1>(); break;
-                case 2: KernelCall.template operator()<2>(); break;
-                case 3: KernelCall.template operator()<3>(); break;
-                case 4: KernelCall.template operator()<4>(); break;
-            }
+            using enum AttributeIsColor;
+            const auto* t = textures[textureIndex];
+            bool doSpectral = (currentOptions.isSpectral && t->IsColor() == IS_COLOR);
+            //
+            if(doSpectral)  RenderTextureAsSpectral(processQueue);
+            else            RenderTextureAsData(processQueue);
+
             break;
         }
     }
@@ -333,12 +535,17 @@ TexViewRenderer::StaticAttributeInfo()
     using enum AttributeOptionality;
     return AttribInfoList
     {
-        {"totalSPP", MRayDataTypeRT(MR_UINT32), IS_SCALAR, MR_MANDATORY}
+        {"totalSPP", MRayDataTypeRT(MR_UINT32), IS_SCALAR, MR_MANDATORY},
+        {"isSpectral", MRayDataTypeRT(MR_BOOL), IS_SCALAR, MR_MANDATORY}
     };
 }
 
 size_t TexViewRenderer::GPUMemoryUsage() const
 {
-    return 0;
+    size_t allSize = spectrumMem.Size();
+    if(rnGenerator) allSize += rnGenerator->GPUMemoryUsage();
+    if(spectrumContext) allSize += spectrumContext->GPUMemoryUsage();
+
+    return allSize;
 }
 

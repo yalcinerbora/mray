@@ -203,7 +203,7 @@ TextureExtent<D> TextureViewCPU<D, T>::ResolveEdge(TextureSignedExtent<D> ijk,
         using enum MRayTextureEdgeResolveEnum;
         case MR_CLAMP:
         {
-            ijk = Math::Clamp(ijk, VecXi(0), mipSize);
+            ijk = Math::Clamp(ijk, VecXi(0), mipSize - VecXi(1));
             break;
         }
         case MR_MIRROR:
@@ -240,6 +240,7 @@ TextureExtent<D> TextureViewCPU<D, T>::ResolveEdge(TextureSignedExtent<D> ijk,
     }
     //
     assert(ijk >= VecXi(0));
+    assert(ijk < mipSize);
     return TextureExtent<D>(ijk);
 }
 

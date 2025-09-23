@@ -16,62 +16,126 @@ void SingleSampleSpectrumWavelength(// Output
                                     SpectrumWaves& wavelengths,
                                     Spectrum& throughput,
                                     // I-O
-                                    BackupRNG& rng,
+                                    RNGDispenser& rng,
                                     // Constant
                                     WavelengthSampleMode mode)
 {
+    static constexpr auto START = Float(Color::CIE_1931_RANGE[0]);
+    static constexpr auto END = Float(Color::CIE_1931_RANGE[1] - 1);
+    // Similar to the PBRT, be bisect the sample space
+    // and use single sample to sample multiple times.
+    static constexpr auto SAMPLE_SPACE_OFFSETS = []()
+    {
+        constexpr auto DELTA = Float(1) / Float(SpectraPerSpectrum);
+        std::array<Float, SpectraPerSpectrum> result = {};
+        constexpr int32_t mid = int32_t(SpectraPerSpectrum / 2);
+        for(int32_t i = 0; i < SpectraPerSpectrum; i++)
+        {
+            result[i] = Float(i - mid) * DELTA;
+        }
+        return result;
+    }();
+
+    static_assert([]()
+    {
+        bool allInRange = true;
+        for(auto offset : SAMPLE_SPACE_OFFSETS)
+            allInRange &= (Math::Abs(offset) < Float(1));
+        return allInRange;
+    }(),
+    "The code below assumes offsets does not exceed the sample range. "
+    "It seems that is not the case!");
+
+    // Sample expansion
+    Float xi0 = rng.NextFloat<0>();
+    std::array<Float, SpectraPerSpectrum> xi;
+    MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
+    for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
+    {
+        Float x = xi0 + SAMPLE_SPACE_OFFSETS[i];
+        // If offset overflows the range, rollover
+        if(x < Float(0))    x += Float(1);
+        if(x >= Float(1))   x -= Float(1);
+
+        xi[i] = x;
+    }
+
     // We pre-divide with the PDF here,
     // thats why throughput is required
+
     switch(mode)
     {
+        using enum WavelengthSampleMode;
         case UNIFORM:
         {
-            constexpr auto START = Float(Color::CIE_1931_RANGE[0]);
-            constexpr auto END = Float(Color::CIE_1931_RANGE[1] - 1);
-            using Distribution::Common::SampleUniformRange;
-
+            Float pdf = Float(0);
             MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
             for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
             {
-                Float xi = rng.NextFloat();
-                SampleT<Float> sample = SampleUniformRange(xi, START, END);
+                using Distribution::Common::SampleUniformRange;
+                SampleT<Float> sample = SampleUniformRange(xi[i], START, END);
                 wavelengths[i] = sample.value;
-                throughput[i] = Float(1);
+                if(i == 0) pdf = sample.pdf;
             }
+            throughput = Spectrum(Float(1) / pdf);
             break;
         }
         case GAUSSIAN_MIS:
         {
             using namespace Distribution;
             using namespace Distribution::Common;
+            // This is for CUDA, it does not like inline constexprs
+            constexpr auto SIGMA = Color::CIE_1931_GAUSS_SIGMA;
+            constexpr auto MU    = Color::CIE_1931_GAUSS_MU;
+            constexpr auto MIS   = Color::CIE_1931_MIS;
 
             MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
             for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
             {
-                // This is for CUDA, it does not like inline constexprs
-                constexpr auto CIE_1931_GAUSS_SIGMA = Color::CIE_1931_GAUSS_SIGMA;
-                constexpr auto CIE_1931_GAUSS_MU    = Color::CIE_1931_GAUSS_MU;
-                constexpr auto CIE_1931_MIS         = Color::CIE_1931_MIS;
+                auto [sampleI, localXi] = BisectSample2(xi[i], MIS, true);
+                uint32_t otherI = (sampleI + 1) & 0b1;
 
-                uint32_t sampleI = 0, otherI = 1;
-                if(rng.NextFloat() >= CIE_1931_MIS[0])
-                    std::swap(sampleI, otherI);
-
-                // TODO: Normalize reuse sample?
-                SampleT<Float> sample = SampleGaussian(rng.NextFloat(),
-                                                       CIE_1931_GAUSS_SIGMA[sampleI],
-                                                       CIE_1931_GAUSS_MU[sampleI]);
-                Float otherPDF = PDFGaussian(rng.NextFloat(),
-                                             CIE_1931_GAUSS_SIGMA[otherI],
-                                             CIE_1931_GAUSS_MU[otherI]);
+                SampleT<Float> sample = SampleGaussian(localXi, SIGMA[sampleI], MU[sampleI]);
+                Float otherPDF = PDFGaussian(sample.value, SIGMA[otherI], MU[otherI]);
 
                 auto pdfs = std::array{sample.pdf, otherPDF};
-                auto weights = std::array{CIE_1931_MIS[sampleI], CIE_1931_MIS[otherI]};
+                auto weights = std::array{MIS[sampleI], MIS[otherI]};
                 auto pdf = MIS::BalanceCancelled(Span<Float, 2>(pdfs),
                                                  Span<Float, 2>(weights));
+                // Gaussian can be funky, check the values
+                assert(Math::IsFinite(pdf));
+                assert(Math::IsFinite(sample.value));
+
+                // TODO: When xi is exactly zero, there is numerical problems.
+                // currently we just eliminate it, but we may need to investigate later.
+                Float invPDF = Float(1) / pdf;
+                if(Math::IsInf(invPDF))
+                    invPDF = Float(0);
 
                 wavelengths[i] = sample.value;
-                throughput[i] = Float(1) / pdf;
+                throughput[i] = invPDF;
+            }
+            break;
+        }
+        case PBRT_HYBERBOLIC:
+        {
+            auto PDF = [](Float lambda)
+            {
+                Float denom = Math::CosH(Float(0.0072) * (lambda - Float(538)));
+                denom = denom * denom;
+                return Float(0.0039398042) / denom;
+            };
+            auto Sample = [](Float xi)
+            {
+                Float a = Float(0.85691062) - Float(1.82750197) * xi;
+                return Float(538) - Float(138.888889) * Math::ArcTanH(a);
+            };
+
+            MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
+            for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
+            {
+                wavelengths[i] = Sample(xi[i]);
+                throughput[i] = Float(1) / PDF(wavelengths[i]);
             }
             break;
         }
@@ -83,16 +147,28 @@ MR_GF_DECL
 Spectrum ConvertSpectraToRGBSingle(const Spectrum& value, const SpectrumWaves& waves,
                                    //
                                    const TextureView<1, Vector3>& observerResponseXYZ,
-                                   const Matrix3x3& xyzToRGB)
+                                   const Matrix3x3& sXYZToRGB)
 {
+    using namespace Color;
     Vector3 xyzTotal = Vector3::Zero();
     for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
     {
-        Float index = waves[i] - Float(Color::CIE_1931_RANGE[0]);
-        Vector3 factors = observerResponseXYZ(index);
+        Float w = waves[i];
+        Float index = w - Float(CIE_1931_RANGE[0]);
+        Vector3 factors = observerResponseXYZ(index + Float(0.5));
         xyzTotal += factors * value[i];
     }
-    return Spectrum(xyzToRGB * xyzTotal, 0);
+    // We technically done "SpectraPerSpectrum" samples not 1.
+    // Compansate for that
+    static constexpr Float SPS = Float(SpectraPerSpectrum);
+    static constexpr Vector3 CIE_SUM = Vector3(CIE_1931_X_INTEGRAL,
+                                               CIE_1931_Y_INTEGRAL,
+                                               CIE_1931_Z_INTEGRAL);
+    static constexpr auto WEIGHT = Vector3(1) / (CIE_SUM * SPS);
+    xyzTotal *= WEIGHT;
+
+    Spectrum result = Spectrum(sXYZToRGB * xyzTotal, 0);
+    return result;
 }
 
 MRAY_KERNEL
@@ -100,15 +176,15 @@ void KCSampleSpectrumWavelengths(// Output
                                  MRAY_GRID_CONSTANT const Span<SpectrumWaves> dWavelengths,
                                  MRAY_GRID_CONSTANT const Span<Spectrum> dThroughputs,
                                  // I-O
-                                 MRAY_GRID_CONSTANT const Span<BackupRNGState> dRNGStates,
+                                 MRAY_GRID_CONSTANT const Span<const RandomNumber> dRandNumbers,
                                  // Constants
                                  MRAY_GRID_CONSTANT const WavelengthSampleMode mode)
 {
     // Grid-stride Loop
     KernelCallParams kp;
-    for(uint32_t i = kp.GlobalId(); i < dRNGStates.size(); i += kp.TotalSize())
+    for(uint32_t i = kp.GlobalId(); i < dWavelengths.size(); i += kp.TotalSize())
     {
-        BackupRNG rng(dRNGStates[i]);
+        RNGDispenser rng = RNGDispenser(dRandNumbers, i, dWavelengths.size());
 
         SpectrumWaves wavelengths;
         Spectrum throughput;
@@ -125,7 +201,7 @@ void KCSampleSpectrumWavelengthsIndirect(// Output
                                          MRAY_GRID_CONSTANT const Span<SpectrumWaves> dWavelengths,
                                          MRAY_GRID_CONSTANT const Span<Spectrum> dThroughputs,
                                          // I-O
-                                         MRAY_GRID_CONSTANT const Span<BackupRNGState> dRNGStates,
+                                         MRAY_GRID_CONSTANT const Span<const RandomNumber> dRandNumbers,
                                          // Input
                                          MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices,
                                          // Constants
@@ -135,8 +211,9 @@ void KCSampleSpectrumWavelengthsIndirect(// Output
     KernelCallParams kp;
     for(uint32_t i = kp.GlobalId(); i < dRayIndices.size(); i += kp.TotalSize())
     {
+        RNGDispenser rng = RNGDispenser(dRandNumbers, i, dRayIndices.size());
+
         RayIndex rIndex = dRayIndices[i];
-        BackupRNG rng(dRNGStates[rIndex]);
 
         SpectrumWaves wavelengths;
         Spectrum throughput;
@@ -413,6 +490,7 @@ SpectrumContextJakob2019::SpectrumContextJakob2019(MRayColorSpaceEnum globalColo
                .spdObserverXYZ = texCIE1931_XYZ.View<Vector3>()
            })
     , sampleMode(sampleMode)
+    , colorSpace(globalColorspace)
 {
     data.RGBToXYZ = Color::SelectRGBToXYZMatrix(globalColorspace);
     data.XYZToRGB = data.RGBToXYZ.Inverse();
@@ -422,12 +500,12 @@ void SpectrumContextJakob2019::SampleSpectrumWavelengths(// Output
                                                          Span<SpectrumWaves> dWavelengths,
                                                          Span<Spectrum> dThroughputs,
                                                          // I-O
-                                                         Span<BackupRNGState> dRNGStates,
+                                                         Span<const RandomNumber> dRandomNumbers,
                                                          // Constants
-                                                         const GPUQueue& queue)
+                                                         const GPUQueue& queue) const
 {
     assert(dWavelengths.size() == dThroughputs.size());
-    assert(dThroughputs.size() == dRNGStates.size());
+    assert(dThroughputs.size() * SampleSpectrumRNCount() == dRandomNumbers.size());
 
     queue.IssueWorkKernel<KCSampleSpectrumWavelengths>
     (
@@ -436,7 +514,7 @@ void SpectrumContextJakob2019::SampleSpectrumWavelengths(// Output
         //
         dWavelengths,
         dThroughputs,
-        dRNGStates,
+        dRandomNumbers,
         sampleMode
     );
 
@@ -445,13 +523,13 @@ void SpectrumContextJakob2019::SampleSpectrumWavelengths(// Output
 void SpectrumContextJakob2019::SampleSpectrumWavelengthsIndirect(// Output
                                                                  Span<SpectrumWaves> dWavelengths,
                                                                  Span<Spectrum> dThroughputs,
-                                                                 // I-O
-                                                                 Span<BackupRNGState> dRNGStates,
                                                                  // Input
+                                                                 Span<const RandomNumber> dRandomNumbers,
                                                                  Span<const RayIndex> dRayIndices,
                                                                  // Constants
-                                                                 const GPUQueue& queue)
+                                                                 const GPUQueue& queue) const
 {
+    assert(dRayIndices.size() * SampleSpectrumRNCount() == dRandomNumbers.size());
     queue.IssueWorkKernel<KCSampleSpectrumWavelengthsIndirect>
     (
         "KCSampleSpectraWavelengths",
@@ -459,10 +537,22 @@ void SpectrumContextJakob2019::SampleSpectrumWavelengthsIndirect(// Output
         //
         dWavelengths,
         dThroughputs,
-        dRNGStates,
+        dRandomNumbers,
         dRayIndices,
         sampleMode
     );
+}
+
+uint32_t SpectrumContextJakob2019::SampleSpectrumRNCount() const
+{
+    switch(sampleMode)
+    {
+        using enum WavelengthSampleMode;
+        case UNIFORM:           return 1;
+        case GAUSSIAN_MIS:      return 1;
+        case PBRT_HYBERBOLIC:   return 1;
+        default: throw MRayError("Unkown spectrum sample mode!");
+    }
 }
 
 void SpectrumContextJakob2019::ConvertSpectrumToRGB(// I-O
@@ -470,7 +560,7 @@ void SpectrumContextJakob2019::ConvertSpectrumToRGB(// I-O
                                                     // Input
                                                     Span<const SpectrumWaves> dWavelengths,
                                                     // Constants
-                                                    const GPUQueue& queue)
+                                                    const GPUQueue& queue) const
 {
     assert(dValues.size() == dWavelengths.size());
     queue.IssueWorkKernel<KCConvertSpectrumToRGB>
@@ -490,7 +580,7 @@ void SpectrumContextJakob2019::ConvertSpectrumToRGBIndirect(// I-O
                                                             Span<const SpectrumWaves> dWavelengths,
                                                             Span<const RayIndex> dRayIndices,
                                                             // Constants
-                                                            const GPUQueue& queue)
+                                                            const GPUQueue& queue) const
 {
     queue.IssueWorkKernel<KCConvertSpectrumToRGBIndirect>
     (

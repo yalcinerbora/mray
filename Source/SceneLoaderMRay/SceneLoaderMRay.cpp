@@ -1056,7 +1056,9 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
                     .pixelType = header.pixelType,
                     .colorSpace = header.colorSpace.second,
                     .gamma = header.colorSpace.first,
-                    .ignoreResClamp = ignoreResClamp
+                    .ignoreResClamp = ignoreResClamp,
+                    .isColor = (isColor) ? AttributeIsColor::IS_COLOR
+                                         : AttributeIsColor::IS_PURE_DATA
                 };
                 // Check and add user params
                 if(edgeResolve.has_value()) params.edgeResolve = *edgeResolve;

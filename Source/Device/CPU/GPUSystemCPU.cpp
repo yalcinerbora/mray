@@ -4,6 +4,7 @@
 
 #include "Core/TimelineSemaphore.h"
 #include "Core/ThreadPool.h"
+#include "Core/Log.h"
 
 #ifdef MRAY_WINDOWS
     #include <Windows.h>
@@ -173,16 +174,16 @@ GPUQueueCPU::~GPUQueueCPU()
     tp->Wait();
 }
 
-GPUSystemCPU::GPUSystemCPU()
+GPUSystemCPU::GPUSystemCPU(bool logBanner, uint32_t threadCount)
     : localTP(nullptr)
     , cpuDomain(nullptr)
 {
-    uint32_t queueSize = Math::NextPowerOfTwo(std::thread::hardware_concurrency() * 128);
+    uint32_t queueSize = Math::NextPowerOfTwo(threadCount * 128);
     localTP = std::make_unique<ThreadPool>
     (
         typename ThreadPool::InitParams
         {
-            .threadCount = std::thread::hardware_concurrency(),
+            .threadCount = threadCount,
             .queueSize  = queueSize
         },
         [](SystemThreadHandle handle, uint32_t id)
@@ -196,16 +197,32 @@ GPUSystemCPU::GPUSystemCPU()
     //    NUMA nodes as separate "Device"
     systemGPUs.emplace_back(*localTP.get(), 0, nullptr);
     systemGPUPtrs.push_back(&systemGPUs.back());
-}
 
-GPUSystemCPU::GPUSystemCPU(ThreadPool& tp)
-    : cpuDomain(nullptr)
-{
-    // TODO: Check NUMA stuff:
-    //  - Put a flag, to auto combine or split
-    //    NUMA nodes as separate "Device"
-    systemGPUs.emplace_back(tp, 0, nullptr);
-    systemGPUPtrs.push_back(&systemGPUs.back());
+    // Skip the banner if not requested
+    if(!logBanner) return;
+
+    std::string banner;
+    banner.reserve(1024);
+    bool isFirst = true;
+    for(const auto& gpu : systemGPUs)
+    {
+        if(!isFirst)
+        {
+            banner += "---------------------\n";
+            isFirst = false;
+        }
+
+        double memGiB = double(gpu.TotalMemory());
+        memGiB /= 1024.0;
+        memGiB /= 1024.0;
+        memGiB /= 1204.0;
+        banner += MRAY_FORMAT("Name      : {}\n"
+                              "Memory    : {:.3f} GiB\n"
+                              "---------------------\n",
+                              gpu.Name(),
+                              memGiB);
+    }
+    MRAY_LOG("----Tracer-GPU(s)----\n{}", banner);
 }
 
 GPUSystemCPU::~GPUSystemCPU()

@@ -380,8 +380,8 @@ class GPUSystemCPU
     protected:
     public:
     // Constructors & Destructor
-                        GPUSystemCPU();
-                        GPUSystemCPU(ThreadPool& tp);
+                        GPUSystemCPU(bool logBanner = false,
+                                     uint32_t threadCount = std::thread::hardware_concurrency());
                         GPUSystemCPU(const GPUSystemCPU&) = delete;
                         GPUSystemCPU(GPUSystemCPU&&) = delete;
     GPUSystemCPU&       operator=(const GPUSystemCPU&) = delete;

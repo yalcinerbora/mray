@@ -284,8 +284,6 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     Span<CommonKey> dKeysDB[2] = {dKeysIn, dKeysOut};
     Span<CommonIndex> dIndicesDB[2] = {dIndicesIn, dIndicesOut};
 
-    //MRAY_LOG("Key Ranges B ({}), D ({})", keyBatchBitRange, keyDataBitRange);
-
     // TODO: Why are we doing two separate sorts? Keys almost always should be contiguous.
     // If not we are wasting information space here.
     // So a single pass should suffice maybe? Reason about this more later

@@ -86,10 +86,12 @@ namespace Math
     template<FloatC T> MR_PF_DECL T Cos(T) noexcept;
     template<FloatC T> MR_PF_DECL T Sin(T) noexcept;
     template<FloatC T> MR_PF_DECL T Tan(T) noexcept;
+    template<FloatC T> MR_PF_DECL T CosH(T) noexcept;
     template<FloatC T> MR_PF_DECL T ArcCos(T) noexcept;
     template<FloatC T> MR_PF_DECL T ArcSin(T) noexcept;
     template<FloatC T> MR_PF_DECL T ArcTan(T) noexcept;
     template<FloatC T> MR_PF_DECL T ArcTan2(T, T) noexcept;
+    template<FloatC T> MR_PF_DECL T ArcTanH(T) noexcept;
     template<FloatC T> MR_PF_DECL std::array<T, 2> SinCos(T) noexcept;
     // Common functions (math functions)
     template<FloatC T> MR_PF_DECL T ErrFunc(T) noexcept;
@@ -566,6 +568,26 @@ MR_PF_DEF T Tan(T v) noexcept
 }
 
 template<FloatC T>
+MR_PF_DECL T CosH(T x) noexcept
+{
+    // no njuffa :(
+    // Using mathematical identity
+    if(std::is_constant_evaluated())
+    {
+        T ex = Exp(-x);
+        T e2x = ex * ex;
+        return Float(1) + e2x / (Float(0.5) * ex);
+    }
+    #ifndef MRAY_DEVICE_CODE_PATH
+        return std::cosh(x);
+    // GPU Code path
+    #else
+        if constexpr(std::is_same_v<T, float>)  return coshf(x);
+        if constexpr(std::is_same_v<T, double>) return cosh(x);
+    #endif
+}
+
+template<FloatC T>
 MR_PF_DEF T ArcCos(T x) noexcept
 {
     assert(T(-1) <= x && x <= T(1));
@@ -669,6 +691,21 @@ MR_PF_DEF T ArcTan2(T y, T x) noexcept
     #else
         if constexpr(std::is_same_v<T, float>)  return atan2f(y, x);
         if constexpr(std::is_same_v<T, double>) return atan2(y, x);
+    #endif
+}
+
+template<FloatC T> MR_PF_DECL T ArcTanH(T x) noexcept
+{
+    // Using math identity, TODO: check better one later.
+    if(std::is_constant_evaluated())
+    {
+        return Float(0.5) * Log((Float(1) + x) / (Float(1) - x));
+    }
+    #ifndef MRAY_DEVICE_CODE_PATH
+        return std::atanh(x);
+    #else
+        if constexpr(std::is_same_v<T, float>)  return atanhf(x);
+        if constexpr(std::is_same_v<T, double>) return atanh(x);
     #endif
 }
 
