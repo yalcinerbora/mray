@@ -910,7 +910,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
                     Float(1.0),
                     colorSpace
                 ),
-                .readMode = MRayTextureReadMode::MR_END
+                .readMode = MRayTextureReadMode::MR_ENUM_END
             },
             .inputType = pixType,
             .pixels = Span<const Byte>(rgbPtr, paddedImageSize)

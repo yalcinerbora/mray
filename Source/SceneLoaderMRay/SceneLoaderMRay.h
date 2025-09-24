@@ -2,12 +2,12 @@
 
 #include "MeshLoader/EntryPoint.h"
 #include "Core/SceneLoaderI.h"
-#include "Core/TracerI.h"
 #include "Core/Expected.h"
 
 #include "JsonNode.h"
 
 class ThreadPool;
+class TracerI;
 
 class SceneLoaderMRay : public SceneLoaderI
 {

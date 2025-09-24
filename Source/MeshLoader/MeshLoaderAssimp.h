@@ -9,6 +9,7 @@
 #include <fstream>
 
 class MeshFileAssimp;
+class PrimitiveAttributeLogic;
 
 class MeshViewAssimp : public MeshFileViewI
 {

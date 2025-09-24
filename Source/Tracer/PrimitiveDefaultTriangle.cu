@@ -168,18 +168,17 @@ void PrimGroupTriangle::CommitReservations()
 
 PrimAttributeInfoList PrimGroupTriangle::AttributeInfo() const
 {
-    using enum MRayDataEnum;
-    using enum PrimitiveAttributeLogic;
+    using enum PrimitiveAttributeLogic::E;
     using enum AttributeOptionality;
     using enum AttributeIsArray;
     // Here we mark them as "IS_SCALAR", because primitive group is group of primitives
     // and not primitive batches
     static const PrimAttributeInfoList LogicList =
     {
-        PrimAttributeInfo(POSITION, MRayDataTypeRT(MR_VECTOR_3),    IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(NORMAL,   MRayDataTypeRT(MR_QUATERNION),  IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(UV0,      MRayDataTypeRT(MR_VECTOR_2),    IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(INDEX,    MRayDataTypeRT(MR_VECTOR_3UI),  IS_SCALAR, MR_MANDATORY)
+        PrimAttributeInfo(POSITION, MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3),    IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(NORMAL,   MRayDataTypeRT(MRayDataEnum::MR_QUATERNION),  IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(UV0,      MRayDataTypeRT(MRayDataEnum::MR_VECTOR_2),    IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(INDEX,    MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3UI),  IS_SCALAR, MR_MANDATORY)
     };
     return LogicList;
 }
@@ -419,18 +418,17 @@ void PrimGroupSkinnedTriangle::CommitReservations()
 
 PrimAttributeInfoList PrimGroupSkinnedTriangle::AttributeInfo() const
 {
-    using enum MRayDataEnum;
-    using enum PrimitiveAttributeLogic;
+    using enum PrimitiveAttributeLogic::E;
     using enum AttributeOptionality;
     using enum AttributeIsArray;
     static const PrimAttributeInfoList LogicList =
     {
-        PrimAttributeInfo(POSITION,     MRayDataTypeRT(MR_VECTOR_3),    IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(NORMAL,       MRayDataTypeRT(MR_QUATERNION),  IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(UV0,          MRayDataTypeRT(MR_VECTOR_2),    IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(WEIGHT,       MRayDataTypeRT(MR_UNORM_4x8),   IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(WEIGHT_INDEX, MRayDataTypeRT(MR_VECTOR_4UC),  IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(INDEX,        MRayDataTypeRT(MR_VECTOR_3UI),  IS_SCALAR, MR_MANDATORY)
+        PrimAttributeInfo(POSITION,     MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3),    IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(NORMAL,       MRayDataTypeRT(MRayDataEnum::MR_QUATERNION),  IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(UV0,          MRayDataTypeRT(MRayDataEnum::MR_VECTOR_2),    IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(WEIGHT,       MRayDataTypeRT(MRayDataEnum::MR_UNORM_4x8),   IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(WEIGHT_INDEX, MRayDataTypeRT(MRayDataEnum::MR_VECTOR_4UC),  IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(INDEX,        MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3UI),  IS_SCALAR, MR_MANDATORY)
     };
     return LogicList;
 }

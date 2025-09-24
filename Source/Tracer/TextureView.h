@@ -1,7 +1,8 @@
 #pragma once
-#include "Core/TracerI.h"
+
 #include "Core/Map.h"
 #include "Core/Variant.h"
+#include "Core/TracerAttribInfo.h"
 
 #include "Device/GPUTextureView.h"
 

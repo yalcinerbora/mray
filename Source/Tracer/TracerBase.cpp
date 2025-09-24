@@ -1448,7 +1448,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     if(!accelGenerator || !accelGGeneratorMap || !accelWGeneratorMap)
     {
         throw MRayError("[Tracer]: Unable to find accelerator generators for type \"{}\"",
-                        AcceleratorType::ToString(type.type));
+                        AcceleratorType::ToString(type.e));
     }
     accelerator = accelGenerator.value().get()
     (

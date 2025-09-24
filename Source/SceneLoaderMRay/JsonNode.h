@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/Types.h"
-#include "Core/TracerI.h"
 #include "Core/SceneLoaderI.h"
 #include "Core/Variant.h"
 

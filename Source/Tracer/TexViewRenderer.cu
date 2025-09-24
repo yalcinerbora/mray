@@ -390,9 +390,11 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
         // Don't bother reloading context if colorspace is same
         if(!spectrumContext || spectrumContext->ColorSpace() != curColorSpace)
         {
-            using enum WavelengthSampleMode;
+            using enum WavelengthSampleMode::E;
             using SC = SpectrumContextJakob2019;
-            spectrumContext = std::make_unique<SC>(curColorSpace, UNIFORM, gpuSystem);
+            spectrumContext = std::make_unique<SC>(curColorSpace,
+                                                   tracerView.tracerParams.wavelengthSampleMode,
+                                                   gpuSystem);
         }
 
         // Allocate sampling buffers
@@ -440,7 +442,7 @@ RendererOutput TexViewRenderer::DoRender()
     // Do not start writing to device side until copy is complete
     // (device buffer is read fully)
     processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
-    switch(currentOptions.mode)
+    switch(currentOptions.renderMode)
     {
         case Mode::SHOW_TILING:
         {

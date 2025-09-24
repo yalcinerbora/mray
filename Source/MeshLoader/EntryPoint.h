@@ -5,7 +5,6 @@
 #include <memory>
 
 #include "Core/MRayDataType.h"
-#include "Core/TracerI.h"
 
 #include "TransientPool/TransientPool.h"
 
@@ -17,6 +16,7 @@
 #endif
 
 struct MRayError;
+class PrimitiveAttributeLogic;
 
 using InnerIdList = const std::vector<uint32_t>;
 

@@ -453,7 +453,7 @@ void RenderImagePool::SaveImage(VisorGUI& visorGUI,
                 .mipCount = 1,
                 .pixelType = outPixelType,
                 .colorSpace = Pair<Float, MRayColorSpaceEnum>(gamma, colorSpace),
-                .readMode = MRayTextureReadMode::MR_END
+                .readMode = MRayTextureReadMode::MR_ENUM_END
             },
             .inputType = inPixelType,
             .pixels = Span<const Byte>(hStagePtr, paddedImageSize)

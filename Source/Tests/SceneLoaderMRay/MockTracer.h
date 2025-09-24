@@ -331,8 +331,7 @@ class TracerMock : public TracerI
 inline TracerMock::TracerMock(bool pl)
     : print(pl)
 {
-    using enum MRayDataEnum;
-    using enum PrimitiveAttributeLogic;
+    using enum PrimitiveAttributeLogic::E;
     using enum AttributeOptionality;
     using enum AttributeIsArray;
     using enum AttributeTexturable;
@@ -345,10 +344,10 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = PrimAttributeInfoList
         {
-            PrimAttributeInfo(POSITION, MRayDataTypeRT(MR_VECTOR_3),    IS_SCALAR, MR_MANDATORY),
-            PrimAttributeInfo(NORMAL,   MRayDataTypeRT(MR_QUATERNION),  IS_SCALAR, MR_OPTIONAL),
-            PrimAttributeInfo(UV0,      MRayDataTypeRT(MR_VECTOR_2),    IS_SCALAR, MR_OPTIONAL),
-            PrimAttributeInfo(INDEX,    MRayDataTypeRT(MR_VECTOR_3UI),  IS_SCALAR, MR_MANDATORY)
+            PrimAttributeInfo(POSITION, MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3),    IS_SCALAR, MR_MANDATORY),
+            PrimAttributeInfo(NORMAL,   MRayDataTypeRT(MRayDataEnum::MR_QUATERNION),  IS_SCALAR, MR_OPTIONAL),
+            PrimAttributeInfo(UV0,      MRayDataTypeRT(MRayDataEnum::MR_VECTOR_2),    IS_SCALAR, MR_OPTIONAL),
+            PrimAttributeInfo(INDEX,    MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3UI),  IS_SCALAR, MR_MANDATORY)
         },
         .name = "(P)Triangle"
     };
@@ -357,12 +356,12 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = PrimAttributeInfoList
         {
-            PrimAttributeInfo(POSITION,     MRayDataTypeRT(MR_VECTOR_3),    IS_SCALAR, MR_MANDATORY),
-            PrimAttributeInfo(NORMAL,       MRayDataTypeRT(MR_QUATERNION),  IS_SCALAR, MR_OPTIONAL),
-            PrimAttributeInfo(UV0,          MRayDataTypeRT(MR_VECTOR_2),    IS_SCALAR, MR_OPTIONAL),
-            PrimAttributeInfo(WEIGHT,       MRayDataTypeRT(MR_UNORM_4x8),   IS_SCALAR, MR_MANDATORY),
-            PrimAttributeInfo(WEIGHT_INDEX, MRayDataTypeRT(MR_VECTOR_4UC),  IS_SCALAR, MR_MANDATORY),
-            PrimAttributeInfo(INDEX,        MRayDataTypeRT(MR_VECTOR_3UI),  IS_SCALAR, MR_MANDATORY)
+            PrimAttributeInfo(POSITION,     MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3),    IS_SCALAR, MR_MANDATORY),
+            PrimAttributeInfo(NORMAL,       MRayDataTypeRT(MRayDataEnum::MR_QUATERNION),  IS_SCALAR, MR_OPTIONAL),
+            PrimAttributeInfo(UV0,          MRayDataTypeRT(MRayDataEnum::MR_VECTOR_2),    IS_SCALAR, MR_OPTIONAL),
+            PrimAttributeInfo(WEIGHT,       MRayDataTypeRT(MRayDataEnum::MR_UNORM_4x8),   IS_SCALAR, MR_MANDATORY),
+            PrimAttributeInfo(WEIGHT_INDEX, MRayDataTypeRT(MRayDataEnum::MR_VECTOR_4UC),  IS_SCALAR, MR_MANDATORY),
+            PrimAttributeInfo(INDEX,        MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3UI),  IS_SCALAR, MR_MANDATORY)
         },
         .name = "(P)TriangleSkinned"
     };
@@ -374,9 +373,9 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = MatAttributeInfoList
         {
-            MatAttributeInfo("albedo", MRayDataTypeRT(MR_VECTOR_3),
+            MatAttributeInfo("albedo", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3),
                              IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR),
-            MatAttributeInfo("normalMap", MRayDataTypeRT(MR_VECTOR_3),
+            MatAttributeInfo("normalMap", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3),
                              IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY, IS_PURE_DATA)
         },
         .name = "(Mt)Lambert"
@@ -385,15 +384,15 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = MatAttributeInfoList
         {
-            MatAttributeInfo("albedo", MRayDataTypeRT(MR_VECTOR_3),
+            MatAttributeInfo("albedo", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3),
                              IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR),
-            MatAttributeInfo("metallic", MRayDataTypeRT(MR_FLOAT),
+            MatAttributeInfo("metallic", MRayDataTypeRT(MRayDataEnum::MR_FLOAT),
                              IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
-            MatAttributeInfo("specular", MRayDataTypeRT(MR_FLOAT),
+            MatAttributeInfo("specular", MRayDataTypeRT(MRayDataEnum::MR_FLOAT),
                              IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
-            MatAttributeInfo("roughness", MRayDataTypeRT(MR_FLOAT),
+            MatAttributeInfo("roughness", MRayDataTypeRT(MRayDataEnum::MR_FLOAT),
                              IS_SCALAR, MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_PURE_DATA),
-            MatAttributeInfo("normalMap", MRayDataTypeRT(MR_VECTOR_3),
+            MatAttributeInfo("normalMap", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3),
                              IS_SCALAR, MR_OPTIONAL, MR_TEXTURE_ONLY, IS_PURE_DATA)
         },
         .name = "(Mt)Unreal"
@@ -421,7 +420,7 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = LightAttributeInfoList
         {
-            LightAttributeInfo("radiance", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+            LightAttributeInfo("radiance", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3), IS_SCALAR,
                                MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR)
         },
         .name = "(L)Skysphere"
@@ -430,7 +429,7 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = LightAttributeInfoList
         {
-            LightAttributeInfo("radiance", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+            LightAttributeInfo("radiance", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3), IS_SCALAR,
                                MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR)
         },
         .name ="(L)Prim(P)Triangle"
@@ -439,13 +438,13 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = LightAttributeInfoList
         {
-            LightAttributeInfo("radiance", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+            LightAttributeInfo("radiance", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3), IS_SCALAR,
                                MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR),
-            LightAttributeInfo("position", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+            LightAttributeInfo("position", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3), IS_SCALAR,
                                MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA),
-            LightAttributeInfo("right", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+            LightAttributeInfo("right", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3), IS_SCALAR,
                                MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA),
-            LightAttributeInfo("up", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+            LightAttributeInfo("up", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3), IS_SCALAR,
                                MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
         },
         .name = "(L)Rectangle"
@@ -458,10 +457,10 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = CamAttributeInfoList
         {
-            CamAttributeInfo("FovAndPlanes", MRayDataTypeRT(MR_VECTOR_4), IS_SCALAR, MR_MANDATORY),
-            CamAttributeInfo("gaze",         MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR, MR_MANDATORY),
-            CamAttributeInfo("position",     MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR, MR_MANDATORY),
-            CamAttributeInfo("up",           MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR, MR_MANDATORY)
+            CamAttributeInfo("FovAndPlanes", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_4), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("gaze",         MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("position",     MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3), IS_SCALAR, MR_MANDATORY),
+            CamAttributeInfo("up",           MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3), IS_SCALAR, MR_MANDATORY)
         },
         .name = "(C)Pinhole"
     };
@@ -478,7 +477,7 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = TransAttributeInfoList
         {
-            TransAttributeInfo("matrix", MRayDataTypeRT(MR_MATRIX_4x4), IS_SCALAR, MR_MANDATORY)
+            TransAttributeInfo("matrix", MRayDataTypeRT(MRayDataEnum::MR_MATRIX_4x4), IS_SCALAR, MR_MANDATORY)
         },
         .name = "(T)Single"
     };
@@ -486,7 +485,7 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = TransAttributeInfoList
         {
-            TransAttributeInfo("matrix", MRayDataTypeRT(MR_MATRIX_4x4), IS_ARRAY, MR_MANDATORY)
+            TransAttributeInfo("matrix", MRayDataTypeRT(MRayDataEnum::MR_MATRIX_4x4), IS_ARRAY, MR_MANDATORY)
         },
         .name = "(T)Multi"
     };
@@ -503,13 +502,13 @@ inline TracerMock::TracerMock(bool pl)
     {
         .attribInfo = TexturedAttributeInfoList
         {
-            MatAttributeInfo("sigmaA", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+            MatAttributeInfo("sigmaA", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3), IS_SCALAR,
                              MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
-            MatAttributeInfo("sigmaS", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+            MatAttributeInfo("sigmaS", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3), IS_SCALAR,
                              MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
-            MatAttributeInfo("emission", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+            MatAttributeInfo("emission", MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3), IS_SCALAR,
                              MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
-            MatAttributeInfo("hgPhase", MRayDataTypeRT(MR_FLOAT), IS_SCALAR,
+            MatAttributeInfo("hgPhase", MRayDataTypeRT(MRayDataEnum::MR_FLOAT), IS_SCALAR,
                              MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
         },
         .name = "(Md)Homogeneous"

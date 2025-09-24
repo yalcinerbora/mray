@@ -229,7 +229,7 @@ template<class EnumType, template<auto> class DataType, class Func, uint32_t O>
 auto StampIfOverEnum(UIntTConst<O>, Func&& F, unsigned int name) -> decltype(auto)
 {
     constexpr uint32_t STAMP_COUNT = 16;
-    constexpr uint32_t VSize = uint32_t(EnumType::MR_END);
+    constexpr uint32_t VSize = uint32_t(EnumType::MR_ENUM_END);
     [[maybe_unused]] int invokeCount = 0;
     // TODO: Check this at godbolt for code generation.
     #define COND_INVOKE(I)                                  \
@@ -341,7 +341,7 @@ constexpr MRayDataEnum MRayDataTypeRT::Name() const
 template<class Func>
 constexpr auto MRayDataTypeRT::SwitchCase(Func&& F) const -> decltype(auto)
 {
-    assert(name < MRayDataEnum::MR_END);
+    assert(name < MRayDataEnum::MR_ENUM_END);
     return DataTypeDetail::SwitchCaseAsIfStatements<MRayDataEnum, MRayDataType>
     (
         std::forward<Func>(F),
@@ -366,7 +366,7 @@ constexpr MRayPixelEnum MRayPixelTypeRT::Name() const
 template<class Func>
 constexpr auto MRayPixelTypeRT::SwitchCase(Func&& F) const -> decltype(auto)
 {
-    assert(name < MRayPixelEnum::MR_END);
+    assert(name < MRayPixelEnum::MR_ENUM_END);
     return DataTypeDetail::SwitchCaseAsIfStatements<MRayPixelEnum, MRayPixelType>
     (
         std::forward<Func>(F),

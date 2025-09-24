@@ -4,7 +4,7 @@
 
 #include "Core/Vector.h"
 #include "Core/TypeGenFunction.h"
-#include "Core/TracerI.h"
+#include "Core/TracerEnums.h"
 
 #include "Device/GPUSystem.h"
 #include "Device/GPUMemory.h"

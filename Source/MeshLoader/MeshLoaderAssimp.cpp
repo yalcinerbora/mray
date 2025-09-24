@@ -8,6 +8,7 @@
 #include "Core/Definitions.h"
 #include "Core/System.h"
 #include "Core/Profiling.h"
+#include "Core/TracerEnums.h"
 #include "TransientPool/TransientPool.h"
 
 MeshViewAssimp::MeshViewAssimp(uint32_t innerIndexIn, const MeshFileAssimp& fileIn)
@@ -62,8 +63,8 @@ TransientData PushVertexAttribute(PrimitiveAttributeLogic attribLogic,
                     sizeof(Float) * 3 * 2);
 
     const T* attributePtr;
-    using enum PrimitiveAttributeLogic;
-    switch(attribLogic)
+    using enum PrimitiveAttributeLogic::E;
+    switch(attribLogic.e)
     {
         case POSITION:
             attributePtr = reinterpret_cast<const T*>(mesh->mVertices);
@@ -80,7 +81,7 @@ TransientData PushVertexAttribute(PrimitiveAttributeLogic attribLogic,
         case UV0: case UV1:
         {
             // Manual push for uv
-            uint32_t texCoordIndex = (attribLogic == UV0) ? 0 : 1;
+            uint32_t texCoordIndex = (attribLogic.e == UV0) ? 0 : 1;
             for(unsigned int i = 0; i < mesh->mNumVertices; i++)
             {
                 T uv = T(mesh->mTextureCoords[texCoordIndex][i].x,
@@ -106,7 +107,7 @@ TransientData MeshViewAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
     auto annotation = _.AnnotateScope();
 
     const auto& mesh = assimpFile.scene->mMeshes[innerIndex];
-    if(attribLogic == PrimitiveAttributeLogic::INDEX)
+    if(attribLogic.e == PrimitiveAttributeLogic::INDEX)
     {
         TransientData input(std::in_place_type_t<Vector3ui>{}, mesh->mNumFaces);
         for(unsigned int i = 0; i < mesh->mNumFaces; i++)
@@ -122,8 +123,8 @@ TransientData MeshViewAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
     }
     else
     {
-        using enum PrimitiveAttributeLogic;
-        switch(attribLogic)
+        using enum PrimitiveAttributeLogic::E;
+        switch(attribLogic.e)
         {
             case POSITION:  return PushVertexAttribute<Vector3>(attribLogic, mesh);
             case NORMAL:    return PushVertexAttribute<Vector3>(attribLogic, mesh);
@@ -140,8 +141,8 @@ bool MeshViewAssimp::HasAttribute(PrimitiveAttributeLogic attribLogic) const
 {
     const auto& mesh = assimpFile.scene->mMeshes[innerIndex];
 
-    using enum PrimitiveAttributeLogic;
-    switch(attribLogic)
+    using enum PrimitiveAttributeLogic::E;
+    switch(attribLogic.e)
     {
         case INDEX:     return true;
         case POSITION:  return mesh->HasPositions();
@@ -158,16 +159,16 @@ MRayDataTypeRT MeshViewAssimp::AttributeLayout(PrimitiveAttributeLogic attribLog
 {
     // Assimp always loads to Vector3/2's so no need to check per-inner item etc.
     using enum MRayDataEnum;
-    if(attribLogic == PrimitiveAttributeLogic::POSITION ||
-       attribLogic == PrimitiveAttributeLogic::NORMAL ||
-       attribLogic == PrimitiveAttributeLogic::TANGENT ||
-       attribLogic == PrimitiveAttributeLogic::BITANGENT)
+    if(attribLogic.e == PrimitiveAttributeLogic::POSITION ||
+       attribLogic.e == PrimitiveAttributeLogic::NORMAL ||
+       attribLogic.e == PrimitiveAttributeLogic::TANGENT ||
+       attribLogic.e == PrimitiveAttributeLogic::BITANGENT)
         return MRayDataTypeRT(MR_VECTOR_3);
-    else if(attribLogic == PrimitiveAttributeLogic::UV0)
+    else if(attribLogic.e == PrimitiveAttributeLogic::UV0)
         return MRayDataTypeRT(MR_VECTOR_2);
-    else if(attribLogic == PrimitiveAttributeLogic::UV1)
+    else if(attribLogic.e == PrimitiveAttributeLogic::UV1)
         return MRayDataTypeRT(MR_VECTOR_2);
-    else if(attribLogic == PrimitiveAttributeLogic::INDEX)
+    else if(attribLogic.e == PrimitiveAttributeLogic::INDEX)
         return MRayDataTypeRT(MR_VECTOR_3UI);
     else
         throw MRayError("Unknown attribute logic!");

@@ -10,6 +10,8 @@
 
 #include "ImageLoader/ImageLoaderI.h"
 
+class TracerI;
+
 // Materials are little bit complex, it will be handled differently,
 // One std surface is "USDPreviewSurface" it is mega shader-like
 // material. We will try to bisect it. These are the lookups that will be

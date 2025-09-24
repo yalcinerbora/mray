@@ -558,7 +558,7 @@ int main(int argc, const char* argv[])
     std::string_view colorSpaceString = args[1];
 
     auto colorSpace = MRayColorSpaceStringifier::FromString(colorSpaceString);
-    if(colorSpace == MRayColorSpaceEnum::MR_END)
+    if(colorSpace == MRayColorSpaceEnum::MR_ENUM_END)
     {
         std::cerr << std::format("Unknown color space name ({})", colorSpaceString);
         return 1;

@@ -2,6 +2,7 @@
 
 #include "Core/ShapeFunctions.h"
 #include "Core/Profiling.h"
+#include "Core/TracerEnums.h"
 #include "TransientPool/TransientPool.h"
 
 #include <filesystem>
@@ -12,13 +13,13 @@ Optional<GFGVertexComponent> MeshViewGFG::FindComponent(PrimitiveAttributeLogic 
     for(const GFGVertexComponent& c : gfgFile.loader.Header().meshes[innerIndex].components)
     {
         using enum GFGVertexComponentLogic;
-        bool eq = ((c.logic == POSITION     && l == PrimitiveAttributeLogic::POSITION)  ||
-                   (c.logic == NORMAL       && l == PrimitiveAttributeLogic::NORMAL)    ||
-                   (c.logic == BINORMAL     && l == PrimitiveAttributeLogic::BITANGENT) ||
-                   (c.logic == TANGENT      && l == PrimitiveAttributeLogic::TANGENT)   ||
-                   (c.logic == UV           && l == PrimitiveAttributeLogic::UV0)       ||
-                   (c.logic == WEIGHT       && l == PrimitiveAttributeLogic::WEIGHT)    ||
-                   (c.logic == WEIGHT_INDEX && l == PrimitiveAttributeLogic::WEIGHT_INDEX));
+        bool eq = ((c.logic == POSITION     && l.e == PrimitiveAttributeLogic::POSITION)  ||
+                   (c.logic == NORMAL       && l.e == PrimitiveAttributeLogic::NORMAL)    ||
+                   (c.logic == BINORMAL     && l.e == PrimitiveAttributeLogic::BITANGENT) ||
+                   (c.logic == TANGENT      && l.e == PrimitiveAttributeLogic::TANGENT)   ||
+                   (c.logic == UV           && l.e == PrimitiveAttributeLogic::UV0)       ||
+                   (c.logic == WEIGHT       && l.e == PrimitiveAttributeLogic::WEIGHT)    ||
+                   (c.logic == WEIGHT_INDEX && l.e == PrimitiveAttributeLogic::WEIGHT_INDEX));
         if(eq) return c;
     }
     return std::nullopt;
@@ -190,7 +191,7 @@ uint32_t MeshViewGFG::InnerIndex() const
 bool MeshViewGFG::HasAttribute(PrimitiveAttributeLogic logic) const
 {
     // By definition, GFG is indexed.
-    if(logic == PrimitiveAttributeLogic::INDEX)
+    if(logic.e == PrimitiveAttributeLogic::INDEX)
         return true;
     return FindComponent(logic).has_value();
 }
@@ -202,7 +203,7 @@ TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
     static const ProfilerAnnotation _("GFG Load Prim Data");
     auto annotation = _.AnnotateScope();
 
-    if(logic == PrimitiveAttributeLogic::INDEX)
+    if(logic.e == PrimitiveAttributeLogic::INDEX)
     {
         uint64_t totalByteSize = gfgFile.loader.MeshIndexDataSize(innerIndex);
         uint64_t dtSize;
@@ -244,7 +245,7 @@ TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
         OptionalComponent c = FindComponent(logic);
         if(!c.has_value())
             throw MRayError("GFG: File do not have attribute of {}, \"{}\"",
-                            PrimAttributeStringifier::ToString(logic),
+                            PrimitiveAttributeLogic::ToString(logic.e),
                             gfgFile.Name());
         const auto& comp = c.value();
         MRayDataTypeRT type = GFGDataTypeToMRayDataType(comp.dataType);
@@ -280,7 +281,7 @@ MRayDataTypeRT MeshViewGFG::AttributeLayout(PrimitiveAttributeLogic logic) const
 {
     using enum MRayDataEnum;
     const GFGMeshHeader& m = gfgFile.loader.Header().meshes[innerIndex];
-    if(logic == PrimitiveAttributeLogic::INDEX)
+    if(logic.e == PrimitiveAttributeLogic::INDEX)
     {
         switch(m.headerCore.indexSize)
         {
@@ -295,7 +296,7 @@ MRayDataTypeRT MeshViewGFG::AttributeLayout(PrimitiveAttributeLogic logic) const
     OptionalComponent c = FindComponent(logic);
     if(!c.has_value())
         throw MRayError("GFG: File do not have attribute of {}, \"{}\"",
-                        PrimAttributeStringifier::ToString(logic),
+                        PrimitiveAttributeLogic::ToString(logic.e),
                         gfgFile.Name());
 
     const auto& comp = c.value();

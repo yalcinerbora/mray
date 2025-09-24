@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/TracerI.h"
+#include "Core/TracerConstants.h"
 
 #include "Device/GPUSystemForward.h"
 #include "Device/GPUTypes.h"

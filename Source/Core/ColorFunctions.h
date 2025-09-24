@@ -91,10 +91,11 @@ namespace Color
 
     // Ad-hoc fitted gaussian of full CIE 1931 Observer
     // https://www.desmos.com/calculator/zepnypxnmd
-    inline constexpr Vector2 CIE_1931_MIS = Vector2(0.384615384615, 0.615384615385);
-    inline constexpr Vector2 CIE_1931_GAUSS_SIGMA = Vector2(25, 48);
-    inline constexpr Vector2 CIE_1931_GAUSS_MU = Vector2(452, 576);
-    static_assert(CIE_1931_MIS.Sum() == Float(1), "Wrong MIS Ratio for CIE_1931 Gaussians!");
+    inline constexpr Vector2 CIE_1931_MIS           = Vector2(0.384615384615, 0.615384615385);
+    inline constexpr Vector2 CIE_1931_GAUSS_SIGMA   = Vector2(25, 48);
+    inline constexpr Vector2 CIE_1931_GAUSS_MU      = Vector2(452, 576);
+    static_assert(CIE_1931_MIS.Sum() == Float(1),
+                  "Non-normalized MIS Ratio for CIE_1931 Gaussians!");
 
     const std::array<Float, CIE_1931_N>&
     SelectIlluminantSPD(MRayColorSpaceEnum);
@@ -352,7 +353,8 @@ MR_PF_DEF Matrix3x3 Color::GenXYZToRGB(const Primaries& p) noexcept
 MR_PF_DEF Color::Primaries Color::FindPrimaries(MRayColorSpaceEnum E)
 {
     using ColorspacePrimaryList = std::array<Tuple<MRayColorSpaceEnum, Primaries>,
-                                             static_cast<size_t>(MRayColorSpaceEnum::MR_END)>;
+                                             size_t(MRayColorSpaceEnum::MR_ENUM_END
+                                             )>;
 
     using enum MRayColorSpaceEnum;
     constexpr ColorspacePrimaryList PRIM_LIST =

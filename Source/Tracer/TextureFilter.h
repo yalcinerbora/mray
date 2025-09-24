@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Core/TracerI.h"
 #include "Core/TypeGenFunction.h"
+#include "Core/TracerEnums.h"
 
 #include "Device/GPUSystemForward.h"
 

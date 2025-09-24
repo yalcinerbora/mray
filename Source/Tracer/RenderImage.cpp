@@ -1,4 +1,5 @@
 #include "RenderImage.h"
+
 #include "Core/TracerI.h"
 
 #ifdef MRAY_GPU_BACKEND_CPU

@@ -3,7 +3,6 @@
 #include <concepts>
 
 #include "Core/MathForward.h"
-#include "Core/TracerI.h"
 #include "Core/TypeNameGenerators.h"
 
 #include "GenericGroup.h"

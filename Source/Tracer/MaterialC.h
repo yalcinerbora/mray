@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/Types.h"
-#include "Core/TracerI.h"
 
 #include "TracerTypes.h"
 #include "GenericGroup.h"

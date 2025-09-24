@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Core/MPMCQueue.h"
-#include "Core/TracerI.h"
 #include "Core/TimelineSemaphore.h"
 #include "Core/Variant.h"
+#include "Core/TracerAttribInfo.h"
 
 #include "AnalyticStructs.h"
 #include "RenderImageStructs.h"

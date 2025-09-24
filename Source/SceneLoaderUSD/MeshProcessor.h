@@ -19,9 +19,13 @@
 
 #include "Core/Vector.h"
 #include "Core/DataStructures.h"
-#include "Core/TracerI.h"
 #include "Core/BitFunctions.h"
+#include "Core/MemAlloc.h"
+#include "Core/TracerAttribInfo.h"
 
+#include "TransientPool/TransientPool.h"
+
+class TracerI;
 class ThreadPool;
 class AttributeIndexer;
 struct CollapsedPrims;

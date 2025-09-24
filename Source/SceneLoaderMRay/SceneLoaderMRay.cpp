@@ -1,7 +1,7 @@
 #include "SceneLoaderMRay.h"
 
-#include "Core/Math.h"
 #include "Core/TracerI.h"
+#include "Core/Math.h"
 #include "Core/Log.h"
 #include "Core/Timer.h"
 #include "Core/Filesystem.h"
@@ -353,8 +353,7 @@ void LoadPrimitive(TracerI& tracer,
                    PrimBatchId batchId,
                    const MeshFileViewI* meshFileView)
 {
-    using enum MRayDataEnum;
-    using enum PrimitiveAttributeLogic;
+    using enum PrimitiveAttributeLogic::E;
     const auto& attributeList = tracer.AttributeInfo(groupId);
     // Meshes are quite different from other type groups,
     // Types should somewhat make sense since there are many file types
@@ -397,7 +396,7 @@ void LoadPrimitive(TracerI& tracer,
             throw MRayError("Mesh File{:s}:[{:d}] do not have \"{}\" "
                             "which is mandatory for {}",
                             meshFileView->Name(), meshFileView->InnerIndex(),
-                            PrimAttributeStringifier::ToString(attribLogic),
+                            PrimitiveAttributeLogic::ToString(attribLogic.e),
                             tracer.TypeName(groupId));
         }
         // Data is available...
@@ -405,11 +404,11 @@ void LoadPrimitive(TracerI& tracer,
         // Convert normal/tangent to quaternion, store it as normal
         // normals are defined as to tangent space transformations
         // (shading tangent space that is)
-        if(attribLogic == NORMAL && groupsLayout.Name() == MR_QUATERNION &&
+        if(attribLogic.e == NORMAL && groupsLayout.Name() == MRayDataEnum::MR_QUATERNION &&
            meshFileView->HasAttribute(TANGENT) && meshFileView->HasAttribute(BITANGENT) &&
-           meshFileView->AttributeLayout(TANGENT).Name() == MR_VECTOR_3 &&
-           meshFileView->AttributeLayout(BITANGENT).Name() == MR_VECTOR_3 &&
-           meshFileView->AttributeLayout(NORMAL).Name() == MR_VECTOR_3)
+           meshFileView->AttributeLayout(TANGENT).Name() == MRayDataEnum::MR_VECTOR_3 &&
+           meshFileView->AttributeLayout(BITANGENT).Name() == MRayDataEnum::MR_VECTOR_3 &&
+           meshFileView->AttributeLayout(NORMAL).Name() == MRayDataEnum::MR_VECTOR_3)
         {
             static const ProfilerAnnotation _("Prim Normal to Quat");
             auto annotation = _.AnnotateScope();
@@ -468,7 +467,7 @@ void LoadPrimitive(TracerI& tracer,
                             "(has type {:s}) does not match the {}'s data layout "
                             "(which is {:s})",
                             meshFileView->Name(), meshFileView->InnerIndex(),
-                            PrimAttributeStringifier::ToString(attribLogic),
+                            PrimitiveAttributeLogic::ToString(attribLogic.e),
                             MRayDataTypeStringifier::ToString(filesLayout.Name()),
                             tracer.TypeName(groupId),
                             MRayDataTypeStringifier::ToString(groupsLayout.Name()));

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/TracerI.h"
+#include "Core/TracerAttribInfo.h"
 #include "TracerTypes.h"
 
 template<class KeyType>

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/System.h"
-#include "Core/TracerI.h"
 
 class TracerI;
 struct TracerParameters;

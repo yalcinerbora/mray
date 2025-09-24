@@ -5,6 +5,7 @@
 #include <iosfwd>
 
 class MeshFileGFG;
+class PrimitiveAttributeLogic;
 
 class MeshViewGFG : public MeshFileViewI
 {

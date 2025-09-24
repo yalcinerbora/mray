@@ -13,7 +13,6 @@
 #include "Texture.h"
 #include "TextureFilter.h"
 
-#include "Core/TracerI.h"
 #include "Core/Algorithm.h"
 #include "Core/TypePack.h"
 

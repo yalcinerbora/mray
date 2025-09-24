@@ -1,8 +1,11 @@
 #pragma once
 
+#include "TextureCommon.h"
+
 #include "Device/GPUSystemForward.h"
 
-#include "TextureCommon.h"
+#include "Core/Vector.h"
+#include "Core/Span.h"
 
 class GenericTexture;
 struct TracerSurfRef;

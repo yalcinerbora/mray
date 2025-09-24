@@ -1,6 +1,8 @@
 #include "MeshLoaderJson.h"
 #include "JsonNode.h"
+
 #include "Core/ShapeFunctions.h"
+#include "Core/TracerEnums.h"
 
 // TODO: This is bad design reiterate over this
 JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
@@ -189,8 +191,8 @@ uint32_t JsonTriangle::InnerIndex() const
 
 bool JsonTriangle::HasAttribute(PrimitiveAttributeLogic attribLogic) const
 {
-    using enum PrimitiveAttributeLogic;
-    switch(attribLogic)
+    using enum PrimitiveAttributeLogic::E;
+    switch(attribLogic.e)
     {
         case POSITION:
         case INDEX:
@@ -215,8 +217,8 @@ TransientData JsonTriangle::GetAttribute(PrimitiveAttributeLogic attribLogic) co
         return result;
     };
 
-    using enum PrimitiveAttributeLogic;
-    switch(attribLogic)
+    using enum PrimitiveAttributeLogic::E;
+    switch(attribLogic.e)
     {
         case POSITION:  return ExplicitCopy.operator()<Vector3>(positions);
         case NORMAL:    return ExplicitCopy.operator()<Vector3>(normals.value());
@@ -231,14 +233,14 @@ TransientData JsonTriangle::GetAttribute(PrimitiveAttributeLogic attribLogic) co
 MRayDataTypeRT JsonTriangle::AttributeLayout(PrimitiveAttributeLogic attribLogic) const
 {
     using enum MRayDataEnum;
-    if(attribLogic == PrimitiveAttributeLogic::POSITION ||
-       attribLogic == PrimitiveAttributeLogic::NORMAL ||
-       attribLogic == PrimitiveAttributeLogic::TANGENT ||
-       attribLogic == PrimitiveAttributeLogic::BITANGENT)
+    if(attribLogic.e == PrimitiveAttributeLogic::POSITION ||
+       attribLogic.e == PrimitiveAttributeLogic::NORMAL   ||
+       attribLogic.e == PrimitiveAttributeLogic::TANGENT  ||
+       attribLogic.e == PrimitiveAttributeLogic::BITANGENT)
         return MRayDataTypeRT(MR_VECTOR_3);
-    else if(attribLogic == PrimitiveAttributeLogic::UV0)
+    else if(attribLogic.e == PrimitiveAttributeLogic::UV0)
         return MRayDataTypeRT(MR_VECTOR_2);
-    else if(attribLogic == PrimitiveAttributeLogic::INDEX)
+    else if(attribLogic.e == PrimitiveAttributeLogic::INDEX)
         return MRayDataTypeRT(MR_VECTOR_3UI);
     else
         throw MRayError("Unknown attribute logic!");
@@ -282,8 +284,8 @@ uint32_t JsonSphere::InnerIndex() const
 
 bool JsonSphere::HasAttribute(PrimitiveAttributeLogic attribLogic) const
 {
-    using enum PrimitiveAttributeLogic;
-    switch(attribLogic)
+    using enum PrimitiveAttributeLogic::E;
+    switch(attribLogic.e)
     {
         case POSITION:  return true;
         case RADIUS:    return true;
@@ -294,14 +296,14 @@ bool JsonSphere::HasAttribute(PrimitiveAttributeLogic attribLogic) const
 TransientData JsonSphere::GetAttribute(PrimitiveAttributeLogic attribLogic) const
 {
     using namespace JsonMeshNames;
-    if(attribLogic == PrimitiveAttributeLogic::POSITION)
+    if(attribLogic.e == PrimitiveAttributeLogic::POSITION)
     {
         TransientData result(std::in_place_type_t<Vector3>{}, 1);
         result.Push(Span<const Vector3>(&position, 1));
         assert(result.IsFull());
         return result;
     }
-    else if(attribLogic == PrimitiveAttributeLogic::RADIUS)
+    else if(attribLogic.e == PrimitiveAttributeLogic::RADIUS)
     {
         TransientData result(std::in_place_type_t<Float>{}, 1);
         result.Push(Span<const Float>(&radius, 1));
@@ -313,12 +315,11 @@ TransientData JsonSphere::GetAttribute(PrimitiveAttributeLogic attribLogic) cons
 
 MRayDataTypeRT JsonSphere::AttributeLayout(PrimitiveAttributeLogic attribLogic) const
 {
-    using enum MRayDataEnum;
-    using enum PrimitiveAttributeLogic;
-    switch(attribLogic)
+    using enum PrimitiveAttributeLogic::E;
+    switch(attribLogic.e)
     {
-        case POSITION:  return MRayDataTypeRT(MR_VECTOR_3);
-        case RADIUS:    return MRayDataTypeRT(MR_FLOAT);
+        case POSITION:  return MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3);
+        case RADIUS:    return MRayDataTypeRT(MRayDataEnum::MR_FLOAT);
         default:        throw MRayError("Unknown attribute logic!");
     }
 }

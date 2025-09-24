@@ -38,9 +38,9 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     };
     struct Options
     {
-        uint32_t totalSPP   = 32;
-        bool     isSpectral = false;
-        Mode     mode       = SHOW_TEXTURES;
+        uint32_t    totalSPP   = 32;
+        bool        isSpectral = false;
+        Mode        renderMode = SHOW_TEXTURES;
     };
 
     private:

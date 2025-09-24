@@ -8,8 +8,8 @@
 #include "Core/DataStructures.h"
 #include "Core/Flag.h"
 #include "Core/MRayDataType.h"
-#include "Core/TracerI.h"
 #include "Core/Expected.h"
+#include "Core/TracerConstants.h"
 
 #include "TransientPool/TransientPool.h"
 

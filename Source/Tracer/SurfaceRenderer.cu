@@ -361,10 +361,10 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     curTMaxAO *= currentOptions.tMaxAORatio;
 
     // Finally generate RNG
-    auto RngGen = tracerView.rngGenerators.at(tracerView.tracerParams.samplerType.type);
+    auto RngGen = tracerView.rngGenerators.at(tracerView.tracerParams.samplerType.e);
     if(!RngGen)
         throw MRayError("[{}]: Unknown random number generator type {}.", TypeName(),
-                        uint32_t(tracerView.tracerParams.samplerType.type));
+                        uint32_t(tracerView.tracerParams.samplerType.e));
     uint32_t generatorCount = (rIP.regionMax - rIP.regionMin).Multiply();
     uint64_t seed = tracerView.tracerParams.seed;
     rnGenerator = RngGen->get()(std::move(generatorCount),

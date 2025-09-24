@@ -29,37 +29,44 @@ void from_json(const nlohmann::json& node, FilterType& t)
     auto radius = node.at(FilterType::RADIUS_NAME).get<Float>();
 
     FilterType::E type = FilterType::FromString(name);
-    if(type == FilterType::END)
+    if(type == FilterType::MR_ENUM_END)
         throw MRayError("Unknown filter type name \"{}\"",
                         name);
     t = FilterType{type, radius};
 }
 
-void from_json(const nlohmann::json& node, AcceleratorType& t)
+void from_json(const nlohmann::json& node, AcceleratorType::E& t)
 {
     auto name = node.get<std::string_view>();
-    AcceleratorType::E type = AcceleratorType::FromString(name);
-    if(type == AcceleratorType::END)
+    t = AcceleratorType::FromString(name);
+    if(t == AcceleratorType::MR_ENUM_END)
         throw MRayError("Unknown accelerator type name \"{}\"",
                         name);
-    t = AcceleratorType{type};
 }
 
-void from_json(const nlohmann::json& node, SamplerType& t)
+void from_json(const nlohmann::json& node, SamplerType::E& t)
 {
     auto name = node.get<std::string_view>();
-    SamplerType::E type = SamplerType::FromString(name);
-    if(type == SamplerType::END)
+    t = SamplerType::FromString(name);
+    if(t == SamplerType::MR_ENUM_END)
         throw MRayError("Unknown sampler type name \"{}\"",
                         name);
-    t = SamplerType{type};
+}
+
+void from_json(const nlohmann::json& node, WavelengthSampleMode::E& t)
+{
+    auto name = node.get<std::string_view>();
+    t = WavelengthSampleMode::FromString(name);
+    if(t == WavelengthSampleMode::MR_ENUM_END)
+        throw MRayError("Unknown wavelength sample mode name \"{}\"",
+                        name);
 }
 
 void from_json(const nlohmann::json& node, MRayColorSpaceEnum& t)
 {
     auto name = node.get<std::string_view>();
     MRayColorSpaceEnum e = MRayColorSpaceStringifier::FromString(name);
-    if(e == MRayColorSpaceEnum::MR_END)
+    if(e == MRayColorSpaceEnum::MR_ENUM_END)
         throw MRayError("Unknown color space \"{}\"", name);
     t = e;
 }
@@ -85,15 +92,16 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
     static constexpr auto TEX_COLOR_SPACE_NAME  = "globalTexColorSpace"sv;
     static constexpr auto MIP_GEN_FILTER_NAME   = "mipGenFilter"sv;
     static constexpr auto FILM_FILTER_NAME      = "filmFilter"sv;
+    static constexpr auto WLSAMPLE_MODE_NAME    = "wavelengthSampleMode"sv;
     //static constexpr auto PARTITION_LOGIC_NAME  = "partitionLogic"sv;
 
     nlohmann::json configJson;
-    auto OptionalFetch = [](auto& outEntry, std::string_view NAME,
-                            const nlohmann::json& inJson) -> void
+    auto OptionalFetch = []<class T>(T& outEntry, std::string_view NAME,
+                                     const nlohmann::json& inJson) -> void
     {
         const auto it = inJson.find(NAME);
         if(it != inJson.cend())
-            outEntry = *it;
+            outEntry = it->get<T>();
     };
 
     try
@@ -117,14 +125,16 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
         if(paramsJson.empty()) return config;
 
         OptionalFetch(config.params.seed, SEED_NAME, paramsJson);
-        OptionalFetch(config.params.accelMode, ACCEL_TYPE_NAME, paramsJson);
+        OptionalFetch(config.params.accelMode.e, ACCEL_TYPE_NAME, paramsJson);
         OptionalFetch(config.params.parallelizationHint, PAR_HINT_NAME, paramsJson);
-        OptionalFetch(config.params.samplerType, SAMPLER_TYPE_NAME, paramsJson);
+        OptionalFetch(config.params.samplerType.e, SAMPLER_TYPE_NAME, paramsJson);
         OptionalFetch(config.params.clampedTexRes, CLAMP_TEX_RES_NAME, paramsJson);
         OptionalFetch(config.params.genMips, GEN_MIP_NAME, paramsJson);
         OptionalFetch(config.params.globalTextureColorSpace, TEX_COLOR_SPACE_NAME, paramsJson);
         OptionalFetch(config.params.mipGenFilter, MIP_GEN_FILTER_NAME, paramsJson);
         OptionalFetch(config.params.filmFilter, FILM_FILTER_NAME, paramsJson);
+        OptionalFetch(config.params.wavelengthSampleMode.e, WLSAMPLE_MODE_NAME, paramsJson);
+
         // TODO: Add this later
         //OptionalFetch(config.params.partitionLogic, PARTITION_LOGIC_NAME, paramsJson);
         return config;
@@ -994,7 +1004,7 @@ void TracerThread::DisplayTypeAttributes(std::string_view typeName)
             AttributeOptionality isOptional = a.isOptional;
 
             MRAY_LOG("{:<16} | {:<16} | {:<6s} | {:<9s}",
-                     PrimAttributeStringifier::ToString(logic),
+                     PrimitiveAttributeLogic::ToString(logic.e),
                      MRayDataTypeStringifier::ToString(layout.Name()),
                      isArray == AttributeIsArray::IS_ARRAY,
                      isOptional == AttributeOptionality::MR_OPTIONAL);

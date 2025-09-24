@@ -22,7 +22,10 @@ set(SRC_SYSTEM
 
 set(SRC_INTERFACES
     ${CURRENT_SOURCE_DIR}/SceneLoaderI.h
-    ${CURRENT_SOURCE_DIR}/TracerI.h)
+    ${CURRENT_SOURCE_DIR}/TracerI.h
+    ${CURRENT_SOURCE_DIR}/TracerEnums.h
+    ${CURRENT_SOURCE_DIR}/TracerConstants.h
+    ${CURRENT_SOURCE_DIR}/TracerAttribInfo.h)
 
 set(SRC_MATH
     ${CURRENT_SOURCE_DIR}/AABB.h

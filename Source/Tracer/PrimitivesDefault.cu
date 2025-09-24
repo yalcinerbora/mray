@@ -25,16 +25,15 @@ void PrimGroupSphere::CommitReservations()
 
 PrimAttributeInfoList PrimGroupSphere::AttributeInfo() const
 {
-    using enum MRayDataEnum;
-    using enum PrimitiveAttributeLogic;
+    using enum PrimitiveAttributeLogic::E;
     using enum AttributeOptionality;
     using enum AttributeIsArray;
     // Here we mark them as "IS_SCALAR", because primitive group is group of primitives
     // and not primitive batches
     static const PrimAttributeInfoList LogicList =
     {
-        PrimAttributeInfo(POSITION, MRayDataTypeRT(MR_VECTOR_3),IS_SCALAR, MR_MANDATORY),
-        PrimAttributeInfo(RADIUS,   MRayDataTypeRT(MR_FLOAT),   IS_SCALAR, MR_MANDATORY)
+        PrimAttributeInfo(POSITION, MRayDataTypeRT(MRayDataEnum::MR_VECTOR_3),IS_SCALAR, MR_MANDATORY),
+        PrimAttributeInfo(RADIUS,   MRayDataTypeRT(MRayDataEnum::MR_FLOAT),   IS_SCALAR, MR_MANDATORY)
     };
     return LogicList;
 }

@@ -1,22 +1,20 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
+#include <type_traits>
 
-#include "Definitions.h"
-#include "Vector.h"
-#include "MRayDataType.h"
-#include "DataStructures.h"
-#include "MRayDescriptions.h"
-#include "TypePack.h"
+#include "TracerConstants.h"
+#include "TracerAttribInfo.h"
 
 #include "Common/RenderImageStructs.h"
 
-#include "TransientPool/TransientPool.h"
-
-#define MRAY_GENERIC_ID(NAME, TYPE) enum class NAME : TYPE {}
-
-using CommonId = MRay::CommonKey;
-using CommonIdRange = Vector<2, CommonId>;
+// Only TransientData is exposed to the user
+namespace TransientPoolDetail
+{
+    class TransientData;
+}
+using TransientData = TransientPoolDetail::TransientData;
 
 // std::numeric_limits<IdType>::max() returns **ZERO** !!!!
 // This should be reported I think?
@@ -43,222 +41,27 @@ struct RenderImageParams
     Vector2ui               regionMax;
 };
 
-enum class PrimitiveAttributeLogic : uint8_t
-{
-    POSITION,
-    INDEX,
-    NORMAL,
-    RADIUS,
-    TANGENT,
-    BITANGENT,
-    UV0,
-    UV1,
-    WEIGHT,
-    WEIGHT_INDEX,
-
-    END
-};
-
-namespace TracerConstants
-{
-    // This is utilized by static vectors to evade heap,
-    // this is currently "small" 65K x 65K textures are max
-    static constexpr size_t MaxTextureMipCount = 16;
-    // Primitive/Material pairs can be batched and a single
-    // accelerator is constructed per batch this is the upper limit
-    // of such pairs
-    static constexpr size_t MaxPrimBatchPerSurface = 8;
-    // Each "group" can have at most N different attributes
-    // (i.e., a triangle primitive's "position" "normal" "uv" etc.)
-    static constexpr size_t MaxAttributePerGroup = 16;
-    // Same as above but for renderer
-    static constexpr size_t MaxRendererAttributeCount = 32;
-    // Renderer can define at most N work per Mat/Prim/Transform
-    // triplet. Most of the time single work definition is enough.
-    // but some renderers (surface renderer) may define multiple
-    // works, and change the work logic according to input parameters
-    static constexpr size_t MaxRenderWorkPerTriplet = 4;
-    // Accelerator report hits as barycentric coordinates for triangles,
-    // and spherical coordinates for spheres. So two is currently enough.
-    // Volume hits will require 3 (local space x, y, z) for hits probably
-    // but these can be generated from position.
-    // In future, there may be different primitives require more that two
-    // hit parametrization (This should rarely be an issue since surfaces
-    // are inherently 2D), and this may be changed
-    static constexpr size_t MaxHitFloatCount = 2;
-    // Maximum camera size, a renderer will allocate this
-    // much memory, and camera should fit into this.
-    // This will be compile time checked.
-    static constexpr size_t MaxCameraInstanceByteSize = 512;
-
-    static constexpr std::string_view IdentityTransName = "(T)Identity";
-    static constexpr std::string_view NullLightName     = "(L)Null";
-    static constexpr std::string_view EmptyPrimName     = "(P)Empty";
-    static constexpr std::string_view VacuumMediumName  = "(Md)Vacuum";
-
-    static constexpr std::string_view LIGHT_PREFIX      = "(L)";
-    static constexpr std::string_view TRANSFORM_PREFIX  = "(T)";
-    static constexpr std::string_view PRIM_PREFIX       = "(P)";
-    static constexpr std::string_view MAT_PREFIX        = "(Mt)";
-    static constexpr std::string_view CAM_PREFIX        = "(C)";
-    static constexpr std::string_view MEDIUM_PREFIX     = "(Md)";
-    static constexpr std::string_view ACCEL_PREFIX      = "(A)";
-    static constexpr std::string_view RENDERER_PREFIX   = "(R)";
-    static constexpr std::string_view WORK_PREFIX       = "(W)";
-}
-
-// Accelerators are responsible for accelerating ray/surface interactions
-// This is abstracted away but exposed to the user for prototyping different
-// accelerators. This is less useful due to hw-accelerated ray tracing.
-//
-// The old design supported mixing and matching "Base Accelerator"
-// (TLAS, IAS on other APIs) with bottom-level accelerators. This
-// design only enables the user to set a single accelerator type
-// for the entire scene. Hardware acceleration APIs, such asOptiX,
-// did not support it anyway so it is removed. Internally software stack
-// utilizes the old implementation for simulating two-level acceleration
-// hierarchy.
-//
-// Currently Accepted types are
-//
-//  -- SOFTWARE_NONE :  No acceleration, ray caster does a !LINEAR SEARCH! over the
-//                      primitives (Should not be used, it is for debugging,
-//                      testing etc.)
-//  -- SOFTWARE_BVH  :  Very basic LBVH. Each triangle's center is converted to
-//                      a morton code and these are sorted. Provided for completeness
-//                      sake and should not be used.
-//  -- HARDWARE      :  On CUDA, it utilizes OptiX for hardware acceleration.
-class AcceleratorType
-{
-    public:
-    enum E
-    {
-        SOFTWARE_NONE,
-        SOFTWARE_BASIC_BVH,
-        HARDWARE,
-
-        END
-    };
-
-    private:
-    static constexpr std::array<std::string_view, static_cast<size_t>(END)> Names =
-    {
-        "Linear",
-        "BVH",
-        "Hardware"
-    };
-
-    public:
-    E type;
-
-    // We use this on a map, so overload less
-    bool operator<(AcceleratorType t) const;
-
-    static constexpr std::string_view   ToString(E e);
-    static constexpr E                  FromString(std::string_view e);
-};
-
-class SamplerType
-{
-    public:
-    enum E
-    {
-        INDEPENDENT,
-
-        END
-    };
-
-    private:
-    static constexpr std::array<std::string_view, static_cast<size_t>(END)> Names =
-    {
-        "Independent"
-    };
-
-    public:
-    E type;
-
-    static constexpr std::string_view   ToString(E e);
-    static constexpr E                  FromString(std::string_view e);
-};
-
-class FilterType
-{
-    public:
-    enum E
-    {
-        BOX,
-        TENT,
-        GAUSSIAN,
-        MITCHELL_NETRAVALI,
-
-        END
-    };
-
-    private:
-    static constexpr std::array<std::string_view, static_cast<size_t>(END)> Names =
-    {
-        "Box",
-        "Tent",
-        "Gaussian",
-        "Mitchell-Netravali"
-    };
-
-    public:
-    E       type;
-    Float   radius;
-
-    static constexpr auto TYPE_NAME = "type";
-    static constexpr auto RADIUS_NAME = "radius";
-
-    static constexpr std::string_view   ToString(E e);
-    static constexpr E                  FromString(std::string_view e);
-};
-
 struct TracerParameters
 {
     // Random Seed value, many samplers etc.
     // will start via this seed if applicable
-    uint64_t        seed = 0;
+    uint64_t            seed = 0;
     // Accelerator mode, software/hardware etc.
-    AcceleratorType accelMode = AcceleratorType{ AcceleratorType::HARDWARE };
+    AcceleratorType     accelMode = AcceleratorType::HARDWARE;
     // Item pool size, amount of "items" (paths/rays/etc) processed
     // in parallel
-    uint32_t    parallelizationHint = 1 << 21; // 2^21 ~= 2M
+    uint32_t            parallelizationHint = 1 << 21; // 2^21 ~= 2M
     // Current sampler logic,
-    SamplerType samplerType = SamplerType{ SamplerType::INDEPENDENT };
+    SamplerType         samplerType = SamplerType::INDEPENDENT;
     // Texture Related
     uint32_t            clampedTexRes = std::numeric_limits<uint32_t>::max();
     bool                genMips = false;
     FilterType          mipGenFilter = FilterType{ FilterType::GAUSSIAN, 2.0f };
     MRayColorSpaceEnum  globalTextureColorSpace = MRayColorSpaceEnum::MR_ACES_CG;
-
     // Film Related
     FilterType          filmFilter = FilterType{FilterType::GAUSSIAN, 1.0f};
-};
-
-enum class AttributeOptionality : uint8_t
-{
-    MR_MANDATORY,
-    MR_OPTIONAL
-};
-
-enum class AttributeTexturable : uint8_t
-{
-    MR_CONSTANT_ONLY,
-    MR_TEXTURE_OR_CONSTANT,
-    MR_TEXTURE_ONLY
-};
-
-enum class AttributeIsColor : uint8_t
-{
-    IS_COLOR,
-    IS_PURE_DATA
-};
-
-enum class AttributeIsArray : uint8_t
-{
-    IS_SCALAR,
-    IS_ARRAY
+    // Spectral Rendering Related
+    WavelengthSampleMode wavelengthSampleMode = WavelengthSampleMode::HYPERBOLIC_PBRT;
 };
 
 // Generic Texture Input Parameters
@@ -274,51 +77,6 @@ struct MRayTextureParameters
     MRayTextureReadMode         readMode        = MRayTextureReadMode::MR_PASSTHROUGH;
 };
 
-// Generic Attribute Info
-struct GenericAttributeInfo
-{
-    std::string             name;
-    MRayDataTypeRT          dataType;
-    AttributeIsArray        isArray;
-    AttributeOptionality    isOptional;
-};
-
-struct TexturedAttributeInfo
-{
-    std::string             name;
-    MRayDataTypeRT          dataType;
-    AttributeIsArray        isArray;
-    AttributeOptionality    isOptional;
-    AttributeTexturable     isTexturable;
-    AttributeIsColor        isColor;
-};
-
-using GenericAttributeInfoList = StaticVector<GenericAttributeInfo,
-                                              TracerConstants::MaxAttributePerGroup>;
-using TexturedAttributeInfoList = StaticVector<TexturedAttributeInfo,
-                                               TracerConstants::MaxAttributePerGroup>;
-using TypeNameList = std::vector<std::string_view>;
-
-struct PrimAttributeStringifier
-{
-    using enum PrimitiveAttributeLogic;
-    static constexpr std::array<std::string_view, static_cast<size_t>(END)> Names =
-    {
-        "Position",
-        "Index",
-        "Normal",
-        "Radius",
-        "Tangent",
-        "BiTangent",
-        "UV0",
-        "UV1",
-        "Weight",
-        "Weight Index"
-    };
-    static constexpr std::string_view           ToString(PrimitiveAttributeLogic e);
-    static constexpr PrimitiveAttributeLogic    FromString(std::string_view e);
-};
-
 // For surface commit analytic information
 struct SurfaceCommitResult
 {
@@ -327,79 +85,11 @@ struct SurfaceCommitResult
     size_t acceleratorCount;
 };
 
-// Prim related
-MRAY_GENERIC_ID(PrimGroupId, CommonId);
-MRAY_GENERIC_ID(PrimBatchId, CommonId);
-struct PrimCount { uint32_t primCount; uint32_t attributeCount; };
-using PrimBatchIdList = std::vector<PrimBatchId>;
-struct PrimAttributeInfo
-{
-    PrimitiveAttributeLogic logic;
-    MRayDataTypeRT          dataType;
-    AttributeIsArray        isArray;
-    AttributeOptionality    isOptional;
-};
-using PrimAttributeInfoList = StaticVector<PrimAttributeInfo,
-                                           TracerConstants::MaxAttributePerGroup>;
-// Texture Related
-MRAY_GENERIC_ID(TextureId, CommonId);
-// Transform Related
-MRAY_GENERIC_ID(TransGroupId, CommonId);
-MRAY_GENERIC_ID(TransformId, CommonId);
-using TransAttributeInfo = GenericAttributeInfo;
-using TransAttributeInfoList = GenericAttributeInfoList;
-// Light Related
-MRAY_GENERIC_ID(LightGroupId, CommonId);
-MRAY_GENERIC_ID(LightId, CommonId);
-using LightAttributeInfo = TexturedAttributeInfo;
-using LightAttributeInfoList = TexturedAttributeInfoList;
-// Camera Related
-MRAY_GENERIC_ID(CameraGroupId, CommonId);
-MRAY_GENERIC_ID(CameraId, CommonId);
-using CamAttributeInfo = GenericAttributeInfo;
-using CamAttributeInfoList = GenericAttributeInfoList;
-// Material Related
-MRAY_GENERIC_ID(MatGroupId, CommonId);
-MRAY_GENERIC_ID(MaterialId, CommonId);
-using MatAttributeInfo = TexturedAttributeInfo;
-using MatAttributeInfoList = TexturedAttributeInfoList;
-// Medium Related
-MRAY_GENERIC_ID(MediumGroupId, CommonId);
-MRAY_GENERIC_ID(MediumId, CommonId);
-using MediumPair = Pair<MediumId, MediumId>;
-using MediumAttributeInfo = TexturedAttributeInfo;
-using MediumAttributeInfoList = TexturedAttributeInfoList;
-// Surface Related
-MRAY_GENERIC_ID(SurfaceId, CommonId);
-MRAY_GENERIC_ID(LightSurfaceId, CommonId);
-MRAY_GENERIC_ID(CamSurfaceId, CommonId);
-using SurfaceMatList        = StaticVector<MaterialId, TracerConstants::MaxPrimBatchPerSurface>;
-using SurfacePrimList       = StaticVector<PrimBatchId, TracerConstants::MaxPrimBatchPerSurface>;
-using OptionalAlphaMapList  = StaticVector<Optional<TextureId>, TracerConstants::MaxPrimBatchPerSurface>;
-using CullBackfaceFlagList  = StaticVector<bool, TracerConstants::MaxPrimBatchPerSurface>;
-// Renderer Related
-MRAY_GENERIC_ID(RendererId, CommonId);
-using RendererAttributeInfo = GenericAttributeInfo;
-using RendererAttributeInfoList = StaticVector<GenericAttributeInfo,
-                                               TracerConstants::MaxRendererAttributeCount>;
-
 using MaterialIdList    = std::vector<MaterialId>;
 using TransformIdList   = std::vector<TransformId>;
 using MediumIdList      = std::vector<MediumId>;
 using LightIdList       = std::vector<LightId>;
 using CameraIdList      = std::vector<CameraId>;
-
-using AttributeCountList = StaticVector<size_t, TracerConstants::MaxAttributePerGroup>;
-
-// For transfer of options
-struct RendererOptionPack
-{
-    using AttributeList = StaticVector<TransientData,
-        TracerConstants::MaxRendererAttributeCount>;
-    //
-    RendererAttributeInfoList   paramTypes;
-    AttributeList               attributes;
-};
 
 namespace TracerConstants
 {
@@ -671,80 +361,3 @@ class [[nodiscard]] TracerI
 };
 
 using TracerConstructorArgs = TypePack<const TracerParameters&>;
-
-// We use this on a map, so overload less
-inline bool AcceleratorType::operator<(AcceleratorType t) const
-{
-    return type < t.type;
-}
-
-constexpr std::string_view AcceleratorType::ToString(AcceleratorType::E e)
-{
-    return Names[static_cast<uint32_t>(e)];
-}
-
-constexpr typename AcceleratorType::E
-AcceleratorType::FromString(std::string_view sv)
-{
-    using IntType = std::underlying_type_t<typename AcceleratorType::E>;
-    IntType i = 0;
-    for(const std::string_view& checkSV : Names)
-    {
-        if(checkSV == sv) return AcceleratorType::E(i);
-        i++;
-    }
-    return END;
-}
-
-constexpr std::string_view SamplerType::ToString(typename SamplerType::E e)
-{
-    return Names[static_cast<uint32_t>(e)];
-}
-
-constexpr typename SamplerType::E
-SamplerType::FromString(std::string_view sv)
-{
-    using IntType = std::underlying_type_t<typename SamplerType::E>;
-    IntType i = 0;
-    for(const std::string_view& checkSV : Names)
-    {
-        if(checkSV == sv) return SamplerType::E(i);
-        i++;
-    }
-    return END;
-}
-
-constexpr std::string_view FilterType::ToString(typename FilterType::E e)
-{
-    return Names[static_cast<uint32_t>(e)];
-}
-
-constexpr typename FilterType::E
-FilterType::FromString(std::string_view sv)
-{
-    using IntType = std::underlying_type_t<typename FilterType::E>;
-    IntType i = 0;
-    for(const std::string_view& checkSV : Names)
-    {
-        if(checkSV == sv) return FilterType::E(i);
-        i++;
-    }
-    return END;
-}
-
-constexpr std::string_view PrimAttributeStringifier::ToString(PrimitiveAttributeLogic e)
-{
-    return Names[static_cast<uint32_t>(e)];
-}
-
-constexpr PrimitiveAttributeLogic PrimAttributeStringifier::FromString(std::string_view sv)
-{
-    using IntType = std::underlying_type_t<PrimitiveAttributeLogic>;
-    IntType i = 0;
-    for(const std::string_view& checkSV : Names)
-    {
-        if(checkSV == sv) return PrimitiveAttributeLogic(i);
-        i++;
-    }
-    return PrimitiveAttributeLogic::END;
-}

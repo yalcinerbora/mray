@@ -4,14 +4,7 @@
 #include "ParamVaryingData.h"
 
 #include "Device/GPUTexture.h"
-
-// TODO: Move this to a user facing system (user can set this via config etc.
-enum class WavelengthSampleMode : uint32_t
-{
-    UNIFORM,
-    GAUSSIAN_MIS,
-    PBRT_HYBERBOLIC
-};
+#include "Core/TracerEnums.h"
 
 // Jakob2019 Spectrum to RGB
 // https://rgl.epfl.ch/publications/Jakob2019Spectral

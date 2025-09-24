@@ -280,7 +280,8 @@ struct StreamingTexturePack
 struct StreamingTexture
 {
     std::string             absoluteFilePath;
-    MRayTextureParameters   texParams;
+    // TODO:
+    //MRayTextureParameters   texParams;
 };
 
 class StreamingTextureCache

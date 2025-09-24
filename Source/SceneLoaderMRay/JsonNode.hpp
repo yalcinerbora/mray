@@ -105,7 +105,7 @@ inline void from_json(const nlohmann::json& node, MRayTextureEdgeResolveEnum& t)
 {
     auto name = node.get<std::string_view>();
     MRayTextureEdgeResolveEnum e = MRayTextureEdgeResolveStringifier::FromString(name);
-    if(e == MRayTextureEdgeResolveEnum::MR_END)
+    if(e == MRayTextureEdgeResolveEnum::MR_ENUM_END)
         throw MRayError("Unknown edge resolve \"{}\"", name);
     t = e;
 }
@@ -114,7 +114,7 @@ inline void from_json(const nlohmann::json& node, MRayTextureInterpEnum& t)
 {
     auto name = node.get<std::string_view>();
     MRayTextureInterpEnum e = MRayTextureInterpStringifier::FromString(name);
-    if(e == MRayTextureInterpEnum::MR_END)
+    if(e == MRayTextureInterpEnum::MR_ENUM_END)
         throw MRayError("Unknown texture interp \"{}\"", name);
     t = e;
 }
@@ -123,7 +123,7 @@ inline void from_json(const nlohmann::json& node, MRayColorSpaceEnum& t)
 {
     auto name = node.get<std::string_view>();
     MRayColorSpaceEnum e = MRayColorSpaceStringifier::FromString(name);
-    if(e == MRayColorSpaceEnum::MR_END)
+    if(e == MRayColorSpaceEnum::MR_ENUM_END)
         throw MRayError("Unknown color space \"{}\"", name);
     t = e;
 }
@@ -133,9 +133,9 @@ inline void from_json(const nlohmann::json& node, MRayTextureReadMode& t)
     auto name = node.get<std::string_view>();
     MRayTextureReadMode e = MRayTextureReadModeStringifier::FromString(name);
     // "drop" read modes are reserved for internal use
-    if(e == MRayTextureReadMode::MR_END    ||
-       e == MRayTextureReadMode::MR_DROP_1 ||
-       e == MRayTextureReadMode::MR_DROP_2 ||
+    if(e == MRayTextureReadMode::MR_ENUM_END ||
+       e == MRayTextureReadMode::MR_DROP_1   ||
+       e == MRayTextureReadMode::MR_DROP_2   ||
        e == MRayTextureReadMode::MR_DROP_3)
         throw MRayError("Unknown read mode \"{}\"", name);
     t = e;

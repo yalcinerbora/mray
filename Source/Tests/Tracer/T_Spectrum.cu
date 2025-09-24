@@ -44,14 +44,14 @@ struct Jakob2019TestParams
 using Implementations = ::testing::Types
 <
     //Jakob2019TestParams<MRayColorSpaceEnum::MR_ACES2065_1,
-    //                    WavelengthSampleMode::PBRT_HYBERBOLIC>
+    //                    WavelengthSampleMode::HYPERBOLIC_PBRT>
     //Jakob2019TestParams<MRayColorSpaceEnum::MR_ACES2065_1,
     //                    WavelengthSampleMode::GAUSSIAN_MIS>
     //Jakob2019TestParams<MRayColorSpaceEnum::MR_ACES2065_1,
     //                    WavelengthSampleMode::UNIFORM>
     //,
     Jakob2019TestParams<MRayColorSpaceEnum::MR_ACES_CG,
-                        WavelengthSampleMode::PBRT_HYBERBOLIC>
+                        WavelengthSampleMode::HYPERBOLIC_PBRT>
     //Jakob2019TestParams<MRayColorSpaceEnum::MR_ACES_CG,
     //                    WavelengthSampleMode::GAUSSIAN_MIS>,
     //Jakob2019TestParams<MRayColorSpaceEnum::MR_ACES_CG,

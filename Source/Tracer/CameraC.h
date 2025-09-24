@@ -6,6 +6,9 @@
 
 #include "GenericGroup.h"
 
+// TODO: Move camera transform somewhere proper
+#include "Common/AnalyticStructs.h"
+
 struct RaySampleT
 {
     Ray             ray;

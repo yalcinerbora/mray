@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Core/TracerI.h"
 #include "Core/Vector.h"
+#include "Core/TracerAttribInfo.h"
 
 #include "TransientPool/TransientPool.h"
 

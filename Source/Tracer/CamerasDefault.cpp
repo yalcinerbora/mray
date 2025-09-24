@@ -37,7 +37,6 @@ void CameraGroupPinhole::CommitReservations()
 CamAttributeInfoList CameraGroupPinhole::AttributeInfo() const
 {
     using enum MRayDataEnum;
-    using enum PrimitiveAttributeLogic;
     using enum AttributeOptionality;
     using enum AttributeIsArray;
     static const CamAttributeInfoList LogicList =

@@ -417,7 +417,7 @@ MRayUSDTexture MaterialConverter::ReadTextureNode(const pxr::UsdPrim& texNodePri
             return MRayTextureEdgeResolveEnum::MR_MIRROR;
         else if(usdWrap == tokens.clamp)
             return MRayTextureEdgeResolveEnum::MR_CLAMP;
-        return MRayTextureEdgeResolveEnum::MR_END;
+        return MRayTextureEdgeResolveEnum::MR_ENUM_END;
     };
     auto ConvertColorSpace = [&tokens](const pxr::TfToken& colorSpace)
     {

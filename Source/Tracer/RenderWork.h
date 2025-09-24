@@ -8,8 +8,6 @@
 #include "Random.h"
 #include "RayGenKernels.h"
 
-#include "Core/TracerI.h"
-
 // Render work kernel parameters
 // There are too many parameters so these are
 // packed in structs

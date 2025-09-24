@@ -63,10 +63,9 @@ void SingleSampleSpectrumWavelength(// Output
     // We pre-divide with the PDF here,
     // thats why throughput is required
 
-    switch(mode)
+    switch(mode.e)
     {
-        using enum WavelengthSampleMode;
-        case UNIFORM:
+        case WavelengthSampleMode::UNIFORM:
         {
             Float pdf = Float(0);
             MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
@@ -80,7 +79,7 @@ void SingleSampleSpectrumWavelength(// Output
             throughput = Spectrum(Float(1) / pdf);
             break;
         }
-        case GAUSSIAN_MIS:
+        case WavelengthSampleMode::GAUSSIAN_MIS:
         {
             using namespace Distribution;
             using namespace Distribution::Common;
@@ -117,7 +116,7 @@ void SingleSampleSpectrumWavelength(// Output
             }
             break;
         }
-        case PBRT_HYBERBOLIC:
+        case WavelengthSampleMode::HYPERBOLIC_PBRT:
         {
             auto PDF = [](Float lambda)
             {
@@ -548,12 +547,12 @@ void SpectrumContextJakob2019::SampleSpectrumWavelengthsIndirect(// Output
 
 uint32_t SpectrumContextJakob2019::SampleSpectrumRNCount() const
 {
-    switch(sampleMode)
+    switch(sampleMode.e)
     {
-        using enum WavelengthSampleMode;
+        using enum WavelengthSampleMode::E;
         case UNIFORM:           return 1;
         case GAUSSIAN_MIS:      return 1;
-        case PBRT_HYBERBOLIC:   return 1;
+        case HYPERBOLIC_PBRT:   return 1;
         default: throw MRayError("Unkown spectrum sample mode!");
     }
 }
