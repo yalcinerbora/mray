@@ -82,12 +82,17 @@ namespace Color
     // These are from here: https://github.com/mitsuba-renderer/rgb2spec
     // (I've checked its not PWC integral, PWL(trapz) integral.
     // So it must be something else?)
+    //
     inline constexpr Float D60_SPD_NORM_FACTOR = Float(10536.3);
     inline constexpr Float D65_SPD_NORM_FACTOR = Float(10566.864);
     // TODO: Since I do not know how are these calculated and paper / refimpl
     // do not have D75 whitepoint, setting it to D65 these are closeby so
     // it should be fine I hope...
-    inline constexpr Float D75_SPD_NORM_FACTOR = D65_SPD_NORM_FACTOR;
+    //
+    // Update: I've found out these factors are the integral of the
+    // product of "Illuminant SPD" and "Observer Y".
+    // Calculated accordingly.
+    inline constexpr Float D75_SPD_NORM_FACTOR = Float(10646.405);
 
     // Ad-hoc fitted gaussian of full CIE 1931 Observer
     // https://www.desmos.com/calculator/zepnypxnmd

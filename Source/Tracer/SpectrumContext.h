@@ -35,7 +35,10 @@ namespace Jacob2019Detail
         // TODO: Rename these when we actually implement this functionality
         // after throughly reading the paper.
         std::array<Table3D, 3>    lut;
+        // Normalized SPD of Std. Observer and
+        // Colorspace's Std. Illuminant
         TextureView<1, Vector3>   spdObserverXYZ;
+        TextureView<1, Float>     spdIlluminant;
     };
 
     using Data = DataT<64>;
@@ -80,6 +83,7 @@ class SpectrumContextJakob2019
     const GPUSystem&        gpuSystem;
     TextureBackingMemory    texMem;
     Texture<1, Vector3>     texCIE1931_XYZ;
+    Texture<1, Float>       texStdIlluminant;
     LUTTextureList          lutTextures;
     Jacob2019Detail::Data   data;
     WavelengthSampleMode    sampleMode;

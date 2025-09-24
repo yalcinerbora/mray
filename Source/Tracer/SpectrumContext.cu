@@ -160,15 +160,10 @@ Spectrum ConvertSpectraToRGBSingle(const Spectrum& value, const SpectrumWaves& w
     // We technically done "SpectraPerSpectrum" samples not 1.
     // Compansate for that
     static constexpr Float SPS = Float(SpectraPerSpectrum);
-    static constexpr Vector3 CIE_SUM = Vector3(CIE_1931_X_INTEGRAL,
-                                               CIE_1931_Y_INTEGRAL,
-                                               CIE_1931_Z_INTEGRAL);
-    static constexpr auto W_SINGLE = Vector3(1) / (CIE_SUM);
-    static constexpr auto W_MULTI = Vector3(1) / (CIE_SUM * SPS);
+    static constexpr auto WEIGHT = Vector3(1) / (SPS);
     // Only compansate for that if the rays are not dispersed.
-    if(waves.IsDispersed()) xyzTotal *= W_SINGLE;
-    else                    xyzTotal *= W_MULTI;
-
+    if(!waves.IsDispersed()) xyzTotal *= WEIGHT;
+    //
     Spectrum result = Spectrum(sXYZToRGB * xyzTotal, 0);
     return result;
 }
@@ -385,6 +380,8 @@ SpectrumContextJakob2019::LoadSpectraLUT(MRayColorSpaceEnum globalColorSpace,
     }
     sizes.push_back(texCIE1931_XYZ.Size());
     alignments.push_back(texCIE1931_XYZ.Alignment());
+    sizes.push_back(texStdIlluminant.Size());
+    alignments.push_back(texStdIlluminant.Alignment());
 
     using MemAlloc::AllocateTextureSpace;
     std::vector<size_t> offsets = AllocateTextureSpace(texMem, sizes, alignments);
@@ -393,18 +390,37 @@ SpectrumContextJakob2019::LoadSpectraLUT(MRayColorSpaceEnum globalColorSpace,
         Texture<3, Float>& t = outputTextures[i];
         t.CommitMemory(copyQueue, texMem, offsets[i]);
     }
-    texCIE1931_XYZ.CommitMemory(copyQueue, texMem, offsets.back());
+    uint32_t lastOffsetI = offsets.size() - 1;
+    texCIE1931_XYZ.CommitMemory(copyQueue, texMem, offsets[lastOffsetI - 1]);
+    texStdIlluminant.CommitMemory(copyQueue, texMem, offsets[lastOffsetI]);
 
     // Sadly, CIE_1931_XYZ is not padded...
-    // We pad the data here
-    // TODO: This probably is not a bottleneck but we can store
-    // CIE_1931_XYZ in a padded fashion maybe.
+    // We pad the data here, fortunately
+    // we can normalize so that every sample do not have to
+    // do 3 extra multiplication.
     std::vector<Vector4> paddedCIE1931ObserverData(Color::CIE_1931_N);
+    std::vector<Float> normalizedSPDIlluminant(Color::CIE_1931_N);
+    const auto& constIllumSPD = Color::SelectIlluminantSPD(globalColorSpace);
+    // Illuminant normalization factor is not the direct integral result
+    // it is factored differently (from PBRT).
+    Float illumSPDNormFactor = Color::CIE_1931_Y_INTEGRAL;
+    illumSPDNormFactor /= Color::SelectIlluminantSPDNormFactor(globalColorSpace);
+    //
     for(uint32_t i = 0; i < Color::CIE_1931_N; i++)
-        paddedCIE1931ObserverData[i] = Vector4(Color::CIE_1931_XYZ[i], 0);
+    {
+        static constexpr Vector3 CIE_SUM = Vector3(Color::CIE_1931_X_INTEGRAL,
+                                                   Color::CIE_1931_Y_INTEGRAL,
+                                                   Color::CIE_1931_Z_INTEGRAL);
+        static constexpr Vector3 WEIGHT = Vector3(1) / CIE_SUM;
+        paddedCIE1931ObserverData[i] = Vector4(Color::CIE_1931_XYZ[i] * WEIGHT, 0);
+        //
+        normalizedSPDIlluminant[i] = constIllumSPD[i] * illumSPDNormFactor;
+    }
 
     texCIE1931_XYZ.CopyFromAsync(copyQueue, 0, 0, Color::CIE_1931_N,
                                  Span<const Vector4>(paddedCIE1931ObserverData));
+    texStdIlluminant.CopyFromAsync(copyQueue, 0, 0, Color::CIE_1931_N,
+                                   Span<const Float>(normalizedSPDIlluminant));
 
     // Lets try a double buffered approach here
     constexpr uint32_t BUFFER_COUNT = 2;
@@ -465,6 +481,15 @@ SpectrumContextJakob2019::SpectrumContextJakob2019(MRayColorSpaceEnum globalColo
                          .interp = MRayTextureInterpEnum::MR_LINEAR,
                          .eResolve = MRayTextureEdgeResolveEnum::MR_CLAMP
                      })
+    , texStdIlluminant(gpuSystem.BestDevice(),
+                       TextureInitParams<1>
+                       {
+                           .size = Color::CIE_1931_N,
+                           .normIntegers = false,
+                           .normCoordinates = false,
+                           .interp = MRayTextureInterpEnum::MR_LINEAR,
+                           .eResolve = MRayTextureEdgeResolveEnum::MR_CLAMP
+                       })
     , lutTextures(LoadSpectraLUT(globalColorspace, gpuSystem.BestDevice()))
     , data(Jacob2019Detail::Data
            {
@@ -489,7 +514,8 @@ SpectrumContextJakob2019::SpectrumContextJakob2019(MRayColorSpaceEnum globalColo
                        .c2 = lutTextures[8].View<Float>()
                    },
                },
-               .spdObserverXYZ = texCIE1931_XYZ.View<Vector3>()
+               .spdObserverXYZ = texCIE1931_XYZ.View<Vector3>(),
+               .spdIlluminant = texStdIlluminant.View<Float>()
            })
     , sampleMode(sampleMode)
     , colorSpace(globalColorspace)

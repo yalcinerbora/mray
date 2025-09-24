@@ -33,42 +33,18 @@ void KCSampleDataAsSpectrum(// I-O
     }
 }
 
-template<MRayColorSpaceEnum COLOR_SPACE,
-         WavelengthSampleMode SAMPLE_MODE>
-struct Jakob2019TestParams
-{
-    static constexpr auto ColorSpace = COLOR_SPACE;
-    static constexpr auto SampleMode = SAMPLE_MODE;
-};
-
-using Implementations = ::testing::Types
-<
-    //Jakob2019TestParams<MRayColorSpaceEnum::MR_ACES2065_1,
-    //                    WavelengthSampleMode::HYPERBOLIC_PBRT>
-    //Jakob2019TestParams<MRayColorSpaceEnum::MR_ACES2065_1,
-    //                    WavelengthSampleMode::GAUSSIAN_MIS>
-    //Jakob2019TestParams<MRayColorSpaceEnum::MR_ACES2065_1,
-    //                    WavelengthSampleMode::UNIFORM>
-    //,
-    Jakob2019TestParams<MRayColorSpaceEnum::MR_ACES_CG,
-                        WavelengthSampleMode::HYPERBOLIC_PBRT>
-    //Jakob2019TestParams<MRayColorSpaceEnum::MR_ACES_CG,
-    //                    WavelengthSampleMode::GAUSSIAN_MIS>,
-    //Jakob2019TestParams<MRayColorSpaceEnum::MR_ACES_CG,
-    //                    WavelengthSampleMode::UNIFORM>
-    // TODO: Add more later or selectively open close
-    // so that we dont waste time etc.
->;
-
-template<class T>
 struct SpectrumJakob2019Test : public testing::Test
 {
-    //static constexpr MRayColorSpaceEnum ColorSpace = T::ColorSpace;
+    GPUSystem gpuSystem;
+
+    static void RunTest(const GPUSystem& gpuSystem,
+                        MRayColorSpaceEnum colorSpace,
+                        WavelengthSampleMode sampleMode);
 };
 
-TYPED_TEST_SUITE(SpectrumJakob2019Test, Implementations);
-
-void TestJakob2019Pipeline(MRayColorSpaceEnum CS, WavelengthSampleMode MODE)
+void SpectrumJakob2019Test::RunTest(const GPUSystem& gpuSystem,
+                                    MRayColorSpaceEnum colorSpace,
+                                    WavelengthSampleMode sampleMode)
 {
     static constexpr auto RNG_SEED = 0u;
     static constexpr auto SAMPLE_COUNT = uint32_t(1024);
@@ -92,7 +68,7 @@ void TestJakob2019Pipeline(MRayColorSpaceEnum CS, WavelengthSampleMode MODE)
         // We do some meh colors here.
         Vector3(0.85, 0.15, 0.15),   // near-pure Red
         Vector3(0.15, 0.85, 0.15),   // near-pure Green
-        Vector3(0.15, 0.10, 0.85),   // near-pure Blue
+        Vector3(0.15, 0.15, 0.85),   // near-pure Blue
         // Random colors (will be generated below)
         Vector3(0, 0, 0),
         Vector3(0, 0, 0),
@@ -108,12 +84,10 @@ void TestJakob2019Pipeline(MRayColorSpaceEnum CS, WavelengthSampleMode MODE)
     for(size_t i = STATIC_COLOR_COUNT; i < TEST_COLORS.size(); i++)
         TEST_COLORS[i] = Vector3(dist(rng), dist(rng), dist(rng));
 
-    GPUSystem gpuSystem;
-
     const GPUDevice& device = gpuSystem.BestDevice();
     const GPUQueue& queue = device.GetComputeQueue(0);
     // Initialize spectrum context
-    auto specContext = SpectrumContextJakob2019(CS, MODE, gpuSystem);
+    auto specContext = SpectrumContextJakob2019(colorSpace, sampleMode, gpuSystem);
 
     uint32_t rnPerSample = specContext.SampleSpectrumRNCount();
     uint32_t rnCount = SAMPLE_COUNT * rnPerSample;
@@ -220,11 +194,23 @@ void TestJakob2019Pipeline(MRayColorSpaceEnum CS, WavelengthSampleMode MODE)
     }
 }
 
-TYPED_TEST(SpectrumJakob2019Test, Pipeline)
-{
-    static constexpr auto CS = TypeParam::ColorSpace;
-    static constexpr auto MODE = TypeParam::SampleMode;
+#define GEN_SPECTRUM_TEST(Name, E, S)   \
+    TEST_F(SpectrumJakob2019Test, Name) \
+    {                                   \
+        RunTest(gpuSystem, E, S);       \
+    }                                   \
 
-    //for(uint32_t i = 0; i < 64; i++)
-        TestJakob2019Pipeline(CS, MODE);
-}
+// These fail, but tests are not good
+//GEN_SPECTRUM_TEST(Aces_AP0_UNIFORM, MRayColorSpaceEnum::MR_ACES2065_1,
+//                  WavelengthSampleMode::UNIFORM)
+//GEN_SPECTRUM_TEST(Aces_AP0_GaussianMIS, MRayColorSpaceEnum::MR_ACES2065_1,
+//                  WavelengthSampleMode::GAUSSIAN_MIS)
+//GEN_SPECTRUM_TEST(Aces_AP0_Hyperbolic, MRayColorSpaceEnum::MR_ACES2065_1,
+//                  WavelengthSampleMode::HYPERBOLIC_PBRT)
+
+GEN_SPECTRUM_TEST(Aces_CG_UNIFORM, MRayColorSpaceEnum::MR_ACES_CG,
+                  WavelengthSampleMode::UNIFORM)
+GEN_SPECTRUM_TEST(Aces_CG_GaussianMIS, MRayColorSpaceEnum::MR_ACES_CG,
+                  WavelengthSampleMode::GAUSSIAN_MIS)
+GEN_SPECTRUM_TEST(Aces_CG_Hyperbolic, MRayColorSpaceEnum::MR_ACES_CG,
+                  WavelengthSampleMode::HYPERBOLIC_PBRT)

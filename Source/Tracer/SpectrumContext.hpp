@@ -127,11 +127,23 @@ Spectrum Converter::ConvertAlbedo(const Vector3& rgb) const noexcept
 MR_GF_DEF
 Spectrum Converter::ConvertRadiance(const Vector3& radiance) const noexcept
 {
-    // TODO: I do not remember what is this for?
-    // Should we return identitiy?
-    // Fail here for now;
-    assert(false);
-    return Spectrum(radiance, Float(0));
+    // TODO: What about HDR maps?
+    // Are those obey this?
+    Float max = radiance[radiance.Maximum()];
+    Float scale = max * Float(2);
+    Vector3 rgb = (scale == Float(0))
+                    ? Vector3::Zero()
+                    : radiance / scale;
+    Spectrum s = ConvertAlbedo(rgb);
+
+    // Multiply by the Illuminant SPD
+    MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
+    for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
+        s[i] *= data.spdIlluminant(wavelengths[i]);
+
+    // Rescale back up
+    s *= scale;
+    return s;
 }
 
 MR_PF_DEF
