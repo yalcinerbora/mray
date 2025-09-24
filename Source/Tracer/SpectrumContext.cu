@@ -390,7 +390,7 @@ SpectrumContextJakob2019::LoadSpectraLUT(MRayColorSpaceEnum globalColorSpace,
         Texture<3, Float>& t = outputTextures[i];
         t.CommitMemory(copyQueue, texMem, offsets[i]);
     }
-    uint32_t lastOffsetI = offsets.size() - 1;
+    size_t lastOffsetI = offsets.size() - size_t(1);
     texCIE1931_XYZ.CommitMemory(copyQueue, texMem, offsets[lastOffsetI - 1]);
     texStdIlluminant.CommitMemory(copyQueue, texMem, offsets[lastOffsetI]);
 
