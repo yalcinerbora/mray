@@ -437,7 +437,9 @@ MRayError FindLightTextures(std::map<pxr::UsdPrim, MRayUSDTexture>& extraTexture
                 .isColor = AttributeIsColor::IS_COLOR,
                 .edgeResolve = MRayTextureEdgeResolveEnum::MR_WRAP,
                 .interpolation = MRayTextureInterpEnum::MR_LINEAR,
-                .readMode = MRayTextureReadMode::MR_PASSTHROUGH
+                .readMode = MRayTextureReadMode::MR_PASSTHROUGH,
+                // Auto assume as illuminant
+                .isIlluminant = MRayTextureIsIlluminant::IS_ILLUMINANT
             }
         };
         extraTextures.emplace(domeLight->uniquePrim, tex);

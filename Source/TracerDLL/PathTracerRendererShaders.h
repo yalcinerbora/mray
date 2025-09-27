@@ -9,6 +9,7 @@
 #include "Tracer/RenderWork.h"
 #include "Tracer/DistributionFunctions.h"
 #include "Tracer/LightSampler.h"
+#include "Tracer/SpectrumContext.h"
 
 template<class SC>
 class PathTracerRendererT;
@@ -95,12 +96,26 @@ namespace PathTraceRDetail
         RenderMode          renderMode = RenderMode::E::THROUGHPUT;
     };
 
+    template<class LightSampler, bool IsSpectral = false>
+    struct GlobalState;
+
     template<class LightSampler>
-    struct GlobalState
+    struct GlobalState<LightSampler, false>
     {
         Vector2ui       russianRouletteRange;
         SampleMode      sampleMode;
         LightSampler    lightSampler;
+    };
+
+    template<class LightSampler>
+    struct GlobalState<LightSampler, true>
+    {
+        using SpecContextData = typename SpectrumContextJakob2019::Data;
+
+        Vector2ui       russianRouletteRange;
+        SampleMode      sampleMode;
+        LightSampler    lightSampler;
+        SpecContextData specContextData;
     };
 
     struct alignas(4) PathDataPack
@@ -125,6 +140,8 @@ namespace PathTraceRDetail
         // Only used when NEE/MIS is active
         Span<Float>             dPrevMatPDF;
         Span<Spectrum>          dShadowRayRadiance;
+        // May be empty if not spectral
+        Span<SpectrumWaves>     dPathWavelengths;
     };
 
     template<class LightSampler, PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
