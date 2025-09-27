@@ -91,10 +91,14 @@ class GenericGroupLightT : public GenericTexturedGroupT<LightKey, LightAttribute
     protected:
     Map<LightKey, PrimBatchKey>  primMappings;
 
+    // TODO: Add non-optional texture etc.
+    void            WarnIfTexturesAreNotIlluminant(const std::vector<Optional<TextureId>>& texIds);
+
     public:
     // Constructors & Destructor
                     GenericGroupLightT(uint32_t groupId, const GPUSystem&,
                                        const TextureViewMap&,
+                                       const TextureMap&,
                                        size_t allocationGranularity = 2_MiB,
                                        size_t initialReservationSize = 4_MiB);
     // Swap the interfaces (old switcheroo)
@@ -120,6 +124,7 @@ class GenericGroupLight : public GenericGroupLightT
     public:
                         GenericGroupLight(uint32_t groupId, const GPUSystem&,
                                           const TextureViewMap&,
+                                          const TextureMap&,
                                           size_t allocationGranularity = 2_MiB,
                                           size_t initialReservationSize = 4_MiB);
     std::string_view    Name() const override;
@@ -130,10 +135,12 @@ class GenericGroupLight : public GenericGroupLightT
 
 inline
 GenericGroupLightT::GenericGroupLightT(uint32_t groupId, const GPUSystem& s,
-                                       const TextureViewMap& map,
+                                       const TextureViewMap& texViewMap,
+                                       const TextureMap& texMap,
                                        size_t allocationGranularity,
                                        size_t initialReservationSize)
-    : Parent(groupId, s, map,
+    : Parent(groupId, s,
+             texViewMap, texMap,
              allocationGranularity,
              initialReservationSize)
 {}
@@ -176,10 +183,12 @@ inline PrimBatchKey GenericGroupLightT::LightPrimBatch(LightKey lKey) const
 
 template <class C>
 GenericGroupLight<C>::GenericGroupLight(uint32_t groupId, const GPUSystem& sys,
-                                        const TextureViewMap& map,
+                                        const TextureViewMap& texViewMap,
+                                        const TextureMap& texMap,
                                         size_t allocationGranularity,
                                         size_t initialReservationSize)
-    : GenericGroupLightT(groupId, sys, map,
+    : GenericGroupLightT(groupId, sys,
+                         texViewMap, texMap,
                          allocationGranularity,
                          initialReservationSize)
 {}

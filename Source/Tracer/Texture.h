@@ -24,12 +24,13 @@ class alignas(8u) GenericTexture
     std::array<Byte, BuffSize> storage;
     // TODO: Could not cast the storage to the interface,
     //
-    GenericTextureI*    impl;
-    MRayPixelTypeRT     pixelType;
-    MRayColorSpaceEnum  colorSpace;
-    Float               gamma;
-    AttributeIsColor    isColor;
-    MipIsLoadedBits     isMipLoaded;
+    GenericTextureI*        impl;
+    MRayPixelTypeRT         pixelType;
+    MRayColorSpaceEnum      colorSpace;
+    Float                   gamma;
+    AttributeIsColor        isColor;
+    MipIsLoadedBits         isMipLoaded;
+    MRayTextureIsIlluminant isIlluminant;
 
     GenericTextureI*         Impl();
     const GenericTextureI*   Impl() const;
@@ -38,7 +39,9 @@ class alignas(8u) GenericTexture
     template<class T, class... Args>
                     GenericTexture(std::in_place_type_t<T>,
                                    MRayColorSpaceEnum, Float,
-                                   AttributeIsColor, MRayPixelTypeRT,
+                                   AttributeIsColor, 
+                                   MRayTextureIsIlluminant,
+                                   MRayPixelTypeRT,
                                    Args&&...);
     // TODO: Enable these later
                     GenericTexture(const GenericTexture&) = delete;
@@ -83,10 +86,11 @@ class alignas(8u) GenericTexture
     const GPUDevice&    Device() const;
 
     // These are extra functionality that will be built on top of
-    MRayColorSpaceEnum  ColorSpace() const;
-    Float               Gamma() const;
-    AttributeIsColor    IsColor() const;
-    MRayPixelTypeRT     PixelType() const;
+    MRayColorSpaceEnum      ColorSpace() const;
+    Float                   Gamma() const;
+    AttributeIsColor        IsColor() const;
+    MRayPixelTypeRT         PixelType() const;
+    MRayTextureIsIlluminant IsIlluminant() const;
 
     void                SetAllMipsToLoaded();
     void                SetMipToLoaded(uint32_t mipLevel);

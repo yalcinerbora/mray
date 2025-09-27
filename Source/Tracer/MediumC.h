@@ -89,6 +89,7 @@ class GenericGroupMedium : public GenericGroupMediumT
                         GenericGroupMedium(uint32_t groupId,
                                            const GPUSystem&,
                                            const TextureViewMap&,
+                                           const TextureMap&,
                                            size_t allocationGranularity = 2_MiB,
                                            size_t initialReservationSize = 4_MiB);
     std::string_view    Name() const override;
@@ -97,10 +98,12 @@ class GenericGroupMedium : public GenericGroupMediumT
 template <class C>
 GenericGroupMedium<C>::GenericGroupMedium(uint32_t groupId,
                                           const GPUSystem& sys,
-                                          const TextureViewMap& map,
+                                          const TextureViewMap& texViewMap,
+                                          const TextureMap& texMap,
                                           size_t allocationGranularity,
                                           size_t initialReservationSize)
-    : GenericGroupMediumT(groupId, sys, map,
+    : GenericGroupMediumT(groupId, sys,
+                          texViewMap, texMap,
                           allocationGranularity,
                           initialReservationSize)
 {}

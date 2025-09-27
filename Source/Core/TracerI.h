@@ -75,6 +75,7 @@ struct MRayTextureParameters
     MRayTextureEdgeResolveEnum  edgeResolve     = MRayTextureEdgeResolveEnum::MR_WRAP;
     MRayTextureInterpEnum       interpolation   = MRayTextureInterpEnum::MR_LINEAR;
     MRayTextureReadMode         readMode        = MRayTextureReadMode::MR_PASSTHROUGH;
+    MRayTextureIsIlluminant     isIlluminant    = MRayTextureIsIlluminant::IS_ALBEDO;
 };
 
 // For surface commit analytic information

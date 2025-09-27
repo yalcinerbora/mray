@@ -69,4 +69,6 @@ namespace NodeNames
     static constexpr auto TEX_NODE_IS_3D                = "is3D"sv;
     static constexpr bool TEX_NODE_IS_3D_DEFAULT        = false;
     static constexpr auto TEX_NODE_CHANNELS             = "channels"sv;
+    static constexpr auto TEX_NODE_IS_ILLUM             = "isIlluminant"sv;
+    static constexpr auto TEX_NODE_IS_ILLUM_DEFAULT     = false;
 }

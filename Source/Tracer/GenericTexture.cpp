@@ -138,6 +138,11 @@ AttributeIsColor GenericTexture::IsColor() const
     return isColor;
 }
 
+MRayTextureIsIlluminant GenericTexture::IsIlluminant() const
+{
+    return isIlluminant;
+}
+
 MRayPixelTypeRT GenericTexture::PixelType() const
 {
     return pixelType;

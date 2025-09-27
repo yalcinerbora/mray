@@ -128,6 +128,7 @@ class GenericGroupMaterialT : public GenericTexturedGroupT<MaterialKey, MatAttri
     // Constructors & Destructor
                     GenericGroupMaterialT(uint32_t groupId, const GPUSystem&,
                                           const TextureViewMap&,
+                                          const TextureMap&,
                                           size_t allocationGranularity = 2_MiB,
                                           size_t initialReservationSize = 4_MiB);
     // Swap the interfaces (old switcheroo)
@@ -147,6 +148,7 @@ class GenericGroupMaterial : public GenericGroupMaterialT
     public:
                         GenericGroupMaterial(uint32_t groupId, const GPUSystem&,
                                              const TextureViewMap&,
+                                             const TextureMap&,
                                              size_t allocationGranularity = 2_MiB,
                                              size_t initialReservationSize = 4_MiB);
     std::string_view    Name() const override;
@@ -179,10 +181,12 @@ bool MaterialCommon::IsSpecular(Float specularity) noexcept
 
 inline
 GenericGroupMaterialT::GenericGroupMaterialT(uint32_t groupId, const GPUSystem& gpuSystem,
-                                             const TextureViewMap& map,
+                                             const TextureViewMap& texViewMap,
+                                             const TextureMap& texMap,
                                              size_t allocationGranularity,
                                              size_t initialReservationSize)
-    : Parent(groupId, gpuSystem, map,
+    : Parent(groupId, gpuSystem,
+             texViewMap, texMap,
              allocationGranularity,
              initialReservationSize)
 {}
@@ -208,10 +212,12 @@ GenericGroupMaterialT::Reserve(const std::vector<AttributeCountList>& countArray
 
 template <class C>
 GenericGroupMaterial<C>::GenericGroupMaterial(uint32_t groupId, const GPUSystem& system,
-                                              const TextureViewMap& map,
+                                              const TextureViewMap& texViewMap,
+                                              const TextureMap& texMap,
                                               size_t allocationGranularity,
                                               size_t initialReservationSize)
-    : GenericGroupMaterialT(groupId, system, map,
+    : GenericGroupMaterialT(groupId, system,
+                            texViewMap, texMap,
                             allocationGranularity,
                             initialReservationSize)
 {}

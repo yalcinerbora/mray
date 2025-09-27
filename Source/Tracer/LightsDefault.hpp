@@ -526,10 +526,10 @@ std::string_view LightGroupPrim<PG>::TypeName()
 template <PrimitiveGroupC PG>
 LightGroupPrim<PG>::LightGroupPrim(uint32_t groupId,
                                    const GPUSystem& system,
-                                   const TextureViewMap& map,
-                                   const TextureMap&,
+                                   const TextureViewMap& texViewMap,
+                                   const TextureMap& texMap,
                                    const GenericGroupPrimitiveT& primGroup)
-    : Parent(groupId, system, map)
+    : Parent(groupId, system, texViewMap, texMap)
     , primGroup(static_cast<const PrimGroup&>(primGroup))
 {}
 
@@ -613,9 +613,10 @@ void LightGroupPrim<PG>::PushTexAttribute(LightKey idStart, LightKey idEnd,
             idStart, idEnd,
             attributeIndex,
             std::move(data),
-            std::move(texIds),
+            texIds,
             queue
         );
+        this->WarnIfTexturesAreNotIlluminant(texIds);
     }
     else throw MRayError("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
                          "function is called", TypeName(), attributeIndex);
@@ -694,13 +695,12 @@ std::string_view LightGroupSkysphere<CC>::TypeName()
 template <CoordConverterC CC>
 LightGroupSkysphere<CC>::LightGroupSkysphere(uint32_t groupId,
                                              const GPUSystem& system,
-                                             const TextureViewMap& map,
-                                             const TextureMap& texMapIn,
+                                             const TextureViewMap& texViewMap,
+                                             const TextureMap& texMap,
                                              const GenericGroupPrimitiveT& primGroup)
-    : Parent(groupId, system, map)
+    : Parent(groupId, system, texViewMap, texMap)
     , primGroup(static_cast<const PrimGroup&>(primGroup))
     , pwcDistributions(system)
-    , texMap(texMapIn)
 {}
 
 template <CoordConverterC CC>
@@ -775,7 +775,7 @@ void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
     {
         if(!texId.has_value()) continue;
 
-        auto optTex = texMap.at(*texId);
+        auto optTex = this->globalTextures.at(*texId);
         if(!optTex)
         {
             throw MRayError("{:s}: Given texture({:d}) is not found",
@@ -793,9 +793,10 @@ void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
         idStart, idEnd,
         attributeIndex,
         std::move(data),
-        std::move(texIds),
+        texIds,
         queue
     );
+    this->WarnIfTexturesAreNotIlluminant(texIds);
 }
 
 template <CoordConverterC CC>

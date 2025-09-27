@@ -3,6 +3,25 @@
 
 #include "Device/GPUSystem.hpp" // IWYU pragma: keep
 
+void GenericGroupLightT::WarnIfTexturesAreNotIlluminant(const std::vector<Optional<TextureId>>& texIds)
+{
+    for(const auto& tIdOpt : texIds)
+    {
+        if(!tIdOpt) continue;
+        // This will be callsed after actual attribute load,
+        // so only assert instead of throw.
+        auto texOpt = globalTextures.at(*tIdOpt);
+        assert(texOpt);
+
+        using enum MRayTextureIsIlluminant;
+        if(texOpt->get().IsIlluminant() != IS_ILLUMINANT)
+            MRAY_WARNING_LOG("{:s}:{:d}: Given texture({:d}) is not marked "
+                             "as \"Illuminant\" but will be used as light. "
+                             "Some renderers may use this information!",
+                             this->Name(), this->groupId, static_cast<CommonKey>(*tIdOpt));
+    }
+}
+
 std::string_view LightGroupNull::TypeName()
 {
     using namespace TypeNameGen::CompTime;
@@ -13,10 +32,10 @@ std::string_view LightGroupNull::TypeName()
 
 LightGroupNull::LightGroupNull(uint32_t groupId,
                                const GPUSystem& system,
-                               const TextureViewMap& texMap,
-                               const TextureMap&,
+                               const TextureViewMap& texViewMap,
+                               const TextureMap& texMap,
                                const GenericGroupPrimitiveT& pg)
-    : GenericGroupLight(groupId, system, texMap)
+    : GenericGroupLight(groupId, system, texViewMap, texMap)
     , primGroup(static_cast<const PrimGroup&>(pg))
 {}
 

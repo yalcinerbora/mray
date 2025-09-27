@@ -6,6 +6,7 @@
 #include "TransientPool/TransientPool.h"
 
 #include "TextureView.h"
+#include "Texture.h"
 #include "ParamVaryingData.h"
 
 using AttributeRanges = StaticVector<Vector<2, size_t>,
@@ -154,16 +155,17 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
 
     template<uint32_t D, class T>
     std::vector<TracerTexView<D, T>>
-    ConvertToView(std::vector<TextureId> texIds,
+    ConvertToView(const std::vector<TextureId>& texIds,
                   uint32_t attributeIndex) const;
 
     template<uint32_t D, class T>
     std::vector<Optional<TracerTexView<D, T>>>
-    ConvertToView(std::vector<Optional<TextureId>> texIds,
+    ConvertToView(const std::vector<Optional<TextureId>>& texIds,
                   uint32_t attributeIndex) const;
 
     protected:
     const TextureViewMap& globalTextureViews;
+    const TextureMap&     globalTextures;
 
     template<uint32_t D, class T>
     void            GenericPushTexAttribute(Span<ParamVaryingData<D, T>>,
@@ -171,27 +173,28 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
                                             IdType idStart, IdType idEnd,
                                             uint32_t attributeIndex,
                                             TransientData,
-                                            std::vector<Optional<TextureId>>,
+                                            const std::vector<Optional<TextureId>>&,
                                             const GPUQueue& queue);
     template<uint32_t D, class T>
     void            GenericPushTexAttribute(Span<Optional<TracerTexView<D, T>>>,
                                             //
                                             IdType idStart, IdType idEnd,
                                             uint32_t attributeIndex,
-                                            std::vector<Optional<TextureId>>,
+                                            const std::vector<Optional<TextureId>>&,
                                             const GPUQueue& queue);
     template<uint32_t D, class T>
     void            GenericPushTexAttribute(Span<TracerTexView<D, T>>,
                                             //
                                             IdType idStart, IdType idEnd,
                                             uint32_t attributeIndex,
-                                            std::vector<TextureId>,
+                                            const std::vector<TextureId>&,
                                             const GPUQueue& queue);
 
     public:
     // Constructors & Destructor
     GenericTexturedGroupT(uint32_t groupId, const GPUSystem&,
                           const TextureViewMap&,
+                          const TextureMap&,
                           size_t allocationGranularity = 2_MiB,
                           size_t initialReservationSize = 4_MiB);
 
@@ -262,7 +265,7 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
     (                                                       \
         Span<ParamVaryingData<D, T>>,                       \
         I, I, uint32_t, TransientData,                      \
-        std::vector<Optional<TextureId>>,                   \
+        const std::vector<Optional<TextureId>>&,            \
         const GPUQueue&                                     \
     );
 
@@ -272,7 +275,7 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
     (                                                       \
         Span<Optional<TracerTexView<D, T>>>,                \
         I, I, uint32_t,                                     \
-        std::vector<Optional<TextureId>>,                   \
+        const std::vector<Optional<TextureId>>&,            \
         const GPUQueue&                                     \
     );
 
@@ -282,7 +285,7 @@ class GenericTexturedGroupT : public GenericGroupT<IdType, AttributeInfoType>
     (                                                       \
         Span<TracerTexView<D, T>>,                          \
         I, I, uint32_t,                                     \
-        std::vector<TextureId>,const GPUQueue&              \
+        const std::vector<TextureId>& ,const GPUQueue&      \
     )
 
 // We only instantiate Float / Vector2 / Vector3 since for

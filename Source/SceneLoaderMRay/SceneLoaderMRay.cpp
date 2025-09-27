@@ -1007,12 +1007,14 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
                 auto fileName = jsonNode.AccessData<std::string>(TEX_NODE_FILE);
                 auto isColor = jsonNode.AccessOptionalData<bool>(TEX_NODE_IS_COLOR)
                                 .value_or(TEX_NODE_IS_COLOR_DEFAULT);
+                auto isIllum = jsonNode.AccessOptionalData<bool>(TEX_NODE_IS_ILLUM)
+                                .value_or(TEX_NODE_IS_ILLUM_DEFAULT);
+                auto gamma = jsonNode.AccessOptionalData<Float>(TEX_NODE_GAMMA);
                 bool loadAsSigned = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_AS_SIGNED)
                                     .value_or(NodeNames::TEX_NODE_AS_SIGNED_DEFAULT);
                 auto edgeResolve = jsonNode.AccessOptionalData<MRayTextureEdgeResolveEnum>(TEX_NODE_EDGE_RESOLVE);
                 auto interp = jsonNode.AccessOptionalData<MRayTextureInterpEnum>(TEX_NODE_INTERPOLATION);
                 auto colorSpace= jsonNode.AccessOptionalData<MRayColorSpaceEnum>(TEX_NODE_COLOR_SPACE);
-                auto gamma = jsonNode.AccessOptionalData<Float>(TEX_NODE_GAMMA);
                 auto userReadMode = jsonNode.AccessOptionalData<MRayTextureReadMode>(TEX_NODE_READ_MODE);
                 //auto is3D = jsonNode.AccessOptionalData<bool>(TEX_NODE_IS_3D)
                 //            .value_or(TEX_NODE_IS_3D_DEFAULT);
@@ -1057,7 +1059,9 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
                     .gamma = header.colorSpace.first,
                     .ignoreResClamp = ignoreResClamp,
                     .isColor = (isColor) ? AttributeIsColor::IS_COLOR
-                                         : AttributeIsColor::IS_PURE_DATA
+                                         : AttributeIsColor::IS_PURE_DATA,
+                    .isIlluminant = (isIllum) ? MRayTextureIsIlluminant::IS_ILLUMINANT
+                                              : MRayTextureIsIlluminant::IS_ALBEDO
                 };
                 // Check and add user params
                 if(edgeResolve.has_value()) params.edgeResolve = *edgeResolve;

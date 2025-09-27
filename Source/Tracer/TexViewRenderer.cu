@@ -99,7 +99,8 @@ void KCSampleTextureSpectral(// I-O
                              MRAY_GRID_CONSTANT const Vector2ui texResolution,
                              MRAY_GRID_CONSTANT const uint32_t mipIndex,
                              MRAY_GRID_CONSTANT const GenericTextureView texView,
-                             MRAY_GRID_CONSTANT const Jacob2019Detail::Data data)
+                             MRAY_GRID_CONSTANT const Jacob2019Detail::Data data,
+                             MRAY_GRID_CONSTANT const bool isIlluminant)
 {
     KernelCallParams kp;
     Vector2i regionSize = imgSpan.Extent();
@@ -144,7 +145,8 @@ void KCSampleTextureSpectral(// I-O
         using Converter = typename SpectrumContextJakob2019::Converter;
         SpectrumWaves waves = dWavelengths[i];
         auto converter = Converter(waves, data);
-        Spectrum s = converter.ConvertAlbedo(result);
+        Spectrum s = isIlluminant ? converter.ConvertRadiance(result)
+                                  : converter.ConvertAlbedo(result);
         Spectrum t = dThroughput[i];
 
         // Multiply with the "1 / PDF"
@@ -233,6 +235,8 @@ void TexViewRenderer::RenderTextureAsSpectral(const GPUQueue& processQueue)
 
     // Sample texture
     auto texView = *textureViews[textureIndex];
+    bool isIlluminant = (textures[textureIndex]->IsIlluminant() ==
+                         MRayTextureIsIlluminant::IS_ILLUMINANT);
     uint32_t texChannelCount = FindTexViewChannelCount(texView);
     using namespace std::string_view_literals;
     auto KernelCall = [&, this]<uint32_t C>()
@@ -250,7 +254,8 @@ void TexViewRenderer::RenderTextureAsSpectral(const GPUQueue& processQueue)
             imageTiler.FullResolution(),
             mipIndex,
             texView,
-            spectrumContext->GetData()
+            spectrumContext->GetData(),
+            isIlluminant
         );
     };
     switch(texChannelCount)

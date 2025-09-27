@@ -306,7 +306,9 @@ template<class T, class... Args>
 inline
 GenericTexture::GenericTexture(std::in_place_type_t<T>,
                                MRayColorSpaceEnum cs, Float gammaIn,
-                               AttributeIsColor col, MRayPixelTypeRT pt,
+                               AttributeIsColor col,
+                               MRayTextureIsIlluminant isIlluminant,
+                               MRayPixelTypeRT pt,
                                Args&&... args)
     : impl(nullptr)
     , pixelType(pt)
@@ -314,6 +316,7 @@ GenericTexture::GenericTexture(std::in_place_type_t<T>,
     , gamma(gammaIn)
     , isColor(col)
     , isMipLoaded(false)
+    , isIlluminant(isIlluminant)
 {
     isMipLoaded.Reset();
     using ConceptType = TexDetail::Concept<T>;
@@ -606,7 +609,7 @@ TextureId TextureMemory::CreateTexture(const Vector<D, uint32_t>& size, uint32_t
                 TextureId id = TextureId(texCounter.fetch_add(1));
                 auto loc = textures.try_emplace(id, std::in_place_type_t<Texture<D, Type>>{},
                                                 inputParams.colorSpace, inputParams.gamma,
-                                                inputParams.isColor,
+                                                inputParams.isColor, inputParams.isIlluminant,
                                                 inputParams.pixelType, device, p);
 
                 TextureReadMode rm = DetermineReadMode(inputParams.pixelType,

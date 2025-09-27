@@ -17,10 +17,10 @@ std::string_view MediumGroupVacuum::TypeName()
 
 MediumGroupVacuum::MediumGroupVacuum(uint32_t groupId,
                                      const GPUSystem& sys,
-                                     const TextureViewMap& map,
-                                     const TextureMap&)
-    : GenericGroupMedium<MediumGroupVacuum>(groupId,
-                                            sys, map)
+                                     const TextureViewMap& texViewMap,
+                                     const TextureMap& texMap)
+    : GenericGroupMedium<MediumGroupVacuum>(groupId, sys,
+                                            texViewMap, texMap)
 {}
 
 void MediumGroupVacuum::CommitReservations()
@@ -88,9 +88,10 @@ std::string_view MediumGroupHomogeneous::TypeName()
 
 MediumGroupHomogeneous::MediumGroupHomogeneous(uint32_t groupId,
                                                const GPUSystem& sys,
-                                               const TextureViewMap& map,
-                                               const TextureMap&)
-    : GenericGroupMedium<MediumGroupHomogeneous>(groupId, sys, map)
+                                               const TextureViewMap& texViewMap,
+                                               const TextureMap& texMap)
+    : GenericGroupMedium<MediumGroupHomogeneous>(groupId, sys,
+                                                 texViewMap, texMap)
 {}
 
 void MediumGroupHomogeneous::CommitReservations()

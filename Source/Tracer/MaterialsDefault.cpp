@@ -21,9 +21,9 @@ std::string_view MatGroupLambert::TypeName()
 
 MatGroupLambert::MatGroupLambert(uint32_t groupId,
                                  const GPUSystem& s,
-                                 const TextureViewMap& map,
-                                 const TextureMap&)
-    : GenericGroupMaterial<MatGroupLambert>(groupId, s, map)
+                                 const TextureViewMap& texViewMap,
+                                 const TextureMap& texMap)
+    : GenericGroupMaterial<MatGroupLambert>(groupId, s, texViewMap, texMap)
 {}
 
 void MatGroupLambert::CommitReservations()
@@ -151,9 +151,9 @@ std::string_view MatGroupReflect::TypeName()
 
 MatGroupReflect::MatGroupReflect(uint32_t groupId,
                                  const GPUSystem& s,
-                                 const TextureViewMap& map,
-                                 const TextureMap&)
-    : GenericGroupMaterial<MatGroupReflect>(groupId, s, map)
+                                 const TextureViewMap& texViewMap,
+                                 const TextureMap& texMap)
+    : GenericGroupMaterial<MatGroupReflect>(groupId, s, texViewMap, texMap)
 {}
 
 void MatGroupReflect::CommitReservations()
@@ -225,9 +225,9 @@ std::string_view MatGroupRefract::TypeName()
 
 MatGroupRefract::MatGroupRefract(uint32_t groupId,
                                  const GPUSystem& s,
-                                 const TextureViewMap& map,
-                                 const TextureMap&)
-    : GenericGroupMaterial<MatGroupRefract>(groupId, s, map)
+                                 const TextureViewMap& texViewMap,
+                                 const TextureMap& texMap)
+    : GenericGroupMaterial<MatGroupRefract>(groupId, s, texViewMap, texMap)
 {}
 
 void MatGroupRefract::CommitReservations()
@@ -371,9 +371,9 @@ std::string_view MatGroupUnreal::TypeName()
 
 MatGroupUnreal::MatGroupUnreal(uint32_t groupId,
                                const GPUSystem& s,
-                               const TextureViewMap& map,
-                               const TextureMap&)
-    : GenericGroupMaterial<MatGroupUnreal>(groupId, s, map)
+                               const TextureViewMap& texViewMap,
+                               const TextureMap& texMap)
+    : GenericGroupMaterial<MatGroupUnreal>(groupId, s, texViewMap, texMap)
 {}
 
 void MatGroupUnreal::CommitReservations()

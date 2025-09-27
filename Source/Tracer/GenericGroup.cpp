@@ -161,7 +161,7 @@ size_t GenericGroupT<ID, AI>::TotalItemCount() const
 template<class I, class A>
 template<uint32_t D, class T>
 std::vector<TracerTexView<D, T>>
-GenericTexturedGroupT<I, A>::ConvertToView(std::vector<TextureId> texIds,
+GenericTexturedGroupT<I, A>::ConvertToView(const std::vector<TextureId>& texIds,
                                            uint32_t attributeIndex) const
 {
     using ViewType = TracerTexView<D, T>;
@@ -192,7 +192,7 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<TextureId> texIds,
 template<class I, class A>
 template<uint32_t D, class T>
 std::vector<Optional<TracerTexView<D, T>>>
-GenericTexturedGroupT<I, A>::ConvertToView(std::vector<Optional<TextureId>> texIds,
+GenericTexturedGroupT<I, A>::ConvertToView(const std::vector<Optional<TextureId>>& texIds,
                                            uint32_t attributeIndex) const
 {
     using ViewType = TracerTexView<D, T>;
@@ -227,16 +227,17 @@ GenericTexturedGroupT<I, A>::ConvertToView(std::vector<Optional<TextureId>> texI
     return result;
 }
 
-
 template<class I, class A>
 GenericTexturedGroupT<I, A>::GenericTexturedGroupT(uint32_t groupId, const GPUSystem& s,
-                                                   const TextureViewMap& map,
+                                                   const TextureViewMap& texViewMap,
+                                                   const TextureMap& texMap,
                                                    size_t allocationGranularity,
                                                    size_t initialReservationSize)
     : Parent(groupId, s,
              allocationGranularity,
              initialReservationSize)
-    , globalTextureViews(map)
+    , globalTextureViews(texViewMap)
+    , globalTextures(texMap)
 {}
 
 template<class I, class A>
@@ -246,7 +247,7 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<ParamVaryingData<
                                                           I idStart, I idEnd,
                                                           uint32_t attributeIndex,
                                                           TransientData hData,
-                                                          std::vector<Optional<TextureId>> optionalTexIds,
+                                                          const std::vector<Optional<TextureId>>& optionalTexIds,
                                                           const GPUQueue& queue)
 {
     if(!this->isCommitted)
@@ -256,8 +257,7 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<ParamVaryingData<
                         this->Name(), this->groupId);
     }
     assert(hData.IsFull());
-    auto hOptTexViews = ConvertToView<D, T>(std::move(optionalTexIds),
-                                            attributeIndex);
+    auto hOptTexViews = ConvertToView<D, T>(optionalTexIds, attributeIndex);
 
     // Now we need to be careful
     auto rangeStart = this->FindRange(idStart.FetchIndexPortion())[attributeIndex];
@@ -292,7 +292,7 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<Optional<TracerTe
                                                           //
                                                           I idStart, I idEnd,
                                                           uint32_t attributeIndex,
-                                                          std::vector<Optional<TextureId>> optionalTexIds,
+                                                          const std::vector<Optional<TextureId>>& optionalTexIds,
                                                           const GPUQueue& queue)
 {
     if(!this->isCommitted)
@@ -301,8 +301,7 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<Optional<TracerTe
                         "You cannot push data!",
                         this->Name(), this->groupId);
     }
-    auto hOptTexViews = ConvertToView<D, T>(std::move(optionalTexIds),
-                                            attributeIndex);
+    auto hOptTexViews = ConvertToView<D, T>(optionalTexIds, attributeIndex);
 
     // YOLO memcpy here! Hopefully it works
     auto rangeStart = this->FindRange(idStart.FetchIndexPortion())[attributeIndex];
@@ -323,7 +322,7 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<TracerTexView<D, 
                                                           //
                                                           I idStart, I idEnd,
                                                           uint32_t attributeIndex,
-                                                          std::vector<TextureId> textureIds,
+                                                          const std::vector<TextureId>& textureIds,
                                                           const GPUQueue& queue)
 {
     if(!this->isCommitted)
@@ -332,8 +331,7 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<TracerTexView<D, 
                         "You cannot push data!",
                         this->Name(), this->groupId);
     }
-    auto hTexViews = ConvertToView<D, T>(std::move(textureIds),
-                                         attributeIndex);
+    auto hTexViews = ConvertToView<D, T>(textureIds, attributeIndex);
 
     // YOLO memcpy here! Hopefully it works
     auto rangeStart = this->FindRange(idStart.FetchIndexPortion())[attributeIndex];

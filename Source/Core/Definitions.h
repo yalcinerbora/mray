@@ -499,6 +499,12 @@ enum class MRayTextureReadMode : uint8_t
     MR_ENUM_END
 };
 
+enum class MRayTextureIsIlluminant : uint8_t
+{
+    IS_ALBEDO,
+    IS_ILLUMINANT
+};
+
 struct MRayDataTypeStringifier
 {
     using enum MRayDataEnum;

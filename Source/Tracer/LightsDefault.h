@@ -308,7 +308,6 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
     Float                               sceneDiameter;
     DataSoA                             soa;
     DistributionGroupPwC2D              pwcDistributions;
-    const TextureMap&                   texMap;
     std::vector<const GenericTexture*>  radianceFieldTextures;
 
     public:
