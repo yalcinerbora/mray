@@ -599,7 +599,6 @@ int main(int argc, const char* argv[])
         std::cerr << std::format("Unable to open {}", outFilePath.string());
         return 1;
     }
-
     outFile << Color::LUT_FILE_CC;
     outFile.write(reinterpret_cast<const char*>(&resolution), sizeof(uint32_t));
     // Reserved, for data  type, 0 means half, 1 means float, 2 means double
@@ -608,21 +607,28 @@ int main(int argc, const char* argv[])
     // The actual data
     outFile.write(reinterpret_cast<const char*>(outputLUT.data()), outputLUT.size_bytes());
     // All Done!
-
     //for(uint32_t l = 0; l < 3; l++)
-    //for(uint32_t k = 0; k < 10; k++)
-    //for(uint32_t j = 0; j < 10; j++)
-    //for(uint32_t i = 0; i < 10; i++)
+    //for(uint32_t k = 0; k < 5; k++)
+    //for(uint32_t j = 0; j < 5; j++)
+    //for(uint32_t i = 0; i < 5; i++)
     //{
+    //    auto xyzSize = resolution * resolution * resolution;
+    //    auto xySize = resolution * resolution;
+    //    auto xSize = resolution;
     //    int idx = ((l * resolution + k) * resolution + j) * resolution + i;
+    //    uint32_t globalOffset = l * xyzSize * 3 + // LUT
+    //                            k * xySize +      // Z
+    //                            j * xSize +       // Y
+    //                            i;                // X
+    //    uint32_t rOffset = globalOffset + 0 * xyzSize;
+    //    uint32_t gOffset = globalOffset + 1 * xyzSize;
+    //    uint32_t bOffset = globalOffset + 2 * xyzSize;
 
-    //    auto r0 = outputLUT[3 * idx + 0];
-    //    auto r1 = outputLUT[3 * idx + 1];
-    //    auto r2 = outputLUT[3 * idx + 2];
+    //    auto r0 = outputLUT[rOffset];
+    //    auto r1 = outputLUT[gOffset];
+    //    auto r2 = outputLUT[bOffset];
     //    printf("[%u][%u, %u, %u] = %.9f, %.9f, %.9f\n",
     //           l, i, j, k, r0, r1, r2);
     //}
-
-
     return 0;
 }

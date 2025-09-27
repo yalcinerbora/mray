@@ -148,13 +148,12 @@ Spectrum ConvertSpectraToRGBSingle(const Spectrum& value, const SpectrumWaves& w
                                    const TextureView<1, Vector3>& observerResponseXYZ,
                                    const Matrix3x3& sXYZToRGB)
 {
-    using namespace Color;
     Vector3 xyzTotal = Vector3::Zero();
+    MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
     for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
     {
-        Float w = waves[i];
-        Float index = w - Float(CIE_1931_RANGE[0]);
-        Vector3 factors = observerResponseXYZ(index + Float(0.5));
+        static constexpr auto OFFSET = Float(0.5) - Float(Color::CIE_1931_RANGE[0]);
+        Vector3 factors = observerResponseXYZ(waves[i] + OFFSET);
         xyzTotal += factors * value[i];
     }
     // We technically done "SpectraPerSpectrum" samples not 1.
@@ -401,7 +400,7 @@ SpectrumContextJakob2019::LoadSpectraLUT(MRayColorSpaceEnum globalColorSpace,
     std::vector<Vector4> paddedCIE1931ObserverData(Color::CIE_1931_N);
     std::vector<Float> normalizedSPDIlluminant(Color::CIE_1931_N);
     const auto& constIllumSPD = Color::SelectIlluminantSPD(globalColorSpace);
-    // Illuminant normalization factor is not the direct integral result
+    // Illuminant normalization factor is not the direct integral result,
     // it is factored differently (from PBRT).
     Float illumSPDNormFactor = Color::CIE_1931_Y_INTEGRAL;
     illumSPDNormFactor /= Color::SelectIlluminantSPDNormFactor(globalColorSpace);

@@ -50,12 +50,20 @@ namespace Jacob2019Detail
         SpectrumWaves   wavelengths;
 
         MR_GF_DECL
-        Vector3                  FetchCoeffs(uint32_t i, Vector3 uv) const;
+        Vector3     FetchCoeffs(uint32_t i, Vector3 uv) const noexcept;
+
+        // Actual paper's sampling
+        MR_GF_DECL
+        Spectrum    ConvertAlbedoJakob(const Vector3&) const noexcept;
+        // Pure sampling,
+        // convert incoming rgb to XYZ
+        // then sample observer data etc.
+        MR_GF_DECL
+        Spectrum    ConvertAlbedoPure(const Vector3&) const noexcept;
 
         public:
         // Constructors & Destructor
-        MR_HF_DECL
-                                 Converter(SpectrumWaves wavelengths, const Data&);
+        MR_HF_DECL               Converter(SpectrumWaves wavelengths, const Data&);
         // Interface
         MR_GF_DECL Spectrum      ConvertAlbedo(const Vector3&) const noexcept;
         MR_GF_DECL Spectrum      ConvertRadiance(const Vector3&) const noexcept;
@@ -105,7 +113,7 @@ class SpectrumContextJakob2019
             ~SpectrumContextJakob2019() = default;
 
     // Methods...
-    Jacob2019Detail::Data GetData() const;
+    Data GetData() const;
 
     //
     void SampleSpectrumWavelengths(// Output

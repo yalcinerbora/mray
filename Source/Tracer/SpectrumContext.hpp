@@ -1,12 +1,13 @@
 #pragma once
 
 #include "SpectrumContext.h"
+#include "Core/ColorFunctions.h"
 
 namespace Jacob2019Detail
 {
 
 MR_GF_DEF
-Vector3 Converter::FetchCoeffs(uint32_t i, Vector3 uv) const
+Vector3 Converter::FetchCoeffs(uint32_t i, Vector3 uv) const noexcept
 {
     // TODO: This header leaks to full .cpp file and on CUDA, it cannot
     // find tex3D function. We need to properly adjust our headers
@@ -46,14 +47,6 @@ Spectrum Converter::ConvertAlbedo(const Vector3& rgb) const noexcept
         return result;
     };
 
-    // PBRT has this shortcut for grayscale values,
-    // I assume LUT fails? (But why exact comparison then?)
-    //
-    // Gray data assumed to have a flat response over wavelengths
-    if(rgb[0] == rgb[1] && rgb[1] == rgb[2])
-        return Spectrum(rgb[0]);
-
-
     uint32_t maxI = rgb.Maximum();
     Float maxChannel = rgb[maxI];
     Vector3 xyz = Vector3::Zero();
@@ -64,6 +57,14 @@ Spectrum Converter::ConvertAlbedo(const Vector3& rgb) const noexcept
                       rgb[(maxI + 2) % 3] * maxChannelFactor,
                       Float(0));
     }
+
+    // maxChannel; which is color, can have negative values.
+    // The reason is the texture filter (such as Mitchell-Netravali)
+    // may introduce negative colors.
+    //
+    // TODO: I do not know the best approach here,
+    // need to investigate.
+    Float sliceI = Math::Clamp(maxChannel, Float(0), Float(1));
 
     // Ok, we can do a binary search just like the paper
     // but binary search over 64 variables to fetch a texture feels costly.
@@ -95,7 +96,7 @@ Spectrum Converter::ConvertAlbedo(const Vector3& rgb) const noexcept
     // (6 on each edge, out of 64) which will not be used at all.
     // All in all, we use accurate version that has transcendentals.
     // TODO: Measure and check the other one.
-    xyz[2] = Math::InvSmoothstep(Math::InvSmoothstep(maxChannel));
+    xyz[2] = Math::InvSmoothstep(Math::InvSmoothstep(sliceI));
 
     // Another thing is that we want to use GPU's texture unit,
     // so we feed normalized texture coordinates to the system (this is
@@ -115,10 +116,10 @@ Spectrum Converter::ConvertAlbedo(const Vector3& rgb) const noexcept
     // And finally, texture fetch for coefficients
     // and evaluation of the polynomial
     Vector3 coeffs = FetchCoeffs(maxI, uv);
+
     Spectrum result;
-    static constexpr auto WAVE_COUNT = SpectraPerSpectrum;
-    MRAY_UNROLL_LOOP_N(WAVE_COUNT)
-    for(uint32_t i = 0; i < WAVE_COUNT; i++)
+    MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
+    for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
         result[i] = EvalPolynomial(coeffs, wavelengths[i]);
 
     return result;
@@ -137,9 +138,10 @@ Spectrum Converter::ConvertRadiance(const Vector3& radiance) const noexcept
     Spectrum s = ConvertAlbedo(rgb);
 
     // Multiply by the Illuminant SPD
+    static constexpr Float OFFSET = Float(0.5) - Float(Color::CIE_1931_RANGE[0]);
     MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
     for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
-        s[i] *= data.spdIlluminant(wavelengths[i]);
+        s[i] *= data.spdIlluminant(wavelengths[i] + OFFSET);
 
     // Rescale back up
     s *= scale;

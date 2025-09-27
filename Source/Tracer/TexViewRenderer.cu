@@ -149,7 +149,17 @@ void KCSampleTextureSpectral(// I-O
 
         // Multiply with the "1 / PDF"
         // (we do not explicitly store PDFs yet (~32MiB extra memory))
-        dThroughput[i] = t * s;
+        t = t * s;
+
+        // Multiply with Illuminant, since these colors are optimized by
+        // that illum conditions.
+        // This means we do furnace test, and it simulates as if it hits a D65 "light".
+        static constexpr Float OFFSET = Float(0.5) - Float(Color::CIE_1931_RANGE[0]);
+        MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
+        for(uint32_t j = 0; j < SpectraPerSpectrum; j++)
+            t[j] *= data.spdIlluminant(waves[j] + OFFSET);
+
+        dThroughput[i] = t;
     }
 }
 
@@ -157,7 +167,6 @@ MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCSplatRGBToImageSpan(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
                            MRAY_GRID_CONSTANT const Span<const Spectrum> dSpectrumAsRGB)
 {
-
     KernelCallParams kp;
 
     Vector2i regionSize = imgSpan.Extent();
@@ -170,7 +179,6 @@ void KCSplatRGBToImageSpan(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
         imgSpan.StorePixel(Vector3(dSpectrumAsRGB[i]), localIndexInt);
     }
 }
-
 
 void TexViewRenderer::RenderTextureAsData(const GPUQueue& processQueue)
 {

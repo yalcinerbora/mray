@@ -367,8 +367,9 @@ requires (FloatPixelC<T>)
     }
     // Lerp part
     for(uint32_t pass = D; pass > 0; pass--)
-    for(uint32_t i = 0; i < pass; i++)
-        pix[i] = Math::Lerp(pix[i * 2], pix[i * 2 + 1], fractions[i]);
+    for(uint32_t i = 0; i < (1u << (pass - 1)); i++)
+        pix[i] = Math::Lerp(pix[i * 2], pix[i * 2 + 1], fractions[D - pass]);
+
     //
     return pix[0];
 }

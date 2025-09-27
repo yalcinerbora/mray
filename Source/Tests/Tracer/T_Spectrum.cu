@@ -24,12 +24,21 @@ void KCSampleDataAsSpectrum(// I-O
     using Converter = typename SpectrumContextJakob2019::Converter;
 
     KernelCallParams kp;
-    for(uint32_t i = kp.GlobalId(); i < dThroughput.size(); i += kp.TotalSize())
+    for(uint32_t tId = kp.GlobalId(); tId < dThroughput.size(); tId += kp.TotalSize())
     {
-        SpectrumWaves waves = dWaves[i];
+        SpectrumWaves waves = dWaves[tId];
         auto converter = Converter(waves, data);
         Spectrum s = converter.ConvertAlbedo(inputColor);
-        dThroughput[i] *= s;
+
+        // Multiply with Illuminant, since these colors are optimized by
+        // that illum conditions.
+        // This means we do furnace test, and it simulates as if it hits a D65 "light".
+        static constexpr Float OFFSET = Float(0.5) - Float(Color::CIE_1931_RANGE[0]);
+        MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
+        for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
+            s[i] *= data.spdIlluminant(waves[i] + OFFSET);
+
+        dThroughput[tId] *= s;
     }
 }
 
@@ -51,14 +60,15 @@ void SpectrumJakob2019Test::RunTest(const GPUSystem& gpuSystem,
     static constexpr uint32_t STATIC_COLOR_COUNT = 6;
     std::array TEST_COLORS =
     {
-        // These are hard-coded since PBRT does it as such?
-        // (TODO: dunno why, investigate)
-        // To be clear, graysacle values directly represented as a flat function.
-        // Not exactly these specific values.
+        // TODO: !Faulty color! -> maps to cyan
+        // should be very very dark blue
+        //Vector3(0.0, 0.0, 0.007843137254902)
+        //
+        Vector3(0.00368, 0.00304, 0.01033),
         Vector3(0),     // Black
         Vector3(0.5),   // Mid gray (linear)
         Vector3(1),     // White
-        // Perfect values does not give proper results (it may be ok?)
+        // TODO: Perfect values does not give proper results (it may be ok?)
         // Since polynomial approx. is not exact
         // Examples:
         //Vector3(1, 0, 0),   // pure Red
@@ -200,7 +210,16 @@ void SpectrumJakob2019Test::RunTest(const GPUSystem& gpuSystem,
         RunTest(gpuSystem, E, S);       \
     }                                   \
 
-// These fail, but tests are not good
+
+GEN_SPECTRUM_TEST(Aces_SRGB_UNIFORM, MRayColorSpaceEnum::MR_REC_709,
+                  WavelengthSampleMode::UNIFORM)
+GEN_SPECTRUM_TEST(Aces_SRGB_GaussianMIS, MRayColorSpaceEnum::MR_REC_709,
+                  WavelengthSampleMode::GAUSSIAN_MIS)
+GEN_SPECTRUM_TEST(Aces_SRGB_Hyperbolic, MRayColorSpaceEnum::MR_REC_709,
+                  WavelengthSampleMode::HYPERBOLIC_PBRT)
+
+// Aces_AP0 (aka. 2065_1) fails on some edge colors, skipping these
+// tests
 //GEN_SPECTRUM_TEST(Aces_AP0_UNIFORM, MRayColorSpaceEnum::MR_ACES2065_1,
 //                  WavelengthSampleMode::UNIFORM)
 //GEN_SPECTRUM_TEST(Aces_AP0_GaussianMIS, MRayColorSpaceEnum::MR_ACES2065_1,
