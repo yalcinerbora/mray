@@ -204,15 +204,15 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
     uint32_t localGenCount = currentRange[1] - currentRange[0];
     using namespace std::string_view_literals;
     queue.IssueWorkKernel<KCGenRandomNumbersPCG32Indirect>
-        (
-            "KCGenRandomNumbersPCG32Indirect"sv,
-            DeviceWorkIssueParams{.workCount = localGenCount},
-            //
-            dNumbersOut,
-            dMainStates.subspan(currentRange[0], localGenCount),
-            dIndices,
-            dimensionCount
-        );
+    (
+        "KCGenRandomNumbersPCG32Indirect"sv,
+        DeviceWorkIssueParams{.workCount = localGenCount},
+        //
+        dNumbersOut,
+        dMainStates.subspan(currentRange[0], localGenCount),
+        dIndices,
+        dimensionCount
+    );
 }
 
 Span<BackupRNGState> RNGGroupIndependent::GetBackupStates()

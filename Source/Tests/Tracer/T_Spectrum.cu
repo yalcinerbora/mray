@@ -19,7 +19,7 @@ void KCSampleDataAsSpectrum(// I-O
                             MRAY_GRID_CONSTANT const Span<const SpectrumWaves> dWaves,
                             // Constants
                             MRAY_GRID_CONSTANT const Vector3 inputColor,
-                            MRAY_GRID_CONSTANT const Jacob2019Detail::Data data)
+                            MRAY_GRID_CONSTANT const Jakob2019Detail::Data data)
 {
     using Converter = typename SpectrumContextJakob2019::Converter;
 
@@ -38,7 +38,7 @@ void KCSampleDataAsSpectrum(// I-O
         for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
             s[i] *= data.spdIlluminant(waves[i] + OFFSET);
 
-        dThroughput[tId] *= s;
+        dThroughput[tId] = s;
     }
 }
 
@@ -117,6 +117,7 @@ void SpectrumJakob2019Test::RunTest(const GPUSystem& gpuSystem,
 
     static constexpr auto TOTAL_SAMPLE_COUNT = TEST_COLORS.size() * SAMPLE_COUNT;
     Span<Spectrum> dThroughput;
+    Span<Spectrum> dPDFs;
     Span<SpectrumWaves> dWaves;
     Span<RandomNumber> dRandomNumbers;
     Span<Spectrum> dResults;
@@ -127,10 +128,11 @@ void SpectrumJakob2019Test::RunTest(const GPUSystem& gpuSystem,
     size_t segReduceTempMemSize = SegmentedTransformReduceTMSize<Spectrum, Spectrum>(TEST_COLORS.size(), queue);
     //
     DeviceLocalMemory mem(device);
-    MemAlloc::AllocateMultiData(Tie(dThroughput, dWaves, dRandomNumbers, dResults,
+    MemAlloc::AllocateMultiData(Tie(dThroughput, dPDFs, dWaves,
+                                    dRandomNumbers, dResults,
                                     dSegmentRanges, dSegmentReduceTempMem),
                                 mem,
-                                {TOTAL_SAMPLE_COUNT,
+                                {TOTAL_SAMPLE_COUNT, TOTAL_SAMPLE_COUNT,
                                  TOTAL_SAMPLE_COUNT,
                                  TOTAL_SAMPLE_COUNT * rnPerSample,
                                  TEST_COLORS.size(), TEST_COLORS.size() + 1,
@@ -148,7 +150,7 @@ void SpectrumJakob2019Test::RunTest(const GPUSystem& gpuSystem,
 
     // Work #1 Sample observer data, save the PDF as pre-divided form
     // in the throughput.
-    specContext.SampleSpectrumWavelengths(dWaves, dThroughput, dRandomNumbers, queue);
+    specContext.SampleSpectrumWavelengths(dWaves, dPDFs, dRandomNumbers, queue);
 
     // Work #2 Sample the colors via the spectrum system
     for(uint32_t i = 0; i < TEST_COLORS.size(); i++)
@@ -167,7 +169,7 @@ void SpectrumJakob2019Test::RunTest(const GPUSystem& gpuSystem,
     }
 
     // Work #3: Convert samples back to RGB
-    specContext.ConvertSpectrumToRGB(dThroughput, dWaves, queue);
+    specContext.ConvertSpectrumToRGB(dThroughput, dWaves, dPDFs, queue);
 
     // Work #4: Collapse the samples to a single value
     static constexpr Float WEIGHT = Float(1) / Float(SAMPLE_COUNT);

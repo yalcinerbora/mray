@@ -3,7 +3,7 @@
 #include "SpectrumContext.h"
 #include "Core/ColorFunctions.h"
 
-namespace Jacob2019Detail
+namespace Jakob2019Detail
 {
 
 MR_GF_DEF
@@ -27,10 +27,11 @@ Vector3 Converter::FetchCoeffs(uint32_t i, Vector3 uv) const noexcept
 }
 
 MR_HF_DEF
-Converter::Converter(SpectrumWaves wavelengths,
+Converter::Converter(SpectrumWaves& wavelengths,
                      const Data& data)
     : data(data)
-    , wavelengths(wavelengths)
+    , dWavelengthsRef(wavelengths)
+    , wavelengths(dWavelengthsRef)
 {}
 
 MR_GF_DEF
@@ -152,6 +153,16 @@ MR_PF_DEF
 SpectrumWaves Converter::Wavelengths() const noexcept
 {
     return wavelengths;
+}
+
+MR_PF_DEF_V void Converter::DisperseWaves() noexcept
+{
+    wavelengths.DisperseSecondaryWaves();
+}
+
+MR_PF_DEF_V void Converter::StoreWaves() const noexcept
+{
+    dWavelengthsRef = wavelengths;
 }
 
 }

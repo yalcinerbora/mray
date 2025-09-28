@@ -61,7 +61,7 @@ void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG, TG> p
         using SpecConverter = typename SpectrumConv::Converter;
         // Converter is per ray, since it needs wavelengths of
         // the current trace, which is accessed by rIndex.
-        SpecConverter specConverter = R::GenSpectrumConverter(params.globalState, rIndex);
+        SpecConverter specConverter = R::GenSpectrumConverter(params, rIndex);
 
         // Create transform context
         TransContext tContext = GenerateTransformContext(params.transSoA,
@@ -126,9 +126,11 @@ void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParamsR<R, I, LG,
                                                          keys.primKey);
 
         // Get instantiation of converter
-        // TODO: Add spectrum related stuff, this should not be
-        // default constructed
-        typename SpectrumConv::Converter specConverter;
+        using SpecConverter = typename SpectrumConv::Converter;
+        // Converter is per ray, since it needs wavelengths of
+        // the current trace, which is accessed by rIndex.
+        SpecConverter specConverter = R::GenSpectrumConverter(params, rIndex);
+
         // Construct Primitive
         auto primitive = Primitive(tContext,
                                    params.primSoA,

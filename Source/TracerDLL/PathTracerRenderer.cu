@@ -169,7 +169,7 @@ class IsAliveFunctor
     }
 };
 
-template<class SC>
+template<SpectrumContextC SC>
 PathTracerRendererT<SC>::PathTracerRendererT(const RenderImagePtr& rb,
                                              TracerView tv,
                                              ThreadPool& tp,
@@ -182,14 +182,14 @@ PathTracerRendererT<SC>::PathTracerRendererT(const RenderImagePtr& rb,
     , saveImage(true)
 {}
 
-template<class SC>
+template<SpectrumContextC SC>
 typename PathTracerRendererT<SC>::AttribInfoList
 PathTracerRendererT<SC>::AttributeInfo() const
 {
     return StaticAttributeInfo();
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 RendererOptionPack
 PathTracerRendererT<SC>::CurrentAttributes() const
 {
@@ -233,7 +233,7 @@ PathTracerRendererT<SC>::CurrentAttributes() const
     return result;
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 void PathTracerRendererT<SC>::PushAttribute(uint32_t attributeIndex,
                                             TransientData data, const GPUQueue&)
 {    switch(attributeIndex)
@@ -249,13 +249,14 @@ void PathTracerRendererT<SC>::PushAttribute(uint32_t attributeIndex,
     }
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 uint32_t PathTracerRendererT<SC>::FindMaxSamplePerIteration(uint32_t rayCount,
                                                             PathTraceRDetail::SampleMode sampleMode)
 {
     uint32_t camSample = (*curCamWork)->StochasticFilterSampleRayRNCount();
+    uint32_t spectrumSample = isSpectral ? spectrumContext->SampleSpectrumRNCount() : 0u;
 
-    uint32_t maxSample = camSample;
+    uint32_t maxSample = Math::Max(camSample, spectrumSample);
     maxSample = std::transform_reduce
     (
         this->currentWorks.cbegin(), this->currentWorks.cend(), maxSample,
@@ -284,7 +285,7 @@ uint32_t PathTracerRendererT<SC>::FindMaxSamplePerIteration(uint32_t rayCount,
     return rayCount * maxSample;
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 uint64_t PathTracerRendererT<SC>::SPPLimit(uint32_t spp) const
 {
     if(spp == std::numeric_limits<uint32_t>::max())
@@ -296,7 +297,7 @@ uint64_t PathTracerRendererT<SC>::SPPLimit(uint32_t spp) const
     return result;
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 Pair<Span<RayIndex>, uint32_t>
 PathTracerRendererT<SC>::ReloadPaths(Span<const RayIndex> dIndices,
                                      uint32_t sppLimit,
@@ -361,6 +362,44 @@ PathTracerRendererT<SC>::ReloadPaths(Span<const RayIndex> dIndices,
                 dRayState,
                 dFilledRayIndices
             );
+
+            // Init path state set the throughput to one.
+            // Now we can call spectral wavelength sample routine.
+            // It stores the PDF values in the througput
+            uint32_t usedRNDimensionCount = camSamplePerRay;
+            if(isSpectral)
+            {
+                uint32_t rnPerSample = spectrumContext->SampleSpectrumRNCount();
+                uint32_t specSampleRNCount = fillRayCount * rnPerSample;
+                // Offset the dimensions
+                auto sampleDims = Vector2ui(camSamplePerRay);
+                sampleDims[1] += rnPerSample;
+
+                auto dSpecWaveGenRNBuffer = dRandomNumBuffer.subspan(0, specSampleRNCount);
+                rnGenerator->GenerateNumbersIndirect(dSpecWaveGenRNBuffer,
+                                                     ToConstSpan(dFilledRayIndices),
+                                                     sampleDims,
+                                                     processQueue);
+
+                // Actual wavelength sampling
+                spectrumContext->SampleSpectrumWavelengthsIndirect
+                (
+                    dRayState.dPathWavelengths,
+                    dSpectrumWavePDFs,
+                    ToConstSpan(dSpecWaveGenRNBuffer),
+                    ToConstSpan(dFilledRayIndices),
+                    processQueue
+                );
+
+                usedRNDimensionCount += rnPerSample;
+            }
+
+            // Set the used dimensions of each path
+            DeviceAlgorithms::InPlaceTransformIndirect
+            (
+                dPathRNGDimensions, ToConstSpan(dFilledRayIndices), processQueue,
+                SetFunctor(usedRNDimensionCount)
+            );
         }
         //
         if(fillRayCount != deadRayCount)
@@ -384,7 +423,7 @@ PathTracerRendererT<SC>::ReloadPaths(Span<const RayIndex> dIndices,
     return Pair(dDeadAliveRayIndices, aliveRayCount);
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 void PathTracerRendererT<SC>::ResetAllPaths(const GPUQueue& queue)
 {
     // Clear states
@@ -397,7 +436,7 @@ void PathTracerRendererT<SC>::ResetAllPaths(const GPUQueue& queue)
     queue.MemsetAsync(dPathRNGDimensions, 0x00);
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 Span<RayIndex>
 PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
                                       const GPUQueue& processQueue)
@@ -469,12 +508,13 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
 
     if(currentOptions.sampleMode == SampleMode::E::PURE)
     {
-        using GlobalState = PathTraceRDetail::GlobalState<EmptyType>;
+        using GlobalState = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
         GlobalState globalState
         {
             .russianRouletteRange = currentOptions.russianRouletteRange,
             .sampleMode = currentOptions.sampleMode,
-            .lightSampler = EmptyType{}
+            .lightSampler = EmptyType{},
+            .specContextData = spectrumContext->GetData()
         };
 
         this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
@@ -514,19 +554,21 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         UniformLightSampler lightSampler(metaLightArray.Array(),
                                          metaLightArray.IndexHashTable());
 
-        using GlobalState = PathTraceRDetail::GlobalState<UniformLightSampler>;
+        using GlobalState = PathTraceRDetail::GlobalState<UniformLightSampler, SpectrumConverter>;
         GlobalState globalState
         {
             .russianRouletteRange = currentOptions.russianRouletteRange,
             .sampleMode = currentOptions.sampleMode,
-            .lightSampler = lightSampler
+            .lightSampler = lightSampler,
+            .specContextData = spectrumContext->GetData()
         };
-        using GlobalStateE = PathTraceRDetail::GlobalState<EmptyType>;
+        using GlobalStateE = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
         GlobalStateE globalStateE
         {
             .russianRouletteRange = currentOptions.russianRouletteRange,
             .sampleMode = currentOptions.sampleMode,
-            .lightSampler = EmptyType{}
+            .lightSampler = EmptyType{},
+            .specContextData = spectrumContext->GetData()
         };
 
         // Clear the shadow ray radiance buffer
@@ -619,7 +661,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
     return dIndices;
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 RendererOutput
 PathTracerRendererT<SC>::DoThroughputSingleTileRender(const GPUDevice& device,
                                                       const GPUQueue& processQueue)
@@ -663,6 +705,19 @@ PathTracerRendererT<SC>::DoThroughputSingleTileRender(const GPUDevice& device,
             dRayState.dPathDataPack, ToConstSpan(dDeadRayIndices), processQueue,
             SetPathStateFunctor(PathTraceRDetail::PathStatusEnum::INVALID)
         );
+
+        if(isSpectral)
+        {
+            spectrumContext->ConvertSpectrumToRGBIndirect
+            (
+                dRayState.dPathRadiance,
+                //
+                ToConstSpan(dRayState.dPathWavelengths),
+                ToConstSpan(dSpectrumWavePDFs),
+                ToConstSpan(dDeadRayIndices),
+                processQueue
+            );
+        }
 
         processQueue.IssueWait(this->renderBuffer->PrevCopyCompleteFence());
         this->renderBuffer->ClearImage(processQueue);
@@ -751,7 +806,7 @@ PathTracerRendererT<SC>::DoThroughputSingleTileRender(const GPUDevice& device,
     };
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 RendererOutput
 PathTracerRendererT<SC>::DoLatencyRender(uint32_t passCount,
                                          const GPUDevice& device,
@@ -815,6 +870,20 @@ PathTracerRendererT<SC>::DoLatencyRender(uint32_t passCount,
                 dRayState.dPathDataPack, ToConstSpan(dDeadRayIndices), processQueue,
                 SetPathStateFunctor(PathTraceRDetail::PathStatusEnum::INVALID)
             );
+
+            if(isSpectral)
+            {
+                spectrumContext->ConvertSpectrumToRGBIndirect
+                (
+                    dRayState.dPathRadiance,
+                    //
+                    ToConstSpan(dRayState.dPathWavelengths),
+                    ToConstSpan(dSpectrumWavePDFs),
+                    ToConstSpan(dDeadRayIndices),
+                    processQueue
+                );
+            }
+
             ImageSpan filmSpan = this->imageTiler.GetTileSpan();
             SetImagePixelsIndirect
             (
@@ -907,7 +976,7 @@ PathTracerRendererT<SC>::DoLatencyRender(uint32_t passCount,
     };
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 RenderBufferInfo
 PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                                      CamSurfaceId camSurfId,
@@ -924,6 +993,15 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
     anchorSampleMode = currentOptions.sampleMode;
     this->totalIterationCount = 0;
     totalDeadRayCount = 0;
+
+    // Generate the spectrum context
+    // Don't bother reloading context if colorspace is same
+    if(!spectrumContext || this->curColorSpace != spectrumContext->ColorSpace())
+    {
+        auto wlSampleMode = this->tracerView.tracerParams.wavelengthSampleMode;
+        spectrumContext = std::make_unique<SC>(this->curColorSpace, wlSampleMode,
+                                               this->gpuSystem);
+    }
 
     // Generate the Filter
     auto FilterGen = this->tracerView.filterGenerators.at(this->tracerView.tracerParams.filmFilter.type);
@@ -990,6 +1068,7 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
     // Find the ray count (1spp per tile)
     uint32_t maxRayCount = this->imageTiler.ConservativeTileSize().Multiply();
     uint32_t maxSampleCount = FindMaxSamplePerIteration(maxRayCount, currentOptions.sampleMode);
+    uint32_t wavelengthCount = (isSpectral) ? maxRayCount : 0u;
     if(currentOptions.sampleMode == SampleMode::E::PURE)
     {
         MemAlloc::AllocateMultiData(Tie(dHits, dHitKeys,
@@ -1001,6 +1080,8 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                                         dRayState.dPathDataPack,
                                         dRayState.dOutRays,
                                         dRayState.dOutRayCones,
+                                        dRayState.dPathWavelengths,
+                                        dSpectrumWavePDFs,
                                         dPathRNGDimensions,
                                         dRandomNumBuffer,
                                         dWorkHashes, dWorkBatchIds,
@@ -1011,8 +1092,9 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
-                                     maxRayCount, maxRayCount,
-                                     maxSampleCount,
+                                     maxRayCount,
+                                     wavelengthCount, wavelengthCount,
+                                     maxRayCount, maxSampleCount,
                                      totalWorkCount, totalWorkCount,
                                      Base::SUB_CAMERA_BUFFER_SIZE});
     }
@@ -1030,6 +1112,8 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                                         dRayState.dOutRayCones,
                                         dRayState.dPrevMatPDF,
                                         dRayState.dShadowRayRadiance,
+                                        dRayState.dPathWavelengths,
+                                        dSpectrumWavePDFs,
                                         dPathRNGDimensions,
                                         dShadowRayVisibilities,
                                         dRandomNumBuffer,
@@ -1042,10 +1126,11 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
-                                     maxRayCount, maxRayCount,
-                                     isVisibleIntCount, maxSampleCount,
-                                     totalWorkCount, totalWorkCount,
-                                     Base::SUB_CAMERA_BUFFER_SIZE});
+                                     maxRayCount,
+                                     wavelengthCount, wavelengthCount,
+                                     maxRayCount, isVisibleIntCount,
+                                     maxSampleCount, totalWorkCount,
+                                     totalWorkCount, Base::SUB_CAMERA_BUFFER_SIZE});
         MetaLightListConstructionParams mlParams =
         {
             .lightGroups = this->tracerView.lightGroups,
@@ -1097,7 +1182,7 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
     };
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 RendererOutput PathTracerRendererT<SC>::DoRender()
 {
     static const auto annotation = this->gpuSystem.CreateAnnotation("Render Frame");
@@ -1142,7 +1227,7 @@ RendererOutput PathTracerRendererT<SC>::DoRender()
     }
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 void PathTracerRendererT<SC>::StopRender()
 {
     this->ClearAllWorkMappings();
@@ -1151,16 +1236,25 @@ void PathTracerRendererT<SC>::StopRender()
     metaLightArray.Clear();
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 std::string_view PathTracerRendererT<SC>::TypeName()
 {
     using namespace std::string_view_literals;
     using namespace TypeNameGen::CompTime;
-    static constexpr auto Name = "PathTracerRGB"sv;
-    return RendererTypeName<Name>;
+
+    if constexpr(IsSpectral)
+    {
+        static constexpr auto Name = "PathTracerSpectral"sv;
+        return RendererTypeName<Name>;
+    }
+    else
+    {
+        static constexpr auto Name = "PathTracerRGB"sv;
+        return RendererTypeName<Name>;
+    }
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 typename PathTracerRendererT<SC>::AttribInfoList
 PathTracerRendererT<SC>::StaticAttributeInfo()
 {
@@ -1178,11 +1272,12 @@ PathTracerRendererT<SC>::StaticAttributeInfo()
     };
 }
 
-template<class SC>
+template<SpectrumContextC SC>
 size_t PathTracerRendererT<SC>::GPUMemoryUsage() const
 {
     return (rayPartitioner.GPUMemoryUsage() +
             rnGenerator->GPUMemoryUsage() +
+            spectrumContext->GPUMemoryUsage() +
             rendererGlobalMem.Size());
 }
 

@@ -251,10 +251,19 @@ RefractMaterial<SC>::RefractMaterial(const SpectrumConverter& sTransContext,
     auto CoeffsToIoR = [&](Vector3 coeffs)
     {
         using namespace Distribution::Medium;
-        return WavesToSpectrumCauchy(sTransContext.Wavelengths(), coeffs);
+        return WavelengthToIoRCauchy(sTransContext.Wavelengths()[0], coeffs);
     };
-    frontIoR = CoeffsToIoR(soa.dFrontCauchyCoeffs[mk.FetchIndexPortion()]);
-    backIoR = CoeffsToIoR(soa.dBackCauchyCoeffs[mk.FetchIndexPortion()]);
+
+    if constexpr(!SpectrumConverter::IsRGB)
+    {
+        frontIoR = CoeffsToIoR(soa.dFrontCauchyCoeffs[mk.FetchIndexPortion()]);
+        backIoR = CoeffsToIoR(soa.dBackCauchyCoeffs[mk.FetchIndexPortion()]);
+    }
+    else
+    {
+        frontIoR = soa.dFrontCauchyCoeffs[mk.FetchIndexPortion()][0];
+        backIoR = soa.dBackCauchyCoeffs[mk.FetchIndexPortion()][0];
+    }
 }
 
 template <class SC>
@@ -262,15 +271,8 @@ MR_GF_DEF
 SampleT<BxDFResult> RefractMaterial<SC>::SampleBxDF(const Vector3& wO,
                                                     RNGDispenser& rng) const
 {
-    Float fromEta, toEta;
-    if constexpr(SpectrumConverter::IsRGB)
-    {
-        fromEta = frontIoR[0];
-        toEta = backIoR[0];
-    }
-    // TODO:
-    else static_assert(SpectrumConverter::IsRGB, "Dispersion is not implemented yet!");
-
+    Float fromEta = frontIoR;
+    Float toEta = backIoR;
     MediumKey fromMedium = mediumKeys.Front();
     MediumKey toMedium = mediumKeys.Back();
 
@@ -309,7 +311,8 @@ SampleT<BxDFResult> RefractMaterial<SC>::SampleBxDF(const Vector3& wO,
             .wI = Ray(wI, surface.position).Nudge(nLocal),
             .reflectance = Spectrum(pdf),
             .mediumKey = outMedium,
-            .isPassedThrough = !doReflection
+            .isPassedThrough = !doReflection,
+            .isDispersed = true
         },
         .pdf = pdf
     };
@@ -388,15 +391,8 @@ RayConeSurface RefractMaterial<SC>::RefractRayCone(const RayConeSurface& rayCone
                 : Math::Normalize(v - n * Math::Dot(n, v));
     };
 
-    Float fromEta, toEta;
-    if constexpr(SpectrumConverter::IsRGB)
-    {
-        fromEta = frontIoR[0];
-        toEta = backIoR[0];
-    }
-    // TODO:
-    else static_assert(SpectrumConverter::IsRGB, "Dispersion is not implemented yet!");
-
+    Float fromEta = frontIoR;
+    Float toEta = backIoR;
     // Swap eta if backside
     if(surface.backSide) std::swap(fromEta, toEta);
 

@@ -74,9 +74,9 @@ Float DirectLightSamplerUniform<ML>::PdfLight(uint32_t index,
                                               const Ray& ray) const
 {
     assert(index < dMetaLights.Size());
-    using STIdentity = SpectrumContextIdentity;
-    using MetaLightView = typename MetaLightArrayView::template MetaLightView<STIdentity>;
-    STIdentity stIdentity;
+    using SCIdentity = SpectrumContextIdentity;
+    using MetaLightView = typename MetaLightArrayView::template MetaLightView<SCIdentity >;
+    SCIdentity specContext;
 
     // Discrete sampling of such light (its uniform)
     uint32_t lightCount = dMetaLights.Size();
@@ -84,7 +84,7 @@ Float DirectLightSamplerUniform<ML>::PdfLight(uint32_t index,
     Float selectionPDF = Float(1) / lightCountF;
 
     // Probability of sampling such direction from the particular light
-    MetaLightView light = dMetaLights(stIdentity, index);
+    MetaLightView light = dMetaLights(specContext, index);
     Float lightPDF = light.PdfSolidAngle(hit, ray.Pos(), ray.Dir());
     return lightPDF * selectionPDF;
 }

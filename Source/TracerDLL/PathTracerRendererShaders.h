@@ -11,7 +11,7 @@
 #include "Tracer/LightSampler.h"
 #include "Tracer/SpectrumContext.h"
 
-template<class SC>
+template<SpectrumContextC SC>
 class PathTracerRendererT;
 
 namespace PathTraceRDetail
@@ -96,26 +96,16 @@ namespace PathTraceRDetail
         RenderMode          renderMode = RenderMode::E::THROUGHPUT;
     };
 
-    template<class LightSampler, bool IsSpectral = false>
-    struct GlobalState;
 
-    template<class LightSampler>
-    struct GlobalState<LightSampler, false>
+    template<class LightSampler, class SpectrumConverter>
+    struct GlobalState
     {
-        Vector2ui       russianRouletteRange;
-        SampleMode      sampleMode;
-        LightSampler    lightSampler;
-    };
+        using SpecConverterData = typename SpectrumConverter::Data;
 
-    template<class LightSampler>
-    struct GlobalState<LightSampler, true>
-    {
-        using SpecContextData = typename SpectrumContextJakob2019::Data;
-
-        Vector2ui       russianRouletteRange;
-        SampleMode      sampleMode;
-        LightSampler    lightSampler;
-        SpecContextData specContextData;
+        Vector2ui           russianRouletteRange;
+        SampleMode          sampleMode;
+        LightSampler        lightSampler;
+        SpecConverterData   specContextData;
     };
 
     struct alignas(4) PathDataPack
@@ -144,17 +134,17 @@ namespace PathTraceRDetail
         Span<SpectrumWaves>     dPathWavelengths;
     };
 
-    template<class LightSampler, PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+    template<class LightSampler, class SpectrumConverter, PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     using WorkParams = RenderWorkParams
     <
-        GlobalState<LightSampler>,
+        GlobalState<LightSampler, SpectrumConverter>,
         RayState,
         PG, MG, TG
     >;
-    template<class LightSampler, LightGroupC LG, TransformGroupC TG>
+    template<class LightSampler, class SpectrumConverter, LightGroupC LG, TransformGroupC TG>
     using LightWorkParams = RenderLightWorkParams
     <
-        GlobalState<LightSampler>,
+        GlobalState<LightSampler, SpectrumConverter>,
         RayState,
         LG, TG
     >;
@@ -165,8 +155,8 @@ namespace PathTraceRDetail
     MR_HF_DECL
     void WorkFunction(const Prim&, const Material&, const Surface&,
                       const RayConeSurface&, const TContext&,
-                      const SpectrumConverter&, RNGDispenser&,
-                      const WorkParams<EmptyType, PG, MG, TG>& params,
+                      SpectrumConverter&, RNGDispenser&,
+                      const WorkParams<EmptyType, SpectrumConverter, PG, MG, TG>& params,
                       RayIndex rayIndex);
 
     template<class LightSampler,
@@ -177,13 +167,13 @@ namespace PathTraceRDetail
     void WorkFunctionNEE(const Prim&, const Material&, const Surface&,
                          const RayConeSurface&, const TContext&,
                          const SpectrumConverter&, RNGDispenser&,
-                         const WorkParams<LightSampler, PG, MG, TG>& params,
+                         const WorkParams<LightSampler, SpectrumConverter, PG, MG, TG>& params,
                          RayIndex rayIndex);
 
     template<LightC Light, class SpectrumConverter, LightGroupC LG, TransformGroupC TG>
     MR_HF_DECL
     void LightWorkFunction(const Light&, RNGDispenser&, const SpectrumConverter&,
-                           const LightWorkParams<EmptyType, LG, TG>& params,
+                           const LightWorkParams<EmptyType, SpectrumConverter, LG, TG>& params,
                            RayIndex rayIndex);
     template<class LightSampler,
              LightC Light, class SpectrumConverter,
@@ -191,7 +181,7 @@ namespace PathTraceRDetail
     MR_HF_DECL
     void LightWorkFunctionWithNEE(const Light&, RNGDispenser&,
                                   const SpectrumConverter&,
-                                  const LightWorkParams<LightSampler, LG, TG>& params,
+                                  const LightWorkParams<LightSampler, SpectrumConverter, LG, TG>& params,
                                   RayIndex rayIndex);
 }
 
@@ -204,8 +194,8 @@ template<PrimitiveC Prim, MaterialC Material,
 MR_HF_DEF
 void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surface& surf,
                                     const RayConeSurface& surfRayCone, const TContext& tContext,
-                                    const SpectrumConverter&, RNGDispenser& rng,
-                                    const WorkParams<EmptyType, PG, MG, TG>& params,
+                                    SpectrumConverter& spectrumConverter, RNGDispenser& rng,
+                                    const WorkParams<EmptyType, SpectrumConverter, PG, MG, TG>& params,
                                     RayIndex rayIndex)
 {
     PathDataPack dataPack = params.rayState.dPathDataPack[rayIndex];
@@ -226,6 +216,18 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     throughput *= raySample.value.reflectance;
 
     RayCone rayConeOut = rConeRefract.ConeAfterScatter(wI, surf.geoNormal);
+
+    // ================ //
+    //    Dispersion    //
+    // ================ //
+    if constexpr(!SpectrumConverter::IsRGB)
+    {
+        if(raySample.value.isDispersed)
+        {
+            spectrumConverter.DisperseWaves();
+            spectrumConverter.StoreWaves();
+        }
+    }
 
     // ================ //
     // Russian Roulette //
@@ -292,7 +294,7 @@ template<LightC Light, class SpectrumConverter,
 MR_HF_DEF
 void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
                                          const SpectrumConverter&,
-                                         const LightWorkParams<EmptyType, LG, TG>& params,
+                                         const LightWorkParams<EmptyType, SpectrumConverter, LG, TG>& params,
                                          RayIndex rayIndex)
 {
     PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
@@ -333,9 +335,9 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
     params.rayState.dPathDataPack[rayIndex] = pathDataPack;
 }
 
-// ======================== //
-//    NEE AND/OR MIS EXT    //
-// ======================== //
+// =============================== //
+//    NEE AND/OR MIS EXTENSIONS    //
+// =============================== //
 template<class LightSampler, PrimitiveC Prim, MaterialC Material,
          class Surface, class TContext, class SpectrumConverter,
          PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
@@ -344,7 +346,7 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
                                        const RayConeSurface& surfRayCone, const TContext& tContext,
                                        const SpectrumConverter& specConverter,
                                        RNGDispenser& rng,
-                                       const WorkParams<LightSampler, PG, MG, TG>& params,
+                                       const WorkParams<LightSampler, SpectrumConverter, PG, MG, TG>& params,
                                        RayIndex rayIndex)
 {
     PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
@@ -419,7 +421,7 @@ template<class LightSampler, LightC Light, class SpectrumConverter,
 MR_HF_DEF
 void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
                                                 const SpectrumConverter&,
-                                                const LightWorkParams<LightSampler, LG, TG>& params,
+                                                const LightWorkParams<LightSampler, SpectrumConverter, LG, TG>& params,
                                                 RayIndex rayIndex)
 {
     PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];

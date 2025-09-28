@@ -26,11 +26,6 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     static constexpr auto CamWorkFunctions = Tuple{};
 
-    // Spectrum Converter Generator
-    template<class GlobalState>
-    MR_HF_DECL
-    static SpectrumConverterIdentity GenSpectrumConverter(const GlobalState&, RayIndex rIndex);
-
     enum Mode
     {
         SHOW_TILING,
@@ -59,6 +54,7 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     std::unique_ptr<RNGGroupIndependent>        rnGenerator;
     DeviceMemory                                spectrumMem;
     Span<Spectrum>                              dThroughputs;
+    Span<Spectrum>                              dWavelengthPDFs;
     Span<SpectrumWaves>                         dWavelengths;
     Span<RandomNumber>                          dRandomNumbers;
 

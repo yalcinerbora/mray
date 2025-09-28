@@ -6,11 +6,17 @@
 #include "ParamVaryingData.h"
 
 template <class C>
-concept SpectrumConverterC = requires(const C c)
+concept SpectrumConverterC = requires(const C cConst,
+                                      C c)
 {
-    {c.ConvertAlbedo(Vector3{})} -> std::same_as<Spectrum>;
-    {c.ConvertRadiance(Vector3{})} -> std::same_as<Spectrum>;
-    {c.Wavelengths()} -> std::same_as<SpectrumWaves>;
+    typename C::Data;
+
+    {cConst.ConvertAlbedo(Vector3{})} -> std::same_as<Spectrum>;
+    {cConst.ConvertRadiance(Vector3{})} -> std::same_as<Spectrum>;
+    {cConst.Wavelengths()} -> std::same_as<SpectrumWaves>;
+    {c.DisperseWaves()} -> std::same_as<void>;
+    {cConst.StoreWaves()} -> std::same_as<void>;
+
     // TODO: Why this does not work?
     // ====================
     //{C::IsRGB} -> std::same_as<const bool>;
@@ -20,13 +26,38 @@ concept SpectrumConverterC = requires(const C c)
 };
 
 template <class C>
-concept SpectrumConverterContextC = requires()
+concept SpectrumContextC = requires(const C c, const GPUQueue & queue)
 {
     typename C::Converter;
     requires SpectrumConverterC<typename C::Converter>;
+
+    typename C::Data;
+
     //
     typename C::template ParamVaryingAlbedo<2>;
     typename C::template ParamVaryingRadiance<2>;
+
+    // TODO: Move these to virtual inheritance maybe.
+    {c.GetData()} -> std::same_as<typename C::Data>;
+    {c.ColorSpace()} -> std::same_as<MRayColorSpaceEnum>;
+    {c.SampleSpectrumRNCount()} -> std::same_as<uint32_t>;
+    {c.SampleSpectrumWavelengthsIndirect(// Output
+                                         Span<SpectrumWaves>(),
+                                         Span<Spectrum>(),
+                                         // Input
+                                         Span<const RandomNumber>(),
+                                         Span<const RayIndex>(),
+                                         // Constants
+                                         queue)} -> std::same_as<void>;
+    {c.ConvertSpectrumToRGBIndirect(// I-O
+                                    Span<Spectrum>(),
+                                    // Input
+                                    Span<const SpectrumWaves>(),
+                                    Span<const Spectrum>(),
+                                    Span<const RayIndex>(),
+                                    // Constants
+                                    queue)} -> std::same_as<void>;
+    {c.GPUMemoryUsage()} -> std::same_as<size_t>;
 };
 
 template<class Converter, uint32_t DIMS, bool IsRadiance = false>
@@ -56,6 +87,8 @@ class SpectralParamVaryingData
 // Concrete Identity Spectrum Converter
 struct SpectrumConverterIdentity
 {
+    using Data = EmptyType;
+
     MR_PF_DECL Spectrum ConvertAlbedo(const Vector3&) const noexcept;
     MR_PF_DECL Spectrum ConvertRadiance(const Vector3&) const noexcept;
     // Adding this for IoR conversion (dispersion)
@@ -64,6 +97,8 @@ struct SpectrumConverterIdentity
     // This is little bit more scalable but for Identity converter this does not
     // makes sense. Medium logic should be careful to incorporate these
     MR_PF_DECL SpectrumWaves Wavelengths() const noexcept;
+    MR_PF_DECL_V void DisperseWaves() const noexcept;
+    MR_PF_DECL_V void StoreWaves() const noexcept;
     // By design the identity converter is RGB
     // (MRay holds every texture, value etc. as RGB)
     static constexpr bool IsRGB = true;
@@ -72,6 +107,7 @@ struct SpectrumConverterIdentity
 struct SpectrumContextIdentity
 {
     using Converter = SpectrumConverterIdentity;
+    using Data      = EmptyType;
 
     // Texture-backed Data
     template<uint32_t DIMS>
@@ -79,6 +115,41 @@ struct SpectrumContextIdentity
 
     template<uint32_t DIMS>
     using ParamVaryingRadiance = SpectralParamVaryingData<Converter, DIMS, true>;
+
+    public:
+    MRayColorSpaceEnum colorSpace = MRayColorSpaceEnum::MR_DEFAULT;
+
+    public:
+    // Consturctors & Destructor
+    SpectrumContextIdentity() = default;
+    SpectrumContextIdentity(MRayColorSpaceEnum cs, WavelengthSampleMode, const GPUSystem&)
+        : colorSpace(cs)
+    {}
+
+    // TODO: Move these to virtual inheritance maybe.
+    EmptyType GetData() const { return EmptyType{}; }
+    MRayColorSpaceEnum ColorSpace() const { return colorSpace; }
+    uint32_t SampleSpectrumRNCount() const { return 0u; }
+    //
+    void SampleSpectrumWavelengthsIndirect(// Output
+                                           Span<SpectrumWaves>,
+                                           Span<Spectrum>,
+                                           // Input
+                                           Span<const RandomNumber>,
+                                           Span<const RayIndex>,
+                                           // Constants
+                                           const GPUQueue&) const {}
+
+    void ConvertSpectrumToRGBIndirect(// I-O
+                                      Span<Spectrum>,
+                                      // Input
+                                      Span<const SpectrumWaves>,
+                                      Span<const Spectrum>,
+                                      Span<const RayIndex>,
+                                      // Constants
+                                      const GPUQueue&) const {}
+
+    size_t GPUMemoryUsage() const { return 0; }
 };
 
 template<class C, uint32_t D, bool IsRadiance>
@@ -149,7 +220,15 @@ SpectrumWaves SpectrumConverterIdentity::Wavelengths() const noexcept
     return SpectrumWaves(VisibleSpectrumMiddle);
 }
 
+MR_PF_DEF_V
+void SpectrumConverterIdentity::DisperseWaves() const noexcept
+{}
+
+MR_PF_DEF_V
+void SpectrumConverterIdentity::StoreWaves() const noexcept
+{}
+
 static_assert(SpectrumConverterC<SpectrumConverterIdentity>,
               "\"SpectrumConverterIdentity\" do not satisfy \"SpectrumConverterC\" concept.");
-static_assert(SpectrumConverterContextC<SpectrumContextIdentity>,
+static_assert(SpectrumContextC<SpectrumContextIdentity>,
               "\"SpectrumContextIdentity\" do not satisfy \"SpectrumConverterContextC\" concept.");

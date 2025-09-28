@@ -199,7 +199,7 @@ namespace mray::algorithms
         queue.IssueWorkLambda
         (
             "KCInPlaceTransformIndirect", p,
-            [=] MRAY_GPU(KernelCallParams kp)
+            [=] MRAY_GPU (KernelCallParams kp)
             {
                 for(uint32_t i = kp.GlobalId();
                     i < static_cast<uint32_t>(dIndices.size());

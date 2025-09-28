@@ -119,8 +119,8 @@ namespace RefractMatDetail
         private:
         const Surface&  surface;
         MediumKeyPair   mediumKeys;
-        Spectrum        frontIoR;
-        Spectrum        backIoR;
+        Float           frontIoR;
+        Float           backIoR;
 
         public:
         MR_GF_DECL

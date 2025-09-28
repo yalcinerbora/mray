@@ -38,9 +38,10 @@ class SurfaceRenderer final : public RendererT<SurfaceRenderer>
     static constexpr auto CamWorkFunctions = Tuple{};
 
     // Spectrum Converter Generator
-    template<class GlobalState>
+    template<class RenderWorkParams>
     MR_HF_DECL
-    static SpectrumConverterIdentity GenSpectrumConverter(const GlobalState&, RayIndex rIndex);
+    static SpectrumConverterIdentity GenSpectrumConverter(const RenderWorkParams&, RayIndex);
+
 
     private:
     Options     currentOptions  = {};
@@ -137,10 +138,10 @@ using SurfaceRenderLightWork = RenderLightWork<R, LG, TG>;
 template<RendererC R, CameraGroupC CG, TransformGroupC TG>
 using SurfaceRenderCamWork = RenderCameraWork<R, CG, TG>;
 
-template<class GlobalState>
+template <class RenderWorkParams>
 MR_HF_DEF
 SpectrumConverterIdentity
-SurfaceRenderer::GenSpectrumConverter(const GlobalState&, RayIndex)
+SurfaceRenderer::GenSpectrumConverter(const RenderWorkParams&, RayIndex)
 {
     return SpectrumConverterIdentity();
 }

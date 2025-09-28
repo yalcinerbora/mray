@@ -8,7 +8,7 @@
 
 // Jakob2019 Spectrum to RGB
 // https://rgl.epfl.ch/publications/Jakob2019Spectral
-namespace Jacob2019Detail
+namespace Jakob2019Detail
 {
     template<uint32_t Resolution>
     struct DataT
@@ -45,29 +45,28 @@ namespace Jacob2019Detail
 
     class Converter
     {
+        public:
+        using Data = Jakob2019Detail::Data;
+
+        private:
         // Path local context
         const Data&     data;
+        SpectrumWaves&  dWavelengthsRef;
         SpectrumWaves   wavelengths;
 
         MR_GF_DECL
         Vector3     FetchCoeffs(uint32_t i, Vector3 uv) const noexcept;
 
-        // Actual paper's sampling
-        MR_GF_DECL
-        Spectrum    ConvertAlbedoJakob(const Vector3&) const noexcept;
-        // Pure sampling,
-        // convert incoming rgb to XYZ
-        // then sample observer data etc.
-        MR_GF_DECL
-        Spectrum    ConvertAlbedoPure(const Vector3&) const noexcept;
-
         public:
         // Constructors & Destructor
-        MR_HF_DECL               Converter(SpectrumWaves wavelengths, const Data&);
+        MR_HF_DECL               Converter(SpectrumWaves& wavelengths, const Data&);
+
         // Interface
         MR_GF_DECL Spectrum      ConvertAlbedo(const Vector3&) const noexcept;
         MR_GF_DECL Spectrum      ConvertRadiance(const Vector3&) const noexcept;
         MR_PF_DECL SpectrumWaves Wavelengths() const noexcept;
+        MR_PF_DECL_V void        DisperseWaves() noexcept;
+        MR_PF_DECL_V void        StoreWaves() const noexcept;
         //
         static constexpr bool IsRGB = false;
     };
@@ -78,8 +77,8 @@ class SpectrumContextJakob2019
     using LUTTextureList = std::array<Texture<3, Float>, 9>;
 
     public:
-    using Converter = Jacob2019Detail::Converter;
-    using Data      = Jacob2019Detail::Data;
+    using Converter = Jakob2019Detail::Converter;
+    using Data      = Jakob2019Detail::Data;
     // Texture-backed Data
     template<uint32_t DIMS>
     using ParamVaryingAlbedo = SpectralParamVaryingData<Converter, DIMS, false>;
@@ -93,7 +92,7 @@ class SpectrumContextJakob2019
     Texture<1, Vector3>     texCIE1931_XYZ;
     Texture<1, Float>       texStdIlluminant;
     LUTTextureList          lutTextures;
-    Jacob2019Detail::Data   data;
+    Data                    data;
     WavelengthSampleMode    sampleMode;
     MRayColorSpaceEnum      colorSpace;
 
@@ -118,14 +117,14 @@ class SpectrumContextJakob2019
     //
     void SampleSpectrumWavelengths(// Output
                                    Span<SpectrumWaves> dWavelengths,
-                                   Span<Spectrum> dThroughputs,
+                                   Span<Spectrum> dWavePDFs,
                                    // I-O
                                    Span<const RandomNumber> dRandomNumbers,
                                    // Constants
                                    const GPUQueue& queue) const;
     void SampleSpectrumWavelengthsIndirect(// Output
                                            Span<SpectrumWaves> dWavelengths,
-                                           Span<Spectrum> dThroughputs,
+                                           Span<Spectrum> dWavePDFs,
                                            // Input
                                            Span<const RandomNumber> dRandomNumbers,
                                            Span<const RayIndex> dRayIndices,
@@ -138,12 +137,14 @@ class SpectrumContextJakob2019
                               Span<Spectrum> dValues,
                               // Input
                               Span<const SpectrumWaves> dWavelengths,
+                              Span<const Spectrum> dWavePDFs,
                               // Constants
                               const GPUQueue& queue) const;
     void ConvertSpectrumToRGBIndirect(// I-O
                                       Span<Spectrum> dValues,
                                       // Input
                                       Span<const SpectrumWaves> dWavelengths,
+                                      Span<const Spectrum> dWavePDFs,
                                       Span<const RayIndex> dRayIndices,
                                       // Constants
                                       const GPUQueue& queue) const;
@@ -152,7 +153,7 @@ class SpectrumContextJakob2019
     size_t              GPUMemoryUsage() const;
 };
 
-inline Jacob2019Detail::Data
+inline Jakob2019Detail::Data
 SpectrumContextJakob2019::GetData() const
 {
     return data;
@@ -172,8 +173,8 @@ SpectrumContextJakob2019::GPUMemoryUsage() const
 
 #include "SpectrumContext.hpp"
 
-static_assert(SpectrumConverterC<Jacob2019Detail::Converter>,
+static_assert(SpectrumConverterC<Jakob2019Detail::Converter>,
               "\"Jacob2019Detail::Converter\" do not satisfy \"SpectrumConverterC\" concept.");
-static_assert(SpectrumConverterContextC<SpectrumContextJakob2019>,
+static_assert(SpectrumContextC<SpectrumContextJakob2019>,
               "\"SpectrumContextJakob2019\" do not satisfy \"SpectrumConverterContextC\" concept.");
 

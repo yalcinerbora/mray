@@ -130,6 +130,7 @@ using Spectrum      = SpectrumT<SpectraPerSpectrum, Float>;
 using SpectrumWaves = SpectrumWavesT<SpectraPerSpectrum, Float>;
 
 // Visible spectrum definitions
+// TODO: Should we fetch this from the Color namespace?
 inline constexpr Vector2   VisibleSpectrumRange = Vector2(380, 700);
 inline constexpr Float     VisibleSpectrumMiddle = VisibleSpectrumRange.Sum() * Float(0.5);
 
@@ -213,6 +214,7 @@ struct BxDFResult
     Spectrum    reflectance;
     MediumKey   mediumKey;
     bool        isPassedThrough = false;
+    bool        isDispersed = false;
 };
 
 struct VoxelizationParameters

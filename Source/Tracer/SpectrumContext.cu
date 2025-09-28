@@ -14,7 +14,7 @@
 MR_GF_DECL
 void SingleSampleSpectrumWavelength(// Output
                                     SpectrumWaves& wavelengths,
-                                    Spectrum& throughput,
+                                    Spectrum& pdfOut,
                                     // I-O
                                     RNGDispenser& rng,
                                     // Constant
@@ -76,7 +76,7 @@ void SingleSampleSpectrumWavelength(// Output
                 wavelengths[i] = sample.value;
                 if(i == 0) pdf = sample.pdf;
             }
-            throughput = Spectrum(Float(1) / pdf);
+            pdfOut = Spectrum(pdf);
             break;
         }
         case WavelengthSampleMode::GAUSSIAN_MIS:
@@ -105,14 +105,8 @@ void SingleSampleSpectrumWavelength(// Output
                 assert(Math::IsFinite(pdf));
                 assert(Math::IsFinite(sample.value));
 
-                // TODO: When xi is exactly zero, there is numerical problems.
-                // currently we just eliminate it, but we may need to investigate later.
-                Float invPDF = Float(1) / pdf;
-                if(Math::IsInf(invPDF))
-                    invPDF = Float(0);
-
                 wavelengths[i] = sample.value;
-                throughput[i] = invPDF;
+                pdfOut[i] = pdf;
             }
             break;
         }
@@ -134,7 +128,7 @@ void SingleSampleSpectrumWavelength(// Output
             for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
             {
                 wavelengths[i] = Sample(xi[i]);
-                throughput[i] = Float(1) / PDF(wavelengths[i]);
+                pdfOut[i] = PDF(wavelengths[i]);
             }
             break;
         }
@@ -144,6 +138,7 @@ void SingleSampleSpectrumWavelength(// Output
 
 MR_GF_DECL
 Spectrum ConvertSpectraToRGBSingle(const Spectrum& value, const SpectrumWaves& waves,
+                                   const Spectrum& pdf,
                                    //
                                    const TextureView<1, Vector3>& observerResponseXYZ,
                                    const Matrix3x3& sXYZToRGB)
@@ -154,8 +149,10 @@ Spectrum ConvertSpectraToRGBSingle(const Spectrum& value, const SpectrumWaves& w
     {
         static constexpr auto OFFSET = Float(0.5) - Float(Color::CIE_1931_RANGE[0]);
         Vector3 factors = observerResponseXYZ(waves[i] + OFFSET);
-        xyzTotal += factors * value[i];
+        Float val = Distribution::Common::DivideByPDF(value[i], pdf[i]);
+        xyzTotal += factors * val;
     }
+
     // We technically done "SpectraPerSpectrum" samples not 1.
     // Compansate for that
     static constexpr Float SPS = Float(SpectraPerSpectrum);
@@ -170,7 +167,7 @@ Spectrum ConvertSpectraToRGBSingle(const Spectrum& value, const SpectrumWaves& w
 MRAY_KERNEL
 void KCSampleSpectrumWavelengths(// Output
                                  MRAY_GRID_CONSTANT const Span<SpectrumWaves> dWavelengths,
-                                 MRAY_GRID_CONSTANT const Span<Spectrum> dThroughputs,
+                                 MRAY_GRID_CONSTANT const Span<Spectrum> dWavePDFs,
                                  // I-O
                                  MRAY_GRID_CONSTANT const Span<const RandomNumber> dRandNumbers,
                                  // Constants
@@ -183,19 +180,19 @@ void KCSampleSpectrumWavelengths(// Output
         RNGDispenser rng = RNGDispenser(dRandNumbers, i, dWavelengths.size());
 
         SpectrumWaves wavelengths;
-        Spectrum throughput;
-        SingleSampleSpectrumWavelength(wavelengths, throughput,
+        Spectrum pdf;
+        SingleSampleSpectrumWavelength(wavelengths, pdf,
                                        rng, mode);
 
         dWavelengths[i] = wavelengths;
-        dThroughputs[i] = throughput;
+        dWavePDFs[i] = pdf;
     }
 }
 
 MRAY_KERNEL
 void KCSampleSpectrumWavelengthsIndirect(// Output
                                          MRAY_GRID_CONSTANT const Span<SpectrumWaves> dWavelengths,
-                                         MRAY_GRID_CONSTANT const Span<Spectrum> dThroughputs,
+                                         MRAY_GRID_CONSTANT const Span<Spectrum> dWavePDFs,
                                          // I-O
                                          MRAY_GRID_CONSTANT const Span<const RandomNumber> dRandNumbers,
                                          // Input
@@ -212,11 +209,11 @@ void KCSampleSpectrumWavelengthsIndirect(// Output
         RayIndex rIndex = dRayIndices[i];
 
         SpectrumWaves wavelengths;
-        Spectrum throughput;
-        SingleSampleSpectrumWavelength(wavelengths, throughput, rng, mode);
+        Spectrum pdf;
+        SingleSampleSpectrumWavelength(wavelengths, pdf, rng, mode);
 
         dWavelengths[rIndex] = wavelengths;
-        dThroughputs[rIndex] = throughput;
+        dWavePDFs[rIndex] = pdf;
     }
 }
 
@@ -225,8 +222,9 @@ void KCConvertSpectrumToRGB(// I-O
                             MRAY_GRID_CONSTANT const Span<Spectrum> dValues,
                             // Input
                             MRAY_GRID_CONSTANT const Span<const SpectrumWaves> dWavelengths,
+                            MRAY_GRID_CONSTANT const Span<const Spectrum> dWavePDFs,
                             // Constants
-                            MRAY_GRID_CONSTANT const Jacob2019Detail::Data contextData)
+                            MRAY_GRID_CONSTANT const Jakob2019Detail::Data contextData)
 {
     KernelCallParams kp;
 
@@ -244,7 +242,7 @@ void KCConvertSpectrumToRGB(// I-O
     // Grid-stride Loop
     for(uint32_t i = kp.GlobalId(); i < dValues.size(); i += kp.TotalSize())
     {
-        dValues[i] = ConvertSpectraToRGBSingle(dValues[i], dWavelengths[i],
+        dValues[i] = ConvertSpectraToRGBSingle(dValues[i], dWavelengths[i], dWavePDFs[i],
                                                contextData.spdObserverXYZ,
                                                sXYZToRGB);
     }
@@ -255,9 +253,10 @@ void KCConvertSpectrumToRGBIndirect(// I-O
                                     MRAY_GRID_CONSTANT const Span<Spectrum> dValues,
                                     // Input
                                     MRAY_GRID_CONSTANT const Span<const SpectrumWaves> dWavelengths,
+                                    MRAY_GRID_CONSTANT const Span<const Spectrum> dWavePDFs,
                                     MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices,
                                     // Constants
-                                    MRAY_GRID_CONSTANT const Jacob2019Detail::Data contextData)
+                                    MRAY_GRID_CONSTANT const Jakob2019Detail::Data contextData)
 {
     KernelCallParams kp;
     #ifndef MRAY_GPU_BACKEND_CPU
@@ -276,8 +275,8 @@ void KCConvertSpectrumToRGBIndirect(// I-O
     {
         RayIndex rIndex = dRayIndices[i];
         dValues[rIndex] = ConvertSpectraToRGBSingle(dValues[rIndex], dWavelengths[rIndex],
-                                               contextData.spdObserverXYZ,
-                                               sXYZToRGB);
+                                                    dWavePDFs[rIndex], contextData.spdObserverXYZ,
+                                                    sXYZToRGB);
     }
 }
 
@@ -330,9 +329,9 @@ ReadMRSpectraFileHeader(std::ifstream& dataStartStream,
     // Resolution
     uint32_t resolution = std::numeric_limits<uint32_t>::max();
     lutFile.read(ToCharPtr(&resolution), sizeof(uint32_t));
-    if(!lutFile || resolution != Jacob2019Detail::Data::N)
+    if(!lutFile || resolution != Jakob2019Detail::Data::N)
         return MRayError("Wrong size ({}), spectra lut size must be {}!",
-                         resolution, Jacob2019Detail::Data::N);
+                         resolution, Jakob2019Detail::Data::N);
 
     // Mode
     uint32_t mode = std::numeric_limits<uint32_t>::max();
@@ -352,7 +351,7 @@ SpectrumContextJakob2019::LoadSpectraLUT(MRayColorSpaceEnum globalColorSpace,
 {
     const GPUQueue& copyQueue = device.GetTransferQueue();
     // To increase runtime performance LUT size is static
-    constexpr uint32_t N = Jacob2019Detail::Data::N;
+    constexpr uint32_t N = Jakob2019Detail::Data::N;
     constexpr Vector3ui TEX_DIMS = Vector3ui(N);
     TextureInitParams<3> tp =
     {
@@ -490,23 +489,23 @@ SpectrumContextJakob2019::SpectrumContextJakob2019(MRayColorSpaceEnum globalColo
                            .eResolve = MRayTextureEdgeResolveEnum::MR_CLAMP
                        })
     , lutTextures(LoadSpectraLUT(globalColorspace, gpuSystem.BestDevice()))
-    , data(Jacob2019Detail::Data
+    , data(Jakob2019Detail::Data
            {
                .lut =
                {
-                   Jacob2019Detail::Data::Table3D
+                   Jakob2019Detail::Data::Table3D
                    {
                        .c0 = lutTextures[0].View<Float>(),
                        .c1 = lutTextures[1].View<Float>(),
                        .c2 = lutTextures[2].View<Float>()
                    },
-                   Jacob2019Detail::Data::Table3D
+                   Jakob2019Detail::Data::Table3D
                    {
                        .c0 = lutTextures[3].View<Float>(),
                        .c1 = lutTextures[4].View<Float>(),
                        .c2 = lutTextures[5].View<Float>()
                    },
-                   Jacob2019Detail::Data::Table3D
+                   Jakob2019Detail::Data::Table3D
                    {
                        .c0 = lutTextures[6].View<Float>(),
                        .c1 = lutTextures[7].View<Float>(),
@@ -525,13 +524,13 @@ SpectrumContextJakob2019::SpectrumContextJakob2019(MRayColorSpaceEnum globalColo
 
 void SpectrumContextJakob2019::SampleSpectrumWavelengths(// Output
                                                          Span<SpectrumWaves> dWavelengths,
-                                                         Span<Spectrum> dThroughputs,
+                                                         Span<Spectrum> dWavePDFs,
                                                          // I-O
                                                          Span<const RandomNumber> dRandomNumbers,
                                                          // Constants
                                                          const GPUQueue& queue) const
 {
-    assert(dWavelengths.size() == dThroughputs.size());
+    assert(dWavelengths.size() == dWavePDFs.size());
     assert(dThroughputs.size() * SampleSpectrumRNCount() == dRandomNumbers.size());
 
     queue.IssueWorkKernel<KCSampleSpectrumWavelengths>
@@ -540,7 +539,7 @@ void SpectrumContextJakob2019::SampleSpectrumWavelengths(// Output
         DeviceWorkIssueParams{.workCount = dWavelengths.size()},
         //
         dWavelengths,
-        dThroughputs,
+        dWavePDFs,
         dRandomNumbers,
         sampleMode
     );
@@ -549,7 +548,7 @@ void SpectrumContextJakob2019::SampleSpectrumWavelengths(// Output
 
 void SpectrumContextJakob2019::SampleSpectrumWavelengthsIndirect(// Output
                                                                  Span<SpectrumWaves> dWavelengths,
-                                                                 Span<Spectrum> dThroughputs,
+                                                                 Span<Spectrum> dWavePDFs,
                                                                  // Input
                                                                  Span<const RandomNumber> dRandomNumbers,
                                                                  Span<const RayIndex> dRayIndices,
@@ -563,7 +562,7 @@ void SpectrumContextJakob2019::SampleSpectrumWavelengthsIndirect(// Output
         DeviceWorkIssueParams{.workCount = dRayIndices.size()},
         //
         dWavelengths,
-        dThroughputs,
+        dWavePDFs,
         dRandomNumbers,
         dRayIndices,
         sampleMode
@@ -586,6 +585,7 @@ void SpectrumContextJakob2019::ConvertSpectrumToRGB(// I-O
                                                     Span<Spectrum> dValues,
                                                     // Input
                                                     Span<const SpectrumWaves> dWavelengths,
+                                                    Span<const Spectrum> dWavePDFs,
                                                     // Constants
                                                     const GPUQueue& queue) const
 {
@@ -597,6 +597,7 @@ void SpectrumContextJakob2019::ConvertSpectrumToRGB(// I-O
         //
         dValues,
         dWavelengths,
+        dWavePDFs,
         data
     );
 }
@@ -605,6 +606,7 @@ void SpectrumContextJakob2019::ConvertSpectrumToRGBIndirect(// I-O
                                                             Span<Spectrum> dValues,
                                                             // Input
                                                             Span<const SpectrumWaves> dWavelengths,
+                                                            Span<const Spectrum> dWavePDFs,
                                                             Span<const RayIndex> dRayIndices,
                                                             // Constants
                                                             const GPUQueue& queue) const
@@ -616,6 +618,7 @@ void SpectrumContextJakob2019::ConvertSpectrumToRGBIndirect(// I-O
         //
         dValues,
         dWavelengths,
+        dWavePDFs,
         dRayIndices,
         data
     );

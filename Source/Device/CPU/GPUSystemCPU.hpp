@@ -157,6 +157,11 @@ void GPUQueueCPU::IssueInternal(std::string_view name,
         },
         blockCount
     );
+
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        tp->Wait();
+    }
 }
 
 template<auto Kernel, class... Args>

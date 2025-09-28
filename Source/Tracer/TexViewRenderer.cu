@@ -99,7 +99,7 @@ void KCSampleTextureSpectral(// I-O
                              MRAY_GRID_CONSTANT const Vector2ui texResolution,
                              MRAY_GRID_CONSTANT const uint32_t mipIndex,
                              MRAY_GRID_CONSTANT const GenericTextureView texView,
-                             MRAY_GRID_CONSTANT const Jacob2019Detail::Data data,
+                             MRAY_GRID_CONSTANT const Jakob2019Detail::Data data,
                              MRAY_GRID_CONSTANT const bool isIlluminant)
 {
     KernelCallParams kp;
@@ -226,11 +226,12 @@ void TexViewRenderer::RenderTextureAsSpectral(const GPUQueue& processQueue)
     auto dRandomNumbersLocal = dRandomNumbers.subspan(0, curPixelCount * perSampleRNCount);
     auto dThroughputLocal = dThroughputs.subspan(0, curPixelCount);
     auto dWavelengthsLocal = dWavelengths.subspan(0, curPixelCount);
+    auto dWavelengthPDFsLocal = dWavelengthPDFs.subspan(0, curPixelCount);
     // Generate random numbers
     rnGenerator->GenerateNumbers(dRandomNumbers, rngDimRange,
                                  processQueue);
     // Sample spectrum
-    spectrumContext->SampleSpectrumWavelengths(dWavelengths, dThroughputs,
+    spectrumContext->SampleSpectrumWavelengths(dWavelengths, dWavelengthPDFsLocal,
                                                dRandomNumbers, processQueue);
 
     // Sample texture
@@ -268,7 +269,7 @@ void TexViewRenderer::RenderTextureAsSpectral(const GPUQueue& processQueue)
 
     // Convert to RGB
     spectrumContext->ConvertSpectrumToRGB(dThroughputLocal, dWavelengthsLocal,
-                                          processQueue);
+                                          dWavelengthPDFsLocal, processQueue);
     // Write these RGB to buffer
     processQueue.IssueWorkKernel<KCSplatRGBToImageSpan>
     (
@@ -403,7 +404,6 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
         // Don't bother reloading context if colorspace is same
         if(!spectrumContext || spectrumContext->ColorSpace() != curColorSpace)
         {
-            using enum WavelengthSampleMode::E;
             using SC = SpectrumContextJakob2019;
             spectrumContext = std::make_unique<SC>(curColorSpace,
                                                    tracerView.tracerParams.wavelengthSampleMode,
@@ -414,8 +414,11 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
         uint32_t maxRayCount = this->imageTiler.ConservativeTileSize().Multiply();
         uint32_t sampleRNCount = spectrumContext->SampleSpectrumRNCount();
         uint32_t maxRNCount = sampleRNCount * maxRayCount;
-        MemAlloc::AllocateMultiData(Tie(dThroughputs, dWavelengths, dRandomNumbers),
-                                    spectrumMem, {maxRayCount, maxRayCount, maxRNCount});
+        MemAlloc::AllocateMultiData(Tie(dThroughputs, dWavelengths,
+                                        dWavelengthPDFs, dRandomNumbers),
+                                    spectrumMem,
+                                    {maxRayCount, maxRayCount,
+                                     maxRayCount, maxRNCount});
 
         // Finally allocate RNG
         using RNG = RNGGroupIndependent;

@@ -29,7 +29,7 @@ namespace Distribution::BxDF
 namespace Distribution::Medium
 {
     MR_PF_DECL
-    Spectrum            WavesToSpectrumCauchy(const SpectrumWaves& waves,
+    Float               WavelengthToIoRCauchy(Float wavelength,
                                               const Vector3& coeffs);
     MR_PF_DECL
     Float               HenyeyGreensteinPhase(Float cosTheta, Float g);
@@ -680,18 +680,12 @@ Float MIS::Balance(uint32_t pdfIndex,
 }
 
 MR_PF_DEF
-Spectrum Medium::WavesToSpectrumCauchy(const SpectrumWaves& waves,
-                                       const Vector3& coeffs)
+Float Medium::WavelengthToIoRCauchy(Float wavelength, const Vector3& coeffs)
 {
-    Spectrum result;
-    MRAY_UNROLL_LOOP
-    for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
-    {
-        Float w2 = waves[i] * waves[i];
-        Float w4 = w2 * w2;
-        result[i] = coeffs[0] + coeffs[1] / w2 + coeffs[2] / w4;
-    }
-    return result;
+    Float w2 = wavelength * wavelength;
+    Float w4 = w2 * w2;
+    Float ior = coeffs[0] + coeffs[1] / w2 + coeffs[2] / w4;
+    return ior;
 }
 
 MR_PF_DEF
