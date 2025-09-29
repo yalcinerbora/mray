@@ -143,23 +143,31 @@ Spectrum ConvertSpectraToRGBSingle(const Spectrum& value, const SpectrumWaves& w
                                    const TextureView<1, Vector3>& observerResponseXYZ,
                                    const Matrix3x3& sXYZToRGB)
 {
+    static constexpr auto WEIGHT = Float(1) / Float(SpectraPerSpectrum);
     Vector3 xyzTotal = Vector3::Zero();
-    MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
-    for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
+
+    uint32_t waveCount = SpectraPerSpectrum;
+
+    // We technically done "SpectraPerSpectrum" samples not 1.
+    // Compansate for that
+    Float weight = WEIGHT;
+    if(waves.IsDispersed())
+    {
+        // If dispersed other weights does mean nothing
+        waveCount = 1;
+        weight = Float(1);
+    }
+    //
+    for(uint32_t i = 0; i < waveCount; i++)
     {
         static constexpr auto OFFSET = Float(0.5) - Float(Color::CIE_1931_RANGE[0]);
         Vector3 factors = observerResponseXYZ(waves[i] + OFFSET);
         Float val = Distribution::Common::DivideByPDF(value[i], pdf[i]);
         xyzTotal += factors * val;
-    }
 
-    // We technically done "SpectraPerSpectrum" samples not 1.
-    // Compansate for that
-    static constexpr Float SPS = Float(SpectraPerSpectrum);
-    static constexpr auto WEIGHT = Vector3(1) / (SPS);
-    // Only compansate for that if the rays are not dispersed.
-    if(!waves.IsDispersed()) xyzTotal *= WEIGHT;
+    }
     //
+    xyzTotal *= weight;
     Spectrum result = Spectrum(sXYZToRGB * xyzTotal, 0);
     return result;
 }
@@ -360,7 +368,7 @@ SpectrumContextJakob2019::LoadSpectraLUT(MRayColorSpaceEnum globalColorSpace,
         .interp = MRayTextureInterpEnum::MR_LINEAR,
         .eResolve = MRayTextureEdgeResolveEnum::MR_CLAMP
     };
-    std::array outputTextures =
+    LUTTextureList outputTextures =
     {
         Texture<3, Float>(device, tp), Texture<3, Float>(device, tp),
         Texture<3, Float>(device, tp), Texture<3, Float>(device, tp),
@@ -383,7 +391,7 @@ SpectrumContextJakob2019::LoadSpectraLUT(MRayColorSpaceEnum globalColorSpace,
 
     using MemAlloc::AllocateTextureSpace;
     std::vector<size_t> offsets = AllocateTextureSpace(texMem, sizes, alignments);
-    for(uint32_t i = 0; i < 9; i++)
+    for(uint32_t i = 0; i < outputTextures.size(); i++)
     {
         Texture<3, Float>& t = outputTextures[i];
         t.CommitMemory(copyQueue, texMem, offsets[i]);
@@ -442,7 +450,7 @@ SpectrumContextJakob2019::LoadSpectraLUT(MRayColorSpaceEnum globalColorSpace,
     // Double buffered read
     std::array fences = {copyQueue.Barrier(), copyQueue.Barrier()};
     uint32_t curI = 0, otherI = 1;
-    for(uint32_t i = 0; i < 9; i++)
+    for(uint32_t i = 0; i < outputTextures.size(); i++)
     {
         if(!fileDataStart.read(ToCharPtr(hBuffers[curI].data()), BUFFER_SIZE))
             throw MRayError("Unable to read sprectum lut file!");
@@ -531,7 +539,7 @@ void SpectrumContextJakob2019::SampleSpectrumWavelengths(// Output
                                                          const GPUQueue& queue) const
 {
     assert(dWavelengths.size() == dWavePDFs.size());
-    assert(dThroughputs.size() * SampleSpectrumRNCount() == dRandomNumbers.size());
+    assert(dWavePDFs.size() * SampleSpectrumRNCount() == dRandomNumbers.size());
 
     queue.IssueWorkKernel<KCSampleSpectrumWavelengths>
     (
