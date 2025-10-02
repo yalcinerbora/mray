@@ -7,8 +7,6 @@
 
 #include "Definitions.h"
 
-#include "Variant.h"
-
 // Rename the std::optional, gpu may not like it
 // most(all after c++20) of optional is constexpr
 // so the "relaxed-constexpr" flag of nvcc will be able to compile it

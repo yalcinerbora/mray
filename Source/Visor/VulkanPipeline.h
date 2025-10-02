@@ -4,6 +4,7 @@
 
 #include "Core/DataStructures.h"
 #include "Core/Expected.h"
+#include "Core/Variant.h"
 
 static constexpr size_t VISOR_MAX_SHADER_BINDINGS = 8;
 static constexpr size_t VISOR_MAX_SHADER_SETS = 4;

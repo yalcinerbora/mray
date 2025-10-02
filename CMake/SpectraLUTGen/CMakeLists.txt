@@ -95,6 +95,7 @@ function(spectra_gen_command)
     add_custom_command(OUTPUT ${OUTPUT_PATH}
                        COMMAND SpectraLUTGen 64 ${SPECTRA_GEN_COMMAND_NAME} ${MRAY_CONFIG_BIN_DIRECTORY}/SpectraLUT/
                        COMMENT "Generating Spectra LUT for ${SPECTRA_GEN_COMMAND_NAME}..."
+                       DEPENDS SpectraLUTGen
                        VERBATIM)
 
 endfunction()

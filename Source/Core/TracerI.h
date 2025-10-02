@@ -6,6 +6,7 @@
 
 #include "TracerConstants.h"
 #include "TracerAttribInfo.h"
+#include "TypePack.h"
 
 #include "Common/RenderImageStructs.h"
 
