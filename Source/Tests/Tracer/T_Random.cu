@@ -73,3 +73,9 @@ TEST(Hash, Constexpr)
     //    SoASpanTest(dInput2A, dInput2B, dInput2C, dInput2D)
     //);
 }
+
+
+TEST(ZSobol, PBRT_MATCH)
+{
+    //
+}

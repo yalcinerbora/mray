@@ -25,13 +25,15 @@ template<class T>
 static constexpr auto RNGGenFuncPack = RNGGenPair
 {
     T::TypeName,
-    &GenerateType<RNGeneratorGroupI, T, uint32_t, uint64_t,
+    &GenerateType<RNGeneratorGroupI, T, const RenderImageParams&,
+                  Vector2ui, uint32_t, uint64_t,
                   const GPUSystem&, ThreadPool&>
 };
 
 static constexpr std::initializer_list<RNGGenPair> RNGGenFuncList =
 {
-    RNGGenFuncPack<RNGGroupIndependent>
+    RNGGenFuncPack<RNGGroupIndependent>,
+    RNGGenFuncPack<RNGGroupZSobol>
 };
 
 // TODO: This is not good, we need to instantiate

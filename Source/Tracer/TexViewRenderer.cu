@@ -216,7 +216,9 @@ void TexViewRenderer::RenderTextureAsData(const GPUQueue& processQueue)
 
 void TexViewRenderer::RenderTextureAsSpectral(const GPUQueue& processQueue)
 {
-    rnGenerator->SetupRange(this->imageTiler.Tile1DRange());
+    rnGenerator->SetupRange(this->imageTiler.LocalTileStart(),
+                            this->imageTiler.LocalTileEnd(),
+                            processQueue);
 
     uint32_t perSampleRNCount = spectrumContext->SampleSpectrumRNCount();
     Vector2ui rngDimRange = Vector2ui(0, perSampleRNCount);
@@ -419,10 +421,12 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
                                     spectrumMem,
                                     {maxRayCount, maxRayCount,
                                      maxRayCount, maxRNCount});
-
         // Finally allocate RNG
         using RNG = RNGGroupIndependent;
-        rnGenerator = std::make_unique<RNG>(mipSize.Multiply(), uint64_t(0),
+        uint64_t seed = this->tracerView.tracerParams.seed;
+        Vector2ui maxDeviceLocalRNGCount = this->imageTiler.ConservativeTileSize();
+        rnGenerator = std::make_unique<RNG>(rIParams, maxDeviceLocalRNGCount,
+                                            currentOptions.totalSPP, seed,
                                             gpuSystem, globalThreadPool);
     }
 

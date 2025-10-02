@@ -333,6 +333,9 @@ PathTracerRendererT<SC>::ReloadPaths(Span<const RayIndex> dIndices,
             auto dFilledRayIndices = dDeadRayIndices.subspan(0, fillRayCount);
             uint32_t camRayGenRNCount = fillRayCount * camSamplePerRay;
             auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
+
+            rnGenerator->IncrementSampleIdIndirect(ToConstSpan(dFilledRayIndices),
+                                                   processQueue);
             rnGenerator->GenerateNumbersIndirect(dCamRayGenRNBuffer,
                                                  ToConstSpan(dFilledRayIndices),
                                                  Vector2ui(0, camSamplePerRay),
@@ -455,7 +458,9 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
     // Iota the indices
     DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
     // Create RNG state for each ray
-    rnGenerator->SetupRange(this->imageTiler.Tile1DRange());
+    rnGenerator->SetupRange(this->imageTiler.LocalTileStart(),
+                            this->imageTiler.LocalTileEnd(),
+                            processQueue);
     // Reload dead paths with new
     auto [dReloadIndices, aliveRayCount] = ReloadPaths(dIndices, sppLimit,
                                                        processQueue);
@@ -1163,9 +1168,12 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
     if(!RngGen)
         throw MRayError("[{}]: Unknown random number generator type {}.", TypeName(),
                         uint32_t(this->tracerView.tracerParams.samplerType.e));
-    uint32_t generatorCount = (rIP.regionMax - rIP.regionMin).Multiply();
+
+    Vector2ui maxDeviceLocalRNGCount = this->imageTiler.ConservativeTileSize();
     uint64_t seed = this->tracerView.tracerParams.seed;
-    rnGenerator = RngGen->get()(std::move(generatorCount), std::move(seed),
+    uint32_t spp = currentOptions.totalSPP;
+    rnGenerator = RngGen->get()(rIP, std::move(maxDeviceLocalRNGCount),
+                                std::move(spp), std::move(seed),
                                 this->gpuSystem, this->globalThreadPool);
 
     ResetAllPaths(queue);

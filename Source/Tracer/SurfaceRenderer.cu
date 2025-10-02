@@ -365,10 +365,13 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     if(!RngGen)
         throw MRayError("[{}]: Unknown random number generator type {}.", TypeName(),
                         uint32_t(tracerView.tracerParams.samplerType.e));
-    uint32_t generatorCount = (rIP.regionMax - rIP.regionMin).Multiply();
+
+    Vector2ui maxDeviceLocalRNGCount = this->imageTiler.ConservativeTileSize();
     uint64_t seed = tracerView.tracerParams.seed;
-    rnGenerator = RngGen->get()(std::move(generatorCount),
-                                std::move(seed),
+    uint32_t spp = currentOptions.totalSPP;
+    rnGenerator = RngGen->get()(rIP,
+                                std::move(maxDeviceLocalRNGCount),
+                                std::move(spp), std::move(seed),
                                 gpuSystem, globalThreadPool);
 
     auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
@@ -433,13 +436,16 @@ RendererOutput SurfaceRenderer::DoRender()
 
     // Create RNG state for each ray
     // Generate rays
-    rnGenerator->SetupRange(imageTiler.Tile1DRange());
+    rnGenerator->SetupRange(this->imageTiler.LocalTileStart(),
+                            this->imageTiler.LocalTileEnd(),
+                            processQueue);
     // Generate RN for camera rays
     uint32_t camSamplePerRay = currentOptions.doStochasticFilter
                         ? (*curCamWork)->SampleRayRNCount()
                         : (*curCamWork)->StochasticFilterSampleRayRNCount();
     uint32_t camRayGenRNCount = rayCount * camSamplePerRay;
     auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
+    rnGenerator->IncrementSampleId(processQueue);
     rnGenerator->GenerateNumbers(dCamRayGenRNBuffer, Vector2ui(0, camSamplePerRay),
                                  processQueue);
 
@@ -577,12 +583,9 @@ RendererOutput SurfaceRenderer::DoRender()
                 if(currentOptions.mode == SurfRDetail::Mode::AO ||
                    currentOptions.mode == SurfRDetail::Mode::FURNACE)
                 {
-                    Vector2ui nextRNGDimRange = (Vector2ui(0u, rnCount) +
-                                                 (*curCamWork)->SampleRayRNCount());
-                    rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer,
-                                                         dLocalIndices,
-                                                         nextRNGDimRange,
-                                                         processQueue);
+                    Vector2ui nextRNGDimRange = Vector2ui(0u, rnCount) + camSamplePerRay;
+                    rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
+                                                         nextRNGDimRange, processQueue);
                 }
 
                 workI.DoWork_1(dRayStateAO,

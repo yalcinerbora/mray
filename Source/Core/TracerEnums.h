@@ -105,6 +105,7 @@ class SamplerType
     enum E
     {
         INDEPENDENT,
+        Z_SOBOL,
 
         MR_ENUM_END
     };
@@ -112,7 +113,8 @@ class SamplerType
     private:
     static constexpr std::array<std::string_view, size_t(MR_ENUM_END)> Names =
     {
-        "Independent"
+        "Independent",
+        "ZSobol"
     };
 
     public:

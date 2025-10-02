@@ -6,11 +6,6 @@
     #include "Device/GPUSystem.hpp"
 #endif
 
-Vector2ui ImageTiler::ResponsibleSize() const
-{
-    return range[1] - range[0];
-}
-
 Vector2ui ImageTiler::GlobalTileStart() const
 {
     return range[0] + LocalTileStart();
@@ -70,20 +65,23 @@ ImageTiler::ImageTiler(RenderImage* rI,
     // This value is the largest tile size.
     // In function call time this class will return
     // the actual tile size depending on current tile
-    Vector2ui fbSize = ResponsibleSize();
+    Vector2ui fbSize = RegionSize();
     coveringTileSize = FindOptimumTileSize(fbSize,
-                                       parallelizationHint);
+                                           parallelizationHint);
 
     paddedTileSize = coveringTileSize + filterPadding * 2u;
     renderBuffer->Resize(paddedTileSize);
     tileCount = Math::DivideUp(fbSize, coveringTileSize);
-
-    pixel1DRange = Vector2ui(0u, CurrentTileSize().Multiply());
 }
 
 Vector2ui ImageTiler::FullResolution() const
 {
     return fullResolution;
+}
+
+Vector2ui ImageTiler::RegionSize() const
+{
+    return range[1] - range[0];
 }
 
 Vector2ui ImageTiler::LocalTileStart() const
@@ -97,7 +95,7 @@ Vector2ui ImageTiler::LocalTileEnd() const
 {
     Vector2ui tileIndex2D = CurrentTileIndex();
     Vector2ui end = (tileIndex2D + 1u) * coveringTileSize;
-    end = Math::Min(end, ResponsibleSize());
+    end = Math::Min(end, RegionSize());
     return end;
 }
 
@@ -106,11 +104,6 @@ Vector2ui ImageTiler::CurrentTileSize() const
     auto start = GlobalTileStart();
     auto end = GlobalTileEnd();
     return end - start;
-}
-
-Vector2ui ImageTiler::Tile1DRange() const
-{
-    return pixel1DRange;
 }
 
 Vector2ui ImageTiler::ConservativeTileSize() const
@@ -139,14 +132,6 @@ void ImageTiler::NextTile()
     using Math::Roll;
     currentTile = uint32_t(Roll(static_cast<int32_t>(currentTile + 1),
                                 0, int32_t(tileCount.Multiply())));
-    //
-    pixel1DRange = Vector2ui(pixel1DRange[1],
-                             pixel1DRange[1] + CurrentTileSize().Multiply());
-    if(currentTile == 0)
-    {
-        pixel1DRange -= Vector2ui((range[1] - range[0]).Multiply());
-        assert(pixel1DRange[0] == 0);
-    }
 }
 
 Optional<RenderImageSection>

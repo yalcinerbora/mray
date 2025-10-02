@@ -12,6 +12,7 @@
 #include "TracerTypes.h"
 
 class ThreadPool;
+struct RenderImageParams;
 
 namespace RNGFunctions::HashPCG64
 {
@@ -81,33 +82,72 @@ namespace RNGFunctions
     template<std::floating_point F, std::unsigned_integral T>
     MR_HF_DECL static F ToFloat01(T);
 
-    // TODO: Implement double as well
+    // Old code we can't use this for sobol afaik.
+    //template<>
+    //MR_HF_DEF float ToFloat01<float, uint32_t>(uint32_t v)
+    //{
+    //    // Sanity Checks
+    //    static_assert(std::numeric_limits<float>::is_iec559, "Non-standard floating point!");
+    //    static_assert(sizeof(uint32_t) == sizeof(float), "float is not 32-bit!");
+
+    //    // This is simpler version also it's 24-bit instead of 23-bit
+    //    // https://marc-b-reynolds.github.io/distribution/2017/01/17/DenseFloat.html
+    //    float rngFloat = static_cast<float>(v >> 8);
+    //    return  rngFloat * 0x1p-24f;
+    //}
+
+    // TODO: Implement double as well as other wide types.
+    // i.e. get sample from 64-bit integer to float etc.
     template<>
     MR_HF_DEF float ToFloat01<float, uint32_t>(uint32_t v)
     {
-        // Sanity Checks
-        static_assert(std::numeric_limits<float>::is_iec559, "Non-standard floating point!");
-        static_assert(sizeof(uint32_t) == sizeof(float), "float is not 32-bit!");
+        // Up to this number we get greatest float that is less than 1
+        // So we must clamp here
+        static_assert(float(0x0) * float(0x1.p-32f) >= float(0));
+        static_assert(float(0xFFFFFF7F) * float(0x1.p-32f) != float(1));
+        static_assert(float(0xFFFFFF80) * float(0x1.p-32f) == float(1));
 
-        // This is simpler version also it's 24-bit instead of 23-bit
-        // https://marc-b-reynolds.github.io/distribution/2017/01/17/DenseFloat.html
-        float rngFloat = static_cast<float>(v >> 8);
-        return  rngFloat * 0x1p-24f;
+        // Unlike the code above, the data is evenly
+        // distributed in 32-bit space for sobol?
+        // So we just scale the given data to 0x1.p-32f (1.0 x 2^-32)
+        // to make it fit into the [0, 1).
+        //
+        // We hope IEEE fp convention will handle the rest...
+        static constexpr float SCALE = float(0x1.p-32f);
+        static constexpr float PREV_FLOAT = Math::PrevFloat(float(1));
+        // TODO: is there a way to prevent this min?
+        return Math::Min(float(v) * SCALE, PREV_FLOAT);
     }
+}
+
+namespace ZSobolDetail
+{
+    struct alignas(16) LocalState
+    {
+        uint64_t pixelMortonCode;
+        uint32_t sampleIndex;
+        uint32_t seed;
+    };
+
+    struct GlobalState
+    {
+        uint32_t    initialMaxSPP;
+        uint32_t    resMaxBits;
+    };
 }
 
 template <std::unsigned_integral T>
 struct RNGDispenserT
 {
     private:
-    Span<const T>       randomNumbers;
-    uint32_t            globalId;
-    uint32_t            stride;
+    Span<const T>   randomNumbers;
+    uint32_t        globalId;
+    uint32_t        stride;
 
     public:
-    MR_HF_DECL         RNGDispenserT(Span<const T> numbers,
-                                      uint32_t globalId,
-                                      uint32_t stride);
+    MR_HF_DECL      RNGDispenserT(Span<const T> numbers,
+                                  uint32_t globalId,
+                                  uint32_t stride);
 
     template<uint32_t I>
     MR_HF_DECL Float   NextFloat();
@@ -177,7 +217,10 @@ class RNGeneratorGroupI
     public:
     virtual         ~RNGeneratorGroupI() = default;
 
-    virtual void    SetupRange(Vector2ui range) = 0;
+    virtual void    SetupRange(Vector2ui rangeStart,
+                               Vector2ui rangeEnd,
+                               const GPUQueue& queue) = 0;
+
     virtual void    GenerateNumbers(// Output
                                     Span<RandomNumber> dNumbersOut,
                                     // Constants
@@ -198,53 +241,57 @@ class RNGeneratorGroupI
                                             // Constants
                                             uint32_t dimensionCount,
                                             const GPUQueue& queue) const = 0;
+    virtual void    IncrementSampleId(const GPUQueue& queue) const = 0;
+    virtual void    IncrementSampleIdIndirect(Span<const RayIndex> dIndices,
+                                              const GPUQueue& queue) const = 0;
 
-    virtual Span<BackupRNGState> GetBackupStates() = 0;
-    virtual size_t GPUMemoryUsage() const = 0;
+    virtual Span<BackupRNGState>    GetBackupStates() = 0;
+    virtual size_t                  GPUMemoryUsage() const = 0;
 };
 
-using RNGGenerator = GeneratorFuncType<RNGeneratorGroupI, uint32_t, uint64_t,
+using RNGGenerator = GeneratorFuncType<RNGeneratorGroupI, const RenderImageParams&,
+                                       Vector2ui, uint32_t, uint64_t,
                                        const GPUSystem&, ThreadPool&>;
 using RNGeneratorPtr = std::unique_ptr<RNGeneratorGroupI>;
 using RNGGeneratorMap = Map<typename SamplerType::E, RNGGenerator>;
 
-struct RNGPack
-{
-    BackupRNG&      backupRNG;
-    RNGDispenser&   rngDispenser;
-};
-
 class RNGGroupIndependent : public RNGeneratorGroupI
 {
     public:
-    using MainRNG       = PermutedCG32;
-    using MainRNGState  = typename MainRNG::State;
+    using MainRNG = PermutedCG32;
+    using MainRNGState = typename MainRNG::State;
     static constexpr typename SamplerType::E TypeName = SamplerType::INDEPENDENT;
 
     private:
-    ThreadPool&             mainThreadPool;
-    const GPUSystem&        gpuSystem;
+    ThreadPool&                 mainThreadPool;
+    const GPUSystem&            gpuSystem;
     // Due to tiling, we save the all state of the
     // entire image in host side.
     // This will copy the data to required HW side
-    //HostLocalMemory         hostMemory;
-    uint32_t                generatorCount;
-    Vector2ui               currentRange;
+    Vector2ui                   generatorCount;
+    std::array<Vector2ui, 2>    currentRange;
 
-    DeviceMemory            deviceMem;
-    Span<BackupRNGState>    dBackupStates;
-    Span<MainRNGState>      dMainStates;
-    Vector2ui               deviceRangeStart;
-    Vector2ui               deviceRangeEnd;
+    //
+    HostLocalMemory             hostMem;
+    Span<BackupRNGState>        hBackupStatesAll;
+    Span<MainRNGState>          hMainStatesAll;
+    // Device local
+    DeviceMemory                deviceMem;
+    Span<BackupRNGState>        dBackupStatesLocal;
+    Span<MainRNGState>          dMainStatesLocal;
 
     public:
     // Constructors & Destructor
-            RNGGroupIndependent(uint32_t generatorCount,
+            RNGGroupIndependent(const RenderImageParams& rIParams,
+                                Vector2ui maxGPUPresentRNGCount,
+                                uint32_t initialMaxSampleCount,
                                 uint64_t seed,
                                 const GPUSystem& system,
                                 ThreadPool& mainThreadPool);
 
-    void    SetupRange(Vector2ui range) override;
+    void    SetupRange(Vector2ui rangeStart,
+                       Vector2ui rangeEnd,
+                       const GPUQueue& queue) override;
 
     void    GenerateNumbers(// Output
                             Span<RandomNumber> dNumbersOut,
@@ -252,7 +299,7 @@ class RNGGroupIndependent : public RNGeneratorGroupI
                             Vector2ui dimensionRange,
                             const GPUQueue& queue) const override;
     void    GenerateNumbersIndirect(// Output
-                                    Span<RandomNumber> numbersOut,
+                                    Span<RandomNumber> dNumbersOut,
                                     // Input
                                     Span<const RayIndex> dIndices,
                                     // Constants
@@ -266,10 +313,86 @@ class RNGGroupIndependent : public RNGeneratorGroupI
                                     // Constants
                                     uint32_t dimensionCount,
                                     const GPUQueue& queue) const override;
+    //
+    void    IncrementSampleId(const GPUQueue& queue) const override;
+    void    IncrementSampleIdIndirect(Span<const RayIndex> dIndices,
+                                      const GPUQueue& queue) const override;
+
+    Span<BackupRNGState> GetBackupStates() override;
+    size_t               GPUMemoryUsage() const override;
+};
+
+// Implementation of
+// https://www.pbr-book.org/4ed/Sampling_and_Reconstruction/Sobol_Samplers
+//
+// Which is implementation of this paper
+// https://dl.acm.org/doi/10.1145/3414685.3417881
+class RNGGroupZSobol : public RNGeneratorGroupI
+{
+    public:
+    using MainRNGState = typename ZSobolDetail::LocalState;
+    using MainRNGGlobalState = typename ZSobolDetail::GlobalState;
+    static constexpr typename SamplerType::E TypeName = SamplerType::Z_SOBOL;
+
+    private:
+    ThreadPool&             mainThreadPool;
+    const GPUSystem&        gpuSystem;
+    // Due to tiling, we save the all state of the
+    // entire image in host side.
+    // This will copy the data to required HW side
+    Vector2ui                   generatorCount;
+    std::array<Vector2ui, 2>    currentRange;
+
+    //
+    HostLocalMemory             hostMem;
+    Span<BackupRNGState>        hBackupStatesAll;
+    Span<MainRNGState>          hMainStatesAll;
+    // Device local
+    DeviceMemory                deviceMem;
+    Span<BackupRNGState>        dBackupStatesLocal;
+    Span<MainRNGState>          dMainStatesLocal;
+    MainRNGGlobalState          globalState;
+
+    public:
+    // Constructors & Destructor
+            RNGGroupZSobol(const RenderImageParams& rIParams,
+                           Vector2ui maxGPUPresentRNGCount,
+                           uint32_t initialMaxSampleCount,
+                           uint64_t seed,
+                           const GPUSystem& system,
+                           ThreadPool& mainThreadPool);
+
+    void    SetupRange(Vector2ui rangeStart,
+                       Vector2ui rangeEnd,
+                       const GPUQueue& queue) override;
+
+    void    GenerateNumbers(// Output
+                            Span<RandomNumber> dNumbersOut,
+                            // Constants
+                            Vector2ui dimensionRange,
+                            const GPUQueue& queue) const override;
+    void    GenerateNumbersIndirect(// Output
+                                    Span<RandomNumber> dNumbersOut,
+                                    // Input
+                                    Span<const RayIndex> dIndices,
+                                    // Constants
+                                    Vector2ui dimensionRange,
+                                    const GPUQueue& queue) const override;
+    void    GenerateNumbersIndirect(// Output
+                                    Span<RandomNumber> dNumbersOut,
+                                    // Input
+                                    Span<const RayIndex> dIndices,
+                                    Span<const uint32_t> dDimensionStart,
+                                    // Constants
+                                    uint32_t dimensionCount,
+                                    const GPUQueue& queue) const override;
+    void    IncrementSampleId(const GPUQueue& queue) const override;
+    void    IncrementSampleIdIndirect(Span<const RayIndex> dIndices,
+                                      const GPUQueue& queue) const override;
 
 
     Span<BackupRNGState> GetBackupStates() override;
-    size_t  GPUMemoryUsage() const override;
+    size_t               GPUMemoryUsage() const override;
 };
 
 namespace RNGFunctions
