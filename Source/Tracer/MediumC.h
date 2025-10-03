@@ -49,8 +49,8 @@ concept MediumC = requires(MediumType md,
     {md.SigmaS(Vector3{})} -> std::same_as<Spectrum>;
     {md.Emission(Vector3{})} -> std::same_as<Spectrum>;
     // Sample RN count
-    MediumType::SampleScatteringRNCount;
-    requires std::is_same_v<decltype(MediumType::SampleScatteringRNCount), const uint32_t>;
+    MediumType::SampleScatteringRNList;
+    requires std::is_same_v<decltype(MediumType::SampleScatteringRNList), const RNRequestList>;
 
     // TODO:
     // We need to expose the iterator in a different way here, because we may

@@ -88,7 +88,7 @@ namespace PathTraceRDetail
 
     struct Options
     {
-        uint32_t            totalSPP = 32;
+        uint32_t            totalSPP = 16'384;
         uint32_t            burstSize = 1;
         Vector2ui           russianRouletteRange = Vector2ui(4, 20);
         LightSamplerType    lightSampler = LightSamplerType::E::UNIFORM;
@@ -239,7 +239,7 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     if(!isPathDead && dataPack.depth >= rrRange[0] &&
        !MaterialCommon::IsSpecular(specularity))
     {
-        Float rrXi = rng.NextFloat<Material::SampleRNCount>();
+        Float rrXi = rng.NextFloat<Material::SampleRNList.TotalRNCount()>();
         Float rrFactor = throughput.Sum() * Float(0.33333);
         auto result = RussianRoulette(throughput, rrFactor, rrXi);
         isPathDead = !result.has_value();

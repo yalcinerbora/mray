@@ -77,8 +77,8 @@ concept PrimitiveC = requires(PrimType pt,
     } -> std::same_as<Float>;
 
     // Primitive surface sample RN count
-    PrimType::SampleRNCount;
-    requires std::is_same_v<decltype(PrimType::SampleRNCount), const uint32_t>;
+    PrimType::SampleRNList;
+    requires std::is_same_v<decltype(PrimType::SampleRNList), const RNRequestList>;
 
     // Total surface area
     {pt.GetSurfaceArea()
@@ -318,7 +318,7 @@ class EmptyPrimitive
     using Intersection      = Optional<IntersectionT<EmptyType>>;
     using TransformContext  = TransContextType;
     //
-    static constexpr uint32_t SampleRNCount = 0;
+    static constexpr RNRequestList SampleRNList = RNRequestList();
 
     private:
     Ref<const TransformContext> transformContext;

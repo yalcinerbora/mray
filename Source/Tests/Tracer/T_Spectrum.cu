@@ -99,7 +99,7 @@ void SpectrumJakob2019Test::RunTest(const GPUSystem& gpuSystem,
     // Initialize spectrum context
     auto specContext = SpectrumContextJakob2019(colorSpace, sampleMode, gpuSystem);
 
-    uint32_t rnPerSample = specContext.SampleSpectrumRNCount();
+    uint32_t rnPerSample = specContext.SampleSpectrumRNList().TotalRNCount();
     uint32_t rnCount = SAMPLE_COUNT * rnPerSample;
     std::vector<RandomNumber> hRandomNumbers(rnCount);
     for(uint32_t j = 0; j < rnPerSample; j++)

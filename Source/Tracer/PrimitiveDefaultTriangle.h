@@ -38,7 +38,7 @@ namespace DefaultTriangleDetail
         using Intersection      = Optional<TriIntersection>;
         using TransformContext  = TransContextType;
         //
-        static constexpr uint32_t SampleRNCount = 2;
+        static constexpr RNRequestList SampleRNList = GenRNRequestList<2>();
 
         private:
         Ref<const TriangleData>     data;

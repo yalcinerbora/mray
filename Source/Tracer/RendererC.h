@@ -80,7 +80,7 @@ class RenderWorkI
     public:
     virtual ~RenderWorkI() = default;
 
-    virtual uint32_t         SampleRNCount(uint32_t workIndex) const = 0;
+    virtual RNRequestList    SampleRNList(uint32_t workIndex) const = 0;
     virtual std::string_view Name() const = 0;
 };
 
@@ -89,7 +89,7 @@ class RenderLightWorkI
     public:
     virtual ~RenderLightWorkI() = default;
 
-    virtual uint32_t         SampleRNCount(uint32_t workIndex) const = 0;
+    virtual RNRequestList    SampleRNList(uint32_t workIndex) const = 0;
     virtual std::string_view Name() const = 0;
 };
 
@@ -99,8 +99,8 @@ class RenderCameraWorkI
     virtual ~RenderCameraWorkI() = default;
 
     virtual std::string_view    Name() const = 0;
-    virtual uint32_t            SampleRayRNCount() const = 0;
-    virtual uint32_t            StochasticFilterSampleRayRNCount() const = 0;
+    virtual RNRequestList       SampleRayRNList() const = 0;
+    virtual RNRequestList       StochasticFilterSampleRayRNList() const = 0;
 };
 
 using RenderImagePtr = std::unique_ptr<RenderImage>;

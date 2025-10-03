@@ -38,7 +38,8 @@ class DirectLightSamplerUniform
     LightLookupTable    dLightIndexTable;
 
     public:
-    static constexpr uint32_t SampleLightRNCount = 1 + MetaLightArray::SampleSolidAngleRNCountWorst;
+    static constexpr 
+    RNRequestList SampleLightRNList = MetaLightArray::SampleSolidAngleRNListWorst.Append(1);
 
     public:
     // Constructors

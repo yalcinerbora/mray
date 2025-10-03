@@ -120,11 +120,11 @@ void KCReadLights(MRAY_GRID_CONSTANT const MetaLightArrayView lightArrayView,
 
         SampleT<Vector3> sampleVec = light.SampleSolidAngle(rng, DistantPoint);
         Float pdfSolidAngle = light.PdfSolidAngle(Hit, DistantPoint, Dir);
-        uint32_t solidRNCount = light.SampleSolidAngleRNCount();
+        uint32_t solidRNCount = light.SampleSolidAngleRNCount().TotalRNCount();
         //
         SampleT<Ray> sampleRay = light.SampleRay(rng);
         Float pdfRay = light.PdfRay(TestRay);
-        uint32_t rayRNCount = light.SampleRayRNCount();
+        uint32_t rayRNCount = light.SampleRayRNCount().TotalRNCount();
         //
         RayCone rayCone = RayCone{.aperture = 0, .width = 0};
         Spectrum radiance0 = light.EmitViaHit(Dir, Hit, rayCone);

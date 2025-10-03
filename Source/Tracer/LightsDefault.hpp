@@ -73,7 +73,7 @@ SampleT<Ray> LightPrim<P, SC>::SampleRay(RNGDispenser& rng) const
     const P& primitive = prim.get();
     SampleT<BasicSurface> surfaceSample = primitive.SampleSurface(rng);
 
-    Vector2 xi = rng.NextFloat2D<Primitive::SampleRNCount>();
+    Vector2 xi = rng.NextFloat2D<P::SampleRNList.TotalRNCount()>();
     SampleT<Vector3> dirSample;
     if(isTwoSided)
     {

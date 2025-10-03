@@ -24,7 +24,7 @@ namespace LambertMatDetail
         using SpectrumConverter = typename SpectrumContext::Converter;
         using DataSoA           = LambertMatData;
         //
-        static constexpr uint32_t SampleRNCount = 2;
+        static constexpr RNRequestList SampleRNList = GenRNRequestList<2>();
 
         private:
         const Surface&              surface;
@@ -70,7 +70,7 @@ namespace ReflectMatDetail
         using SpectrumConverter = typename SpectrumContext::Converter;
         using DataSoA           = ReflectMatData;
         //
-        static constexpr uint32_t SampleRNCount = 0;
+        static constexpr RNRequestList SampleRNList = RNRequestList();
 
         private:
         const Surface& surface;
@@ -114,7 +114,7 @@ namespace RefractMatDetail
         using SpectrumConverter = typename SpectrumContext::Converter;
         using DataSoA           = RefractMatData;
         //
-        static constexpr uint32_t SampleRNCount = 0;
+        static constexpr RNRequestList SampleRNList = RNRequestList();
 
         private:
         const Surface&  surface;
@@ -170,7 +170,7 @@ namespace UnrealMatDetail
         using OptionalNormalMap = Optional<TracerTexView<2, Vector3>>;
         using DataSoA           = UnrealMatData;
         //
-        static constexpr uint32_t SampleRNCount = 3;
+        static constexpr RNRequestList SampleRNList = GenRNRequestList<2, 1>();
 
         private:
         const Surface&      surface;

@@ -122,6 +122,7 @@ namespace RNGFunctions
 
 namespace ZSobolDetail
 {
+    // Rest is at the impl. file
     struct alignas(16) LocalState
     {
         uint64_t pixelMortonCode;
@@ -157,6 +158,42 @@ struct RNGDispenserT
 
 using RandomNumber = uint32_t;
 using RNGDispenser = RNGDispenserT<RandomNumber>;
+
+// RNG Request List
+// Up until ZSobol implementation we just use a RN count variable
+// that each material/renderer work returns. Now zsobol requires dimension
+// information and corraletion between adjacent dimension when 2D sampling
+// is required. So we utilize a bitset that represents this information.
+// each 2bits corralates a sample which can be 1/2/3. Up to 3D sampling is supported
+// per request
+class RNRequestList
+{
+    private:
+    uint64_t list = 0; // up to 32 samples, each can at most be 3D.
+    uint32_t fillCounter = 0;
+
+    static constexpr uint64_t BIT_PER_REQUEST = 2;
+    static constexpr uint64_t MASK = (uint64_t(1) << BIT_PER_REQUEST) - 1;
+    static constexpr uint64_t BIT_LIMIT = sizeof(uint64_t) * CHAR_BIT;
+
+    public:
+    // Constructors & Destructor
+    RNRequestList() = default;
+
+    // Utility
+    MR_PF_DECL uint32_t DimensionOfRequest(uint32_t requestIndex) const;
+    MR_PF_DECL uint32_t TotalRNCount() const;
+    MR_PF_DECL uint32_t TotalRequestCount() const;
+    
+    MR_PF_DECL RNRequestList Append(uint32_t dimOfRequest) const;
+    MR_PF_DECL RNRequestList Append(const RNRequestList&) const;
+
+    MR_PF_DECL_V void CombineMax(const RNRequestList&);
+};
+
+// Convenience for constexpr generation
+template<uint32_t... Is>
+MR_PF_DECL RNRequestList GenRNRequestList();
 
 // PCG with 32bit state
 // https://www.pcg-random.org
@@ -224,22 +261,24 @@ class RNGeneratorGroupI
     virtual void    GenerateNumbers(// Output
                                     Span<RandomNumber> dNumbersOut,
                                     // Constants
-                                    Vector2ui dimensionRange,
+                                    uint16_t dimensionStart,
+                                    RNRequestList rnRequests,
                                     const GPUQueue& queue) const = 0;
     virtual void    GenerateNumbersIndirect(// Output
                                             Span<RandomNumber> dNumbersOut,
                                             // Input
                                             Span<const RayIndex> dIndices,
                                             // Constants
-                                            Vector2ui dimensionRange,
+                                            uint16_t dimensionStart,
+                                            RNRequestList rnRequests,
                                             const GPUQueue& queue) const = 0;
     virtual void    GenerateNumbersIndirect(// Output
                                             Span<RandomNumber> dNumbersOut,
                                             // Input
                                             Span<const RayIndex> dIndices,
-                                            Span<const uint32_t> dDimensionStart,
+                                            Span<const uint16_t> dDimensionStart,
                                             // Constants
-                                            uint32_t dimensionCount,
+                                            RNRequestList rnRequests,
                                             const GPUQueue& queue) const = 0;
     virtual void    IncrementSampleId(const GPUQueue& queue) const = 0;
     virtual void    IncrementSampleIdIndirect(Span<const RayIndex> dIndices,
@@ -296,22 +335,24 @@ class RNGGroupIndependent : public RNGeneratorGroupI
     void    GenerateNumbers(// Output
                             Span<RandomNumber> dNumbersOut,
                             // Constants
-                            Vector2ui dimensionRange,
+                            uint16_t dimensionStart,
+                            RNRequestList rnRequests,
                             const GPUQueue& queue) const override;
     void    GenerateNumbersIndirect(// Output
                                     Span<RandomNumber> dNumbersOut,
                                     // Input
                                     Span<const RayIndex> dIndices,
                                     // Constants
-                                    Vector2ui dimensionRange,
+                                    uint16_t dimensionStart,
+                                    RNRequestList rnRequests,
                                     const GPUQueue& queue) const override;
     void    GenerateNumbersIndirect(// Output
                                     Span<RandomNumber> dNumbersOut,
                                     // Input
                                     Span<const RayIndex> dIndices,
-                                    Span<const uint32_t> dDimensionStart,
+                                    Span<const uint16_t> dDimensionStart,
                                     // Constants
-                                    uint32_t dimensionCount,
+                                    RNRequestList rnRequests,
                                     const GPUQueue& queue) const override;
     //
     void    IncrementSampleId(const GPUQueue& queue) const override;
@@ -369,22 +410,24 @@ class RNGGroupZSobol : public RNGeneratorGroupI
     void    GenerateNumbers(// Output
                             Span<RandomNumber> dNumbersOut,
                             // Constants
-                            Vector2ui dimensionRange,
+                            uint16_t dimensionStart,
+                            RNRequestList rnRequests,
                             const GPUQueue& queue) const override;
     void    GenerateNumbersIndirect(// Output
                                     Span<RandomNumber> dNumbersOut,
                                     // Input
                                     Span<const RayIndex> dIndices,
                                     // Constants
-                                    Vector2ui dimensionRange,
+                                    uint16_t dimensionStart,
+                                    RNRequestList rnRequests,
                                     const GPUQueue& queue) const override;
     void    GenerateNumbersIndirect(// Output
                                     Span<RandomNumber> dNumbersOut,
                                     // Input
                                     Span<const RayIndex> dIndices,
-                                    Span<const uint32_t> dDimensionStart,
+                                    Span<const uint16_t> dDimensionStart,
                                     // Constants
-                                    uint32_t dimensionCount,
+                                    RNRequestList rnRequests,
                                     const GPUQueue& queue) const override;
     void    IncrementSampleId(const GPUQueue& queue) const override;
     void    IncrementSampleIdIndirect(Span<const RayIndex> dIndices,
@@ -464,6 +507,89 @@ Vector2 RNGDispenserT<T>::NextFloat2D()
 
     return Vector2(RNGFunctions::ToFloat01<Float>(xi0),
                    RNGFunctions::ToFloat01<Float>(xi1));
+}
+
+MR_PF_DEF 
+uint32_t RNRequestList::DimensionOfRequest(uint32_t requestIndex) const
+{
+    uint32_t i = requestIndex;
+    uint32_t result = (list >> (i * BIT_PER_REQUEST)) & MASK;
+    return result;
+}
+
+MR_PF_DEF 
+uint32_t RNRequestList::TotalRNCount() const
+{
+    static_assert(BIT_PER_REQUEST == 2, "This implementation is "
+                  "only for 2-bit dimension per request. "
+                  "You need to change constants for that.");
+    constexpr uint64_t LSB_MASK = 0x5555555555555555;
+    constexpr uint64_t MSB_MASK = 0xAAAAAAAAAAAAAAAA;
+    return uint32_t(Bit::PopC(MSB_MASK & list) * 2ull +
+                    Bit::PopC(LSB_MASK & list));
+}
+
+MR_PF_DEF
+uint32_t RNRequestList::TotalRequestCount() const
+{
+    assert((fillCounter % BIT_PER_REQUEST) == 0);
+    return fillCounter / BIT_PER_REQUEST;
+}
+
+MR_PF_DEF 
+RNRequestList RNRequestList::Append(uint32_t dimOfRequest) const
+{
+    assert(fillCounter + 2 < BIT_LIMIT);
+    assert(dimOfRequest <= MASK);
+
+    RNRequestList result = (*this);
+    if(dimOfRequest == 0) return result;
+
+    result.list = (dimOfRequest << fillCounter) | list;
+    result.fillCounter = fillCounter + 2u;    
+    return result;
+}
+
+MR_PF_DEF 
+RNRequestList RNRequestList::Append(const RNRequestList& other) const
+{    
+    assert(other.fillCounter + fillCounter <= BIT_LIMIT);
+    RNRequestList result = (*this);
+
+    result.list = (other.list << fillCounter) | list;
+    result.fillCounter = fillCounter + other.fillCounter;
+    return result;
+}
+
+MR_PF_DEF_V
+void RNRequestList::CombineMax(const RNRequestList& r)
+{
+    // Given "this" and another RN request list
+    // find the maximum required random numbers that does not
+    // alter the dimensionality of the samples.
+    // Increase sample count if required
+    uint32_t newFill = Math::Max(fillCounter, r.fillCounter);
+    uint32_t reqCount = newFill / BIT_PER_REQUEST;
+
+    RNRequestList newList;
+    for(uint32_t i = 0; i < reqCount; i++)
+    {
+        uint32_t localMax = Math::Max(DimensionOfRequest(i),
+                                      r.DimensionOfRequest(i));
+        newList = newList.Append(localMax);
+    }
+    *this = newList;       
+}
+
+template<uint32_t... Is>
+MR_PF_DEF 
+RNRequestList GenRNRequestList()
+{
+    constexpr std::array UNPACK_LIST = {Is...};
+    RNRequestList result;
+    for(size_t i = 0; i < UNPACK_LIST.size(); i++)
+        result = result.Append(UNPACK_LIST[i]);
+    return result;
 }
 
 MR_HF_DEF

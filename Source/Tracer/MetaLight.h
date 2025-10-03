@@ -93,17 +93,29 @@ namespace MetaLightDetail
     constexpr bool AllImplicitLifetime() { return true; }
 
     template<LightC... Lights>
-    constexpr uint32_t SampleSolidAngleRNCountWorstCase()
+    constexpr RNRequestList SampleSolidAngleRNListWorstCase()
     {
-        uint32_t result = std::max({Lights::SampleSolidAngleRNCount...});
-        return result;
+        constexpr std::array LIST_UNPACK = {Lights::SampleSolidAngleRNList...};
+
+        RNRequestList worstCaseList;
+        for(const RNRequestList& r : LIST_UNPACK)
+        {
+            worstCaseList.CombineMax(r);
+        }
+        return worstCaseList;
     }
 
     template<LightC... Lights>
-    constexpr uint32_t SampleRayRNCountWorstCase()
+    constexpr RNRequestList SampleRayRNListWorstCase()
     {
-        uint32_t result = std::max({Lights::SampleRayRNCount...});
-        return result;
+        constexpr std::array LIST_UNPACK = {Lights::SampleRayRNList...};
+
+        RNRequestList worstCaseList;
+        for(const RNRequestList& r : LIST_UNPACK)
+        {
+            worstCaseList.CombineMax(r);
+        }
+        return worstCaseList;     
     }
 }
 
@@ -129,13 +141,13 @@ class MetaLightViewT
                                       const Vector3& distantPoint,
                                       const Vector3& dir) const;
     MR_HF_DECL
-    uint32_t            SampleSolidAngleRNCount() const;
+    RNRequestList       SampleSolidAngleRNCount() const;
     MR_HF_DECL
     SampleT<Ray>        SampleRay(RNGDispenser& dispenser) const;
     MR_HF_DECL
     Float               PdfRay(const Ray&) const;
     MR_HF_DECL
-    uint32_t            SampleRayRNCount() const;
+    RNRequestList       SampleRayRNCount() const;
 
     MR_HF_DECL
     Spectrum            EmitViaHit(const Vector3& wO,
@@ -249,14 +261,14 @@ class MetaLightArrayT
 
     public:
     using MetaLight = LightVariant;
-    static constexpr uint32_t SampleSolidAngleRNCountWorst = MetaLightDetail::SampleSolidAngleRNCountWorstCase
+    static constexpr RNRequestList SampleSolidAngleRNListWorst = MetaLightDetail::SampleSolidAngleRNListWorstCase
     <
         MetaLightDetail::LightType<TypePackElement<0, TransformLightTuple>,
                                    TypePackElement<1, TransformLightTuple>>
         ...
     >();
 
-    static constexpr uint32_t SampleRayRNCountWorst = MetaLightDetail::SampleRayRNCountWorstCase
+    static constexpr RNRequestList SampleRayRNListWorst = MetaLightDetail::SampleRayRNListWorstCase
     <
         MetaLightDetail::LightType<TypePackElement<0, TransformLightTuple>,
                                    TypePackElement<1, TransformLightTuple>>

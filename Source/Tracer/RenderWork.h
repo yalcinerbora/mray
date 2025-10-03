@@ -142,8 +142,7 @@ class RenderWork : public RenderWorkT<R>
     MRAY_RENDER_DO_WORK_DEF(0)
     MRAY_RENDER_DO_WORK_DEF(1)
 
-
-    uint32_t         SampleRNCount(uint32_t workIndex) const override;
+    RNRequestList    SampleRNList(uint32_t workIndex) const override;
     std::string_view Name() const override;
 };
 
@@ -183,7 +182,7 @@ class RenderLightWork : public RenderLightWorkT<R>
     MRAY_RENDER_DO_LIGHT_WORK_DEF(0)
     MRAY_RENDER_DO_LIGHT_WORK_DEF(1)
 
-    uint32_t            SampleRNCount(uint32_t workIndex) const override;
+    RNRequestList       SampleRNList(uint32_t workIndex) const override;
     std::string_view    Name() const override;
 };
 
@@ -246,8 +245,8 @@ class RenderCameraWork : public RenderCameraWorkT<R>
                                     const GPUQueue& queue) const override;
 
     std::string_view    Name() const override;
-    uint32_t            SampleRayRNCount() const override;
-    uint32_t            StochasticFilterSampleRayRNCount() const override;
+    RNRequestList       SampleRayRNList() const override;
+    RNRequestList       StochasticFilterSampleRayRNList() const override;
 };
 
 template<RendererC R, uint32_t I, PrimitiveGroupC PG,
@@ -361,9 +360,9 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
 
 template<RendererC R, PrimitiveGroupC P,
          MaterialGroupC M, TransformGroupC T>
-uint32_t RenderWork<R, P, M, T>::SampleRNCount(uint32_t) const
+RNRequestList RenderWork<R, P, M, T>::SampleRNList(uint32_t) const
 {
-    return 0;
+    return RNRequestList();
 }
 
 template<RendererC R, PrimitiveGroupC P,
@@ -458,9 +457,9 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
 }
 
 template<RendererC R, LightGroupC L, TransformGroupC T>
-uint32_t RenderLightWork<R, L, T>::SampleRNCount(uint32_t) const
+RNRequestList RenderLightWork<R, L, T>::SampleRNList(uint32_t) const
 {
-    return 0;
+    return RNRequestList();
 }
 
 template<RendererC R, LightGroupC L, TransformGroupC T>
@@ -540,7 +539,7 @@ void RenderCameraWork<R, C, T>::GenerateRays(// Output
                                              const GPUQueue& queue) const
 {
     using Camera = typename C::Camera;
-    assert(dRayIndices.size() * Camera::SampleRayRNCount == dRandomNums.size());
+    assert(dRayIndices.size() * Camera::SampleRayRNList.TotalRNCount() == dRandomNums.size());
     assert(sizeof(Camera) <= dCamBuffer.size_bytes());
     assert(uintptr_t(dCamBuffer.data()) % alignof(Camera) == 0);
     const Camera* dCamera = reinterpret_cast<const Camera*>(dCamBuffer.data());
@@ -590,7 +589,7 @@ void RenderCameraWork<R, C, T>::GenRaysStochasticFilter(// Output
                                                         const GPUQueue& queue) const
 {
     using Camera = typename C::Camera;
-    assert(dRayIndices.size() * StochasticFilterSampleRayRNCount() == dRandomNums.size());
+    assert(dRayIndices.size() * StochasticFilterSampleRayRNList().TotalRNCount() == dRandomNums.size());
     assert(sizeof(Camera) <= dCamBuffer.size_bytes());
     assert(uintptr_t(dCamBuffer.data()) % alignof(Camera) == 0);
     const Camera* dCamera = reinterpret_cast<const Camera*>(dCamBuffer.data());
@@ -645,13 +644,13 @@ std::string_view RenderCameraWork<R, C, T>::Name() const
 }
 
 template<RendererC R, CameraGroupC C, TransformGroupC T>
-uint32_t RenderCameraWork<R, C, T>::SampleRayRNCount() const
+RNRequestList RenderCameraWork<R, C, T>::SampleRayRNList() const
 {
-    return C::SampleRayRNCount;
+    return C::SampleRayRNList;
 }
 
 template<RendererC R, CameraGroupC C, TransformGroupC T>
-uint32_t RenderCameraWork<R, C, T>::StochasticFilterSampleRayRNCount() const
+RNRequestList RenderCameraWork<R, C, T>::StochasticFilterSampleRayRNList() const
 {
-    return 2u;
+    return GenRNRequestList<2>();
 }

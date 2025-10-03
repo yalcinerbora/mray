@@ -195,8 +195,8 @@ uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount, SurfRDeta
 {
     using enum SurfRDetail::Mode::E;
     uint32_t camSample = (doStochasticFilter)
-        ? (*curCamWork)->StochasticFilterSampleRayRNCount()
-        : (*curCamWork)->SampleRayRNCount();
+        ? (*curCamWork)->StochasticFilterSampleRayRNList().TotalRNCount()
+        : (*curCamWork)->SampleRayRNList().TotalRNCount();
 
     uint32_t maxSample = camSample;
     if(mode == AO)
@@ -212,7 +212,7 @@ uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount, SurfRDeta
             },
             [](const auto& renderWorkStruct) -> uint32_t
             {
-                return renderWorkStruct.workPtr->SampleRNCount(1);
+                return renderWorkStruct.workPtr->SampleRNList(1).TotalRNCount();
             }
         );
     }
@@ -440,14 +440,14 @@ RendererOutput SurfaceRenderer::DoRender()
                             this->imageTiler.LocalTileEnd(),
                             processQueue);
     // Generate RN for camera rays
-    uint32_t camSamplePerRay = currentOptions.doStochasticFilter
-                        ? (*curCamWork)->SampleRayRNCount()
-                        : (*curCamWork)->StochasticFilterSampleRayRNCount();
-    uint32_t camRayGenRNCount = rayCount * camSamplePerRay;
+    RNRequestList camSamplePerRayList = currentOptions.doStochasticFilter
+                        ? (*curCamWork)->SampleRayRNList()
+                        : (*curCamWork)->StochasticFilterSampleRayRNList();
+    uint32_t camRayGenRNCount = rayCount * camSamplePerRayList.TotalRNCount();
     auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
     rnGenerator->IncrementSampleId(processQueue);
-    rnGenerator->GenerateNumbers(dCamRayGenRNBuffer, Vector2ui(0, camSamplePerRay),
-                                 processQueue);
+    rnGenerator->GenerateNumbers(dCamRayGenRNBuffer, 0, 
+                                 camSamplePerRayList, processQueue);
 
     uint64_t& tilePixIndex = tilePathCounts[imageTiler.CurrentTileIndex1D()];
     if(currentOptions.doStochasticFilter)
@@ -575,17 +575,19 @@ RendererOutput SurfaceRenderer::DoRender()
                 using enum SurfRDetail::Mode::E;
                 const auto& workI = *wLoc->workPtr.get();
 
-                uint32_t rnCount = (currentOptions.mode == AO)
-                                    ? 2u
-                                    : workI.SampleRNCount(1);
+                RNRequestList rnCountList = (currentOptions.mode == AO)
+                                                ? GenRNRequestList<2>()
+                                                : workI.SampleRNList(1);
+                uint32_t rnCount = rnCountList.TotalRNCount();
+                uint32_t rnStart = camSamplePerRayList.TotalRNCount();
 
                 auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
                 if(currentOptions.mode == SurfRDetail::Mode::AO ||
                    currentOptions.mode == SurfRDetail::Mode::FURNACE)
                 {
-                    Vector2ui nextRNGDimRange = Vector2ui(0u, rnCount) + camSamplePerRay;
                     rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-                                                         nextRNGDimRange, processQueue);
+                                                         uint16_t(rnStart), rnCountList,
+                                                         processQueue);
                 }
 
                 workI.DoWork_1(dRayStateAO,

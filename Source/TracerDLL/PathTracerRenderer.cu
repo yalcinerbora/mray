@@ -253,8 +253,10 @@ template<SpectrumContextC SC>
 uint32_t PathTracerRendererT<SC>::FindMaxSamplePerIteration(uint32_t rayCount,
                                                             PathTraceRDetail::SampleMode sampleMode)
 {
-    uint32_t camSample = (*curCamWork)->StochasticFilterSampleRayRNCount();
-    uint32_t spectrumSample = isSpectral ? spectrumContext->SampleSpectrumRNCount() : 0u;
+    uint32_t camSample = (*curCamWork)->StochasticFilterSampleRayRNList().TotalRNCount();
+    uint32_t spectrumSample = isSpectral 
+                ? spectrumContext->SampleSpectrumRNList().TotalRNCount() 
+                : 0u;
 
     uint32_t maxSample = Math::Max(camSample, spectrumSample);
     maxSample = std::transform_reduce
@@ -276,10 +278,10 @@ uint32_t PathTracerRendererT<SC>::FindMaxSamplePerIteration(uint32_t rayCount,
             // But when PathTracerRendererT was not a template it did work.
             // Anyway report it...
             if(sampleMode == PathTraceRDetail::SampleMode::E::PURE)
-                return renderWorkStruct.workPtr->SampleRNCount(0);
+                return renderWorkStruct.workPtr->SampleRNList(0).TotalRNCount();
             else
-                return Math::Max(renderWorkStruct.workPtr->SampleRNCount(0),
-                                 renderWorkStruct.workPtr->SampleRNCount(1));
+                return Math::Max(renderWorkStruct.workPtr->SampleRNList(0).TotalRNCount(),
+                                 renderWorkStruct.workPtr->SampleRNList(1).TotalRNCount());
         }
     );
     return rayCount * maxSample;
@@ -313,7 +315,8 @@ PathTracerRendererT<SC>::ReloadPaths(Span<const RayIndex> dIndices,
     processQueue.Barrier().Wait();
 
     // Generate RN for camera rays
-    uint32_t camSamplePerRay = (*curCamWork)->StochasticFilterSampleRayRNCount();
+    RNRequestList camSampleRNList = (*curCamWork)->StochasticFilterSampleRayRNList();
+    uint32_t camSamplePerRay = camSampleRNList.TotalRNCount();
     uint32_t deadRayCount = hDeadRayRanges[2] - hDeadRayRanges[1];
     auto dDeadRayIndices = dDeadAliveRayIndices.subspan(hDeadRayRanges[1],
                                                         deadRayCount);
@@ -338,7 +341,7 @@ PathTracerRendererT<SC>::ReloadPaths(Span<const RayIndex> dIndices,
                                                    processQueue);
             rnGenerator->GenerateNumbersIndirect(dCamRayGenRNBuffer,
                                                  ToConstSpan(dFilledRayIndices),
-                                                 Vector2ui(0, camSamplePerRay),
+                                                 0, camSampleRNList,
                                                  processQueue);
             //
             const auto& cameraWork = (*curCamWork->get());
@@ -372,7 +375,8 @@ PathTracerRendererT<SC>::ReloadPaths(Span<const RayIndex> dIndices,
             uint32_t usedRNDimensionCount = camSamplePerRay;
             if(isSpectral)
             {
-                uint32_t rnPerSample = spectrumContext->SampleSpectrumRNCount();
+                RNRequestList spectralRNList = spectrumContext->SampleSpectrumRNList();
+                uint32_t rnPerSample = spectralRNList.TotalRNCount();
                 uint32_t specSampleRNCount = fillRayCount * rnPerSample;
                 // Offset the dimensions
                 auto sampleDims = Vector2ui(camSamplePerRay);
@@ -381,7 +385,7 @@ PathTracerRendererT<SC>::ReloadPaths(Span<const RayIndex> dIndices,
                 auto dSpecWaveGenRNBuffer = dRandomNumBuffer.subspan(0, specSampleRNCount);
                 rnGenerator->GenerateNumbersIndirect(dSpecWaveGenRNBuffer,
                                                      ToConstSpan(dFilledRayIndices),
-                                                     sampleDims,
+                                                     uint16_t(camSamplePerRay), spectralRNList,
                                                      processQueue);
 
                 // Actual wavelength sampling
@@ -401,7 +405,7 @@ PathTracerRendererT<SC>::ReloadPaths(Span<const RayIndex> dIndices,
             DeviceAlgorithms::InPlaceTransformIndirect
             (
                 dPathRNGDimensions, ToConstSpan(dFilledRayIndices), processQueue,
-                SetFunctor(usedRNDimensionCount)
+                SetFunctor_U16(uint16_t(usedRNDimensionCount))
             );
         }
         //
@@ -526,16 +530,18 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t partitionSize)
         {
-            uint32_t rnCount = workI.SampleRNCount(0);
+            RNRequestList rnList = workI.SampleRNList(0);
+            uint32_t rnCount = rnList.TotalRNCount();
             auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
             rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-                                                 dPathRNGDimensions, rnCount,
+                                                 dPathRNGDimensions, 
+                                                 rnList,
                                                  processQueue);
 
             DeviceAlgorithms::InPlaceTransformIndirect
             (
                 dPathRNGDimensions, dLocalIndices, processQueue,
-                ConstAddFunctor(rnCount)
+                ConstAddFunctor_U16(uint16_t(rnCount))
             );
 
             workI.DoWork_0(dRayState, dLocalIndices,
@@ -581,23 +587,23 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
         // CUDA Init check error, we access the rays even if it is not written
         processQueue.MemsetAsync(dRayState.dOutRays, 0x00);
-
-
         // Do the NEE kernel + boundary work
         this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t partitionSize)
         {
-            uint32_t rnCount = workI.SampleRNCount(1);
+            RNRequestList rnList = workI.SampleRNList(1);
+            uint32_t rnCount = rnList.TotalRNCount();
             auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
             rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-                                                 dPathRNGDimensions, rnCount,
+                                                 dPathRNGDimensions, 
+                                                 rnList,
                                                  processQueue);
 
             DeviceAlgorithms::InPlaceTransformIndirect
             (
                 dPathRNGDimensions, dLocalIndices, processQueue,
-                ConstAddFunctor(rnCount)
+                ConstAddFunctor_U16(uint16_t(rnCount))
             );
 
             workI.DoWork_1(dRayState, dLocalIndices,
@@ -642,16 +648,18 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         [&](const auto& workI, Span<uint32_t> dLocalIndices,
             uint32_t, uint32_t partitionSize)
         {
-            uint32_t rnCount = workI.SampleRNCount(0);
+            RNRequestList rnList = workI.SampleRNList(0);
+            uint32_t rnCount = rnList.TotalRNCount();
             auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
             rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-                                                 dPathRNGDimensions, rnCount,
+                                                 dPathRNGDimensions, 
+                                                 rnList,
                                                  processQueue);
 
             DeviceAlgorithms::InPlaceTransformIndirect
             (
                 dPathRNGDimensions, dLocalIndices, processQueue,
-                ConstAddFunctor(rnCount)
+                ConstAddFunctor_U16(uint16_t(rnCount))
             );
 
             workI.DoWork_0(dRayState, dLocalIndices,

@@ -31,7 +31,7 @@ LightSample DirectLightSamplerUniform<ML>::SampleLight(RNGDispenser& rng,
                                                        const RayConeSurface& distantRayConeSurf) const
 {
     using MetaLightView = typename MetaLightArrayView::template MetaLightView<SpectrumConverter>;
-    static constexpr auto DiscreteSampleIndex = ML::SampleSolidAngleRNCountWorst;
+    static constexpr auto DiscreteSampleIndex = ML::SampleSolidAngleRNListWorst.TotalRNCount();
 
     uint32_t lightCount = dMetaLights.Size();
     Float lightCountF = Float(lightCount);

@@ -67,9 +67,10 @@ namespace ZSobolDetail
         public:
         // Constructors & Destructor
         MR_PF_DECL_V ZSobol(const LocalState&, const GlobalState&);
-
-        MR_HF_DECL
-        uint32_t    Next(uint32_t dim) const;
+        //
+        MR_HF_DECL uint32_t     Next(uint32_t dim) const;
+        MR_HF_DECL Vector2ui    Next2D(uint32_t dim) const;
+        MR_HF_DECL Vector3ui    Next3D(uint32_t dim) const;
     };
 }
 
@@ -282,16 +283,89 @@ ZSobolDetail::ZSobol::ZSobol(const LocalState& ls,
 
 MR_HF_DEF
 uint32_t ZSobolDetail::ZSobol::Next(uint32_t dim) const
+{       
+    uint64_t sampleIndex = SampleIndex(dim);
+    uint32_t sample = SampleSobol32(sampleIndex, 0);
+    using RNGFunctions::HashPCG64::Hash;
+    uint64_t sampleHash = Hash(dim, seed);
+    sample = ScambleOwenFast(sample, uint32_t(sampleHash));
+    return sample;
+}
+
+MR_HF_DEF
+Vector2ui ZSobolDetail::ZSobol::Next2D(uint32_t dim) const
 {
-    uint32_t dimU = dim & (0xFFFFFFFE);
-    uint32_t dimL = dim & (0x00000001);
-    uint64_t sampleIndex = SampleIndex(dimU);
-    uint32_t sample = SampleSobol32(sampleIndex, dimL);
+    uint64_t sampleIndex = SampleIndex(dim);
+    uint32_t sample0 = SampleSobol32(sampleIndex, 0);
+    uint32_t sample1 = SampleSobol32(sampleIndex, 1);
 
     using RNGFunctions::HashPCG64::Hash;
     uint64_t sampleHash = Hash(dim, seed);
-    //sample = ScambleOwenFast(sample, uint32_t(sampleHash));
-    return sample;
+    sample0 = ScambleOwenFast(sample0, uint32_t(sampleHash & 0xFFFFFFFF));
+    sample1 = ScambleOwenFast(sample1, uint32_t(sampleHash >> 32));
+    return Vector2ui(sample0, sample1);
+}
+
+MR_HF_DEF
+Vector3ui ZSobolDetail::ZSobol::Next3D(uint32_t dim) const
+{
+    uint64_t sampleIndex = SampleIndex(dim);
+    uint32_t sample0 = SampleSobol32(sampleIndex, 0);
+    uint32_t sample1 = SampleSobol32(sampleIndex, 1);
+    uint32_t sample2 = SampleSobol32(sampleIndex, 2);
+
+    using RNGFunctions::HashPCG64::Hash;
+    uint64_t sampleHash = Hash(dim, seed);
+    static constexpr uint64_t MASK = (1 << 21) - 1;
+    sample0 = ScambleOwenFast(sample0, uint32_t((sampleHash >>  0) & MASK));
+    sample1 = ScambleOwenFast(sample1, uint32_t((sampleHash >> 21) & MASK));
+    sample2 = ScambleOwenFast(sample2, uint32_t((sampleHash >> 42)       ));
+    return Vector3ui(sample0, sample1, sample2);
+}
+
+MR_HF_DEF
+void GenerateZSobolPack(// Output
+                        const Span<RandomNumber>& dNumbers,
+                        // Input
+                        const ZSobolDetail::ZSobol& rng,
+                        // Constants
+                        const RNRequestList& rnRequests,
+                        uint32_t rngCount, 
+                        uint32_t rngIndex,
+                        uint32_t dimOffset)
+{
+    uint32_t totalRequests = rnRequests.TotalRequestCount();
+    uint32_t o = 0;
+    for(uint32_t reqI = 0; reqI < totalRequests; reqI++)
+    {
+        uint32_t dim = rnRequests.DimensionOfRequest(reqI);
+        switch(dim)
+        {
+            // Write in strided fashion to coalesce mem
+            case 1:
+            {
+                dNumbers[rngIndex + rngCount * o] = rng.Next(dimOffset + o);
+                break;
+            }
+            case 2:
+            {
+                Vector2ui numbers = rng.Next2D(dimOffset + o);
+                dNumbers[rngIndex + rngCount * (o + 0)] = numbers[0];
+                dNumbers[rngIndex + rngCount * (o + 1)] = numbers[1];
+                break;
+            }
+            case 3:
+            {
+                Vector3ui numbers = rng.Next3D(dimOffset + o);
+                dNumbers[rngIndex + rngCount * (o + 0)] = numbers[0];
+                dNumbers[rngIndex + rngCount * (o + 1)] = numbers[1];
+                dNumbers[rngIndex + rngCount * (o + 2)] = numbers[2];
+                break;
+            }
+        }
+        o += dim;
+    }
+    assert(o == rnRequests.TotalRNCount());
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
@@ -300,9 +374,9 @@ void KCGenRandomNumbersPCG32(// Output
                              // I-O
                              MRAY_GRID_CONSTANT const Span<typename PermutedCG32::State> dStates,
                              // Constants
-                             MRAY_GRID_CONSTANT const uint32_t dimPerGenerator)
+                             MRAY_GRID_CONSTANT const uint32_t rnCount)
 {
-    assert(dStates.size() * dimPerGenerator <= dNumbers.size());
+    assert(dStates.size() * rnCount <= dNumbers.size());
 
     uint32_t generatorCount = uint32_t(dStates.size());
     KernelCallParams kp;
@@ -315,7 +389,7 @@ void KCGenRandomNumbersPCG32(// Output
         // hold a state for each dimension but for a path tracer it is infeasible).
         //
         // So we just generate numbers using a single state
-        for(uint32_t n = 0; n < dimPerGenerator; n++)
+        for(uint32_t n = 0; n < rnCount; n++)
         {
             // Write in strided fashion to coalesce mem
             dNumbers[i + generatorCount * n] = rng.Next();
@@ -331,9 +405,9 @@ void KCGenRandomNumbersPCG32Indirect(// Output
                                      // Input
                                      MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
                                      // Constants
-                                     MRAY_GRID_CONSTANT const uint32_t dimPerGenerator)
+                                     MRAY_GRID_CONSTANT const uint32_t rnCount)
 {
-    assert(dNumbers.size() == dIndices.size() * dimPerGenerator);
+    assert(dNumbers.size() == dIndices.size() * rnCount);
 
     uint32_t generatorCount = uint32_t(dIndices.size());
     KernelCallParams kp;
@@ -348,7 +422,7 @@ void KCGenRandomNumbersPCG32Indirect(// Output
         // hold a state for each dimension but for a path tracer it is infeasible).
         //
         // So we just generate numbers using a single state
-        for(uint32_t n = 0; n < dimPerGenerator; n++)
+        for(uint32_t n = 0; n < rnCount; n++)
         {
             // Write in strided fashion to coalesce mem
             dNumbers[i + generatorCount * n] = rng.Next();
@@ -362,23 +436,19 @@ void KCGenRandomNumbersZSobol(// Output
                               // I-O
                               MRAY_GRID_CONSTANT const Span<const ZSobolDetail::LocalState> dStates,
                               // Constants
-                              MRAY_GRID_CONSTANT const Vector2ui dimRange,
+                              MRAY_GRID_CONSTANT const uint32_t dimStartOffset,
+                              MRAY_GRID_CONSTANT const RNRequestList rnRequests,
                               MRAY_GRID_CONSTANT const ZSobolDetail::GlobalState globalState)
 {
-    assert(dStates.size() * (dimRange[1] - dimRange[0]) <= dNumbers.size());
-
+    assert(dStates.size() * (rnRequests.TotalRNCount()) == dNumbers.size());
+    
     KernelCallParams kp;
     uint32_t generatorCount = uint32_t(dStates.size());
     for(uint32_t i = kp.GlobalId(); i < generatorCount; i += kp.TotalSize())
     {
         ZSobolDetail::ZSobol rng(dStates[i], globalState);
-
-        uint32_t dimCount = dimRange[1] - dimRange[0];
-        for(uint32_t n = 0; n < dimCount; n++)
-        {
-            // Write in strided fashion to coalesce mem
-            dNumbers[i + generatorCount * n] = rng.Next(dimRange[0] + n);
-        }
+        GenerateZSobolPack(dNumbers, rng, rnRequests,
+                           generatorCount, i, dimStartOffset);        
     }
 }
 
@@ -390,12 +460,13 @@ void KCGenRandomNumbersZSobolIndirect(// Output
                                       // Input
                                       MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
                                       // Constants
-                                      MRAY_GRID_CONSTANT const Vector2ui dimRange,
+                                      MRAY_GRID_CONSTANT const uint32_t dimStartOffset,
+                                      MRAY_GRID_CONSTANT const RNRequestList rnRequests,
                                       MRAY_GRID_CONSTANT const ZSobolDetail::GlobalState globalState)
 {
-    KernelCallParams kp;
-    assert(dNumbers.size() == dIndices.size() * (dimRange[1] - dimRange[0]));
+    assert(dNumbers.size() == dIndices.size() * (rnRequests.TotalRNCount()));
 
+    KernelCallParams kp;
     uint32_t generatorCount = uint32_t(dIndices.size());
     for(uint32_t i = kp.GlobalId(); i < generatorCount; i += kp.TotalSize())
     {
@@ -403,13 +474,8 @@ void KCGenRandomNumbersZSobolIndirect(// Output
         assert(index < dStates.size());
 
         ZSobolDetail::ZSobol rng(dStates[index], globalState);
-        //
-        uint32_t dimCount = dimRange[1] - dimRange[0];
-        for(uint32_t n = 0; n < dimCount; n++)
-        {
-            // Write in strided fashion to coalesce mem
-            dNumbers[i + generatorCount * n] = rng.Next(dimRange[0] + n);
-        }
+        GenerateZSobolPack(dNumbers, rng, rnRequests,
+                           generatorCount, i, dimStartOffset);
     }
 }
 
@@ -420,12 +486,13 @@ void KCGenRandomNumbersZSobolIndirectDynamicDim(// Output
                                                 MRAY_GRID_CONSTANT const Span<ZSobolDetail::LocalState> dStates,
                                                 // Input
                                                 MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
-                                                MRAY_GRID_CONSTANT const Span<const uint32_t> dCurrentDimensions,
+                                                MRAY_GRID_CONSTANT const Span<const uint16_t> dCurrentDimensions,
                                                 // Constants
-                                                MRAY_GRID_CONSTANT const uint32_t dimPerGenerator,
+                                                //MRAY_GRID_CONSTANT const uint32_t dimPerGenerator,
+                                                MRAY_GRID_CONSTANT const RNRequestList rnRequests,
                                                 MRAY_GRID_CONSTANT const ZSobolDetail::GlobalState globalState)
 {
-    assert(dNumbers.size() == dIndices.size() * dimPerGenerator);
+    assert(dNumbers.size() == dIndices.size() * rnRequests.TotalRNCount());
     KernelCallParams kp;
     uint32_t generatorCount = uint32_t(dIndices.size());
     for(uint32_t i = kp.GlobalId(); i < generatorCount; i += kp.TotalSize())
@@ -433,14 +500,10 @@ void KCGenRandomNumbersZSobolIndirectDynamicDim(// Output
         RayIndex index = dIndices[i];
         assert(index < dStates.size());
 
+        uint32_t dimStartOffset = dCurrentDimensions[index];
         ZSobolDetail::ZSobol rng(dStates[index], globalState);
-        //
-        uint32_t dimStart = dCurrentDimensions[index];
-        for(uint32_t n = 0; n < dimPerGenerator; n++)
-        {
-            // Write in strided fashion to coalesce mem
-            dNumbers[i + generatorCount * n] = rng.Next(dimStart + n);
-        }
+        GenerateZSobolPack(dNumbers, rng, rnRequests,
+                           generatorCount, i, dimStartOffset);        
     }
 }
 
@@ -562,7 +625,8 @@ void RNGGroupIndependent::SetupRange(Vector2ui rangeStart,
 void RNGGroupIndependent::GenerateNumbers(// Output
                                           Span<RandomNumber> dNumbersOut,
                                           // Constants
-                                          Vector2ui dimensionRange,
+                                          uint16_t,
+                                          RNRequestList rnRequests,
                                           const GPUQueue& queue) const
 {
     assert(currentRange[1] != Vector2ui::Zero());
@@ -570,7 +634,6 @@ void RNGGroupIndependent::GenerateNumbers(// Output
     // Independent RNG do not have a notion of dimensions (or has a single
     // dimension)
     // so we disregard range, and give single random numbers
-    uint32_t dimensionCount = dimensionRange[1] - dimensionRange[0];
     uint32_t localGenCount = (currentRange[1] - currentRange[0]).Multiply();
     using namespace std::string_view_literals;
     queue.IssueWorkKernel<KCGenRandomNumbersPCG32>
@@ -580,7 +643,7 @@ void RNGGroupIndependent::GenerateNumbers(// Output
         //
         dNumbersOut,
         dMainStatesLocal.subspan(0, localGenCount),
-        dimensionCount
+        rnRequests.TotalRNCount()
     );
 }
 
@@ -589,7 +652,8 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
                                                   // Input
                                                   Span<const RayIndex> dIndices,
                                                   // Constants
-                                                  Vector2ui dimensionRange,
+                                                  uint16_t,
+                                                  RNRequestList rnRequests,
                                                   const GPUQueue& queue) const
 {
     assert(currentRange[1] != Vector2ui::Zero());
@@ -597,7 +661,6 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
     // Independent RNG do not have a notion of dimensions (or has a single
     // dimension)
     // so we disregard range, and give single random numbers
-    uint32_t dimensionCount = dimensionRange[1] - dimensionRange[0];
     uint32_t localGenCount = (currentRange[1] - currentRange[0]).Multiply();
     uint32_t usedGenCount = static_cast<uint32_t>(dIndices.size());
     using namespace std::string_view_literals;
@@ -609,7 +672,7 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
         dNumbersOut,
         dMainStatesLocal.subspan(0, localGenCount),
         dIndices,
-        dimensionCount
+        rnRequests.TotalRNCount()
     );
 }
 
@@ -617,9 +680,9 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
                                                   Span<RandomNumber> dNumbersOut,
                                                   // Input
                                                   Span<const RayIndex> dIndices,
-                                                  Span<const uint32_t>,
+                                                  Span<const uint16_t>,
                                                   // Constants
-                                                  uint32_t dimensionCount,
+                                                  RNRequestList rnRequests,
                                                   const GPUQueue& queue) const
 {
     // Independent RNG do not have a notion of dimensions (or has a single
@@ -635,7 +698,7 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
         dNumbersOut,
         dMainStatesLocal.subspan(0, localGenCount),
         dIndices,
-        dimensionCount
+        rnRequests.TotalRNCount()
     );
 }
 
@@ -847,7 +910,8 @@ void RNGGroupZSobol::SetupRange(Vector2ui rangeStart,
 void RNGGroupZSobol::GenerateNumbers(// Output
                                      Span<RandomNumber> dNumbersOut,
                                      // Constants
-                                     Vector2ui dimensionRange,
+                                     uint16_t dimensionStart,
+                                     RNRequestList rnRequests,
                                      const GPUQueue& queue) const
 {
     assert(currentRange[1] != Vector2ui::Zero());
@@ -861,7 +925,8 @@ void RNGGroupZSobol::GenerateNumbers(// Output
         //
         dNumbersOut,
         dMainStatesLocal.subspan(0, localGenCount),
-        dimensionRange,
+        dimensionStart,
+        rnRequests,
         globalState
     );
 }
@@ -871,7 +936,8 @@ void RNGGroupZSobol::GenerateNumbersIndirect(// Output
                                              // Input
                                              Span<const RayIndex> dIndices,
                                              // Constants
-                                             Vector2ui dimensionRange,
+                                             uint16_t dimensionStart,
+                                             RNRequestList rnRequests,
                                              const GPUQueue& queue) const
 {
     assert(currentRange[1] != Vector2ui::Zero());
@@ -887,7 +953,8 @@ void RNGGroupZSobol::GenerateNumbersIndirect(// Output
         dNumbersOut,
         dMainStatesLocal.subspan(0, localGenCount),
         dIndices,
-        dimensionRange,
+        dimensionStart,
+        rnRequests,
         globalState
     );
 }
@@ -896,9 +963,9 @@ void RNGGroupZSobol::GenerateNumbersIndirect(// Output
                                              Span<RandomNumber> dNumbersOut,
                                              // Input
                                              Span<const RayIndex> dIndices,
-                                             Span<const uint32_t> dDimensionStart,
+                                             Span<const uint16_t> dDimensionStartOffsets,
                                              // Constants
-                                             uint32_t dimensionCount,
+                                             RNRequestList rnRequests,
                                              const GPUQueue& queue) const
 {
     uint32_t localGenCount = (currentRange[1] - currentRange[0]).Multiply();
@@ -911,8 +978,8 @@ void RNGGroupZSobol::GenerateNumbersIndirect(// Output
             dNumbersOut,
             dMainStatesLocal.subspan(0, localGenCount),
             dIndices,
-            dDimensionStart,
-            dimensionCount,
+            dDimensionStartOffsets,
+            rnRequests,
             globalState
         );
 }

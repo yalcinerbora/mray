@@ -33,7 +33,7 @@ namespace MediumDetail
         using DataSoA = EmptyType;
         using SpectrumConverter = typename SpectrumContextIdentity::Converter;
 
-        static constexpr uint32_t SampleScatteringRNCount = 0;
+        static constexpr RNRequestList SampleScatteringRNList = RNRequestList();
 
         public:
         MR_PF_DECL_V    MediumVacuum(const SpectrumConverter&,
@@ -60,7 +60,7 @@ namespace MediumDetail
         using SpectrumConverter = typename SpectrumContext::Converter;
         using enum HomogeneousMediumData::I;
 
-        static constexpr uint32_t SampleScatteringRNCount = 2;
+        static constexpr RNRequestList SampleScatteringRNList = GenRNRequestList<2>();
 
         private:
         Spectrum sigmaA;

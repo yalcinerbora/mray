@@ -130,7 +130,7 @@ class SpectrumContextJakob2019
                                            Span<const RayIndex> dRayIndices,
                                            // Constants
                                            const GPUQueue& queue) const;
-    uint32_t SampleSpectrumRNCount() const;
+    RNRequestList SampleSpectrumRNList() const;
 
     //
     void ConvertSpectrumToRGB(// I-O

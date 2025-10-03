@@ -194,14 +194,14 @@ Float MetaLightViewT<V, ST>::PdfSolidAngle(const MetaHit& hit,
 
 template<class V, class ST>
 MR_HF_DEF
-uint32_t MetaLightViewT<V, ST>::SampleSolidAngleRNCount() const
+RNRequestList MetaLightViewT<V, ST>::SampleSolidAngleRNCount() const
 {
-    return Visit(light, [](auto&& l) -> uint32_t
+    return Visit(light, [](auto&& l) -> RNRequestList
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
-            return 0;
-        else return T::SampleSolidAngleRNCount;
+            return RNRequestList();
+        else return T::SampleSolidAngleRNList;
     });
 }
 
@@ -233,14 +233,14 @@ Float MetaLightViewT<V, ST>::PdfRay(const Ray& ray) const
 
 template<class V, class ST>
 MR_HF_DEF
-uint32_t MetaLightViewT<V, ST>::SampleRayRNCount() const
+RNRequestList MetaLightViewT<V, ST>::SampleRayRNCount() const
 {
-    return Visit(light, [](auto&& l) -> uint32_t
+    return Visit(light, [](auto&& l) -> RNRequestList
     {
         using T = std::remove_cvref_t<decltype(l)>;
         if constexpr(std::is_same_v<T, std::monostate>)
-            return 0;
-        else return T::SampleRayRNCount;
+            return RNRequestList();
+        else return T::SampleRayRNList;
     });
 }
 

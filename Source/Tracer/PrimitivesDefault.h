@@ -34,7 +34,7 @@ namespace DefaultSphereDetail
         using Intersection      = Optional<SphereIntersection>;
         using TransformContext  = TransContextType;
         //
-        static constexpr uint32_t SampleRNCount = 2;
+        static constexpr RNRequestList SampleRNList = GenRNRequestList<2>();
 
         private:
         Vector3                     center;

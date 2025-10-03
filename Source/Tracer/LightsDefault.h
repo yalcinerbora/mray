@@ -71,9 +71,10 @@ namespace LightDetail
         using SpectrumConverter = typename SpectrumContext::Converter;
         using Primitive         = PrimitiveT;
         //
-        static constexpr bool     IsPrimitiveBackedLight    = true;
-        static constexpr uint32_t SampleSolidAngleRNCount   = Primitive::SampleRNCount;
-        static constexpr uint32_t SampleRayRNCount          = Primitive::SampleRNCount + 2;
+        static constexpr bool   IsPrimitiveBackedLight    = true;
+
+        static constexpr RNRequestList SampleSolidAngleRNList = Primitive::SampleRNList;
+        static constexpr RNRequestList SampleRayRNList        = SampleSolidAngleRNList.Append(2);
 
         private:
         Ref<const Primitive>    prim;
@@ -119,10 +120,9 @@ namespace LightDetail
         using SpectrumConverter = typename SpectrumContext::Converter;
         using Primitive         = EmptyPrimitive<TContext>;
         //
-        static constexpr bool       IsPrimitiveBackedLight = false;
-        static constexpr uint32_t   SampleSolidAngleRNCount = 2;
-        static constexpr uint32_t   SampleRayRNCount        = 4;
-
+        static constexpr bool           IsPrimitiveBackedLight = false;
+        static constexpr RNRequestList  SampleSolidAngleRNList = GenRNRequestList<2>();
+        static constexpr RNRequestList  SampleRayRNList        = GenRNRequestList<2, 2>();
 
         private:
         Ref<const Primitive>    prim;
@@ -170,9 +170,9 @@ namespace LightDetail
         using SpectrumConverter = typename SpectrumContext::Converter;
         using Primitive         = EmptyPrimitive<TContext>;
         //
-        static constexpr bool     IsPrimitiveBackedLight    = false;
-        static constexpr uint32_t SampleSolidAngleRNCount   = 0;
-        static constexpr uint32_t SampleRayRNCount          = 0;
+        static constexpr bool     IsPrimitiveBackedLight      = false;
+        static constexpr RNRequestList SampleSolidAngleRNList = RNRequestList();
+        static constexpr RNRequestList SampleRayRNList        = RNRequestList();
 
         MR_HF_DECL          LightNull(const SpectrumConverter& sTransContext,
                                       const Primitive& p,
@@ -296,7 +296,7 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
 
     // Prim Type
     template<class TContext = TransformContextIdentity>
-    using Primitive     = EmptyPrimitive<TContext>;
+    using Primitive         = EmptyPrimitive<TContext>;
     // Light Type
     template <class TransformContext = TransformContextIdentity,
               class SpectrumConverterContext = SpectrumContextIdentity>

@@ -28,8 +28,8 @@ concept CameraC = requires(CameraType c,
     CameraType(typename CameraType::DataSoA{}, CameraKey{});
 
     // RN Count
-    CameraType::SampleRayRNCount;
-    requires std::is_same_v<decltype(CameraType::SampleRayRNCount), const uint32_t>;
+    CameraType::SampleRayRNList;
+    requires std::is_same_v<decltype(CameraType::SampleRayRNList), const RNRequestList>;
 
     {c.SampleRay(Vector2ui{}, Vector2ui{}, rng)
     } -> std::same_as<RaySample>;
@@ -54,7 +54,9 @@ concept CameraGroupC = requires(CGType cg)
     // Internal Camera type that satisfies its concept
     typename CGType::Camera;
     requires CameraC<typename CGType::Camera>;
-    CGType::SampleRayRNCount;
+    //
+    CGType::SampleRayRNList;
+    requires std::is_same_v<decltype(CGType::SampleRayRNList), const RNRequestList>;
 
     // SoA fashion camera data. This will be used to access internal
     // of the camera with a given an index

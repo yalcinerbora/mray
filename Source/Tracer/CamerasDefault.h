@@ -17,7 +17,7 @@ namespace CameraDetail
     {
         public:
         using DataSoA = CamPinholeData;
-        static constexpr uint32_t SampleRayRNCount = 2;
+        static constexpr RNRequestList SampleRayRNList = GenRNRequestList<2>();
 
         private:
         Vector3 position;
@@ -64,7 +64,7 @@ class CameraGroupPinhole : public GenericGroupCamera<CameraGroupPinhole>
     public:
     using DataSoA   = CameraDetail::CamPinholeData;
     using Camera    = CameraDetail::CameraPinhole;
-    static constexpr uint32_t SampleRayRNCount = Camera::SampleRayRNCount;
+    static constexpr RNRequestList SampleRayRNList = Camera::SampleRayRNList;
 
     private:
     Span<Vector4>   dFovAndPlanes;

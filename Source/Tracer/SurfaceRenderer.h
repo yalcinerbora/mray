@@ -123,12 +123,12 @@ class SurfaceRenderWork : public RenderWork<R, PG, MG, TG>
     public:
     using Base::Base;
 
-    uint32_t SampleRNCount(uint32_t workIndex) const override
+    RNRequestList SampleRNList(uint32_t workIndex) const override
     {
-        constexpr uint32_t matSampleCount = MG::template Material<>::SampleRNCount;
+        constexpr RNRequestList matSampleList = MG::template Material<>::SampleRNList;
         if(workIndex == 1)
-            return matSampleCount;
-        return 0;
+            return matSampleList;
+        return RNRequestList();
     }
 };
 

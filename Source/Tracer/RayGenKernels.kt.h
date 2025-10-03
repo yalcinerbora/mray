@@ -44,7 +44,7 @@ void KCGenerateCamRays(// Output (Only dRayIndices pointed data should be writte
                        MRAY_GRID_CONSTANT const uint64_t globalRegionIndex,
                        MRAY_GRID_CONSTANT const Vector2ui regionCount)
 {
-    assert(dRayIndices.size() * Camera::SampleRayRNCount == dRandomNums.size());
+    assert(dRayIndices.size() * Camera::SampleRayRNList.TotalRNCount() == dRandomNums.size());
     KernelCallParams kp;
     const Camera& dCam = *dCamera;
 
@@ -105,7 +105,7 @@ void KCGenerateCamRaysStochastic(// Output (Only dRayIndices pointed data should
                                  MRAY_GRID_CONSTANT const Vector2ui regionCount,
                                  MRAY_GRID_CONSTANT const FilterType Filter)
 {
-    assert(dRayIndices.size() * Camera::SampleRayRNCount == dRandomNums.size());
+    assert(dRayIndices.size() * Camera::SampleRayRNList.TotalRNCount() == dRandomNums.size());
     KernelCallParams kp;
     const Camera& dCam = *dCamera;
 

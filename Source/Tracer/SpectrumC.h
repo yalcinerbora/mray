@@ -40,7 +40,7 @@ concept SpectrumContextC = requires(const C c, const GPUQueue & queue)
     // TODO: Move these to virtual inheritance maybe.
     {c.GetData()} -> std::same_as<typename C::Data>;
     {c.ColorSpace()} -> std::same_as<MRayColorSpaceEnum>;
-    {c.SampleSpectrumRNCount()} -> std::same_as<uint32_t>;
+    {c.SampleSpectrumRNList()} -> std::same_as<RNRequestList>;
     {c.SampleSpectrumWavelengthsIndirect(// Output
                                          Span<SpectrumWaves>(),
                                          Span<Spectrum>(),
@@ -129,7 +129,7 @@ struct SpectrumContextIdentity
     // TODO: Move these to virtual inheritance maybe.
     EmptyType GetData() const { return EmptyType{}; }
     MRayColorSpaceEnum ColorSpace() const { return colorSpace; }
-    uint32_t SampleSpectrumRNCount() const { return 0u; }
+    RNRequestList SampleSpectrumRNList() const { return RNRequestList(); }
     //
     void SampleSpectrumWavelengthsIndirect(// Output
                                            Span<SpectrumWaves>,

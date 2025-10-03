@@ -35,10 +35,10 @@ concept LightC = requires(LightType l,
     LightType::IsPrimitiveBackedLight;
     requires std::is_same_v<decltype(LightType::IsPrimitiveBackedLight), const bool>;
     // Sample RN counts
-    LightType::SampleRayRNCount;
-    requires std::is_same_v<decltype(LightType::SampleRayRNCount), const uint32_t>;
-    LightType::SampleSolidAngleRNCount;
-    requires std::is_same_v<decltype(LightType::SampleSolidAngleRNCount), const uint32_t>;
+    LightType::SampleRayRNList;
+    requires std::is_same_v<decltype(LightType::SampleRayRNList), const RNRequestList>;
+    LightType::SampleSolidAngleRNList;
+    requires std::is_same_v<decltype(LightType::SampleSolidAngleRNList), const RNRequestList>;
 
     // Type traits
     requires std::is_trivially_copyable_v<LightType>;

@@ -220,17 +220,15 @@ void TexViewRenderer::RenderTextureAsSpectral(const GPUQueue& processQueue)
                             this->imageTiler.LocalTileEnd(),
                             processQueue);
 
-    uint32_t perSampleRNCount = spectrumContext->SampleSpectrumRNCount();
-    Vector2ui rngDimRange = Vector2ui(0, perSampleRNCount);
-    rngDimRange[1] = spectrumContext->SampleSpectrumRNCount();
-
+    RNRequestList perSampleRNCountList = spectrumContext->SampleSpectrumRNList();
     uint32_t curPixelCount = imageTiler.CurrentTileSize().Multiply();
-    auto dRandomNumbersLocal = dRandomNumbers.subspan(0, curPixelCount * perSampleRNCount);
+    uint32_t totalRNCount = curPixelCount * perSampleRNCountList.TotalRNCount();
+    auto dRandomNumbersLocal = dRandomNumbers.subspan(0,  totalRNCount);
     auto dThroughputLocal = dThroughputs.subspan(0, curPixelCount);
     auto dWavelengthsLocal = dWavelengths.subspan(0, curPixelCount);
     auto dWavelengthPDFsLocal = dWavelengthPDFs.subspan(0, curPixelCount);
     // Generate random numbers
-    rnGenerator->GenerateNumbers(dRandomNumbers, rngDimRange,
+    rnGenerator->GenerateNumbers(dRandomNumbers, 0, perSampleRNCountList,
                                  processQueue);
     // Sample spectrum
     spectrumContext->SampleSpectrumWavelengths(dWavelengths, dWavelengthPDFsLocal,
@@ -414,7 +412,7 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
 
         // Allocate sampling buffers
         uint32_t maxRayCount = this->imageTiler.ConservativeTileSize().Multiply();
-        uint32_t sampleRNCount = spectrumContext->SampleSpectrumRNCount();
+        uint32_t sampleRNCount = spectrumContext->SampleSpectrumRNList().TotalRNCount();
         uint32_t maxRNCount = sampleRNCount * maxRayCount;
         MemAlloc::AllocateMultiData(Tie(dThroughputs, dWavelengths,
                                         dWavelengthPDFs, dRandomNumbers),
@@ -422,12 +420,17 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
                                     {maxRayCount, maxRayCount,
                                      maxRayCount, maxRNCount});
         // Finally allocate RNG
-        using RNG = RNGGroupIndependent;
+        auto RngGen = tracerView.rngGenerators.at(tracerView.tracerParams.samplerType.e);
+        if(!RngGen)
+            throw MRayError("[{}]: Unknown random number generator type {}.", TypeName(),
+                            uint32_t(tracerView.tracerParams.samplerType.e));
         uint64_t seed = this->tracerView.tracerParams.seed;
         Vector2ui maxDeviceLocalRNGCount = this->imageTiler.ConservativeTileSize();
-        rnGenerator = std::make_unique<RNG>(rIParams, maxDeviceLocalRNGCount,
-                                            currentOptions.totalSPP, seed,
-                                            gpuSystem, globalThreadPool);
+        rnGenerator = RngGen->get()(rIParams,
+                                    std::move(maxDeviceLocalRNGCount),
+                                    std::move(currentOptions.totalSPP), 
+                                    std::move(seed), gpuSystem, 
+                                    globalThreadPool);
     }
 
     auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();

@@ -56,8 +56,8 @@ concept MaterialC = requires(MatType mt,
     {mt.Pdf(Ray{}, Vector3{})} -> std::same_as<Float>;
 
     // How many random numbers the sampler of this class uses
-    MatType::SampleRNCount;
-    requires std::is_same_v<decltype(MatType::SampleRNCount), const uint32_t>;
+    MatType::SampleRNList;
+    requires std::is_same_v<decltype(MatType::SampleRNList), const RNRequestList>;
 
     // Evaluate material given w0, wI
     {mt.Evaluate(Ray{}, Vector3{})}-> std::same_as<Spectrum>;

@@ -539,7 +539,7 @@ void SpectrumContextJakob2019::SampleSpectrumWavelengths(// Output
                                                          const GPUQueue& queue) const
 {
     assert(dWavelengths.size() == dWavePDFs.size());
-    assert(dWavePDFs.size() * SampleSpectrumRNCount() == dRandomNumbers.size());
+    assert(dWavePDFs.size() * SampleSpectrumRNList().TotalRNCount() == dRandomNumbers.size());
 
     queue.IssueWorkKernel<KCSampleSpectrumWavelengths>
     (
@@ -563,7 +563,7 @@ void SpectrumContextJakob2019::SampleSpectrumWavelengthsIndirect(// Output
                                                                  // Constants
                                                                  const GPUQueue& queue) const
 {
-    assert(dRayIndices.size() * SampleSpectrumRNCount() == dRandomNumbers.size());
+    assert(dRayIndices.size() * SampleSpectrumRNList().TotalRNCount() == dRandomNumbers.size());
     queue.IssueWorkKernel<KCSampleSpectrumWavelengthsIndirect>
     (
         "KCSampleSpectraWavelengths",
@@ -577,14 +577,14 @@ void SpectrumContextJakob2019::SampleSpectrumWavelengthsIndirect(// Output
     );
 }
 
-uint32_t SpectrumContextJakob2019::SampleSpectrumRNCount() const
+RNRequestList SpectrumContextJakob2019::SampleSpectrumRNList() const
 {
     switch(sampleMode.e)
     {
         using enum WavelengthSampleMode::E;
-        case UNIFORM:           return 1;
-        case GAUSSIAN_MIS:      return 1;
-        case HYPERBOLIC_PBRT:   return 1;
+        case UNIFORM:           return GenRNRequestList<1>();
+        case GAUSSIAN_MIS:      return GenRNRequestList<1>();
+        case HYPERBOLIC_PBRT:   return GenRNRequestList<1>();
         default: throw MRayError("Unkown spectrum sample mode!");
     }
 }

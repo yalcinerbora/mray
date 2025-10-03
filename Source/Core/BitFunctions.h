@@ -427,14 +427,21 @@ MR_PF_DEF T Bit::CountTOne(T value) noexcept
 template<std::unsigned_integral T>
 MR_PF_DEF T Bit::PopC(T value) noexcept
 {
-    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
-        if constexpr(std::is_same_v<T, uint64_t>)
-            return T(__popcll(value));
-        else
-            return T(__popc(uint32_t(value)));
-    #else
+    if(std::is_constant_evaluated())
+    {
         return T(std::popcount<T>(value));
-    #endif
+    }
+    else
+    {
+        #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+            if constexpr(std::is_same_v<T, uint64_t>)
+                return T(__popcll(value));
+            else
+                return T(__popc(uint32_t(value)));
+        #else
+            return T(std::popcount<T>(value));
+        #endif
+    }
 }
 
 MR_PF_DEF uint32_t Bit::GenerateFourCC(char byte0, char byte1,

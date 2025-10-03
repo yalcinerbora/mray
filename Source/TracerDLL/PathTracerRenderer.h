@@ -14,31 +14,31 @@
 // We make this a functor
 // TODO: This is somewhat related to the RNG (at least currently)
 // maybe change this later.
-class ConstAddFunctor
+class ConstAddFunctor_U16
 {
     private:
-    uint32_t constant;
+    uint16_t constant;
 
     public:
-    ConstAddFunctor(uint32_t c) : constant(c) {}
+    ConstAddFunctor_U16(uint16_t c) : constant(c) {}
 
     MR_GF_DECL
-    void operator()(uint32_t& i) const noexcept
+    void operator()(uint16_t& i) const noexcept
     {
         i += constant;
     }
 };
 
-class SetFunctor
+class SetFunctor_U16
 {
     private:
-    uint32_t constant;
+    uint16_t constant;
 
     public:
-    SetFunctor(uint32_t c) : constant(c) {}
+    SetFunctor_U16(uint16_t c) : constant(c) {}
 
     MR_GF_DECL
-    void operator()(uint32_t& i) const noexcept
+    void operator()(uint16_t& i) const noexcept
     {
         i = constant;
     }
@@ -127,7 +127,7 @@ class PathTracerRendererT final : public RendererT<PathTracerRendererT<SpectrumC
     Span<uint32_t>      dShadowRayVisibilities;
     Span<RandomNumber>  dRandomNumBuffer;
     Span<Byte>          dSubCameraBuffer;
-    Span<uint32_t>      dPathRNGDimensions;
+    Span<uint16_t>      dPathRNGDimensions;
     RayState            dRayState;
     // Work Hash related
     Span<CommonKey>     dWorkHashes;
@@ -202,17 +202,15 @@ class PathTracerRenderWork : public RenderWork<R, PG, MG, TG>
     public:
     using Base::Base;
 
-    uint32_t SampleRNCount(uint32_t workIndex) const override
+    RNRequestList SampleRNList(uint32_t workIndex) const override
     {
-        constexpr uint32_t matSampleCount   = MG::template Material<>::SampleRNCount;
-        constexpr uint32_t rrSampleCount    = 1;
-        constexpr uint32_t lightSampleCount = R::UniformLightSampler::SampleLightRNCount;
-
-        if(workIndex == 0)
-            return (matSampleCount + rrSampleCount);
-        else if(workIndex == 1)
-            return lightSampleCount;
-        return 0;
+        static constexpr auto matSampleList   = MG::template Material<>::SampleRNList;
+        static constexpr auto rrSampleList    = GenRNRequestList<1>();
+        static constexpr auto lightSampleList = R::UniformLightSampler::SampleLightRNList;
+        //
+        if(workIndex == 0)  return matSampleList.Append(rrSampleList);
+        if(workIndex == 1)  return lightSampleList;
+                            return RNRequestList();
     }
 };
 
