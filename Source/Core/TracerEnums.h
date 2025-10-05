@@ -106,6 +106,7 @@ class SamplerType
     {
         INDEPENDENT,
         Z_SOBOL,
+        SOBOL,
 
         MR_ENUM_END
     };
@@ -114,7 +115,8 @@ class SamplerType
     static constexpr std::array<std::string_view, size_t(MR_ENUM_END)> Names =
     {
         "Independent",
-        "ZSobol"
+        "ZSobol",
+        "Sobol"
     };
 
     public:

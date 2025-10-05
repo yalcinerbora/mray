@@ -33,7 +33,8 @@ static constexpr auto RNGGenFuncPack = RNGGenPair
 static constexpr std::initializer_list<RNGGenPair> RNGGenFuncList =
 {
     RNGGenFuncPack<RNGGroupIndependent>,
-    RNGGenFuncPack<RNGGroupZSobol>
+    RNGGenFuncPack<RNGGroupZSobol>,
+    RNGGenFuncPack<RNGGroupSobol>
 };
 
 // TODO: This is not good, we need to instantiate
@@ -85,13 +86,6 @@ void TracerBase::PopulateAttribInfoAndTypeLists()
     InstantiateAndGetAttribInfo(transAttributeInfoMap,
                                 typeGenerators.transGenerator,
                                 0u, gpuSystem);
-    // InstantiateAndGetAttribInfo(rendererAttributeInfoMap,
-    //                             typeGenerators.rendererGenerator,
-    //                             RenderImagePtr(),
-    //                             GenerateTracerView(),
-    //                             *globalThreadPool,
-    //                             gpuSystem,
-    //                             RenderWorkPack());
 
     // Light is special so write it by hand
     // Find instantiate the prim again...

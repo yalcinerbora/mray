@@ -120,6 +120,23 @@ namespace RNGFunctions
     }
 }
 
+namespace SobolDetail
+{
+    // Rest is at the impl. file
+    struct alignas(16) LocalState
+    {
+        Vector2ui pixel;
+        uint32_t sampleIndex;
+        uint32_t seed;
+    };
+
+    struct GlobalState
+    {
+        Span<const uint32_t>    dSobolMatices;
+        Vector2ui               resolution;
+    };
+}
+
 namespace ZSobolDetail
 {
     // Rest is at the impl. file
@@ -402,6 +419,82 @@ class RNGGroupZSobol : public RNGeneratorGroupI
                            uint64_t seed,
                            const GPUSystem& system,
                            ThreadPool& mainThreadPool);
+
+    void    SetupRange(Vector2ui rangeStart,
+                       Vector2ui rangeEnd,
+                       const GPUQueue& queue) override;
+
+    void    GenerateNumbers(// Output
+                            Span<RandomNumber> dNumbersOut,
+                            // Constants
+                            uint16_t dimensionStart,
+                            RNRequestList rnRequests,
+                            const GPUQueue& queue) const override;
+    void    GenerateNumbersIndirect(// Output
+                                    Span<RandomNumber> dNumbersOut,
+                                    // Input
+                                    Span<const RayIndex> dIndices,
+                                    // Constants
+                                    uint16_t dimensionStart,
+                                    RNRequestList rnRequests,
+                                    const GPUQueue& queue) const override;
+    void    GenerateNumbersIndirect(// Output
+                                    Span<RandomNumber> dNumbersOut,
+                                    // Input
+                                    Span<const RayIndex> dIndices,
+                                    Span<const uint16_t> dDimensionStart,
+                                    // Constants
+                                    RNRequestList rnRequests,
+                                    const GPUQueue& queue) const override;
+    void    IncrementSampleId(const GPUQueue& queue) const override;
+    void    IncrementSampleIdIndirect(Span<const RayIndex> dIndices,
+                                      const GPUQueue& queue) const override;
+
+
+    Span<BackupRNGState> GetBackupStates() override;
+    size_t               GPUMemoryUsage() const override;
+};
+
+// Implementation of
+// https://www.pbr-book.org/4ed/Sampling_and_Reconstruction/Sobol_Samplers
+//
+// Which is implementation of this paper
+// https://dl.acm.org/doi/10.1145/3414685.3417881
+class RNGGroupSobol : public RNGeneratorGroupI
+{
+    public:
+    using MainRNGState = typename SobolDetail::LocalState;
+    using MainRNGGlobalState = typename SobolDetail::GlobalState;
+    static constexpr typename SamplerType::E TypeName = SamplerType::SOBOL;
+
+    private:
+    ThreadPool&             mainThreadPool;
+    const GPUSystem&        gpuSystem;
+    // Due to tiling, we save the all state of the
+    // entire image in host side.
+    // This will copy the data to required HW side
+    Vector2ui                   generatorCount;
+    std::array<Vector2ui, 2>    currentRange;
+
+    //
+    HostLocalMemory             hostMem;
+    Span<BackupRNGState>        hBackupStatesAll;
+    Span<MainRNGState>          hMainStatesAll;
+    // Device local
+    DeviceMemory                deviceMem;
+    Span<uint32_t>              dSobolMatrices;
+    Span<BackupRNGState>        dBackupStatesLocal;
+    Span<MainRNGState>          dMainStatesLocal;
+    MainRNGGlobalState          globalState;
+
+    public:
+    // Constructors & Destructor
+            RNGGroupSobol(const RenderImageParams& rIParams,
+                          Vector2ui maxGPUPresentRNGCount,
+                          uint32_t initialMaxSampleCount,
+                          uint64_t seed,
+                          const GPUSystem& system,
+                          ThreadPool& mainThreadPool);
 
     void    SetupRange(Vector2ui rangeStart,
                        Vector2ui rangeEnd,

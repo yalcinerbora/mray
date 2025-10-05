@@ -122,7 +122,9 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/Random.h
         ${CURRENT_SOURCE_DIR}/DistributionFunctions.h
         ${CURRENT_SOURCE_DIR}/Distributions.h
-        ${CURRENT_SOURCE_DIR}/Distributions.cu)
+        ${CURRENT_SOURCE_DIR}/Distributions.cu
+        ${CURRENT_SOURCE_DIR}/SobolMatrices.cpp
+        ${CURRENT_SOURCE_DIR}/SobolMatrices.h)
 
     set(SRC_SPECTRUM
         ${CURRENT_SOURCE_DIR}/SpectrumContext.cu

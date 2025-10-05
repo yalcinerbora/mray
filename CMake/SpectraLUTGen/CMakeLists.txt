@@ -1,5 +1,5 @@
 
-set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/SpectraLutGen)
+set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/SpectraLUTGen)
 
 # We may compile this with O3 for all configurations so we do
 # not want any dependencies (due to MSVC ITERATOR_DEBUG_LEVEL stuff)

@@ -33,7 +33,7 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     };
     struct Options
     {
-        uint32_t    totalSPP   = 32;
+        uint32_t    totalSPP   = 16'384;
         bool        isSpectral = false;
         Mode        renderMode = SHOW_TEXTURES;
     };
@@ -51,7 +51,7 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     std::vector<const GenericTextureView*>  textureViews;
     // Spectral Mode related
     std::unique_ptr<SpectrumContextJakob2019>   spectrumContext;
-    std::unique_ptr<RNGGroupIndependent>        rnGenerator;
+    RNGeneratorPtr                              rnGenerator;
     DeviceMemory                                spectrumMem;
     Span<Spectrum>                              dThroughputs;
     Span<Spectrum>                              dWavelengthPDFs;

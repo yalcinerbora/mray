@@ -74,8 +74,8 @@ namespace SurfRDetail
 
     struct Options
     {
-        uint32_t    totalSPP            = 32;
-        Mode::E     mode                = Mode::WORLD_NORMAL;
+        uint32_t    totalSPP            = 16'384;
+        Mode::E     mode                = Mode::AO;
         bool        doStochasticFilter  = true;
         Float       tMaxAORatio         = Float(0.15);
     };
