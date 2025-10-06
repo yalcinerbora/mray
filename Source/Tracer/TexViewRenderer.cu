@@ -228,11 +228,11 @@ void TexViewRenderer::RenderTextureAsSpectral(const GPUQueue& processQueue)
     auto dWavelengthsLocal = dWavelengths.subspan(0, curPixelCount);
     auto dWavelengthPDFsLocal = dWavelengthPDFs.subspan(0, curPixelCount);
     // Generate random numbers
-    rnGenerator->GenerateNumbers(dRandomNumbers, 0, perSampleRNCountList,
+    rnGenerator->GenerateNumbers(dRandomNumbersLocal, 0, perSampleRNCountList,
                                  processQueue);
     // Sample spectrum
     spectrumContext->SampleSpectrumWavelengths(dWavelengths, dWavelengthPDFsLocal,
-                                               dRandomNumbers, processQueue);
+                                               dRandomNumbersLocal, processQueue);
 
     // Sample texture
     auto texView = *textureViews[textureIndex];
@@ -428,8 +428,8 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
         Vector2ui maxDeviceLocalRNGCount = this->imageTiler.ConservativeTileSize();
         rnGenerator = RngGen->get()(rIParams,
                                     std::move(maxDeviceLocalRNGCount),
-                                    std::move(currentOptions.totalSPP), 
-                                    std::move(seed), gpuSystem, 
+                                    std::move(currentOptions.totalSPP),
+                                    std::move(seed), gpuSystem,
                                     globalThreadPool);
     }
 

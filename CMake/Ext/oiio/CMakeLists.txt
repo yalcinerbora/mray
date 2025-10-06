@@ -143,6 +143,8 @@ mray_build_ext_dependency_git(
             -Dtiff-contrib=OFF
             -Dtiff-install=ON
             -Dzlib=ON
+            -Dlzma=OFF
+            -Dzstd=OFF
             -DZLIB_ROOT:PATH=${ZLIB_INSTALL_LOC}
             -DJPEG_ROOT:PATH=${JPEGTURBO_INSTALL_LOC}
             -DCMAKE_DEBUG_POSTFIX:STRING=d

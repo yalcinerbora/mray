@@ -7,6 +7,7 @@
 #include <string_view>
 #include <algorithm>
 #include <type_traits>
+#include <stdexcept>
 
 // Commonize some  non-standart attributes etc.
 #define MR_STAMP_PRAGMA_(X)     _Pragma(#X)
@@ -214,7 +215,7 @@ MR_HF_DEF void HybridTerminateOrTrap(const char* const info = nullptr)
     // it affects register allocation.
     // (only on GPU). On CPU we just throw.
     #ifndef MRAY_DEVICE_CODE_PATH
-        throw std::exception(info);
+        throw std::runtime_error(info);
     #elif defined MRAY_DEVICE_CODE_PATH_CUDA
         if constexpr(MRAY_IS_DEBUG)
             printf("%s\n", info);
@@ -226,7 +227,7 @@ MR_HF_DEF void HybridTerminateOrTrap(const char* const info = nullptr)
         abort();
 
     #elif defined MRAY_DEVICE_CODE_PATH_CPU
-        throw std::exception(info);
+        throw std::runtime_error(info);
 
     #endif
     //

@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <mutex>
+#include <thread>
 
 #include "Core/Types.h"
 #include "Core/Math.h"
@@ -330,8 +331,10 @@ class GPUDeviceCPU
     GPUQueueCPU             transferQueue;
     //
     int                     deviceId;
-    AnnotationHandle        domain;
     ThreadPool*             threadPool;
+    //
+    [[maybe_unused]]
+    AnnotationHandle        domain;
     //
     std::string             name;
     size_t                  totalMemory;
@@ -371,6 +374,8 @@ class GPUSystemCPU
     std::unique_ptr<ThreadPool> localTP;
     GPUList                     systemGPUs;
     GPUPtrList                  systemGPUPtrs;
+    //
+    [[maybe_unused]]
     AnnotationHandle            cpuDomain;
 
     // TODO: Check designs for this, this made the GPUSystem global

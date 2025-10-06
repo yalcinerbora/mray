@@ -4,6 +4,7 @@
 #include "Types.h"
 
 #include "Core/GraphicsFunctions.h"
+#include "Core/DataStructures.h"
 
 namespace Shape
 {

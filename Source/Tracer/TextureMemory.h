@@ -23,7 +23,7 @@ struct TexClampParameters
     // TODO: Due to heavy template cost of SurfRefVariant
     // (and it is parsed by most of the cu files)
     // we heap allocate the thing.
-    std::unique_ptr<TracerSurfRef> surface = nullptr;
+    std::unique_ptr<TracerSurfRef> surface;
 
     // Constructors & Destructor
     TexClampParameters() = default;

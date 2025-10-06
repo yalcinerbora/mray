@@ -29,13 +29,12 @@ void SingleSampleSpectrumWavelength(// Output
         constexpr auto DELTA = Float(1) / Float(SpectraPerSpectrum);
         std::array<Float, SpectraPerSpectrum> result = {};
         constexpr int32_t mid = int32_t(SpectraPerSpectrum / 2);
-        for(int32_t i = 0; i < SpectraPerSpectrum; i++)
+        for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
         {
-            result[i] = Float(i - mid) * DELTA;
+            result[i] = Float(int32_t(i) - mid) * DELTA;
         }
         return result;
     }();
-
     static_assert([]()
     {
         bool allInRange = true;
@@ -456,7 +455,8 @@ SpectrumContextJakob2019::LoadSpectraLUT(MRayColorSpaceEnum globalColorSpace,
             throw MRayError("Unable to read sprectum lut file!");
         if constexpr(MRAY_IS_DEBUG)
         {
-            for(const auto& v : hBuffers[curI])
+            // Clang come on!, we are on constexpr if :(
+            for([[maybe_unused]] const auto& v : hBuffers[curI])
                 assert(Math::IsFinite(v));
         }
 
@@ -499,29 +499,31 @@ SpectrumContextJakob2019::SpectrumContextJakob2019(MRayColorSpaceEnum globalColo
     , lutTextures(LoadSpectraLUT(globalColorspace, gpuSystem.BestDevice()))
     , data(Jakob2019Detail::Data
            {
-               .lut =
-               {
-                   Jakob2019Detail::Data::Table3D
-                   {
-                       .c0 = lutTextures[0].View<Float>(),
-                       .c1 = lutTextures[1].View<Float>(),
-                       .c2 = lutTextures[2].View<Float>()
-                   },
-                   Jakob2019Detail::Data::Table3D
-                   {
-                       .c0 = lutTextures[3].View<Float>(),
-                       .c1 = lutTextures[4].View<Float>(),
-                       .c2 = lutTextures[5].View<Float>()
-                   },
-                   Jakob2019Detail::Data::Table3D
-                   {
-                       .c0 = lutTextures[6].View<Float>(),
-                       .c1 = lutTextures[7].View<Float>(),
-                       .c2 = lutTextures[8].View<Float>()
-                   },
-               },
-               .spdObserverXYZ = texCIE1931_XYZ.View<Vector3>(),
-               .spdIlluminant = texStdIlluminant.View<Float>()
+                .RGBToXYZ = Matrix3x3(),
+                .XYZToRGB = Matrix3x3(),
+                .lut =
+                {
+                    Jakob2019Detail::Data::Table3D
+                    {
+                        .c0 = lutTextures[0].View<Float>(),
+                        .c1 = lutTextures[1].View<Float>(),
+                        .c2 = lutTextures[2].View<Float>()
+                    },
+                    Jakob2019Detail::Data::Table3D
+                    {
+                        .c0 = lutTextures[3].View<Float>(),
+                        .c1 = lutTextures[4].View<Float>(),
+                        .c2 = lutTextures[5].View<Float>()
+                    },
+                    Jakob2019Detail::Data::Table3D
+                    {
+                        .c0 = lutTextures[6].View<Float>(),
+                        .c1 = lutTextures[7].View<Float>(),
+                        .c2 = lutTextures[8].View<Float>()
+                    },
+                },
+                .spdObserverXYZ = texCIE1931_XYZ.View<Vector3>(),
+                .spdIlluminant = texStdIlluminant.View<Float>()
            })
     , sampleMode(sampleMode)
     , colorSpace(globalColorspace)

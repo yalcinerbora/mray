@@ -254,8 +254,8 @@ uint32_t PathTracerRendererT<SC>::FindMaxSamplePerIteration(uint32_t rayCount,
                                                             PathTraceRDetail::SampleMode sampleMode)
 {
     uint32_t camSample = (*curCamWork)->StochasticFilterSampleRayRNList().TotalRNCount();
-    uint32_t spectrumSample = isSpectral 
-                ? spectrumContext->SampleSpectrumRNList().TotalRNCount() 
+    uint32_t spectrumSample = isSpectral
+                ? spectrumContext->SampleSpectrumRNList().TotalRNCount()
                 : 0u;
 
     uint32_t maxSample = Math::Max(camSample, spectrumSample);
@@ -534,7 +534,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
             uint32_t rnCount = rnList.TotalRNCount();
             auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
             rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-                                                 dPathRNGDimensions, 
+                                                 dPathRNGDimensions,
                                                  rnList,
                                                  processQueue);
 
@@ -596,7 +596,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
             uint32_t rnCount = rnList.TotalRNCount();
             auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
             rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-                                                 dPathRNGDimensions, 
+                                                 dPathRNGDimensions,
                                                  rnList,
                                                  processQueue);
 
@@ -652,7 +652,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
             uint32_t rnCount = rnList.TotalRNCount();
             auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
             rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-                                                 dPathRNGDimensions, 
+                                                 dPathRNGDimensions,
                                                  rnList,
                                                  processQueue);
 
@@ -1297,5 +1297,5 @@ size_t PathTracerRendererT<SC>::GPUMemoryUsage() const
             rendererGlobalMem.Size());
 }
 
-template PathTracerRendererT<SpectrumContextIdentity>;
-template PathTracerRendererT<SpectrumContextJakob2019>;
+template class PathTracerRendererT<SpectrumContextIdentity>;
+template class PathTracerRendererT<SpectrumContextJakob2019>;

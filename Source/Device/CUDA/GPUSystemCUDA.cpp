@@ -21,7 +21,7 @@ namespace mray::cuda
 
         MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
                        fmt::format(fg(fmt::color::green),
-                                   std::string("CUDA Failure")),
+                                   "CUDA Failure"),
                        cudaGetErrorString(code), file, line);
         assert(false);
     }
@@ -33,7 +33,7 @@ namespace mray::cuda
         {
             MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
                            fmt::format(fg(fmt::color::green),
-                                       std::string("CUDA Failure")),
+                                       "CUDA Failure"),
                            cudaGetErrorString(code),
                            file,
                            line);
@@ -48,13 +48,13 @@ namespace mray::cuda
         if(code != CUDA_SUCCESS)
         {
             std::string greenErrorCode = fmt::format(fg(fmt::color::green),
-                                                     std::string("CUDA Failure"));
+                                                     "CUDA Failure");
             const char* errStr;
             cuGetErrorString(code, &errStr);
 
             MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
                            fmt::format(fg(fmt::color::green),
-                                       std::string("CUDA Failure")),
+                                       "CUDA Failure"),
                            errStr, file, line);
             assert(false);
         }
@@ -66,13 +66,13 @@ namespace mray::cuda
         if(code == CUDA_ERROR_OUT_OF_MEMORY)
         {
             std::string greenErrorCode = fmt::format(fg(fmt::color::green),
-                                                     std::string("CUDA Failure"));
+                                                     "CUDA Failure");
             const char* errStr;
             cuGetErrorString(code, &errStr);
 
             MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
                            fmt::format(fg(fmt::color::green),
-                                       std::string("CUDA Failure")),
+                                       "CUDA Failure"),
                            errStr, file, line);
 
             throw MRayError("GPU Device is out of memory!");

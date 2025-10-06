@@ -106,9 +106,9 @@ class SpectrumContextJakob2019
     using This = SpectrumContextJakob2019;
             SpectrumContextJakob2019(MRayColorSpaceEnum, WavelengthSampleMode, const GPUSystem&);
             SpectrumContextJakob2019(const This&) = delete;
-            SpectrumContextJakob2019(This&&) = default;
+            SpectrumContextJakob2019(This&&) = delete;
     This&   operator=(const This&) = delete;
-    This&   operator=(This&&) = default;
+    This&   operator=(This&&) = delete;
             ~SpectrumContextJakob2019() = default;
 
     // Methods...

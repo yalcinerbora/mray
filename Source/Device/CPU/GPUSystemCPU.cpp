@@ -113,8 +113,8 @@ void GPUSemaphoreViewCPU::HostRelease()
 GPUDeviceCPU::GPUDeviceCPU(ThreadPool& tp, int deviceId,
                            AnnotationHandle domain)
     : deviceId(deviceId)
-    , domain(domain)
     , threadPool(&tp)
+    , domain(domain)
     , name(GetCPUName())
     , totalMemory(GetTotalCPUMemory())
 {

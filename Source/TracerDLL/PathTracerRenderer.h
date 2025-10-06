@@ -62,7 +62,7 @@ class PathTracerRendererT final : public RendererT<PathTracerRendererT<SpectrumC
     //
     using UniformLightSampler   = DirectLightSamplerUniform<MetaLightList>;
     using AttribInfoList        = typename Base::AttribInfoList;
-    using SpectrumContext       = typename SpectrumContextT;
+    using SpectrumContext       = SpectrumContextT;
     using SpectrumConverter     = typename SpectrumContext::Converter;
     using SpecContextPtr        = std::unique_ptr<SpectrumContext>;
     static constexpr bool IsSpectral = !std::is_same_v<SpectrumContext, SpectrumContextIdentity>;
@@ -183,8 +183,8 @@ class PathTracerRendererT final : public RendererT<PathTracerRendererT<SpectrumC
     size_t              GPUMemoryUsage() const override;
 };
 
-extern template PathTracerRendererT<SpectrumContextIdentity>;
-extern template PathTracerRendererT<SpectrumContextJakob2019>;
+extern template class PathTracerRendererT<SpectrumContextIdentity>;
+extern template class PathTracerRendererT<SpectrumContextJakob2019>;
 
 using PathTracerRendererRGB = PathTracerRendererT<SpectrumContextIdentity>;
 using PathTracerRendererSpectral = PathTracerRendererT<SpectrumContextJakob2019>;
@@ -208,9 +208,9 @@ class PathTracerRenderWork : public RenderWork<R, PG, MG, TG>
         static constexpr auto rrSampleList    = GenRNRequestList<1>();
         static constexpr auto lightSampleList = R::UniformLightSampler::SampleLightRNList;
         //
-        if(workIndex == 0)  return matSampleList.Append(rrSampleList);
-        if(workIndex == 1)  return lightSampleList;
-                            return RNRequestList();
+             if(workIndex == 0) return matSampleList.Append(rrSampleList);
+        else if(workIndex == 1) return lightSampleList;
+        else                    return RNRequestList();
     }
 };
 

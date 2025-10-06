@@ -49,7 +49,6 @@ struct Error
     std::string errorInfo;
 };
 
-
 struct RGBToXYZMatrixPair
 {
     Mat3F rgbToXYZ;
@@ -71,8 +70,8 @@ FetchConversionMatrices(MRayColorSpaceEnum globalColorSpace)
         static constexpr Matrix3x3 fromXYZ = toXYZ.Inverse();
         result = RGBToXYZMatrixPair
         {
-            .rgbToXYZ = toXYZ,
-            .xyzToRGB = fromXYZ
+            .rgbToXYZ = Mat3F(toXYZ),
+            .xyzToRGB = Mat3F(fromXYZ)
         };
         return true;
     });
@@ -325,9 +324,11 @@ Error PassGenerateSpectrumLUT(// Output
             using namespace std::string_view_literals;
             std::string errInfo = std::format
             (
-                "Unable to optimize polynomial for l: {}, ijk: {} => "
-                "Coeffs: {}, Residual: {}, Mode: {:s}",
-                l, ijk.AsArray(), c.AsArray(), e,
+                "Unable to optimize polynomial for l: {}, "
+                "ijk: [{}, {}, {}] => Coeffs: [{}, {}, {}], "
+                "Residual: {}, Mode: {:s}",
+                l, ijk[0], ijk[1], ijk[2],
+                c[0], c[1], c[2], e,
                 (std::is_same_v<FloatType, double>)
                 ? "Double"sv : "Float"sv
             );

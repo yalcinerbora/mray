@@ -31,10 +31,10 @@ namespace SobolDetail
     {
         private:
         const GlobalState&  globalState;
-        uint64_t            sobolIndex;        
+        uint64_t            sobolIndex;
         uint32_t            seed;
 
-        MR_PF_DECL 
+        MR_PF_DECL
         static uint32_t RollDim(uint32_t dim);
 
         public:
@@ -164,32 +164,31 @@ uint64_t SobolCommon::MixBits(uint64_t v)
     return v;
 };
 
-MR_PF_DEF 
+MR_PF_DEF
 uint32_t SobolDetail::BitwiseMatrixMult(uint64_t a, uint32_t dim,
                                         const Span<const uint32_t>& matrixList)
 {
     auto sobolMatrix = matrixList.subspan(dim * SOBOL_MATRIX_WIDTH, SOBOL_MATRIX_WIDTH);
 
     uint32_t result = 0;
-    MRAY_UNROLL_LOOP
     for(uint32_t i = 0; i < SOBOL_MATRIX_WIDTH; i++)
     {
         if(a == 0x0) return result;
         if(a &  0x1) result ^= sobolMatrix[i];
-        
+
         a >>= 1;
     }
     return result;
 }
 
-MR_PF_DEF 
+MR_PF_DEF
 uint32_t SobolDetail::Sobol::RollDim(uint32_t dim)
 {
     constexpr auto D = SOBOL_DIM_COUNT;
 
     if(dim >= D) dim -= SOBOL_DIM_COUNT;
     if(dim >= D) dim -= SOBOL_DIM_COUNT;
-    else while(dim >= SOBOL_DIM_COUNT) 
+    else while(dim >= SOBOL_DIM_COUNT)
         dim -= SOBOL_DIM_COUNT;
 
     return dim;
@@ -200,17 +199,13 @@ SobolDetail::Sobol::Sobol(const LocalState& ls, const GlobalState& gs)
     : globalState(gs)
     , seed(ls.seed)
 {
-    uint32_t maxRes = gs.resolution[gs.resolution.Maximum()];
-    maxRes = Math::NextPowerOfTwo(maxRes);
-    uint32_t mod = Bit::RequiredBitsToRepresent(maxRes) - 1;
-
     // Rely on scrambling instead of sequence advancing
     sobolIndex = ls.sampleIndex;
 }
 
 MR_HF_DEF
 uint32_t SobolDetail::Sobol::Next(uint32_t dim) const
-{   
+{
     dim = RollDim(dim);
     uint32_t s = BitwiseMatrixMult(sobolIndex, dim, globalState.dSobolMatices);
 
@@ -226,7 +221,7 @@ Vector2ui SobolDetail::Sobol::Next2D(uint32_t dim) const
     dim = RollDim(dim);
     uint32_t s0 = BitwiseMatrixMult(sobolIndex, dim + 0, globalState.dSobolMatices);
     uint32_t s1 = BitwiseMatrixMult(sobolIndex, dim + 1, globalState.dSobolMatices);
-    
+
     using RNGFunctions::HashPCG64::Hash;
     uint64_t sampleHash = Hash(dim, seed);
     s0 = ScambleOwenFast(s0, uint32_t(sampleHash & 0xFFFFFFFF));
@@ -234,7 +229,7 @@ Vector2ui SobolDetail::Sobol::Next2D(uint32_t dim) const
     return Vector2ui(s0, s1);
 }
 
-MR_HF_DEF 
+MR_HF_DEF
 Vector3ui SobolDetail::Sobol::Next3D(uint32_t dim) const
 {
     dim = RollDim(dim);
@@ -252,12 +247,11 @@ Vector3ui SobolDetail::Sobol::Next3D(uint32_t dim) const
 }
 
 template<std::array<uint32_t, ZSobolDetail::SOBOL_MATRIX_WIDTH> SobolArray>
-MR_PF_DEF 
+MR_PF_DEF
 uint32_t ZSobolDetail::BitwiseMatrixMult(uint64_t a)
-{    
+{
     // Let compiler decide to embed the values as immediates
     uint32_t result = 0;
-    MRAY_UNROLL_LOOP
     for(uint32_t i = 0; i < SOBOL_MATRIX_WIDTH; i++)
     {
         if(a == 0x0) return result;
@@ -290,30 +284,27 @@ uint64_t ZSobolDetail::ZSobol::SampleIndex(uint32_t dimension) const
             >                                       \
             (__VA_ARGS__, 0u)
 
-        // Sanity check, we use "ull" literal suffix to deduce the "Compose"
-        // function's arguments, so if compiler changes this should fail.
-        static_assert(std::is_same_v<decltype(0ull), uint64_t>);
 
         // After multiple implementations, this seems to be the
         // fastest (althought slightly)
         static constexpr std::array<uint64_t, 4> TABLE =
         {
-            COMPOSE_48x2(0ull, 0ull, 0ull, 0ull, 0ull, 0ull,
+            COMPOSE_48x2(uint64_t(0ull), 0ull, 0ull, 0ull, 0ull, 0ull,
                          1ull, 1ull, 1ull, 1ull, 1ull, 1ull,
                          2ull, 2ull, 2ull, 2ull, 2ull, 2ull,
                          3ull, 3ull, 3ull, 3ull, 3ull, 3ull),
             //
-            COMPOSE_48x2(1ull, 1ull, 2ull, 2ull, 3ull, 3ull,
+            COMPOSE_48x2(uint64_t(1ull), 1ull, 2ull, 2ull, 3ull, 3ull,
                          0ull, 0ull, 2ull, 2ull, 3ull, 3ull,
                          1ull, 1ull, 0ull, 0ull, 3ull, 3ull,
                          1ull, 1ull, 2ull, 2ull, 0ull, 0ull),
             //
-            COMPOSE_48x2(2ull, 3ull, 1ull, 3ull, 2ull, 1ull,
+            COMPOSE_48x2(uint64_t(2ull), 3ull, 1ull, 3ull, 2ull, 1ull,
                          2ull, 3ull, 0ull, 3ull, 2ull, 0ull,
                          0ull, 3ull, 1ull, 3ull, 0ull, 1ull,
                          2ull, 0ull, 1ull, 0ull, 2ull, 1ull),
             //
-            COMPOSE_48x2(3ull, 2ull, 3ull, 1ull, 1ull, 2ull,
+            COMPOSE_48x2(uint64_t(3ull), 2ull, 3ull, 1ull, 1ull, 2ull,
                          3ull, 2ull, 3ull, 0ull, 0ull, 2ull,
                          3ull, 0ull, 3ull, 1ull, 1ull, 0ull,
                          0ull, 2ull, 0ull, 1ull, 1ull, 2ull)
@@ -357,7 +348,7 @@ uint32_t ZSobolDetail::ZSobol::SampleSobol32(uint64_t a, uint32_t dim) const
         return BitwiseMatrixMult<SOBOL_32_JOE_KUO_DIM_0>(a);
     else if(dim == 1)
         return BitwiseMatrixMult<SOBOL_32_JOE_KUO_DIM_1>(a);
-    else        
+    else
         return BitwiseMatrixMult<SOBOL_32_JOE_KUO_DIM_2>(a);
 }
 
@@ -392,7 +383,7 @@ ZSobolDetail::ZSobol::ZSobol(const LocalState& ls,
 
 MR_HF_DEF
 uint32_t ZSobolDetail::ZSobol::Next(uint32_t dim) const
-{       
+{
     uint64_t sampleIndex = SampleIndex(dim);
     uint32_t sample = SampleSobol32(sampleIndex, 0);
     using RNGFunctions::HashPCG64::Hash;
@@ -440,7 +431,7 @@ void GenerateRNFromList(// Output
                         const SobolT& rng,
                         // Constants
                         const RNRequestList& rnRequests,
-                        uint32_t rngCount, 
+                        uint32_t rngCount,
                         uint32_t rngIndex,
                         uint32_t dimOffset)
 {
@@ -552,14 +543,14 @@ void KCGenRandomNumbersGeneric(// Output
                                MRAY_GRID_CONSTANT const GlobalStateT globalState)
 {
     assert(dStates.size() * (rnRequests.TotalRNCount()) == dNumbers.size());
-    
+
     KernelCallParams kp;
     uint32_t generatorCount = uint32_t(dStates.size());
     for(uint32_t i = kp.GlobalId(); i < generatorCount; i += kp.TotalSize())
     {
         GeneratorT rng(dStates[i], globalState);
         GenerateRNFromList(dNumbers, rng, rnRequests,
-                           generatorCount, i, dimStartOffset);        
+                           generatorCount, i, dimStartOffset);
     }
 }
 
@@ -616,7 +607,7 @@ void KCGenRandomNumbersGenericIndirectDynamicDim(// Output
         uint32_t dimStartOffset = dCurrentDimensions[index];
         GeneratorT rng(dStates[index], globalState);
         GenerateRNFromList(dNumbers, rng, rnRequests,
-                           generatorCount, i, dimStartOffset);        
+                           generatorCount, i, dimStartOffset);
     }
 }
 
@@ -865,7 +856,7 @@ RNGGroupSobol::RNGGroupSobol(const RenderImageParams& rip,
                                     dSobolMatrices),
                                 deviceMem,
                                 {gpuRNGCountMax , gpuRNGCountMax,
-                                 SobolDetail::SOBOL_DATA_SIZE});    
+                                 SobolDetail::SOBOL_DATA_SIZE});
 
     size_t totalRNGCount = generatorCount.Multiply();
     MemAlloc::AllocateMultiData(Tie(hBackupStatesAll, hMainStatesAll),
@@ -896,7 +887,7 @@ RNGGroupSobol::RNGGroupSobol(const RenderImageParams& rip,
         rngLocal.discard(start);
         for(uint32_t i = start; i < end; i++)
         {
-            uint32_t xi = rngLocal();
+            uint32_t xi = uint32_t(rngLocal());
             Vector2ui regionSize = rip.regionMax - rip.regionMin;
             Vector2ui localPixelOffset = Vector2ui(i % regionSize[0],
                                                    i / regionSize[0]);
@@ -927,7 +918,7 @@ RNGGroupSobol::RNGGroupSobol(const RenderImageParams& rip,
         rngLocal.discard(start);
         for(uint32_t i = start; i < end; i++)
         {
-            auto xi = rngLocal();
+            auto xi = uint32_t(rngLocal());
             hBackupStates[i] = BackupRNG::GenerateState(uint32_t(xi));
         }
     }, 4u);
@@ -1158,7 +1149,7 @@ RNGGroupZSobol::RNGGroupZSobol(const RenderImageParams& rip,
         rngLocal.discard(start);
         for(uint32_t i = start; i < end; i++)
         {
-            uint32_t xi = rngLocal();
+            uint32_t xi = uint32_t(rngLocal());
             Vector2ui regionSize = rip.regionMax - rip.regionMin;
             Vector2ui localPixelOffset = Vector2ui(i % regionSize[0],
                                                    i / regionSize[0]);
@@ -1191,7 +1182,7 @@ RNGGroupZSobol::RNGGroupZSobol(const RenderImageParams& rip,
         rngLocal.discard(start);
         for(uint32_t i = start; i < end; i++)
         {
-            auto xi = rngLocal();
+            auto xi = uint32_t(rngLocal());
             hBackupStates[i] = BackupRNG::GenerateState(uint32_t(xi));
         }
     }, 4u);
