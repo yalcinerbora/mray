@@ -490,7 +490,7 @@ constexpr auto VariantDetail::SwitchCaseVisitImpl(UIntTConst<O>, VariantT&& v, F
                         std::forward<VariantT>(v) \
                     )                             \
                 );                                \
-            break;                                \
+            else break;                           \
         }
     //
     switch(v.Index())
@@ -521,16 +521,19 @@ constexpr auto VariantDetail::SwitchCaseVisitImpl(UIntTConst<O>, VariantT&& v, F
                     std::forward<VariantT>(v),
                     std::forward<Func>(f)
                 );
-            break;
+            else break;
         }
     }
     // On GPU we crash and burn...
     // on CPU we throw
-    #ifdef MRAY_DEVICE_CODE_PATH
-        MRAY_UNREACHABLE;
-    #else
-        throw MRayError("Unable to invoke visit over a variant!");
-    #endif
+    if constexpr(VSize - O < STAMP_COUNT)
+    {
+        #ifdef MRAY_DEVICE_CODE_PATH
+            MRAY_UNREACHABLE;
+        #else
+            throw MRayError("Unable to invoke visit over a variant!");
+        #endif
+    }
 }
 
 template<class ... Types>
