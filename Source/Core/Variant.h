@@ -222,14 +222,24 @@ namespace VariantDetail
         static constexpr auto INVALID_INDEX = std::numeric_limits<VariantIndex>::max();
         // Storage type related
         using StorageType = UnionStorage<TC, TD, 0, sizeof...(Types), TypePack<Types...>>;
-        // Friends
-        template <class T, class... Ts>
-        friend constexpr bool ::HoldsAlternative(const Variant<Ts...>&) noexcept;
 
-        template <uint32_t I, class VariantT>
-        friend constexpr decltype(auto) ::Alternative(VariantT&& v) noexcept;
+        // =========================== //
+        // Compiler bug maybe? Report! //
+        // =========================== //
+        // gcc-14 unable to parse the friend class "Alternative" (due to decltype(auto) maybe?).
+        // I did not bother explicitly stating the return type or overloading Alternative multiple
+        // times. Just making storage and tag public here and dont bother declaring friends.
+        #ifndef MRAY_GCC
+            template <class T, class... Ts>
+            friend constexpr bool ::HoldsAlternative(const Variant<Ts...>&) noexcept;
 
-        private:
+            template <uint32_t I, class VariantT>
+            friend constexpr decltype(auto) ::Alternative(VariantT&&) noexcept;
+            private:
+        #else  // ^^^^^ Compiler(Clang/MSVC)
+            public:
+        #endif // ^^^^^ Compiler(GCC)
+
         StorageType     storage;
         VariantIndex    tag = 0;
 
