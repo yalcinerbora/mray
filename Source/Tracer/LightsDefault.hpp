@@ -536,18 +536,11 @@ LightGroupPrim<PG>::LightGroupPrim(uint32_t groupId,
 template <PrimitiveGroupC PG>
 void LightGroupPrim<PG>::CommitReservations()
 {
-    // TODO: Wasting 32x memory cost due to "Bit" is not a type
-    // Change this later
     this->GenericCommit(Tie(dRadiances, dPrimRanges,
                             dIsTwoSidedFlags),
                         {0, 0, 0});
-
-    auto dIsTwoSidedFlagsIn = Bitspan<uint32_t>(dIsTwoSidedFlags);
-
     soa.dRadiances = ToConstSpan(dRadiances);
-    soa.dIsTwoSidedFlags = ToConstSpan(dIsTwoSidedFlagsIn);
-    // TODO:
-    //soa.dPrimRanges = ToConstSpan(dPrimRanges);
+    soa.dIsTwoSidedFlags = ToConstSpan(dIsTwoSidedFlags);
 }
 
 template <PrimitiveGroupC PG>
@@ -561,19 +554,25 @@ LightAttributeInfoList LightGroupPrim<PG>::AttributeInfo() const
     static const LightAttributeInfoList LogicList =
     {
         LightAttributeInfo("radiance", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
-                           MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR)
+                           MR_MANDATORY, MR_TEXTURE_OR_CONSTANT, IS_COLOR),
+        LightAttributeInfo("isTwoSided", MRayDataTypeRT(MR_BOOL), IS_SCALAR,
+                           MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
     };
     return LogicList;
 }
 
 template <PrimitiveGroupC PG>
-void LightGroupPrim<PG>::PushAttribute(LightKey,
+void LightGroupPrim<PG>::PushAttribute(LightKey id,
                                        uint32_t attributeIndex,
-                                       TransientData,
-                                       const GPUQueue&)
+                                       TransientData data,
+                                       const GPUQueue& queue)
 {
-    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
-                    "function is called", TypeName(), attributeIndex);
+    if(attributeIndex != 1)
+        throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
+                        "function is called", TypeName(), attributeIndex);
+
+    this->GenericPushData(dIsTwoSidedFlags, id.FetchIndexPortion(),
+                          attributeIndex, std::move(data), queue);
 }
 
 template <PrimitiveGroupC PG>
@@ -583,18 +582,30 @@ void LightGroupPrim<PG>::PushAttribute(LightKey,
                                        TransientData,
                                        const GPUQueue&)
 {
-    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
-                    "function is called", TypeName(), attributeIndex);
+    if(attributeIndex != 1)
+        throw MRayError("{:s}: Attribute {:d} is \"ConstantOnly\" but not \"Array\", "
+                        "wrong function is called", TypeName(), attributeIndex);
+    else
+        throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
+                        "function is called", TypeName(), attributeIndex);
 }
 
 template <PrimitiveGroupC PG>
-void LightGroupPrim<PG>::PushAttribute(LightKey, LightKey,
+void LightGroupPrim<PG>::PushAttribute(LightKey idStart, LightKey idEnd,
                                        uint32_t attributeIndex,
-                                       TransientData,
-                                       const GPUQueue&)
+                                       TransientData data,
+                                       const GPUQueue& queue)
 {
-    throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
-                    "function is called", TypeName(), attributeIndex);
+    if(attributeIndex != 1)
+        throw MRayError("{:s}: Attribute {:d} is not \"ConstantOnly\", wrong "
+                        "function is called", TypeName(), attributeIndex);
+
+    // When
+    using IdInt = typename LightGroupPrim<PG>::IdInt;
+    Vector<2, IdInt > idRange(idStart.FetchIndexPortion(),
+                              idEnd.FetchIndexPortion());
+    this->GenericPushData(dIsTwoSidedFlags, idRange,
+                          attributeIndex, std::move(data), queue);
 }
 
 template <PrimitiveGroupC PG>
@@ -604,22 +615,21 @@ void LightGroupPrim<PG>::PushTexAttribute(LightKey idStart, LightKey idEnd,
                                           std::vector<Optional<TextureId>> texIds,
                                           const GPUQueue& queue)
 {
-    if(attributeIndex == 0)
-    {
-        this->template GenericPushTexAttribute<2, Vector3>
-        (
-            dRadiances,
-            //
-            idStart, idEnd,
-            attributeIndex,
-            std::move(data),
-            texIds,
-            queue
-        );
-        this->WarnIfTexturesAreNotIlluminant(texIds);
-    }
-    else throw MRayError("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
-                         "function is called", TypeName(), attributeIndex);
+    if(attributeIndex != 0)
+        throw MRayError("{:s}: Attribute {:d} is not \"ParamVarying\", wrong "
+                        "function is called", TypeName(), attributeIndex);
+
+    this->template GenericPushTexAttribute<2, Vector3>
+    (
+        dRadiances,
+        //
+        idStart, idEnd,
+        attributeIndex,
+        std::move(data),
+        texIds,
+        queue
+    );
+    this->WarnIfTexturesAreNotIlluminant(texIds);
 }
 
 template <PrimitiveGroupC PG>
@@ -675,8 +685,7 @@ void LightGroupPrim<PG>::Finalize(const GPUQueue& q)
     for(const auto& [_, batchKey] : this->primMappings)
         hPrimRanges.push_back(primGroup.BatchRange(batchKey));
 
-    // TODO: Add is two sided flags
-    q.MemsetAsync(dIsTwoSidedFlags, 0x00);
+    // TODO: Extract luminance etc. if the radiance is textured
     q.MemcpyAsync(dPrimRanges, Span<const Vector2ui>(hPrimRanges));
     q.Barrier().Wait();
 }

@@ -349,12 +349,13 @@ TEST(DefaultLights, PrimLight_Triangle)
         .indexList = Span<const Vector3ui>(hIndex)
     };
 
-    std::vector<uint32_t> hIsTwoSidedFlags = {0};
+    static_assert(sizeof(std::byte) == sizeof(bool));
+    std::vector<std::byte> hIsTwoSidedFlags = {std::byte{0}};
     std::vector<ParamVaryingData<2, Vector3>> hRadiances = {ParamVaryingData<2, Vector3>(Vector3(1))};
     LightData lData =
     {
         .dRadiances = Span<const ParamVaryingData<2, Vector3>>(hRadiances),
-        .dIsTwoSidedFlags = Bitspan<const uint32_t>(Span<const uint32_t>(hIsTwoSidedFlags))
+        .dIsTwoSidedFlags = Span<const bool>(reinterpret_cast<bool*>(hIsTwoSidedFlags.data()), 1)
     };
 
     Triangle tri0(tContext, pData, PrimitiveKey::CombinedKey(0, 0));

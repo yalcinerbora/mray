@@ -64,7 +64,7 @@ class Quat
     // basis so we can fetch the axes via these functions.
     // These are implemented since MSVC did not optimize the above
     // code fully. It is an obvious optimization. We just ignore
-    // most of the data since they are  zero.
+    // most of the data since they are zero.
     MR_PF_DECL Vector<3, T>     OrthoBasisX() const noexcept;
     MR_PF_DECL Vector<3, T>     OrthoBasisY() const noexcept;
     MR_PF_DECL Vector<3, T>     OrthoBasisZ() const noexcept;

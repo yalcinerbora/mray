@@ -482,6 +482,7 @@ constexpr auto VariantDetail::SwitchCaseVisitImpl(UIntTConst<O>, VariantT&& v, F
         case(O + I):                              \
         {                                         \
             if constexpr(VSize > (I + O))         \
+            {                                     \
                 return std::invoke                \
                 (                                 \
                     std::forward<Func>(f),        \
@@ -490,6 +491,7 @@ constexpr auto VariantDetail::SwitchCaseVisitImpl(UIntTConst<O>, VariantT&& v, F
                         std::forward<VariantT>(v) \
                     )                             \
                 );                                \
+            }                                     \
             else break;                           \
         }
     //
@@ -515,12 +517,14 @@ constexpr auto VariantDetail::SwitchCaseVisitImpl(UIntTConst<O>, VariantT&& v, F
         default:
         {
             if constexpr(VSize > O + STAMP_COUNT)
+            {
                 return SwitchCaseVisitImpl
                 (
                     UIntTConst<O + STAMP_COUNT>{},
                     std::forward<VariantT>(v),
                     std::forward<Func>(f)
                 );
+            }
             else break;
         }
     }

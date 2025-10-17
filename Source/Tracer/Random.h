@@ -201,7 +201,7 @@ class RNRequestList
     MR_PF_DECL uint32_t DimensionOfRequest(uint32_t requestIndex) const;
     MR_PF_DECL uint32_t TotalRNCount() const;
     MR_PF_DECL uint32_t TotalRequestCount() const;
-    
+
     MR_PF_DECL RNRequestList Append(uint32_t dimOfRequest) const;
     MR_PF_DECL RNRequestList Append(const RNRequestList&) const;
 
@@ -602,7 +602,7 @@ Vector2 RNGDispenserT<T>::NextFloat2D()
                    RNGFunctions::ToFloat01<Float>(xi1));
 }
 
-MR_PF_DEF 
+MR_PF_DEF
 uint32_t RNRequestList::DimensionOfRequest(uint32_t requestIndex) const
 {
     uint32_t i = requestIndex;
@@ -610,7 +610,7 @@ uint32_t RNRequestList::DimensionOfRequest(uint32_t requestIndex) const
     return result;
 }
 
-MR_PF_DEF 
+MR_PF_DEF
 uint32_t RNRequestList::TotalRNCount() const
 {
     static_assert(BIT_PER_REQUEST == 2, "This implementation is "
@@ -629,7 +629,7 @@ uint32_t RNRequestList::TotalRequestCount() const
     return fillCounter / BIT_PER_REQUEST;
 }
 
-MR_PF_DEF 
+MR_PF_DEF
 RNRequestList RNRequestList::Append(uint32_t dimOfRequest) const
 {
     assert(fillCounter + 2 < BIT_LIMIT);
@@ -639,13 +639,13 @@ RNRequestList RNRequestList::Append(uint32_t dimOfRequest) const
     if(dimOfRequest == 0) return result;
 
     result.list = (dimOfRequest << fillCounter) | list;
-    result.fillCounter = fillCounter + 2u;    
+    result.fillCounter = fillCounter + 2u;
     return result;
 }
 
-MR_PF_DEF 
+MR_PF_DEF
 RNRequestList RNRequestList::Append(const RNRequestList& other) const
-{    
+{
     assert(other.fillCounter + fillCounter <= BIT_LIMIT);
     RNRequestList result = (*this);
 
@@ -671,11 +671,11 @@ void RNRequestList::CombineMax(const RNRequestList& r)
                                       r.DimensionOfRequest(i));
         newList = newList.Append(localMax);
     }
-    *this = newList;       
+    *this = newList;
 }
 
 template<uint32_t... Is>
-MR_PF_DEF 
+MR_PF_DEF
 RNRequestList GenRNRequestList()
 {
     constexpr std::array UNPACK_LIST = {Is...};

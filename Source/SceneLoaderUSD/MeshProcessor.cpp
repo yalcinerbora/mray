@@ -313,6 +313,13 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
             // [2, 3, 4] or [2, 3, 0]
             Vector3 n2 = (faceVertexCount == 4)
                 ? Normal(2, 3, 0) : Normal(2, 3, 4);
+
+            // We selected 3 normals, if any of those is NaN
+            // eliminate
+            if(!Math::IsFinite(n0)) n0 = Vector3::Zero();
+            if(!Math::IsFinite(n1)) n1 = Vector3::Zero();
+            if(!Math::IsFinite(n2)) n2 = Vector3::Zero();
+            //
             // TODO: This fails if two concave vertices are back to back,
             // Change this later
             return Math::Normalize(n0 + n1 + n2);

@@ -21,9 +21,9 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 #ifdef MRAY_GPU_BACKEND_CUDA
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCCopyScanY(Span<Float> dYCDFs,
+    void KCCopyScanY(MRAY_GRID_CONSTANT const Span<Float> dYCDFs,
                      // Input
-                     Span<const Float> dXCDFs)
+                     MRAY_GRID_CONSTANT const Span<const Float> dXCDFs)
     {
         KernelCallParams kp;
         if(kp.blockId != 0) return;
@@ -81,7 +81,8 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     };
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCNormalizeXY(Span<Float> dXCDFs, Span<Float> dYCDFs)
+    void KCNormalizeXY(MRAY_GRID_CONSTANT const Span<Float> dXCDFs, 
+                       MRAY_GRID_CONSTANT const Span<Float> dYCDFs)
     {
         KernelCallParams kp;
         static constexpr uint32_t ITEMS_PER_THREAD = 4;
@@ -144,10 +145,10 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     }
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCSegmentedScanPrecise(Span<Float> dOut,
-                                Span<const Float> dIn,
-                                uint32_t segmentSize,
-                                uint32_t totalBlocks)
+    void KCSegmentedScanPrecise(MRAY_GRID_CONSTANT const Span<Float> dOut,
+                                MRAY_GRID_CONSTANT const Span<const Float> dIn,
+                                MRAY_GRID_CONSTANT const uint32_t segmentSize,
+                                MRAY_GRID_CONSTANT const uint32_t totalBlocks)
     {
         KernelCallParams kp;
 
@@ -233,9 +234,9 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 #elif defined MRAY_GPU_BACKEND_CPU
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCCopyScanY(Span<Float> dYCDFs,
+    void KCCopyScanY(MRAY_GRID_CONSTANT const Span<Float> dYCDFs,
                      // Input
-                     Span<const Float> dXCDFs)
+                     MRAY_GRID_CONSTANT const Span<const Float> dXCDFs)
     {
         KernelCallParams kp;
         if(kp.blockId != 0) return;
@@ -255,10 +256,10 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     }
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCSegmentedScanPrecise(Span<Float> dOut,
-                                Span<const Float> dIn,
-                                uint32_t segmentSize,
-                                uint32_t totalBlocks)
+    void KCSegmentedScanPrecise(MRAY_GRID_CONSTANT const Span<Float> dOut,
+                                MRAY_GRID_CONSTANT const Span<const Float> dIn,
+                                MRAY_GRID_CONSTANT const uint32_t segmentSize,
+                                MRAY_GRID_CONSTANT const uint32_t totalBlocks)
     {
         KernelCallParams kp;
         // Block-stride loop
@@ -277,7 +278,8 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     }
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCNormalizeXY(Span<Float> dXCDFs, Span<Float> dYCDFs)
+    void KCNormalizeXY(MRAY_GRID_CONSTANT const Span<Float> dXCDFs, 
+                       MRAY_GRID_CONSTANT const Span<Float> dYCDFs)
     {
         KernelCallParams kp;
 
@@ -306,26 +308,28 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     #error DistributionPwC2D kernels do not have generic implementation yet!
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCCopyScanY(Span<Float> dYCDFs,
+    void KCCopyScanY(MRAY_GRID_CONSTANT const Span<Float> dYCDFs,
                      // Input
-                     Span<const Float> dXCDFs)
+                     MRAY_GRID_CONSTANT const Span<const Float> dXCDFs)
     {}
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCSegmentedScanPrecise(Span<Float> dOut,
-                                Span<const Float> dIn,
-                                uint32_t segmentSize,
-                                uint32_t totalBlocks)
+    void KCSegmentedScanPrecise(MRAY_GRID_CONSTANT const Span<Float> dOut,
+                                MRAY_GRID_CONSTANT const Span<const Float> dIn,
+                                MRAY_GRID_CONSTANT const uint32_t segmentSize,
+                                MRAY_GRID_CONSTANT const uint32_t totalBlocks)
     {}
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCNormalizeXY(Span<Float> dXCDFs, Span<Float> dYCDFs)
+    void KCNormalizeXY(MRAY_GRID_CONSTANT const Span<Float> dXCDFs, 
+                       MRAY_GRID_CONSTANT const Span<Float> dYCDFs)
     {}
 
 #endif
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCValidateScan(Span<const Float> dXCDFs, uint32_t segmentSize)
+void KCValidateScan(MRAY_GRID_CONSTANT const Span<const Float> dXCDFs, 
+                    MRAY_GRID_CONSTANT const uint32_t segmentSize)
 {
     uint32_t totalElements = static_cast<uint32_t>(dXCDFs.size());
     uint32_t segmentCount = totalElements / segmentSize;

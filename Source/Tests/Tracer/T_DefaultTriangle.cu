@@ -61,14 +61,14 @@ static_assert(normals.size() == uvs.size());
 
 }
 
-MRAY_KERNEL void KCAccessFirstTriangle(Span<uint8_t> dIsValid,
-                                       Span<PrimitiveKey> primKeys,
+MRAY_KERNEL void KCAccessFirstTriangle(MRAY_GRID_CONSTANT const Span<uint8_t> dIsValid,
+                                       MRAY_GRID_CONSTANT const Span<PrimitiveKey> primKeys,
                                        // Constants
-                                       const typename PrimGroupTriangle::DataSoA soa,
-                                       const std::array<Vector3ui, 1> indices,
-                                       const std::array<Vector3, 3> positions,
-                                       const std::array<Quaternion, 3> normalsQuat,
-                                       const std::array<Vector2, 3> uvs)
+                                       MRAY_GRID_CONSTANT const typename PrimGroupTriangle::DataSoA soa,
+                                       MRAY_GRID_CONSTANT const std::array<Vector3ui, 1> indices,
+                                       MRAY_GRID_CONSTANT const std::array<Vector3, 3> positions,
+                                       MRAY_GRID_CONSTANT const std::array<Quaternion, 3> normalsQuat,
+                                       MRAY_GRID_CONSTANT const std::array<Vector2, 3> uvs)
 {
     static constexpr uint32_t TRI_VERTEX_COUNT = Shape::Triangle::TRI_VERTEX_COUNT;
     assert(dIsValid.size() == primKeys.size());

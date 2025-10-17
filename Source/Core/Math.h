@@ -97,8 +97,10 @@ namespace Math
     template<FloatC T> MR_PF_DECL T ErrFunc(T) noexcept;
     template<FloatC T> MR_PF_DECL T InvErrFunc(T) noexcept;
     template<FloatC T> MR_PF_DECL T Exp(T) noexcept;
+    template<FloatC T> MR_PF_DECL T ExpM1(T) noexcept;
     template<FloatC T> MR_PF_DECL T Exp2(T) noexcept;
     template<FloatC T> MR_PF_DECL T Log(T) noexcept;
+    template<FloatC T> MR_PF_DECL T Log1P(T) noexcept;
     template<FloatC T> MR_PF_DECL T Log2(T) noexcept;
     template<FloatC T> MR_PF_DECL T Gaussian(T x, T sigma = T(1), T mu = T(0)) noexcept;
     // Rounding
@@ -277,7 +279,9 @@ MR_PF_DEF T NextPrime(T value) noexcept
                                  value);
     }
     // Check one by one
-    for(T i = value;; i++)
+    if((value & 0x1) == 0)
+        value++;
+    for(T i = value;; i += 2)
     {
         if(IsPrime(i)) return i;
     }
@@ -850,6 +854,24 @@ MR_PF_DEF T Exp(T x) noexcept
 }
 
 template<FloatC T>
+MR_PF_DEF T ExpM1(T x) noexcept
+{
+    if(std::is_constant_evaluated())
+    {
+        return Math::Exp(x) - T(1);
+    }
+    else
+    {
+        #ifndef MRAY_DEVICE_CODE_PATH
+            return std::expm1(x);
+        #else
+            if constexpr(std::is_same_v<T, float>)  return expm1f(x);
+            if constexpr(std::is_same_v<T, double>) return expm1(x);
+        #endif
+    }
+}
+
+template<FloatC T>
 MR_PF_DEF T Exp2(T x) noexcept
 {
     // Another njuffa solution
@@ -909,6 +931,24 @@ MR_PF_DEF T Log(T x) noexcept
         if constexpr(std::is_same_v<T, float>)  return logf(x);
         if constexpr(std::is_same_v<T, double>) return log(x);
     #endif
+}
+
+template<FloatC T>
+MR_PF_DEF T Log1P(T x) noexcept
+{
+    if(std::is_constant_evaluated())
+    {
+        return Math::Log(x + T(1));
+    }
+    else
+    {
+    #ifndef MRAY_DEVICE_CODE_PATH
+        return std::log1p(x);
+    #else
+        if constexpr(std::is_same_v<T, float>)  return log1pf(x);
+        if constexpr(std::is_same_v<T, double>) return log1p(x);
+    #endif
+    }
 }
 
 template<FloatC T>

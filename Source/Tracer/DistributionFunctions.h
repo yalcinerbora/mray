@@ -5,6 +5,115 @@
 #include "Core/Math.h"
 #include "TracerTypes.h"
 
+namespace Distribution::GaussLobe
+{
+    // A gaussian lobe (aka. vMF distribution) in two dimension.
+    // with anisotrophy (we can fit 1 word here)
+    struct GaussLobeBaseParams
+    {
+        SNorm2x16   dirCoOcta; // CoOcta coordinates of the normal vector
+        Float       kappa;     // "girth" of the lobe
+    };
+
+    struct GaussLobeAnisoParams
+    {
+        // Disney's principaled BxDF style aniso.
+        // Rotation of the aniso disk between [0-180) (in radians)
+        UNorm2x16   anisoAndRotation;
+    };
+
+    struct GaussLobeScaleParams
+    {
+        // Single channel data only overall Luminance
+        // depending on the situation, this struct may be multi
+        // channle or multi-spectra. (Unlikely since this means extra memory
+        Float luminance;
+    };
+
+    using GaussLobeSoA = SoASpan<GaussLobeBaseParams,
+                                 GaussLobeAnisoParams,
+                                 GaussLobeScaleParams>;
+
+    struct GaussianLobe
+    {
+        Vector3 dir;
+        Float   kappa;
+        Float   value;
+
+        GaussianLobe() = default;
+
+        MR_HF_DECL
+        GaussianLobe(const GaussLobeSoA& soa, uint32_t index)
+            : kappa(soa.Get<0>()[index].kappa)
+        {
+            // Decompress normal
+            Vector2 coOcta = Vector2(soa.Get<0>()[index].dirCoOcta);
+            dir = Graphics::ConcentricOctahedralToDirection(coOcta);
+            value = soa.Get<2>()[index].luminance;
+            // TODO: Aniso
+        }
+
+        MR_HF_DECL
+        SampleT<Vector3> Sample(Vector2 xi)
+        {
+            // Numerically stable vMF sampling
+            // https://gpuopen.com/download/A_Numerically_Stable_Implementation_of_the_von_Mises%E2%80%93Fisher_Distribution_on_S2.pdf
+            static constexpr auto MachineEpsilon = std::numeric_limits<Float>::epsilon();
+            static constexpr auto T = MachineEpsilon / Float(4);
+
+            Float r = 0;
+            if(kappa > T)
+            {
+                r = (Float(1) / kappa);
+                r *= Math::Log1P(xi[1] * Math::ExpM1(Float(-2) * kappa));
+            }
+            else r = Float(-2) * xi[1];
+
+            Float cosPhi = 1 + r;
+            Float sinPhi = Math::Sqrt(-Math::FMA(r, r, Float(2) * r));
+            Float theta = Float(2) * MathConstants::Pi<Float>() * xi[0];
+            auto [sinTheta, cosTheta] = Math::SinCos(theta);
+            Vector3 dirZ = Graphics::UnitSphericalToCartesian(Vector2(sinTheta, cosTheta),
+                                                              Vector2(sinPhi, cosPhi));
+            // Do orientation
+            Quaternion rot = Quaternion::RotationBetweenZAxis(dirZ);
+            Vector3 dirWorld = rot.ApplyRotation(dir);
+            //
+            return SampleT<Vector3>
+            {
+                .value = dirWorld,
+                .pdf = Value(dirWorld)
+            };
+        }
+
+        MR_HF_DECL
+        Float Value(Vector3 wI)
+        {
+            // TODO: Is this solid angle density or what????
+            auto XOverExp1M = [](Float x)
+            {
+                Float u = Math::Exp(x);
+                if(u == Float(1))           return Float(1);
+                if(Math::Abs(x) < Float(1)) return Math::Log(u) / (u - Float(1));
+                else                        return x / (u - Float(1));
+            };
+
+            Vector3 d = dir - wI;
+            Float result = Math::Exp(Float(-0.5) * kappa * Math::LengthSqr(d));
+            result *= MathConstants::Inv4Pi<Float>();
+            result *= XOverExp1M(Float(-2) * kappa);
+            return result;
+        }
+
+        MR_HF_DECL
+        Float SolidAnglePDF(Vector3)
+        {
+            // TODO: ???
+            return Float(NAN);
+        }
+    };
+}
+
 namespace Distribution::BxDF
 {
     MR_PF_DECL Float FresnelDielectric(Float cosFront, Float etaFront, Float etaBack);
@@ -682,7 +791,9 @@ Float MIS::Balance(uint32_t pdfIndex,
 MR_PF_DEF
 Float Medium::WavelengthToIoRCauchy(Float wavelength, const Vector3& coeffs)
 {
-    Float w2 = wavelength * wavelength;
+    // Cauchy formulae requires wavelengths to be in micrometers
+    Float w = wavelength * Float(1e-3);
+    Float w2 = w * w;
     Float w4 = w2 * w2;
     Float ior = coeffs[0] + coeffs[1] / w2 + coeffs[2] / w4;
     return ior;

@@ -503,13 +503,14 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
     );
 
     // Finally, partition using the generated keys.
-    // Fully partition here using single sort
+    // Fully partitioning here by using a single sort
     auto& rp = rayPartitioner;
     auto partitionOutput = rp.MultiPartition(dKeys, dIndices,
                                              workHasher.WorkBatchDataRange(),
                                              workHasher.WorkBatchBitRange(),
                                              processQueue, false);
     // Wait for results to be available in host buffers
+    // since we need partition ranges on the CPU to Issue kernels.
     processQueue.Barrier().Wait();
     // Old Indices array (and the key) is invalidated
     // Change indices to the partitioned one
@@ -517,6 +518,11 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
 
     if(currentOptions.sampleMode == SampleMode::E::PURE)
     {
+        // =================== //
+        //  Pure Path Tracing  //
+        // =================== //
+        // Work_0           = BxDF sample
+        // BoundaryWork_0   = Accumulate light radiance value to the path
         using GlobalState = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
         GlobalState globalState
         {
@@ -562,6 +568,13 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
     }
     else
     {
+        // =================================  //
+        //  Path Tracing with NEE and/or MIS  //
+        // ================================== //
+        // Work_0           = BxDF sample
+        // Work_1           = NEE sample only
+        // BoundaryWork_1   = Same as light accumulation but with many states
+        //                    regarding NEE and MIS
         UniformLightSampler lightSampler(metaLightArray.Array(),
                                          metaLightArray.IndexHashTable());
 
@@ -621,8 +634,8 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
                                    globalState, processQueue);
         });
 
-        // After the kernel call(s), "dRayState.dOutRays" holds the shadow rays
-        // check visibility.
+        // After the kernel call(s), "dRayState.dOutRays" holds the
+        // shadow rays. Check for visibility.
         Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
         this->tracerView.baseAccelerator.CastVisibilityRays
         (
@@ -667,7 +680,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
                            dRays, dHits, dHitKeys,
                            globalStateE, processQueue);
         },
-        // Empty Kernel for light
+        // Empty Invocation for lights this pass
         [&](const auto&, Span<uint32_t>, uint32_t, uint32_t) {});
     }
 
@@ -694,7 +707,9 @@ PathTracerRendererT<SC>::DoThroughputSingleTileRender(const GPUDevice& device,
         );
     }
 
-    //
+    // ====================== //
+    //   Single Render Pass   //
+    // ====================== //
     uint32_t sppLimit = (saveImage) ? currentOptions.totalSPP
                                     : std::numeric_limits<uint32_t>::max();
     Span<RayIndex> dIndices = DoRenderPass(sppLimit, processQueue);

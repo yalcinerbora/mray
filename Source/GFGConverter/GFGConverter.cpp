@@ -476,7 +476,8 @@ Expected<double> MRayConvert::ConvertMeshesToGFG(const std::string& outFileName,
                                                  uint32_t threadCount,
                                                  ConversionFlags flags)
 {
-    ThreadPool threadPool(threadCount);
+    using TPInitParams = typename ThreadPool::InitParams;
+    ThreadPool threadPool(TPInitParams{.threadCount = threadCount});
 
     using enum ConvFlagEnum;
     namespace fs = std::filesystem;

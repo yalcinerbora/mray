@@ -16,12 +16,12 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 
 template <class T, class BinaryOp>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-void KCInclusiveSegmentedScan(Span<T> dOut,
-                              Span<const T> dIn,
-                              uint32_t segmentSize,
-                              uint32_t totalBlocks,
-                              T identityElement,
-                              BinaryOp op)
+void KCInclusiveSegmentedScan(MRAY_GRID_CONSTANT const Span<T> dOut,
+                              MRAY_GRID_CONSTANT const Span<const T> dIn,
+                              MRAY_GRID_CONSTANT const uint32_t segmentSize,
+                              MRAY_GRID_CONSTANT const uint32_t totalBlocks,
+                              MRAY_GRID_CONSTANT const T identityElement,
+                              MRAY_GRID_CONSTANT const BinaryOp op)
 {
     KernelCallParamsCUDA kp;
 

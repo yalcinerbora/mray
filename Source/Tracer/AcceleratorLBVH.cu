@@ -494,9 +494,9 @@ void KCIntersectBaseLBVH(// Output
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenAABBCenters(// Outputs
-                      Span<Vector3> dAABBCenters,
+                      MRAY_GRID_CONSTANT const Span<Vector3> dAABBCenters,
                       // Inputs
-                      const Span<const AABB3> dLeafAABBs)
+                      MRAY_GRID_CONSTANT const Span<const AABB3> dLeafAABBs)
 {
     assert(dAABBCenters.size() == dLeafAABBs.size());
    KernelCallParams kp;
@@ -508,7 +508,7 @@ void KCGenAABBCenters(// Outputs
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCInitializeBitStack(Span<uint32_t> dBitStacksStates)
+void KCInitializeBitStack(MRAY_GRID_CONSTANT const Span<uint32_t> dBitStacksStates)
 {
     LBVHAccelDetail::BitStack stack(0, BaseAcceleratorLBVH::StackBitCount);
     //

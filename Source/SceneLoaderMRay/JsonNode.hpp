@@ -241,7 +241,7 @@ inline bool JsonNode::CheckOptionalData(std::string_view name) const
 
     const auto& n = (isMultiNode) ? node->at(name).at(innerIndex)
                                   : node->at(name);
-    return IsDashed(n);
+    return !IsDashed(n);
 }
 
 template<class T>

@@ -111,13 +111,13 @@ class LookupTable
     Span<V>             values;
 
     public:
-    MR_HF_DEF         LookupTable(const Span<Vector<VL, H>>& hashes,
+    MR_HF_DECL          LookupTable(const Span<Vector<VL, H>>& hashes,
                                     const Span<K>& keys,
                                     const Span<V>& values);
 
-    MR_HF_DEF
+    MR_HF_DECL
     Optional<V>             Search(const K&) const;
-    MR_HF_DEF
+    MR_HF_DECL
     Pair<const V*, bool>    Insert(const K&, const V&) const;
 
 };

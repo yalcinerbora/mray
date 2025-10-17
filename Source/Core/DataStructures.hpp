@@ -3,7 +3,7 @@
 #include "DataStructures.h"
 
 template <std::unsigned_integral T>
-MR_HF_DECL
+MR_HF_DEF
 StratifiedIntegerAliasTable<T>::StratifiedIntegerAliasTable(const T* dAliasRanges, T gcd)
     : gcdShift(static_cast<T>(std::popcount(gcd - 1)))
     , gAliasRanges(dAliasRanges)
@@ -12,7 +12,7 @@ StratifiedIntegerAliasTable<T>::StratifiedIntegerAliasTable(const T* dAliasRange
 }
 
 template <std::unsigned_integral T>
-MR_HF_DECL
+MR_HF_DEF
 uint32_t StratifiedIntegerAliasTable<T>::FindIndex(T id) const
 {
     uint32_t tableIndex = id >> gcdShift;
@@ -21,7 +21,7 @@ uint32_t StratifiedIntegerAliasTable<T>::FindIndex(T id) const
 
 template <LookupKeyC K, class V, std::unsigned_integral H,
           uint32_t VECL, LookupStrategyC<H, K> S>
-MR_HF_DECL
+MR_HF_DEF
 LookupTable<K, V, H, VECL, S>::LookupTable(const Span<Vector<VL, H>>& hashes,
                                            const Span<K>& keys,
                                            const Span<V>& values)
@@ -35,7 +35,7 @@ LookupTable<K, V, H, VECL, S>::LookupTable(const Span<Vector<VL, H>>& hashes,
 
 template <LookupKeyC K, class V, std::unsigned_integral H,
           uint32_t VECL, LookupStrategyC<H, K> S>
-MR_HF_DECL
+MR_HF_DEF
 Optional<V> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
 {
     uint32_t tableSize = static_cast<uint32_t>(keys.size());
@@ -72,7 +72,7 @@ Optional<V> LookupTable<K, V, H, VECL, S>::Search(const K& k) const
 
 template <LookupKeyC K, class V, std::unsigned_integral H,
           uint32_t VECL, LookupStrategyC<H, K> S>
-MR_HF_DECL
+MR_HF_DEF
 Pair<const V*, bool> LookupTable<K, V, H, VECL, S>::Insert(const K& k, const V& v) const
 {
     using P = Pair<const V*, bool>;

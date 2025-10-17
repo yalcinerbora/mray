@@ -9,35 +9,32 @@
 template <class R, class PG, class MG, class TG, uint32_t I>
 static constexpr auto GetWorkFunction()
 {
-    {
-        using TC = typename PrimTransformContextType<PG, TG>::Result;
-        using M = typename MG:: template Material<typename R::SpectrumContext>;
-        using P = typename PG:: template Primitive<TC>;
-        using S = typename M::Surface;
-        constexpr auto WF = R::template WorkFunctions<P, M, S, TC, PG, MG, TG>;
-        return get<I>(WF);
-    }
-};
+    using TC = typename PrimTransformContextType<PG, TG>::Result;
+    using M = typename MG:: template Material<typename R::SpectrumContext>;
+    using P = typename PG:: template Primitive<TC>;
+    using S = typename M::Surface;
+    constexpr auto WF = R::template WorkFunctions<P, M, S, TC, PG, MG, TG>;
+    return get<I>(WF);
+}
+
 template <class R, class LG, class TG, uint32_t I>
 static constexpr auto GetLightWorkFunction()
 {
-    {
-        using PG = typename LG::PrimGroup;
-        using TC = typename PrimTransformContextType<PG, TG>::Result;
-        using L = typename LG::template Light<TC, typename R::SpectrumContext>;
-        constexpr auto WF = R:: template LightWorkFunctions<L, LG, TG>;
-        return get<I>(WF);
-    }
-};
+    using PG = typename LG::PrimGroup;
+    using TC = typename PrimTransformContextType<PG, TG>::Result;
+    using L = typename LG::template Light<TC, typename R::SpectrumContext>;
+    constexpr auto WF = R:: template LightWorkFunctions<L, LG, TG>;
+    return get<I>(WF);
+}
+
 template <class R, class CG, class TG, uint32_t I>
 static constexpr auto GetCamWorkFunction()
 {
-    {
-        using C = typename CG::Camera;
-        constexpr auto WF = R:: template CamWorkFunctions<C, CG, TG>;
-        return get<I>(WF);
-    }
-};
+    using C = typename CG::Camera;
+    constexpr auto WF = R:: template CamWorkFunctions<C, CG, TG>;
+    return get<I>(WF);
+
+}
 
 // Renderer Related
 #define MRAY_RENDERER_KERNEL_INSTANTIATE(R, P, M, T, I)     \

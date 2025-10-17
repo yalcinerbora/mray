@@ -138,7 +138,7 @@ MRayUSDGeomMatResolWarnings ExpandGeomsAndFindMaterials(CollapsedPrims& subGeomP
 
     // TODO: It is not avail on the token pool (UsdShadeTokens)?
     // Check later.
-    pxr::TfToken usdPrevSurfToken = pxr::TfToken("UsdPreviewSurface");
+    static const pxr::TfToken usdPrevSurfToken = pxr::TfToken("UsdPreviewSurface");
 
     auto BindMaterial = [&](MRayUSDPrimSurface& surface,
                             pxr::UsdShadeMaterial boundMaterial,

@@ -201,21 +201,6 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
             .data = std::move(tData),
             .textures = std::vector<Optional<TextureId>>()
         });
-
-        // list[i].dataType.SwitchCase([&](auto&& dataType)
-        // {
-        //     using T = std::remove_cvref_t<decltype(dataType)>::Type;
-        //     using enum AttributeTexturable;
-        //     auto initData = TexturedAttributeData
-        //     {
-        //         .data = TransientData(std::in_place_type_t<T>{},
-        //                               (texturability == MR_TEXTURE_ONLY)
-        //                                 ? 0
-        //                                 : totalCounts[i]),
-        //         .textures = std::vector<Optional<TextureId>>()
-        //     };
-        //     result.push_back(std::move(initData));
-        // });
     }
 
     // Now data is set we can load

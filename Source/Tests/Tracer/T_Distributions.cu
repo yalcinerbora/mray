@@ -14,11 +14,11 @@
 // Put it as a template for future tests (PwL maybe?)
 template<class Dist2D, bool DoUV>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCSampleDist(Span<SampleT<Vector2>> dOutSamples,
-                  Span<Float> dOutPdfs,
-                  Span<const Vector2> dRandomNumbers,
-                  Span<const Dist2D, 1> dDist,
-                  uint32_t sampleCount)
+void KCSampleDist(MRAY_GRID_CONSTANT const Span<SampleT<Vector2>> dOutSamples,
+                  MRAY_GRID_CONSTANT const Span<Float> dOutPdfs,
+                  MRAY_GRID_CONSTANT const Span<const Vector2> dRandomNumbers,
+                  MRAY_GRID_CONSTANT const Span<const Dist2D, 1> dDist,
+                  MRAY_GRID_CONSTANT const uint32_t sampleCount)
 {
     KernelCallParams kp;
     for(uint32_t i = kp.GlobalId(); i < sampleCount; i += kp.TotalSize())

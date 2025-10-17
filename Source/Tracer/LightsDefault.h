@@ -18,7 +18,7 @@ namespace LightDetail
     struct alignas(32) LightData
     {
         Span<const ParamVaryingData<2, Vector3>>    dRadiances;
-        Bitspan<const uint32_t>                     dIsTwoSidedFlags;
+        Span<const bool>                            dIsTwoSidedFlags;
     };
 
     struct alignas(32) LightSkysphereData
@@ -234,7 +234,7 @@ class LightGroupPrim : public GenericGroupLight<LightGroupPrim<PrimGroupT>>
     const PrimGroup&                    primGroup;
     Span<ParamVaryingData<2, Vector3>>  dRadiances;
     Span<Vector2ui>                     dPrimRanges;
-    Span<uint32_t>                      dIsTwoSidedFlags;
+    Span<bool>                          dIsTwoSidedFlags;
     DataSoA                             soa;
 
     public:

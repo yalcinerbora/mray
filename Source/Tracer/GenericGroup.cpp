@@ -387,6 +387,7 @@ MRAY_GENERIC_TEX_PUSH_ATTRIB_INST(, MediumKey, MediumAttributeInfo, 3);
 // ================== //
 //       LIGHT        //
 // ================== //
+MRAY_GENERIC_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, bool);
 //MRAY_GENERIC_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, Float);
 //MRAY_GENERIC_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, Vector2);
 //MRAY_GENERIC_PUSH_ATTRIB_INST(, LightKey, LightAttributeInfo, Vector3);

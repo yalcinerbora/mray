@@ -31,7 +31,7 @@ namespace MathConstants
 
 }
 
-#undef MRAY_PFC
+#undef MRAY_FPSC
 
 // TODO: Hopefully, these will be half and constexpr in future.
 #define MRAY_HALF_MAX 65504.0f

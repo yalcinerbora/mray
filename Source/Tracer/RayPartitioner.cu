@@ -49,15 +49,15 @@ void KCFindSplits(//Output
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCFindBinMatIds(// Output
-                     Span<CommonKey> gBinKeys,
+                     MRAY_GRID_CONSTANT const Span<CommonKey> gBinKeys,
                      // I-O
-                     Span<uint32_t> gBinRanges,
+                     MRAY_GRID_CONSTANT const Span<uint32_t> gBinRanges,
                      // Input
-                     Span<const uint32_t> gDenseSplitIndices,
-                     Span<const CommonKey> gSortedHitKeys,
-                     Span<const uint32_t, 1> gPartitionCount,
+                     MRAY_GRID_CONSTANT const Span<const uint32_t> gDenseSplitIndices,
+                     MRAY_GRID_CONSTANT const Span<const CommonKey> gSortedHitKeys,
+                     MRAY_GRID_CONSTANT const Span<const uint32_t, 1> gPartitionCount,
                      // Constants
-                     uint32_t totalRays)
+                     MRAY_GRID_CONSTANT const uint32_t totalRays)
 {
     KernelCallParams kp;
 

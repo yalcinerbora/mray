@@ -20,7 +20,8 @@ function(gen_tracer_test)
         ${CURRENT_SOURCE_DIR}/T_Distributions.cu
         ${CURRENT_SOURCE_DIR}/T_Materials.cu
         ${CURRENT_SOURCE_DIR}/T_StreamingTexture.cu
-        ${CURRENT_SOURCE_DIR}/T_RayCone.cu)
+        ${CURRENT_SOURCE_DIR}/T_RayCone.cu
+        ${CURRENT_SOURCE_DIR}/T_SpatialQuery.cu)
 
     source_group("" FILES ${SRC_COMMON})
 

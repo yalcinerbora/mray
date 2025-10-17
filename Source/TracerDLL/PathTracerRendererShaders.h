@@ -320,8 +320,8 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
         emission = l.EmitViaSurfacePoint(wO, position, rayCone);
     }
 
-    // Check the depth if we exceed it, do not accumulate
-    // we terminate the path regardless
+    // Check the depth if we exceed it, do not accumulate.
+    // We terminate the path regardless
     pathDataPack.depth += 1u;
     Vector2ui rrRange = params.globalState.russianRouletteRange;
     if(pathDataPack.depth <= rrRange[1])
