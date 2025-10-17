@@ -266,7 +266,8 @@ MR_PF_DECL
 Pair<Ray, Vector2> RayFromGMem(Span<const RayGMem> gRays, RayIndex index) noexcept
 {
     RayGMem rayGMem = gRays[index];
-    return Pair(Ray(rayGMem.dir, rayGMem.pos),
+    using RetT = Pair<Ray, Vector2>;
+    return RetT(Ray(rayGMem.dir, rayGMem.pos),
                 Vector2(rayGMem.tMin, rayGMem.tMax));
 }
 

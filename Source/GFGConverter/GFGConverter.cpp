@@ -334,7 +334,8 @@ void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
             // Positions
             static_assert(sizeof(Vector3) == sizeof(aiVector3D));
             static_assert(alignof(Vector3) == alignof(aiVector3D));
-            std::memcpy(positions.data(), meshIn->mVertices,
+            std::memcpy(static_cast<void*>(positions.data()),
+                        static_cast<const void*>(meshIn->mVertices),
                         vertexCount * sizeof(Vector3));
             // UVs
             static_assert(sizeof(Vector2) == sizeof(aiVector2D));
@@ -391,11 +392,14 @@ void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
             }
             else
             {
-                std::memcpy(normals.data(), meshIn->mNormals,
+                std::memcpy(static_cast<void*>(normals.data()),
+                            static_cast<const void*>(meshIn->mNormals),
                             vertexCount * sizeof(Vector3));
-                std::memcpy(tangents.data(), meshIn->mTangents,
+                std::memcpy(static_cast<void*>(tangents.data()),
+                            static_cast<const void*>(meshIn->mTangents),
                             vertexCount * sizeof(Vector3));
-                std::memcpy(bitangents.data(), meshIn->mBitangents,
+                std::memcpy(static_cast<void*>(bitangents.data()),
+                            static_cast<const void*>(meshIn->mBitangents),
                             vertexCount * sizeof(Vector3));
             }
 

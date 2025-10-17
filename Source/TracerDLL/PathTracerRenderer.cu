@@ -427,7 +427,8 @@ PathTracerRendererT<SC>::ReloadPaths(Span<const RayIndex> dIndices,
     }
     // Index buffer may be invalidated (Binary partition should not
     // invalidate but lets return the new buffer)
-    return Pair(dDeadAliveRayIndices, aliveRayCount);
+    using RetT = Pair<Span<RayIndex>, uint32_t>;
+    return RetT(dDeadAliveRayIndices, aliveRayCount);
 }
 
 template<SpectrumContextC SC>

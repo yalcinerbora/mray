@@ -29,10 +29,13 @@ struct Pair : public std::pair<First, Second>
     using Base::Base;
 };
 
+#ifndef MRAY_GCC
+
 template<class F, class S>
 Pair(F&&, S&&) -> Pair<std::remove_cvref_t<F>,
                        std::remove_cvref_t<S>>;
 
+#endif
 
 // TODO: reference_wrapper<T> vs. span<T,1> which is better?
 template <class T>

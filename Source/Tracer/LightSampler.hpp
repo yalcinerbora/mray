@@ -5,13 +5,14 @@
 MR_HF_DEF
 Pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) const
 {
+    using RetT = Pair<Ray, Vector2>;
     Vector3 dir = Math::Normalize(position - distantPoint);
     // Nudge the position back here, this will be used
     // for visibility check
     // TODO: Bad usage of API, constructing a ray to nudge a position
     Vector3 pos = Ray(Vector3::Zero(), position).Nudge(-dir).Pos();
     Float length = Math::Length(pos - distantPoint);
-    return Pair(Ray(dir, distantPoint), Vector2(0, length * 0.999f));
+    return RetT(Ray(dir, distantPoint), Vector2(0, length * 0.999f));
 }
 
 template<class ML>

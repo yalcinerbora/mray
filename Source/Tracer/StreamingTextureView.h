@@ -446,7 +446,7 @@ TextureStreamingContext::CalculatePhysicalUVsLod(const VirtualTexInfo&,
                                                  PhysicalTileId,
                                                  Vector2 uv, Float lod)
 {
-    return Pair{uv, lod};
+    return Pair<Vector2, Float>{uv, lod};
 }
 
 MR_HF_DEF constexpr

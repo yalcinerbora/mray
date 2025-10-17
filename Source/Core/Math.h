@@ -1391,8 +1391,9 @@ MR_PF_DEF auto ModF(T x) noexcept -> std::array<T, 2>
 template<FloatC T>
 MR_PF_DEF auto ModFInt(T x) noexcept -> Pair<IntegralSister<T>, T>
 {
+    using ReturnT = Pair<IntegralSister<T>, T>;
     const auto& [i, f] = ModF(x);
-    return Pair(static_cast<IntegralSister<T>>(i), T(f));
+    return ReturnT(static_cast<IntegralSister<T>>(i), T(f));
 }
 
 template<FloatC T>

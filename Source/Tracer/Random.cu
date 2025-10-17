@@ -326,7 +326,7 @@ uint64_t ZSobolDetail::ZSobol::SampleIndex(uint32_t dimension) const
         uint32_t digit = (mortonIndex >> digitShift) & 0b11u;
 
         uint64_t higherDigits = mortonIndex >> (digitShift + 2u);
-        uint32_t p = (MixBits(higherDigits ^ dimMixer) >> 24u) % 24u;
+        uint32_t p = uint32_t((MixBits(higherDigits ^ dimMixer) >> 24u) % 24u);
 
         digit = GetPermutation(p, digit);
         sampleIndex |= uint64_t(digit) << digitShift;
