@@ -33,24 +33,6 @@ static void KCInitPathState(MRAY_GRID_CONSTANT const PathTraceRDetail::RayState 
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-static void KCCopyRays(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
-                       MRAY_GRID_CONSTANT const Span<RayCone> dRayDiffOut,
-                       MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
-                       MRAY_GRID_CONSTANT const Span<const RayGMem> dRaysIn,
-                       MRAY_GRID_CONSTANT const Span<const RayCone> dRayDiffIn)
-{
-    using namespace PathTraceRDetail;
-    KernelCallParams kp;
-    uint32_t pathCount = static_cast<uint32_t>(dIndices.size());
-    for(uint32_t i = kp.GlobalId(); i < pathCount; i += kp.TotalSize())
-    {
-        RayIndex index = dIndices[i];
-        dRaysOut[index] = dRaysIn[index];
-        dRayDiffOut[index] = dRayDiffIn[index];
-    }
-}
-
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static void KCWriteInvalidRays(MRAY_GRID_CONSTANT const Span<PathTraceRDetail::PathDataPack> dPathDataPack,
                                MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
                                MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices)
@@ -175,7 +157,7 @@ PathTracerRendererT<SC>::PathTracerRendererT(const RenderImagePtr& rb,
                                              ThreadPool& tp,
                                              const GPUSystem& s,
                                              const RenderWorkPack& wp)
-    : Base(rb, wp, tv, s, tp)
+    : RendererBase(rb, wp, tv, s, tp, TypeName())
     , metaLightArray(s)
     , rayPartitioner(s)
     , rendererGlobalMem(s.AllGPUs(), 128_MiB, 512_MiB)
@@ -253,7 +235,7 @@ template<SpectrumContextC SC>
 uint32_t PathTracerRendererT<SC>::FindMaxSamplePerIteration(uint32_t rayCount,
                                                             PathTraceRDetail::SampleMode sampleMode)
 {
-    uint32_t camSample = (*curCamWork)->StochasticFilterSampleRayRNList().TotalRNCount();
+    uint32_t camSample = curCamWork->StochasticFilterSampleRayRNList().TotalRNCount();
     uint32_t spectrumSample = isSpectral
                 ? spectrumContext->SampleSpectrumRNList().TotalRNCount()
                 : 0u;
@@ -315,7 +297,7 @@ PathTracerRendererT<SC>::ReloadPaths(Span<const RayIndex> dIndices,
     processQueue.Barrier().Wait();
 
     // Generate RN for camera rays
-    RNRequestList camSampleRNList = (*curCamWork)->StochasticFilterSampleRayRNList();
+    RNRequestList camSampleRNList = curCamWork->StochasticFilterSampleRayRNList();
     uint32_t camSamplePerRay = camSampleRNList.TotalRNCount();
     uint32_t deadRayCount = hDeadRayRanges[2] - hDeadRayRanges[1];
     auto dDeadRayIndices = dDeadAliveRayIndices.subspan(hDeadRayRanges[1],
@@ -344,7 +326,7 @@ PathTracerRendererT<SC>::ReloadPaths(Span<const RayIndex> dIndices,
                                                  0, camSampleRNList,
                                                  processQueue);
             //
-            const auto& cameraWork = (*curCamWork->get());
+            const auto& cameraWork = *curCamWork;
             cameraWork.GenRaysStochasticFilter
             (
                 dRayCones, dRays,
@@ -533,7 +515,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
             .specContextData = spectrumContext->GetData()
         };
 
-        this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
+        this->IssueWorkKernelsToPartitions<This>(workHasher, partitionOutput,
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t partitionSize)
         {
@@ -602,7 +584,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         // CUDA Init check error, we access the rays even if it is not written
         processQueue.MemsetAsync(dRayState.dOutRays, 0x00);
         // Do the NEE kernel + boundary work
-        this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
+        this->IssueWorkKernelsToPartitions<This>(workHasher, partitionOutput,
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t partitionSize)
         {
@@ -658,7 +640,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         );
 
         // Do the actual kernel
-        this->IssueWorkKernelsToPartitions(workHasher, partitionOutput,
+        this->IssueWorkKernelsToPartitions<This>(workHasher, partitionOutput,
         [&](const auto& workI, Span<uint32_t> dLocalIndices,
             uint32_t, uint32_t partitionSize)
         {
@@ -694,7 +676,7 @@ PathTracerRendererT<SC>::DoThroughputSingleTileRender(const GPUDevice& device,
                                                       const GPUQueue& processQueue)
 {
     Timer timer; timer.Start();
-    const auto& cameraWork = (*curCamWork->get());
+    const auto& cameraWork = *curCamWork;
     // Generate subcamera of this specific tile
     if(this->totalIterationCount == 0)
     {
@@ -846,7 +828,7 @@ PathTracerRendererT<SC>::DoLatencyRender(uint32_t passCount,
 
     Timer timer; timer.Start();
     // Generate subcamera of this specific tile
-    const auto& cameraWork = (*curCamWork->get());
+    const auto& cameraWork = *curCamWork;
     cameraWork.GenerateSubCamera
     (
         dSubCameraBuffer,
@@ -1090,7 +1072,8 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                     pack.tgId == transGroupId);
         }
     );
-    curCamWork = &packLoc->workPtr;
+    assert(packLoc != this->currentCameraWorks.cend());
+    curCamWork = packLoc->workPtr.get();
 
     // Allocate the ray state buffers
     const GPUQueue& queue = this->gpuSystem.BestDevice().GetComputeQueue(0);
@@ -1125,7 +1108,7 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                                      wavelengthCount, wavelengthCount,
                                      maxRayCount, maxSampleCount,
                                      totalWorkCount, totalWorkCount,
-                                     Base::SUB_CAMERA_BUFFER_SIZE});
+                                     RendererBase::SUB_CAMERA_BUFFER_SIZE});
     }
     else
     {
@@ -1159,7 +1142,8 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                                      wavelengthCount, wavelengthCount,
                                      maxRayCount, isVisibleIntCount,
                                      maxSampleCount, totalWorkCount,
-                                     totalWorkCount, Base::SUB_CAMERA_BUFFER_SIZE});
+                                     totalWorkCount,
+                                    RendererBase::SUB_CAMERA_BUFFER_SIZE});
         MetaLightListConstructionParams mlParams =
         {
             .lightGroups = this->tracerView.lightGroups,

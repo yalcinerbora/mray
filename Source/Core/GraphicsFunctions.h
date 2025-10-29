@@ -324,7 +324,7 @@ Vector2 DirectionToConcentricOctahedral(const Vector3& dir)
     Float atanIn = yAbs / xAbs;
     Float phiPrime = Math::ArcTan(atanIn);
 
-    Float radius = Math::Sqrt(Float{1} - Math::Abs(dir[2]));
+    Float radius = Math::SqrtMax(Float{1} - Math::Abs(dir[2]));
 
     Float v = radius * TwoOvrPi * phiPrime;
     Float u = radius - v;

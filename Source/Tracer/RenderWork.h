@@ -103,6 +103,68 @@ using RenderCameraWorkParamsR = RenderCameraWorkParams
     CG, TG
 >;
 
+// Helper Macros for Work Generation
+// for Renderers.
+#define MRAY_WORK_FUNCTOR_DEFINE_TYPES(PG_TYPE, MG_TYPE, TG_TYPE, SPEC_CTX, TPW) \
+    static constexpr uint32_t THREAD_PER_WORK = TPW;                             \
+    using PG            = PG_TYPE;                                               \
+    using MG            = MG_TYPE;                                               \
+    using TG            = TG_TYPE;                                               \
+    using SpectrumCtx   = SPEC_CTX;                                              \
+    using SpectrumConv  = typename SpectrumCtx::Converter;                       \
+    using TContext      = typename PrimTransformContextType<PG, TG>::Result;     \
+    using Material      = typename MG::template Material<SpectrumCtx>;           \
+    using Primitive     = typename PG::template Primitive<TContext>;             \
+    using Surface       = typename Material::Surface;                            \
+    static_assert(Bit::PopC(TPW) == 1u && TPW <= 32,                             \
+                  "Thread per renderer work must be power of 2 and "             \
+                  "at most 32!")
+
+#define MRAY_LIGHT_WORK_FUNCTOR_DEFINE_TYPES(LG_TYPE, TG_TYPE, SPEC_CTX, TPW)   \
+    static constexpr uint32_t THREAD_PER_WORK = TPW;                            \
+    using LG            = LG_TYPE;                                              \
+    using TG            = TG_TYPE;                                              \
+    using SpectrumCtx   = SPEC_CTX;                                             \
+    using SpectrumConv  = typename SpectrumCtx::Converter;                      \
+    using PG            = typename LG::PrimGroup;                               \
+    using TContext      = typename PrimTransformContextType<PG, TG>::Result;    \
+    using Light         = typename LG::template Light<TContext, SpectrumCtx>;   \
+    using Primitive     = typename PG::template Primitive<TContext>;            \
+    static_assert(Bit::PopC(TPW) == 1u && TPW <= 32,                            \
+                  "Thread per renderer work must be power of 2 and "            \
+                  "at most 32!")
+
+// TODO: Implement these later
+template<class T>
+concept WorkFuncC = requires()
+{
+    typename T::PG;
+    typename T::Params;
+};
+
+template<class T>
+concept LightWorkFuncC = requires()
+{
+    typename T::LG;
+    typename T::Params;
+};
+
+template<class T>
+concept CamWorkFuncC = requires()
+{
+    true;
+};
+
+template<RendererC R, class WorkFunc>
+constexpr auto AcquireSpectrumConverterGenerator()
+{
+    using Params = typename WorkFunc::Params;
+    constexpr auto Func = R::template GenSpectrumConverter<Params>;
+    return Func;
+}
+#define MRAY_REND_SPECGEN_FUNCTION(R, WF)      \
+    AcquireSpectrumConverterGenerator<R, WF>()
+
 template<RendererC R, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG>
 class RenderWork : public RenderWorkT<R>
@@ -211,6 +273,13 @@ class RenderCameraWork : public RenderCameraWorkT<R>
                               Vector2ui stratumIndex,
                               Vector2ui stratumCount,
                               const GPUQueue& queue) const override;
+    void    GenCameraPosition(// Output
+                              const Span<Vector3, 1>& dCamPosOut,
+                              // Input
+                              Span<const Byte> dCamBuffer,
+                              TransformKey transKey,
+                              // Constants
+                              const GPUQueue& queue) const override;
 
     void    GenerateRays(// Output
                          const Span<RayCone>& dRayDiffsOut,
@@ -249,24 +318,19 @@ class RenderCameraWork : public RenderCameraWorkT<R>
     RNRequestList       StochasticFilterSampleRayRNList() const override;
 };
 
-template<RendererC R, uint32_t I, PrimitiveGroupC PG,
-         MaterialGroupC MG, TransformGroupC TG,
-         auto WorkFunction,
-         auto GenerateTransformContext = MRAY_PRIM_TGEN_FUNCTION(PG, TG)>
+template<WorkFuncC WorkFunction,
+         auto GenSpectrumConverter, auto GenerateTransformContext>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG, TG> params);
+void KCRenderWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params params);
 
-template<RendererC R, uint32_t I, LightGroupC LG, TransformGroupC TG,
-         auto WorkFunction,
-         auto GenerateTransformContext = MRAY_PRIM_TGEN_FUNCTION(typename LG::PrimGroup, TG)>
+template<LightWorkFuncC WorkFunction,
+         auto GenSpectrumConverter, auto GenerateTransformContext>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParamsR<R, I, LG, TG> params);
+void KCRenderLightWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params params);
 
-template<RendererC R, uint32_t I, PrimitiveGroupC PG,
-         CameraGroupC CG, TransformGroupC TG,
-         auto WorkFunction>
+template<CamWorkFuncC WorkFunction>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCRenderCameraWork(MRAY_GRID_CONSTANT const RenderCameraWorkParamsR<R, I, CG, TG> params);
+void KCRenderCameraWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params params);
 
 template<RendererC R, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG>
@@ -310,13 +374,8 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
                                                const GPUQueue& queue) const
 {
     // Please check the kernel for details
-    using TC = typename PrimTransformContextType<PG, TG>::Result;
-    using M = typename MG:: template Material<typename R::SpectrumContext>;
-    using P = typename PG:: template Primitive<TC>;
-    using S = typename M::Surface;
-    static constexpr auto WF = R::template WorkFunctions<P, M, S, TC, PG, MG, TG>;
-
-    if constexpr(I >= WF.TypeCount)
+    using WFList = R::template WorkFunctions<PG, MG, TG>;
+    if constexpr(I >= WFList::TypeCount)
     {
         throw MRayError("[{}]: Runtime call to \"DoWork_{}\" which does not have a kernel "
                         "associated with it!", R::TypeName(), I);
@@ -324,9 +383,9 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
     else
     {
         using GlobalState = RenderGlobalState<R, I>;
-        using RayState = RenderRayState<R, I>;
-
-        const RenderWorkParams<GlobalState, RayState, PG, MG, TG> params =
+        using RayState    = RenderRayState<R, I>;
+        using RWParams    = RenderWorkParams<GlobalState, RayState, PG, MG, TG>;
+        const RWParams params =
         {
             .rayState = dRayStates,
             .in =
@@ -347,8 +406,15 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
         uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
         using namespace std::string_literals;
         static const std::string KernelName = std::string(TypeName()) + "-Work"s;
-        static constexpr auto WorkFunc = get<I>(WF);
-        static constexpr auto Kernel = KCRenderWork<R, I, PG, MG, TG, WorkFunc>;
+        using WF = TypePackElement<I, WFList>;
+        static_assert(std::is_same_v<RWParams, typename WF::Params>,
+                      "WorkFunction's ParamType does not match the renderer's param type!");
+        static constexpr auto Kernel = KCRenderWork
+        <
+            WF,
+            MRAY_REND_SPECGEN_FUNCTION(R, WF),
+            MRAY_PRIM_TGEN_FUNCTION(PG, TG)
+        >;
         queue.IssueWorkKernel<Kernel>
         (
             KernelName,
@@ -407,24 +473,19 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
                                                         const RenderGlobalState<R, I>& globalState,
                                                         const GPUQueue& queue) const
 {
-    // Please check the kernel for details
-    using PG    = typename LG::PrimGroup;
-    using TC    = typename PrimTransformContextType<PG, TG>::Result;
-    using L     = typename LG::template Light<TC, typename R::SpectrumContext>;
-    static constexpr auto WF = R:: template LightWorkFunctions<L, LG, TG>;
-
-    if constexpr(I >= WF.TypeCount)
+    using WFList = R:: template LightWorkFunctions<LG, TG>;
+    if constexpr(I >= WFList::TypeCount)
     {
         throw MRayError("[{}]: Runtime call to \"DoBoundaryWork_{}\" which does not have a kernel "
                         "associated with it!", R::TypeName(), I);
     }
     else
     {
+        const auto& pg    = lg.PrimitiveGroup();
         using GlobalState = RenderGlobalState<R, I>;
-        using RayState = RenderRayState<R, I>;
-
-        const auto& pg = lg.PrimitiveGroup();
-        const RenderLightWorkParams<GlobalState, RayState, LG, TG> params =
+        using RayState    = RenderRayState<R, I>;
+        using RWParams    = RenderLightWorkParams<GlobalState, RayState, LG, TG>;
+        const RWParams params =
         {
             .rayState = dRayStates,
             .in =
@@ -445,8 +506,15 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
         uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
         using namespace std::string_literals;
         static const std::string KernelName = std::string(TypeName()) + "-BoundaryWork"s;
-        static constexpr auto WorkFunc = get<I>(WF);
-        static constexpr auto Kernel = KCRenderLightWork<R, I, LG, TG, WorkFunc>;
+        using WF = TypePackElement<I, WFList>;
+        static_assert(std::is_same_v<RWParams, typename WF::Params>,
+                      "WorkFunction's ParamType does not match the renderer's param type!");
+        static constexpr auto Kernel = KCRenderLightWork
+        <
+            WF,
+            MRAY_REND_SPECGEN_FUNCTION(R, WF),
+            MRAY_PRIM_TGEN_FUNCTION(typename LG::PrimGroup, TG)
+        >;
         queue.IssueWorkKernel<Kernel>
         (
             TypeName(),
@@ -635,6 +703,38 @@ void RenderCameraWork<R, C, T>::GenRaysStochasticFilter(// Output
                         LaunchKernel(MitchellNetravaliFilter(filterRadius)); break;
         default: throw MRayError("Unkown filter type!");
     }
+}
+
+
+template<RendererC R, CameraGroupC C, TransformGroupC T>
+void RenderCameraWork<R, C, T>::GenCameraPosition(// Output
+                                                  const Span<Vector3, 1>& dCamPosOut,
+                                                  // Input
+                                                  Span<const Byte> dCamBuffer,
+                                                  TransformKey transKey,
+                                                  // Constants
+                                                  const GPUQueue& queue) const
+{
+    using Camera = typename C::Camera;
+    assert(sizeof(Camera) <= dCamBuffer.size_bytes());
+    assert(uintptr_t(dCamBuffer.data()) % alignof(Camera) == 0);
+    const Camera* dCamera = reinterpret_cast<const Camera*>(dCamBuffer.data());
+
+    static constexpr auto Kernel = KCGenerateCameraPosition<Camera, T>;
+    using namespace std::string_literals;
+    static const std::string KernelName = std::string(TypeName()) + "-GenCamPos"s;
+
+    queue.IssueWorkKernel<Kernel>
+    (
+        KernelName,
+        DeviceWorkIssueParams{.workCount = 1},
+        // Out
+        dCamPosOut,
+        // In
+        dCamera,
+        transKey,
+        tg.SoA()
+    );
 }
 
 template<RendererC R, CameraGroupC C, TransformGroupC T>

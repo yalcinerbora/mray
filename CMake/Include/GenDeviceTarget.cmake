@@ -29,7 +29,8 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/CUDA/GPUSystemCUDA.hpp
         ${CURRENT_SOURCE_DIR}/CUDA/GPUSystemCUDA.cpp
         ${CURRENT_SOURCE_DIR}/CUDA/DefinitionsCUDA.h
-        ${CURRENT_SOURCE_DIR}/CUDA/GPUAtomicCUDA.h)
+        ${CURRENT_SOURCE_DIR}/CUDA/GPUAtomicCUDA.h
+        ${CURRENT_SOURCE_DIR}/CUDA/GPUWarpCUDA.h)
 
     set(SRC_CUDA_ALGS
         ${CURRENT_SOURCE_DIR}/CUDA/AlgForwardCUDA.h
@@ -55,7 +56,8 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/HIP/GPUSystemHIP.hpp
         ${CURRENT_SOURCE_DIR}/HIP/GPUSystemHIP.cpp
         ${CURRENT_SOURCE_DIR}/HIP/DefinitionsHIP.h
-        ${CURRENT_SOURCE_DIR}/HIP/GPUAtomicHIP.h)
+        ${CURRENT_SOURCE_DIR}/HIP/GPUAtomicHIP.h
+        ${CURRENT_SOURCE_DIR}/HIP/GPUWarpHIP.h)
 
     set(SRC_HIP_ALGS
         ${CURRENT_SOURCE_DIR}/HIP/AlgForwardHIP.h
@@ -81,7 +83,8 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/CPU/GPUSystemCPU.hpp
         ${CURRENT_SOURCE_DIR}/CPU/GPUSystemCPU.cpp
         ${CURRENT_SOURCE_DIR}/CPU/DefinitionsCPU.h
-        ${CURRENT_SOURCE_DIR}/CPU/GPUAtomicCPU.h)
+        ${CURRENT_SOURCE_DIR}/CPU/GPUAtomicCPU.h
+        ${CURRENT_SOURCE_DIR}/CPU/GPUWarpCPU.h)
 
     set(SRC_CPU_ALGS
         ${CURRENT_SOURCE_DIR}/CPU/AlgForwardCPU.h
@@ -104,7 +107,8 @@ function(gen_device_target)
         ${CURRENT_SOURCE_DIR}/GPUSystem.hpp
         ${CURRENT_SOURCE_DIR}/GPUDebug.h
         ${CURRENT_SOURCE_DIR}/GPUTypes.h
-        ${CURRENT_SOURCE_DIR}/GPUAtomic.h)
+        ${CURRENT_SOURCE_DIR}/GPUAtomic.h
+        ${CURRENT_SOURCE_DIR}/GPUWarp.h)
 
     set(SRC_ALGS
         ${CURRENT_SOURCE_DIR}/GPUAlgForward.h

@@ -294,7 +294,7 @@ class GPUQueueCUDA
 
     // Split the device side kernel calls. glibc++ span has
     // explicitly defined defaulted destructor and NVCC errors
-    // because of that even if we dont call the kernel from the
+    // because of that even if we don't call the kernel from the
     // device.
     template<auto Kernel, class... Args>
     MR_GF_DECL void DeviceIssueWorkKernel(std::string_view name,

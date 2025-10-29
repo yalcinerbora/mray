@@ -24,9 +24,15 @@ void KCSetBoundaryWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<HitKeyPack> dWo
                                    MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
                                    MRAY_GRID_CONSTANT const HitKeyPack boundaryWorkKey);
 
-template <class C>
-template<class WorkF, class LightWorkF, class CamWorkF>
-void RendererT<C>::IssueWorkKernelsToPartitions(const RenderWorkHasher& workHasher,
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCCopyRays(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
+                MRAY_GRID_CONSTANT const Span<RayCone> dRayDiffOut,
+                MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
+                MRAY_GRID_CONSTANT const Span<const RayGMem> dRaysIn,
+                MRAY_GRID_CONSTANT const Span<const RayCone> dRayDiffIn);
+
+template<class Renderer, class WorkF, class LightWorkF, class CamWorkF>
+void RendererBase::IssueWorkKernelsToPartitions(const RenderWorkHasher& workHasher,
                                                 const MultiPartitionOutput& p,
                                                 WorkF&& WF, LightWorkF&& LWF,
                                                 CamWorkF&&) const
@@ -58,15 +64,15 @@ void RendererT<C>::IssueWorkKernelsToPartitions(const RenderWorkHasher& workHash
         });
         if(wLoc != this->currentWorks.cend())
         {
-            const auto& workPtr = *wLoc->workPtr.get();
+            const auto& workPtr = UpcastRenderWork<Renderer>(wLoc->workPtr);
             WF(workPtr, dLocalIndices, partitionStart, partitionSize);
         }
         else if(lightWLoc != this->currentLightWorks.cend())
         {
-            const auto& workPtr = *lightWLoc->workPtr.get();
+            const auto& workPtr = UpcastRenderLightWork<Renderer>(lightWLoc->workPtr);
             LWF(workPtr, dLocalIndices, partitionStart, partitionSize);
         }
         else throw MRayError("[{}]: Unkown work id is found ({}).",
-                             C::TypeName(), key);
+                             rendererName, key);
     }
 }

@@ -286,7 +286,7 @@ TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
                                  ThreadPool& tp,
                                  const GPUSystem& s,
                                  const RenderWorkPack& wp)
-    : RendererT(rb, wp, tv, s, tp)
+    : RendererBase(rb, wp, tv, s, tp, TypeName())
     , saveImage(true)
     , spectrumMem(gpuSystem.AllGPUs(), 4_MiB, 32_MiB, true)
 {

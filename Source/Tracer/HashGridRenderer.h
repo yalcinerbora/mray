@@ -2,99 +2,111 @@
 
 #include "RendererC.h"
 #include "SpectrumC.h"
+#include "Random.h"
+#include "RenderWork.h"
+#include "HashGrid.h"
 #include "RayPartitioner.h"
-#include "SurfaceRendererShaders.h"
 
-class SurfaceRenderer final : public RendererBase
+#include "Core/BitFunctions.h"
+#include "Core/ColorFunctions.h"
+
+#include "HashGridRendererShaders.h"
+
+class HashGridRenderer final : public RendererBase
 {
-    using FilmFilterPtr = std::unique_ptr<TextureFilterI>;
-    using Options = SurfRDetail::Options;
-
     public:
     static std::string_view TypeName();
     static AttribInfoList StaticAttributeInfo();
-    //
-    using SpectrumContext = SpectrumContextIdentity;
-    // Work States
-    using GlobalStateList   = TypePack<SurfRDetail::GlobalState, SurfRDetail::GlobalState>;
-    using RayStateList      = TypePack<SurfRDetail::RayStateCommon, SurfRDetail::RayStateAO>;
-    using RayStateCommon    = TypePackElement<0, RayStateList>;
-    using RayStateAO        = TypePackElement<1, RayStateList>;
-    // Work Functions
+
+    using RayState          = HashGridRDetail::RayState;
+    using GlobalState       = HashGridRDetail::GlobalState;
+    using GlobalStateList   = TypePack<GlobalState>;
+    using RayStateList      = TypePack<RayState>;
+    using SpectrumContext   = SpectrumContextIdentity;
+
     template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     using WorkFunctions = TypePack
     <
-        SurfRDetail::WorkFunctionCommon<PG, MG, TG>,
-        SurfRDetail::WorkFunctionFurnaceOrAO<PG, MG, TG>
+        HashGridRDetail::BounceWork<PG, MG, TG>
     >;
 
     template<LightGroupC LG, TransformGroupC TG>
     using LightWorkFunctions = TypePack
     <
-        SurfRDetail::LightWorkFunctionCommon<LG, TG>
+        HashGridRDetail::LightBounceWork<LG, TG>
     >;
 
-    template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
+    template<CameraGroupC CG, TransformGroupC TG>
     using CamWorkFunctions = TypePack<>;
 
-    // Spectrum Converter Generator
     template<class RenderWorkParams>
     MR_HF_DECL
     static SpectrumConverterIdentity GenSpectrumConverter(const RenderWorkParams&, RayIndex);
 
+    struct Options
+    {
+        uint32_t cacheEntryLimit   = 3'000'000;
+        uint32_t cachePosBits      = 12;
+        uint32_t cacheNormalBits   = 2;
+        uint32_t cacheLevelCount   = 4;
+        Float    cacheConeAperture = Float(0.6);
+        //
+        uint32_t pathTraceDepth    = 3;
+    };
 
     private:
     Options     currentOptions  = {};
     Options     newOptions      = {};
+    // State
+    uint32_t    curPosBits    = 0;
+    uint32_t    curNormalBits = 0;
     //
-    SurfRDetail::Mode::E        anchorMode;
-    FilmFilterPtr               filmFilter;
-    RenderWorkHasher            workHasher;
-    //
+    bool        saveImage;
+    // Camera stuff
     Optional<CameraTransform>   curCamTransformOverride;
     CameraSurfaceParams         curCamSurfaceParams;
     TransformKey                curCamTransformKey;
     CameraKey                   curCamKey;
     const RenderCameraWorkI*    curCamWork;
-    std::vector<uint64_t>       tilePathCounts;
-    Float                       curTMaxAO = std::numeric_limits<Float>::max();
-    //
+    // Renderer Systems and Memory
+    HashGrid            hashGrid;
     RayPartitioner      rayPartitioner;
     RNGeneratorPtr      rnGenerator;
+    RenderWorkHasher    workHasher;
     //
     DeviceMemory        rendererGlobalMem;
     Span<MetaHit>       dHits;
     Span<HitKeyPack>    dHitKeys;
     Span<RayGMem>       dRays;
     Span<RayCone>       dRayCones;
-    RayStateCommon      dRayStateCommon;
-    RayStateAO          dRayStateAO;
-
-    Span<uint32_t>      dIsVisibleBuffer;
     Span<RandomNumber>  dRandomNumBuffer;
     Span<Byte>          dSubCameraBuffer;
-
+    Span<uint16_t>      dPathRNGDimensions;
+    RayState            dRayState;
     // Work Hash related
     Span<CommonKey>     dWorkHashes;
     Span<CommonKey>     dWorkBatchIds;
-    //
-    bool                saveImage;
+    // For hash grid, cam position buffer
+    Span<Vector3>       dCamPosBuffer;
 
-    uint32_t    FindMaxSamplePerIteration(uint32_t rayCount,
-                                          SurfRDetail::Mode::E,
-                                          bool doStochasticFilter);
+    uint32_t    FindMaxSamplePerIteration(uint32_t maxRayCount);
+    void        PathTraceAndQuery();
+    bool        CopyAliveRays(uint32_t rayCount, uint32_t maxWorkCount,
+                              const GPUQueue& processQueue);
 
     public:
     // Constructors & Destructor
-                        SurfaceRenderer(const RenderImagePtr&,
-                                        TracerView,
-                                        ThreadPool&,
-                                        const GPUSystem&,
-                                        const RenderWorkPack&);
-                        SurfaceRenderer(const SurfaceRenderer&) = delete;
-                        SurfaceRenderer(SurfaceRenderer&&) = delete;
-    SurfaceRenderer&    operator=(const SurfaceRenderer&) = delete;
-    SurfaceRenderer&    operator=(SurfaceRenderer&&) = delete;
+    using This = HashGridRenderer;
+            HashGridRenderer(const RenderImagePtr&,
+                             TracerView,
+                             ThreadPool&,
+                             const GPUSystem&,
+                             const RenderWorkPack&);
+            HashGridRenderer(const This&) = delete;
+            HashGridRenderer(This&&) = delete;
+    This&   operator=(const This&) = delete;
+    This&   operator=(This&&) = delete;
+
     //
     AttribInfoList      AttributeInfo() const override;
     RendererOptionPack  CurrentAttributes() const override;
@@ -111,12 +123,11 @@ class SurfaceRenderer final : public RendererBase
     size_t              GPUMemoryUsage() const override;
 };
 
-static_assert(RendererC<SurfaceRenderer>, "\"SurfaceRenderer\" does not "
+static_assert(RendererC<HashGridRenderer>, "\"HashGridRenderer\" does not "
               "satisfy renderer concept.");
 
-
 template<RendererC R, PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-class SurfaceRenderWork : public RenderWork<R, PG, MG, TG>
+class HashGridRenderWork : public RenderWork<R, PG, MG, TG>
 {
     using Base = RenderWork<R, PG, MG, TG>;
 
@@ -125,23 +136,23 @@ class SurfaceRenderWork : public RenderWork<R, PG, MG, TG>
 
     RNRequestList SampleRNList(uint32_t workIndex) const override
     {
-        constexpr RNRequestList matSampleList = MG::template Material<>::SampleRNList;
-        if(workIndex == 1)
-            return matSampleList;
-        return RNRequestList();
+        static constexpr auto matSampleList = MG::template Material<>::SampleRNList;
+        //
+        if(workIndex == 0) return matSampleList;
+        else               return RNRequestList();
     }
 };
 
 template<RendererC R, LightGroupC LG, TransformGroupC TG>
-using SurfaceRenderLightWork = RenderLightWork<R, LG, TG>;
+using HashGridRenderLightWork = RenderLightWork<R, LG, TG>;
 
 template<RendererC R, CameraGroupC CG, TransformGroupC TG>
-using SurfaceRenderCamWork = RenderCameraWork<R, CG, TG>;
+using HashGridRenderCamWork = RenderCameraWork<R, CG, TG>;
 
 template <class RenderWorkParams>
 MR_HF_DEF
 SpectrumConverterIdentity
-SurfaceRenderer::GenSpectrumConverter(const RenderWorkParams&, RayIndex)
+HashGridRenderer::GenSpectrumConverter(const RenderWorkParams&, RayIndex)
 {
     return SpectrumConverterIdentity();
 }

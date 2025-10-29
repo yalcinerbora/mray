@@ -9,52 +9,92 @@ namespace Distribution::GaussLobe
 {
     // A gaussian lobe (aka. vMF distribution) in two dimension.
     // with anisotrophy (we can fit 1 word here)
-    struct GaussLobeBaseParams
+    struct GaussLobeDirParams
     {
         SNorm2x16   dirCoOcta; // CoOcta coordinates of the normal vector
-        Float       kappa;     // "girth" of the lobe
+                               // over unit sphere
     };
 
-    struct GaussLobeAnisoParams
+    struct GaussLobeMeanParams
     {
-        // Disney's principaled BxDF style aniso.
-        // Rotation of the aniso disk between [0-180) (in radians)
-        UNorm2x16   anisoAndRotation;
+        static constexpr uint32_t   KAPPA_MAX = 1024;
+        static constexpr Float      KAPPA_DELTA = Float(KAPPA_MAX) / UNorm2x16::Max();
+        // [0, 1024] UNorm16 value;
+        uint16_t    kappa;
     };
 
+    // TODO: We may further compress this in log scale maybe
+    // since these will be pdf most of the time.
     struct GaussLobeScaleParams
     {
-        // Single channel data only overall Luminance
+        // Single channel data only overall Luminance maybe (for PG)
         // depending on the situation, this struct may be multi
         // channle or multi-spectra. (Unlikely since this means extra memory
-        Float luminance;
+        Float scale;
     };
 
-    using GaussLobeSoA = SoASpan<GaussLobeBaseParams,
-                                 GaussLobeAnisoParams,
+    // TODO: Add anisotrophy to the system.
+    // Multiplying aniso with another aniso distribution
+    // is not straightforward. So it is shelved for now.
+    struct GaussLobeAnisoParams
+    {
+        // Disney's principaled BxDF style aniso
+        // (at least this is inspired from it).
+        //
+        // "beta" is Kent Distribution "beta" (Kent Distribution is
+        // Aniso of GaussLobe aka. vMF)
+        // Constraint:
+        //   0 <= "beta" < UNorm * (kappa / 2)
+        //
+        // Rotation of the aniso disk between [0-180) (in radians)
+        // Aniso basis will be deterministic
+        // Not final but we rotate x_y basis with this rotation than
+        // align Z with the "dir" param.
+        UNorm2x16   betaAndRotation;
+    };
+
+    static constexpr auto DIR_INDEX   = 0;
+    static constexpr auto MEAN_INDEX  = 1;
+    static constexpr auto SCALE_INDEX = 2;
+    using GaussLobeSoA = SoASpan<GaussLobeDirParams,
+                                 GaussLobeMeanParams,
                                  GaussLobeScaleParams>;
+    using LobeMixtureSizeT = uint8_t;
 
     struct GaussianLobe
     {
         Vector3 dir;
         Float   kappa;
-        Float   value;
+        Float   alpha;
 
-        GaussianLobe() = default;
+        static constexpr Float MIN_K = MathConstants::LargeEpsilon<Float>();
+        static constexpr Float MAX_K = Float(1) / MIN_K;
+
+        constexpr GaussianLobe() = default;
+
+        MR_HF_DECL
+        GaussianLobe(const Vector3& dir, Float kappa, Float alpha)
+            : dir(dir)
+            , kappa(kappa)
+            , alpha(alpha)
+        {}
 
         MR_HF_DECL
         GaussianLobe(const GaussLobeSoA& soa, uint32_t index)
-            : kappa(soa.Get<0>()[index].kappa)
         {
+            // Decompress mean
+            uint16_t kappaC = soa.Get<MEAN_INDEX>()[index].kappa;
+            kappa = NormConversion::FromUNorm<Float>(kappaC);
+            kappa *= GaussLobeMeanParams::KAPPA_DELTA;
+
             // Decompress normal
-            Vector2 coOcta = Vector2(soa.Get<0>()[index].dirCoOcta);
+            Vector2 coOcta = Vector2(soa.Get<DIR_INDEX>()[index].dirCoOcta);
             dir = Graphics::ConcentricOctahedralToDirection(coOcta);
-            value = soa.Get<2>()[index].luminance;
-            // TODO: Aniso
+            alpha = XOverExp1M(Float(-2) * kappa);
         }
 
         MR_HF_DECL
-        SampleT<Vector3> Sample(Vector2 xi)
+        SampleT<Vector3> Sample(Vector2 xi) const
         {
             // Numerically stable vMF sampling
             // https://gpuopen.com/download/A_Numerically_Stable_Implementation_of_the_von_Mises%E2%80%93Fisher_Distribution_on_S2.pdf
@@ -82,34 +122,102 @@ namespace Distribution::GaussLobe
             return SampleT<Vector3>
             {
                 .value = dirWorld,
-                .pdf = Value(dirWorld)
+                .pdf = Pdf(dirWorld)
             };
         }
 
         MR_HF_DECL
-        Float Value(Vector3 wI)
+        static Float XOverExp1M(Float x)
         {
-            // TODO: Is this solid angle density or what????
-            auto XOverExp1M = [](Float x)
-            {
-                Float u = Math::Exp(x);
-                if(u == Float(1))           return Float(1);
-                if(Math::Abs(x) < Float(1)) return Math::Log(u) / (u - Float(1));
-                else                        return x / (u - Float(1));
-            };
+            Float u = Math::Exp(x);
+            //
+            if(u == Float(1))           return Float(1);
+            if(Math::Abs(x) < Float(1)) return Math::Log(u) / (u - Float(1));
+            else                        return x            / (u - Float(1));
+        };
 
+        MR_HF_DECL
+        static Float XOverExp1MRecip(Float x)
+        {
+            Float u = Math::Exp(x);
+            //
+            if(u == Float(1))           return Float(1);
+            if(Math::Abs(x) < Float(1)) return (u - Float(1)) / Math::Log(u);
+            else                        return (u - Float(1)) / x;
+        };
+
+        MR_HF_DECL
+        Float Value(Vector3 wI) const
+        {
             Vector3 d = dir - wI;
             Float result = Math::Exp(Float(-0.5) * kappa * Math::LengthSqr(d));
+            result *= alpha;
             result *= MathConstants::Inv4Pi<Float>();
-            result *= XOverExp1M(Float(-2) * kappa);
             return result;
         }
 
         MR_HF_DECL
-        Float SolidAnglePDF(Vector3)
+        Float Pdf(Vector3 wI) const
         {
-            // TODO: ???
-            return Float(NAN);
+            return Value(wI);
+        }
+
+        MR_HF_DECL
+        Float SolidAnglePDF(Vector3 wI) const
+        {
+            // TODO: How to convert to solid angle density???
+            // or is it already solid angle
+            return Pdf(wI);
+        }
+
+        MR_HF_DECL
+        GaussianLobe Convolution(const GaussianLobe& other) const
+        {
+            // https://www.mitsuba-renderer.org/~wenzel/files/vmf.pdf
+            auto A3 = [](Float k)
+            {
+                Float r = Float(1) / Math::TanH(k);
+                r -= Float(1) / k;
+                return r;
+            };
+            auto dA3 = [](Float k)
+            {
+                Float c = Float(2) / (Math::Exp(k) - Math::Exp(-k));
+                Float r = Float(1) / (k * k) - (c * c);
+                return r;
+            };
+
+            // Newton-Raphson
+            Float x = Math::Min(kappa, other.kappa);
+            Float y = A3(kappa) * A3(other.kappa);
+            Float residual = 0;
+            do
+            {
+                residual = A3(x) - y;
+                x -= residual / dA3(x);
+            }
+            while(Math::Abs(residual) > MathConstants::SmallEpsilon<Float>());
+
+            //
+            return GaussianLobe(dir, x, XOverExp1M(Float(-2) * x));
+        }
+
+        MR_HF_DECL
+        GaussianLobe Product(const GaussianLobe& other) const
+        {
+            Float k1 = kappa;
+            Float k2 = other.kappa;
+            Vector3 d1 = dir;
+            Vector3 d2 = other.dir;
+
+            Vector3 newD = d1 * k1 + d2 * k2;
+            Float length = Math::Length(newD);
+            Float newK = Math::Clamp(length, MIN_K, MAX_K);
+            Float newAlpha = XOverExp1M(Float(-2) * k1) * XOverExp1M(Float(-2) * k2);
+            newAlpha *= XOverExp1MRecip(Float(-2) * newK);
+
+            newD /= length;
+            return GaussianLobe(newD, newK, newAlpha);
         }
     };
 }

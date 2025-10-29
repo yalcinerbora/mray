@@ -9,6 +9,27 @@
 #include "Random.h"
 
 #include "Device/GPUSystem.hpp"
+#include "DistributionFunctions.h"
+#include "Device/GPUWarp.h"
+
+struct RadianceSampleSoA : public SoASpan<UNorm2x16, Float,
+                                          Float, Float, Float>
+{
+    using Base = SoASpan<UNorm2x16, Float, Float, Float, Float>;
+    enum PathStateIndex
+    {
+        DIRECTION,
+        POS_X,
+        POS_Y,
+        POS_Z,
+        SCALE
+    };
+    using Base::Base;
+
+    MR_PF_DECL Vector3 GetPos(uint32_t i) const;
+    MR_PF_DECL Vector3 GetDir(uint32_t i) const;
+    MR_PF_DECL Float   GetScale(uint32_t i) const;
+};
 
 class SpatialCode
 {
@@ -82,6 +103,34 @@ class SpatialDatasetView
     MR_PF_DECL
     uint64_t ScenePosToMorton(const Vector3& pos) const;
 };
+
+using GaussLobe = Distribution::GaussLobe::GaussianLobe;
+using GaussLobeDirParams = Distribution::GaussLobe::GaussLobeDirParams;
+using GaussLobeMeanParams = Distribution::GaussLobe::GaussLobeMeanParams;
+using GaussLobeScaleParams = Distribution::GaussLobe::GaussLobeScaleParams;
+using GaussLobeSoA = Distribution::GaussLobe::GaussLobeSoA;
+static constexpr uint32_t GAUSS_PER_ENTRY = 8;
+
+MR_PF_DEF
+Vector3 RadianceSampleSoA::GetPos(uint32_t i) const
+{
+    return Vector3(Get<POS_X>()[i],
+                   Get<POS_Y>()[i],
+                   Get<POS_Z>()[i]);
+}
+
+MR_PF_DEF
+Vector3 RadianceSampleSoA::GetDir(uint32_t i) const
+{
+    UNorm2x16 dirPacked = Get<DIRECTION>()[i];
+    return Graphics::ConcentricOctahedralToDirection(Vector2(dirPacked));
+}
+
+MR_PF_DEF
+Float RadianceSampleSoA::GetScale(uint32_t i) const
+{
+    return Get<SCALE>()[i];
+}
 
 MR_PF_DEF
 uint32_t SpatialCode::MaxLevel()
@@ -250,16 +299,6 @@ void KCQueryDataStruct(MRAY_GRID_CONSTANT const Span<uint32_t> dDataIndices,
     }
 }
 
-#include <DistributionFunctions.h>
-
-using GaussLobe = Distribution::GaussLobe::GaussianLobe;
-using GaussLobe = Distribution::GaussLobe::GaussianLobe;
-using GaussLobeBase = Distribution::GaussLobe::GaussLobeBaseParams;
-using GaussLobeScale = Distribution::GaussLobe::GaussLobeScaleParams;
-using GaussLobeAniso = Distribution::GaussLobe::GaussLobeAnisoParams;
-using GaussLobeSoA = Distribution::GaussLobe::GaussLobeSoA;
-static constexpr uint32_t GAUSS_PER_ENTRY = 8;
-
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCQueryDataStructAndFakeWork(MRAY_GRID_CONSTANT const Span<uint32_t> dDataIndices,
                                   MRAY_GRID_CONSTANT const Span<const SpatialCode> dCodes,
@@ -300,6 +339,8 @@ void KCQueryDataStructAndFakeWorkWarp(MRAY_GRID_CONSTANT const Span<uint32_t> dD
                                       MRAY_GRID_CONSTANT const SpatialDatasetView ds,
                                       MRAY_GRID_CONSTANT const GaussLobeSoA gaussLobeSoA)
 {
+    #ifdef MRAY_DEVICE_CODE_PATH
+
     static_assert(WarpSize() % GAUSS_PER_ENTRY == 0);
     KernelCallParams kp;
 
@@ -315,7 +356,7 @@ void KCQueryDataStructAndFakeWorkWarp(MRAY_GRID_CONSTANT const Span<uint32_t> dD
         uint32_t gaussI;
         if(isLeader)
             gaussI = ds.lt.Search(dCodes[i]).value_or(std::numeric_limits<uint32_t>::max());
-        gaussI = __shfl_sync(0xFFFFFFFF, 0, gaussI, THREAD_PER_WARP);
+        gaussI = DeviceWarp::WarpBroadcast<THREAD_PER_WARP>(0, gaussI);
         WarpSynchronize<THREAD_PER_WARP>();
 
         if(gaussI != std::numeric_limits<uint32_t>::max())
@@ -331,9 +372,7 @@ void KCQueryDataStructAndFakeWorkWarp(MRAY_GRID_CONSTANT const Span<uint32_t> dD
             Float r = (sample.value[0] + sample.value[1] + sample.value[2] + sample.pdf);
 
             uint32_t xx = uint32_t(r);
-            MRAY_UNROLL_LOOP
-            for(uint32_t j = (GAUSS_PER_ENTRY >> 1); j != 0; j >>= 1)
-                xx += __shfl_up_sync(0xFFFFFFFF, j, xx, THREAD_PER_WARP);
+            xx = DeviceWarp::WarpReduceAdd<THREAD_PER_WARP>(xx);
             WarpSynchronize<THREAD_PER_WARP>();
 
             if(isLeader)
@@ -341,6 +380,8 @@ void KCQueryDataStructAndFakeWorkWarp(MRAY_GRID_CONSTANT const Span<uint32_t> dD
         }
         else dDataIndices[i] = gaussI;
     }
+
+    #endif
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
@@ -394,6 +435,243 @@ void KCQueryDataStructInterp(MRAY_GRID_CONSTANT const Span<uint32_t> dDataIndice
 }
 
 
+namespace UpdateMixtureKernelParams
+{
+    static constexpr Vector2ui THRD_RANGE       = Vector2ui(0, 4);
+    static constexpr Vector2ui WARP_4_RANGE     = Vector2ui(4, 8);
+    static constexpr Vector2ui WARP_8_RANGE     = Vector2ui(8, 16);
+    static constexpr Vector2ui WARP_16_RANGE    = Vector2ui(16, 32);
+    static constexpr Vector2ui WARP_32_RANGE    = Vector2ui(32, 64);
+    static constexpr Vector2ui BLOCK_64_RANGE   = Vector2ui(64, 128);
+    static constexpr Vector2ui BLOCK_128_RANGE  = Vector2ui(128, std::numeric_limits<uint32_t>::max());
+
+    MR_PF_DECL
+    bool SkipRangeThread(Vector2ui sampleRange)
+    {
+        uint32_t count = sampleRange[1] - sampleRange[0];
+        return !(THRD_RANGE[0] < count && count < THRD_RANGE[1]);
+    }
+
+    template <uint32_t WARP_SIZE>
+    MR_PF_DECL
+    bool SkipRangeWarp(Vector2ui sampleRange)
+    {
+        uint32_t count = sampleRange[1] - sampleRange[0];
+             if constexpr(WARP_SIZE == 4)  return !(WARP_4_RANGE[0] <= count && count < WARP_4_RANGE[1]);
+        else if constexpr(WARP_SIZE == 8)  return !(WARP_8_RANGE[0] <= count && count < WARP_8_RANGE[1]);
+        else if constexpr(WARP_SIZE == 16) return !(WARP_16_RANGE[0] <= count && count < WARP_16_RANGE[1]);
+        else if constexpr(WARP_SIZE == 32) return !(WARP_32_RANGE[0] <= count && count < WARP_32_RANGE[1]);
+                                           return true;
+    }
+
+    template <uint32_t BLOCK_SIZE>
+    MR_PF_DECL
+    bool SkipRangeBlock(Vector2ui sampleRange)
+    {
+        uint32_t count = sampleRange[1] - sampleRange[0];
+             if constexpr(BLOCK_SIZE ==  64) return !(BLOCK_64_RANGE[0] <= count && count < BLOCK_64_RANGE[1]);
+        else if constexpr(BLOCK_SIZE == 128) return !(BLOCK_128_RANGE[0] <= count && count < BLOCK_128_RANGE[1]);
+                                             return true;
+    }
+};
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCUpdateMixturesThread(// I-O
+                            MRAY_GRID_CONSTANT const GaussLobeSoA dGaussLobeSoA,
+                            MRAY_GRID_CONSTANT const Span<Vector4uc> dMixtureCountsPacked,
+                            // Input
+                            MRAY_GRID_CONSTANT const Span<SpatialCode> dCodes,
+                            MRAY_GRID_CONSTANT const Span<Vector2ui> dSegmentRanges,
+                            MRAY_GRID_CONSTANT const Span<uint32_t> dPathSoAIndices,
+                            MRAY_GRID_CONSTANT const RadianceSampleSoA dPathSoA,
+                            MRAY_GRID_CONSTANT const SpatialDatasetView dSpatialTable)
+{
+    //using namespace UpdateMixtureKernelParams;
+    //static constexpr uint32_t INVALID_INDEX = std::numeric_limits<uint32_t>::max();
+
+    //KernelCallParams kp;
+    //// Dedicate a thread for each lobe (basic case, CPU probably will call this)
+    //// Grid-stride loop
+    //for(uint32_t cellId = kp.GlobalId(); cellId < dCodes.size(); cellId += kp.TotalSize())
+    //{
+    //    // Defer the computation to the warp kernel
+    //    Vector2ui range = dSegmentRanges[cellId];
+    //    uint32_t totalSampleCount = range[1] - range[0];
+    //    if(SkipRangeThread(range)) continue;
+
+
+
+    //    // Load etc
+    //    uint32_t gaussI = dSpatialTable.lt.Search(dCodes[cellId]).value_or(INVALID_INDEX);
+    //    if(gaussI == INVALID_INDEX) continue;
+
+    //    // Load the loabs to local memory.
+    //    GaussLobe lobe[GAUSS_PER_ENTRY];
+    //    uint32_t h = gaussI / 4;
+    //    uint32_t l = gaussI % 4;
+    //    uint32_t curMixCount = dMixtureCountsPacked[h][l];
+    //    assert(curMixCount <= GAUSS_PER_ENTRY);
+
+    //    for(uint32_t i = 0; i < curMixCount; i++)
+    //        lobe[i] = GaussLobe(dGaussLobeSoA, gaussI * GAUSS_PER_ENTRY + i);
+
+    //    // Do statistics pass in batch
+    //    Float sumWeight;
+    //    Float logLhood;
+    //    Float oldLogLhood;
+    //    //
+    //    static constexpr auto SAMPLE_PER_BATCH = GAUSS_PER_ENTRY;
+    //    static constexpr auto MAX_ITER = 100;
+
+    //    // Stats buffer for the current iteration
+    //    Vector3 sufficientStats[SAMPLE_PER_BATCH];
+    //    Vector3 sufficientStats[SAMPLE_PER_BATCH];
+    //    // Batchify the samples
+    //    uint32_t batchCount = Math::DivideUp(totalSampleCount, SAMPLE_PER_BATCH);
+    //    for(uint32_t bI = 0; bI < batchCount; bI++)
+    //    {
+    //        // EM For a batch of data
+    //        for(uint32_t _ = 0; _ < MAX_ITER; _++)
+    //        {
+    //            Float totalStatWeight = 0;
+    //            for(uint32_t i = 0; i < SAMPLE_PER_BATCH; i++)
+    //                sufficientStats[SAMPLE_PER_BATCH] = Vector3::Zero();
+
+    //            //===============================//
+    //            //  Sufficient stats generation  //
+    //            //===============================//
+    //            uint32_t startI = bI * batchCount;
+    //            uint32_t endI = Math::Max((bI + 1) * batchCount, totalSampleCount);
+    //            uint32_t batchSampleCount = endI - startI;
+    //            for(uint32_t i = 0; i < batchSampleCount; i++)
+    //            {
+    //                uint32_t readIndex = range[0] + i;
+    //                Vector2 dirC = Vector2(dPathSoA.Get<RadianceSampleSoA::DIRECTION>()[readIndex]);
+    //                Vector3 dir = Graphics::ConcentricOctahedralToDirection(dirC);
+
+    //                Float mixturePDF = 0;
+    //                Float softAssignments[SAMPLE_PER_BATCH];
+    //                for(uint32_t lobeIndex = 0; lobeIndex < curMixCount; lobeIndex++)
+    //                {
+    //                    softAssignments[lobeIndex] = lobe[lobeIndex].Pdf(dir);
+    //                    mixturePDF += softAssignments[lobeIndex];
+    //                }
+    //                //
+    //                Float mixPDFRecip = Float(1) / mixturePDF;
+    //                for(uint32_t lobeIndex = 0; lobeIndex < curMixCount; lobeIndex++)
+    //                    softAssignments[lobeIndex] *= mixPDFRecip;
+
+    //                // Assign these to each lobe
+    //                Float scale = dPathSoA.Get<RadianceSampleSoA::SCALE>()[readIndex];
+    //                for(uint32_t lobeIndex = 0; lobeIndex < curMixCount; lobeIndex++)
+    //                {
+    //                    Float assignWeight = softAssignments[lobeIndex] * scale;
+    //                    sufficientStats[lobeIndex] += dir * assignWeight;
+    //                    totalStatWeight += assignWeight;
+    //                }
+    //            }
+    //            //===============================//
+    //            //       Mixture Update          //
+    //            //===============================//
+    //            for(uint32_t lobeIndex = 0; lobeIndex < curMixCount; lobeIndex++)
+    //            {
+    //                Float maxMeanCosine = 0;
+    //                Float mixWeight = lobe.;
+    //            }
+    //        }
+    //    }
+    //        MRAY_GRID_CONSTANT const Span<Vector2ui> dSegmentRanges,
+
+
+    //        gMM.
+    //    }
+
+    //    //
+
+    //    //// EM-pass
+    //    //Vector3 data0;
+    //    //Float sumWeight;
+    //    //static constexpr uint32_t SAMPLE_PER_PASS = 16;
+
+
+    //    ////
+    //    //Float sampleSoftAssignWeights[GAUSS_PER_ENTRY];
+    //    //Float mixturePDF;
+
+
+    //    //Vector3 st
+
+
+    //    //for(uint32_t i = 0; i < 100; i++)
+    //    //{
+    //    //    // For each pass
+    //    //}
+
+    //    //// Read samples
+    //    //Vector2ui range = dSegmentRanges[tId];
+    //    //for(uint32_t i = range[0]; i < range[1]; i++)
+    //    //{
+    //    //    uint32_t sampleI = dPathSoAIndices[i];
+
+    //    //    Vector3 dir = dPathSoA.GetDir(sampleI);
+    //    //    Float scale = dPathSoA.GetScale(sampleI);
+
+
+    //    //}
+    //}
+}
+
+template<uint32_t LOGICAL_WARP_SIZE>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCUpdateMixturesWarp(// I-O
+                          MRAY_GRID_CONSTANT const GaussLobeSoA dGaussLobeSoA,
+                          // Input
+                          MRAY_GRID_CONSTANT const Span<SpatialCode> dCodes,
+                          MRAY_GRID_CONSTANT const Span<Vector2ui> dSegmentRanges,
+                          MRAY_GRID_CONSTANT const Span<uint32_t> dPathSoAIndices,
+                          MRAY_GRID_CONSTANT const RadianceSampleSoA dPathSoA,
+                          MRAY_GRID_CONSTANT const SpatialDatasetView dSpatialTable)
+{
+    using namespace UpdateMixtureKernelParams;
+    KernelCallParams kp;
+
+    uint32_t laneId = kp.threadId % LOGICAL_WARP_SIZE;
+    uint32_t globalWarpId = kp.GlobalId() / LOGICAL_WARP_SIZE;
+    uint32_t globalWarpCount = kp.TotalSize() / LOGICAL_WARP_SIZE;
+    // Warp-stride Loop (logical warp)
+    bool isLeader = (laneId == 0);
+    for(uint32_t cellId = globalWarpId; cellId < dCodes.size(); cellId += globalWarpCount)
+    {
+        // Defer computation to block
+        Vector2ui range = dSegmentRanges[cellId];
+        if(SkipRangeWarp<LOGICAL_WARP_SIZE>(range)) continue;
+    }
+}
+
+template<uint32_t BLOCK_SIZE>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(BLOCK_SIZE)
+void KCUpdateMixturesBlock(// I-O
+                           MRAY_GRID_CONSTANT const GaussLobeSoA dGaussLobeSoA,
+                           // Input
+                           MRAY_GRID_CONSTANT const Span<SpatialCode> dCodes,
+                           MRAY_GRID_CONSTANT const Span<Vector2ui> dSegmentRanges,
+                           MRAY_GRID_CONSTANT const Span<uint32_t> dPathSoAIndices,
+                           MRAY_GRID_CONSTANT const RadianceSampleSoA dPathSoA,
+                           MRAY_GRID_CONSTANT const SpatialDatasetView dSpatialTable)
+{
+    KernelCallParams kp;
+
+    // Block-stride loop
+    bool isLeader = (kp.threadId == 0);
+    for(uint32_t cellId = kp.blockId; cellId < dCodes.size(); cellId += kp.gridSize)
+    {
+        // Defer computation to block
+        Vector2ui range = dSegmentRanges[cellId];
+        if(SkipRangeBlock<BLOCK_SIZE>(range)) continue;
+    }
+}
+
+
 TEST(SpatialQuery, Perf)
 {
     GPUSystem gpuSystem;// (false, 1);
@@ -404,9 +682,13 @@ TEST(SpatialQuery, Perf)
     static constexpr size_t OctreeLeafSize = 2048;
     // Emulating an sparse voxel octree SVO here, last level is 1M voxels
     // since it is surface discretization it should reduce by 4 (instead of 8)
-    static constexpr size_t EntryL0Count = 1'500'000;
-    static constexpr size_t EntryL1Count =   375'000;
-    static constexpr size_t EntryL2Count =    93'750;
+    //static constexpr size_t EntryL0Count = 1'500'000;
+    //static constexpr size_t EntryL1Count =   375'000;
+    //static constexpr size_t EntryL2Count =    93'750;
+    static constexpr size_t EntryL0Count = 500'000;
+    static constexpr size_t EntryL1Count = 125'000;
+    static constexpr size_t EntryL2Count = 31'250;
+
 
     static constexpr size_t TotalEntries = EntryL0Count + EntryL1Count + EntryL2Count;
     static constexpr size_t LTSize = Math::NextPowerOfTwo(TotalEntries * 2);
@@ -495,18 +777,18 @@ TEST(SpatialQuery, Perf)
     MemAlloc::AllocateMultiData(Tie(dCodes, dValues),
                                 htMem, {hCodes.size(), hValues.size()});
     //
-    DeviceMemory gaussLobeMem(gpuSystem.AllGPUs(), 2_MiB, 16_MiB);
-    Span<GaussLobeBase> dGaussBaseParams;
-    Span<GaussLobeScale> dGaussScaleParams;
-    Span<GaussLobeAniso> dGaussAnisoParams;
-    MemAlloc::AllocateMultiData(Tie(dGaussBaseParams,
-                                    dGaussScaleParams,
-                                    dGaussAnisoParams),
+    DeviceMemory gaussLobeMem(gpuSystem.AllGPUs(), 2_MiB, 2_MiB);
+    Span<GaussLobeDirParams> dGaussDirParams;
+    Span<GaussLobeMeanParams> dGaussMeanParams;
+    Span<GaussLobeScaleParams> dGaussScaleParams;
+    MemAlloc::AllocateMultiData(Tie(dGaussDirParams,
+                                    dGaussMeanParams,
+                                    dGaussScaleParams),
                                 gaussLobeMem,
                                 {TotalEntries * GAUSS_PER_ENTRY,
                                  TotalEntries * GAUSS_PER_ENTRY,
                                  TotalEntries * GAUSS_PER_ENTRY});
-    GaussLobeSoA gaussSoA(dGaussBaseParams, dGaussAnisoParams, dGaussScaleParams);
+    GaussLobeSoA gaussSoA(dGaussDirParams, dGaussMeanParams, dGaussScaleParams);
     //
     Span<SpatialCode> dQueriedCodes;
     Span<uint32_t>    dOutputIndices;
@@ -577,5 +859,56 @@ TEST(SpatialQuery, Perf)
     //    if(i >= 16)
     //        MRAY_LOG("{}", i);
     //}
+
+}
+
+
+
+
+TEST(GaussLobeMix, Update)
+{
+
+}
+
+
+namespace MCAlber2025
+{
+
+    // Slightly compressed Markov Chain data of
+    // Alber et al. (2025).
+    struct alignas(16) MCAlber2025BaseParams
+    {
+        UNorm2x16   wTarget;
+        Float       wTargetScale;
+        Float       wSum;
+        Float       wCos;
+    };
+
+    struct MarkovChainCountParam
+    {
+        uint16_t mcN;
+        uint16_t irradN;
+    };
+
+    struct IrradianceParam
+    {
+        Float irrad;
+    };
+
+
+    // Register-space class of the parameters
+    struct MCAlber2025
+    {
+        static constexpr uint32_t WINDOW_SIZE = 1024;
+
+        Vector3 wTarget;
+        Float   wTargetScale;
+        Float   wSum;
+        Float   wCos;
+        //
+        //UNorm2x16 w_tgt;
+        // Current window size (initially, state will start with 0 it'll be
+        //uint32_t curWind; // 6-bit or 22-bit left here;
+    };
 
 }

@@ -87,6 +87,7 @@ namespace Math
     template<FloatC T> MR_PF_DECL T Sin(T) noexcept;
     template<FloatC T> MR_PF_DECL T Tan(T) noexcept;
     template<FloatC T> MR_PF_DECL T CosH(T) noexcept;
+    template<FloatC T> MR_PF_DECL T TanH(T x) noexcept;
     template<FloatC T> MR_PF_DECL T ArcCos(T) noexcept;
     template<FloatC T> MR_PF_DECL T ArcSin(T) noexcept;
     template<FloatC T> MR_PF_DECL T ArcTan(T) noexcept;
@@ -572,7 +573,7 @@ MR_PF_DEF T Tan(T v) noexcept
 }
 
 template<FloatC T>
-MR_PF_DECL T CosH(T x) noexcept
+MR_PF_DEF T CosH(T x) noexcept
 {
     // no njuffa :(
     // Using mathematical identity
@@ -588,6 +589,25 @@ MR_PF_DECL T CosH(T x) noexcept
     #else
         if constexpr(std::is_same_v<T, float>)  return coshf(x);
         if constexpr(std::is_same_v<T, double>) return cosh(x);
+    #endif
+}
+
+template<FloatC T>
+MR_PF_DEF T TanH(T x) noexcept
+{  assert(T(-1) <= x && x <= T(1));
+    // njuffa
+    // https://stackoverflow.com/a/7380529
+    if(std::is_constant_evaluated())
+    {
+        T e2x = Math::Exp(Float(2 * x));
+        return (e2x - Float(1)) / (e2x + Float(1));
+    }
+    #ifndef MRAY_DEVICE_CODE_PATH
+        return std::acos(x);
+    // GPU Code path
+    #else
+        if constexpr(std::is_same_v<T, float>)  return tanhf(x);
+        if constexpr(std::is_same_v<T, double>) return tanh(x);
     #endif
 }
 
@@ -698,7 +718,8 @@ MR_PF_DEF T ArcTan2(T y, T x) noexcept
     #endif
 }
 
-template<FloatC T> MR_PF_DECL T ArcTanH(T x) noexcept
+template<FloatC T>
+MR_PF_DEF T ArcTanH(T x) noexcept
 {
     // Using math identity, TODO: check better one later.
     if(std::is_constant_evaluated())
@@ -963,6 +984,7 @@ MR_PF_DEF T Log2(T x) noexcept
         // Some bit manipulation is better with uints
         // less undefined behaviour
         using UI = std::make_unsigned_t<I>;
+        F xF = F(x);
         F m, r;
         F i = 0.0f;
         if (x < 1.175494351e-38f)   // 0x1.0p-126
@@ -970,13 +992,13 @@ MR_PF_DEF T Log2(T x) noexcept
             x = x * 8388608.0f;     // 0x1.0p+23
             i = -23.0f;
         }
-        I e = I((Bit::BitCast<UI>(x) - UI(0x3f3504f3)) & UI(0xff800000));
-        m = Bit::BitCast<F>(Bit::BitCast<I>(x) - e);
+        I e = I((Bit::BitCast<UI>(xF) - UI(0x3f3504f3)) & UI(0xff800000));
+        m = Bit::BitCast<F>(Bit::BitCast<I>(xF) - e);
         i = FMA(float(e), 1.19209290e-7f, i); // 0x1.0p-23
         m = m - 1.0f;
         // Compute log2(1+m) for m in [sqrt(0.5)-1, sqrt(2.0)-1]
         r =           -1.09985352e-1f;  // -0x1.c28000p-4
-        r = FMA (r, m, 1.86182275e-1f); //  0x1.7d4d22p-3
+        r = FMA(r, m,  1.86182275e-1f); //  0x1.7d4d22p-3
         r = FMA(r, m, -1.91066533e-1f); // -0x1.874de4p-3
         r = FMA(r, m,  2.04593703e-1f); //  0x1.a30206p-3
         r = FMA(r, m, -2.39627063e-1f); // -0x1.eac198p-3
@@ -991,8 +1013,8 @@ MR_PF_DEF T Log2(T x) noexcept
         constexpr F Inf = Bit::BitCast<F>(0x7f800000); // +INF
         // We cant use inline assembly in constexpr.
         // This is one place that is different from the link above.
-        if(x <= 0.0f)   return -std::numeric_limits<F>::infinity();
-        if(x > Inf)     return std::numeric_limits<F>::infinity();
+        if(xF <= 0.0f)  return -std::numeric_limits<F>::infinity();
+        if(xF > Inf)    return std::numeric_limits<F>::infinity();
         else            return T(r);
     }
     #ifndef MRAY_DEVICE_CODE_PATH
@@ -1397,7 +1419,7 @@ MR_PF_DEF auto ModFInt(T x) noexcept -> Pair<IntegralSister<T>, T>
 }
 
 template<FloatC T>
-MR_PF_DECL T Pow(T x, T y) noexcept
+MR_PF_DEF T Pow(T x, T y) noexcept
 {
     if(std::is_constant_evaluated())
     {
@@ -1453,7 +1475,7 @@ MR_PF_DEF T Floor(const T& v) noexcept
 }
 
 template<FloatVectorC T>
-MR_PF_DECL auto RoundInt(const T& v) noexcept -> Vector<T::Dims, IntegralSister<typename T::InnerType>>
+MR_PF_DEF auto RoundInt(const T& v) noexcept -> Vector<T::Dims, IntegralSister<typename T::InnerType>>
 {
     using VecXInt = Vector<T::Dims, IntegralSister<typename T::InnerType>>;
     VecXInt r;

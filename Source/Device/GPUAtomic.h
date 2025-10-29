@@ -18,6 +18,7 @@
         using namespace ::mray::hip::atomic;
     }
 #elif defined MRAY_GPU_BACKEND_CPU
+
     #include "CPU/GPUAtomicCPU.h" // IWYU pragma: export
 
     namespace DeviceAtomic

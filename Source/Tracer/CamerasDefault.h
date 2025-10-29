@@ -56,6 +56,8 @@ namespace CameraDetail
         MR_HF_DECL
         CameraPinhole   GenerateSubCamera(const Vector2ui& regionId,
                                           const Vector2ui& regionCount) const;
+        MR_HF_DECL
+        Vector3         GetCameraPosition() const;
     };
 }
 

@@ -97,7 +97,6 @@ MemAlloc::ConvertMemSizeToString(size_t size)
         result.second = "Bytes"sv;
         shiftVal = 0;
     }
-
     size_t mask = ((size_t(1) << shiftVal) - 1);
     size_t integer = size >> shiftVal;
     size_t decimal = mask & size;
@@ -107,11 +106,10 @@ MemAlloc::ConvertMemSizeToString(size_t size)
                   "IEEE-754 floats.");
     static constexpr size_t DOUBLE_MANTISSA = 52;
     static constexpr size_t MANTISSA_MASK = (size_t(1) << DOUBLE_MANTISSA) - 1;
-    size_t bitCount = Bit::RequiredBitsToRepresent(decimal);
-    if(bitCount > DOUBLE_MANTISSA)
-        decimal >>= (bitCount - DOUBLE_MANTISSA);
+    if(shiftVal > DOUBLE_MANTISSA)
+        decimal >>= (shiftVal - DOUBLE_MANTISSA);
     else
-        decimal <<= (DOUBLE_MANTISSA - bitCount);
+        decimal <<= (DOUBLE_MANTISSA - shiftVal);
 
 
     uint64_t dblFrac = std::bit_cast<uint64_t>(1.0);

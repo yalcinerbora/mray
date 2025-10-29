@@ -63,4 +63,5 @@ R TexViewRenderer             "Tracer/TexViewRenderer.h"    RenderWork          
 R SurfaceRenderer             "Tracer/SurfaceRenderer.h"    SurfaceRenderWork       SurfaceRenderLightWork      SurfaceRenderCamWork        2           1           0
 R PathTracerRendererRGB       "PathTracerRenderer.h"        PathTracerRenderWork    PathTracerRenderLightWork   PathTracerRenderCamWork     2           2           0
 R PathTracerRendererSpectral  "PathTracerRenderer.h"        PathTracerRenderWork    PathTracerRenderLightWork   PathTracerRenderCamWork     2           2           0
+R HashGridRenderer            "Tracer/HashGridRenderer.h"   HashGridRenderWork      HashGridRenderLightWork     HashGridRenderCamWork       1           1           0
 

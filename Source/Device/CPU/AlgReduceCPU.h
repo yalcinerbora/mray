@@ -124,7 +124,7 @@ void TransformReduce(Span<OutT, 1> dReducedValue,
                 OutT desired;
                 do
                 {
-                    desired = op(local, expected);
+                    desired = binaryOp(local, expected);
                 } while(!finalRef.compare_exchange_weak(expected, desired));
             }
         }

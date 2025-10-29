@@ -266,6 +266,43 @@ class PermutedCG32
 using BackupRNG = PermutedCG32;
 using BackupRNGState = typename PermutedCG32::State;
 
+// Renderers store path dimension states on their own
+// Mostly as a uint16_t buffer
+// We can't make these lambdas  due to an NVCC error
+//
+// "An extended __host__ __device__
+// lambda cannot be defined inside a generic lambda expression."
+//
+// So we define these here
+class ConstAddFunctor_U16
+{
+    private:
+    uint16_t constant;
+
+    public:
+    ConstAddFunctor_U16(uint16_t c) : constant(c) {}
+
+    constexpr void operator()(uint16_t& i) const noexcept
+    {
+        i += constant;
+    }
+};
+
+class SetFunctor_U16
+{
+    private:
+    uint16_t constant;
+
+    public:
+    SetFunctor_U16(uint16_t c) : constant(c) {}
+
+
+    constexpr void operator()(uint16_t& i) const noexcept
+    {
+        i = constant;
+    }
+};
+
 class RNGeneratorGroupI
 {
     public:

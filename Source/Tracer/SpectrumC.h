@@ -60,6 +60,35 @@ concept SpectrumContextC = requires(const C c, const GPUQueue & queue)
     {c.GPUMemoryUsage()} -> std::same_as<size_t>;
 };
 
+struct SpectrumContextI
+{
+    virtual                     ~SpectrumContextI() = default;
+    //
+    virtual MRayColorSpaceEnum  ColorSpace() const = 0;
+    virtual RNRequestList       SampleSpectrumRNList() const = 0;
+    virtual size_t              GPUMemoryUsage() const = 0;
+
+    // TODO: Add direct versions when its needed
+    virtual
+    void SampleSpectrumWavelengthsIndirect(// Output
+                                           Span<SpectrumWaves> dWavelengths,
+                                           Span<Spectrum> dWavePDFs,
+                                           // Input
+                                           Span<const RandomNumber> dRandomNumbers,
+                                           Span<const RayIndex> dRayIndices,
+                                           // Constants
+                                           const GPUQueue&) const = 0;
+    virtual
+    void ConvertSpectrumToRGBIndirect(// I-O
+                                      Span<Spectrum> dValues,
+                                      // Input
+                                      Span<const SpectrumWaves> dWavelengths,
+                                      Span<const Spectrum> dWavePDFs,
+                                      Span<const RayIndex> dRayIndices,
+                                      // Constants
+                                      const GPUQueue&) const = 0;
+};
+
 template<class Converter, uint32_t DIMS, bool IsRadiance = false>
 class SpectralParamVaryingData
 {
@@ -104,7 +133,7 @@ struct SpectrumConverterIdentity
     static constexpr bool IsRGB = true;
 };
 
-struct SpectrumContextIdentity
+struct SpectrumContextIdentity : public SpectrumContextI
 {
     using Converter = SpectrumConverterIdentity;
     using Data      = EmptyType;
@@ -128,8 +157,8 @@ struct SpectrumContextIdentity
 
     // TODO: Move these to virtual inheritance maybe.
     EmptyType GetData() const { return EmptyType{}; }
-    MRayColorSpaceEnum ColorSpace() const { return colorSpace; }
-    RNRequestList SampleSpectrumRNList() const { return RNRequestList(); }
+    MRayColorSpaceEnum ColorSpace() const override { return colorSpace; }
+    RNRequestList SampleSpectrumRNList() const override { return RNRequestList(); }
     //
     void SampleSpectrumWavelengthsIndirect(// Output
                                            Span<SpectrumWaves>,
@@ -138,7 +167,7 @@ struct SpectrumContextIdentity
                                            Span<const RandomNumber>,
                                            Span<const RayIndex>,
                                            // Constants
-                                           const GPUQueue&) const {}
+                                           const GPUQueue&) const override {}
 
     void ConvertSpectrumToRGBIndirect(// I-O
                                       Span<Spectrum>,
@@ -147,9 +176,9 @@ struct SpectrumContextIdentity
                                       Span<const Spectrum>,
                                       Span<const RayIndex>,
                                       // Constants
-                                      const GPUQueue&) const {}
+                                      const GPUQueue&) const override {}
 
-    size_t GPUMemoryUsage() const { return 0; }
+    size_t GPUMemoryUsage() const override { return 0; }
 };
 
 template<class C, uint32_t D, bool IsRadiance>

@@ -40,6 +40,7 @@ concept CameraC = requires(CameraType c,
     {c.GetCameraTransform()} -> std::same_as<CameraTransform>;
     {c.OverrideTransform(CameraTransform{})} -> std::same_as<void>;
     {c.GenerateSubCamera(Vector2ui{}, Vector2ui{})} -> std::same_as<CameraType>;
+    {c.GetCameraPosition()} -> std::same_as<Vector3>;
 
     // Type traits
     requires std::is_trivially_copyable_v<CameraType>;

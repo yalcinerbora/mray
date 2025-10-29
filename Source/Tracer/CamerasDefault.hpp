@@ -209,4 +209,10 @@ CameraPinhole CameraPinhole::GenerateSubCamera(const Vector2ui& stratumIndex,
     return p;
 }
 
+MR_HF_DEF
+Vector3 CameraPinhole::GetCameraPosition() const
+{
+    return position;
+}
+
 }

@@ -7,6 +7,7 @@
 
 #include "RenderWork.h"
 #include "DistributionFunctions.h"
+#include "SpectrumC.h"
 
 class SurfaceRenderer;
 
@@ -96,6 +97,7 @@ namespace SurfRDetail
         Span<ImageCoordinate>   dImageCoordinates;
         Span<Float>             dFilmFilterWeights;
     };
+
     struct RayStateAO
     {
         // Can be position, furnace radiance, normal
@@ -106,42 +108,62 @@ namespace SurfRDetail
         Span<RayGMem>           dVisibilityRays;
     };
 
-    template<PrimitiveC Prim, MaterialC Material, class Surface, class TContext,
-             PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    MR_HF_DECL
-    void WorkFunctionCommon(const Prim&, const Material&, const Surface&,
-                            const RayConeSurface&, const TContext&,
-                            const SpectrumConverterIdentity&, RNGDispenser&,
-                            const RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>& params,
-                            RayIndex rayIndex);
+    template<PrimitiveGroupC PGType, MaterialGroupC MGType, TransformGroupC TGType>
+    struct WorkFunctionCommon
+    {
+        MRAY_WORK_FUNCTOR_DEFINE_TYPES(PGType, MGType, TGType,
+                                       SpectrumContextIdentity, 1u);
+        using Params = RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>;
 
-    template<PrimitiveC Prim, MaterialC Material, class Surface, class TContext,
-             PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    MR_HF_DECL
-    void WorkFunctionFurnaceOrAO(const Prim&, const Material&, const Surface&,
-                                 const RayConeSurface&, const TContext&,
-                                 const SpectrumConverterIdentity&, RNGDispenser&,
-                                 const RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>& params,
-                                 RayIndex rayIndex);
+        MR_HF_DECL
+        static void Call(const Primitive&, const Material&, const Surface&,
+                         const RayConeSurface&, const TContext&,
+                         const SpectrumConv&, RNGDispenser&,
+                         const Params& params,
+                         RayIndex rayIndex, uint32_t laneId);
 
-    template<LightC Light, LightGroupC LG, TransformGroupC TG>
-    MR_HF_DECL
-    void LightWorkFunctionCommon(const Light&, RNGDispenser&,
-                                 const SpectrumConverterIdentity&,
-                                 const RenderLightWorkParams<GlobalState, RayStateCommon, LG, TG>& params,
-                                 RayIndex rayIndex);
+    };
+
+    template<PrimitiveGroupC PGType, MaterialGroupC MGType, TransformGroupC TGType>
+    struct WorkFunctionFurnaceOrAO
+    {
+        MRAY_WORK_FUNCTOR_DEFINE_TYPES(PGType, MGType, TGType,
+                                       SpectrumContextIdentity, 1u);
+        using Params = RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>;
+
+        MR_HF_DECL
+        static void Call(const Primitive&, const Material&, const Surface&,
+                         const RayConeSurface&, const TContext&,
+                         const SpectrumConv&, RNGDispenser&,
+                         const Params& params,
+                         RayIndex rayIndex, uint32_t laneId);
+
+    };
+
+    template<LightGroupC LGType, TransformGroupC TGType>
+    struct LightWorkFunctionCommon
+    {
+        MRAY_LIGHT_WORK_FUNCTOR_DEFINE_TYPES(LGType, TGType,
+                                             SpectrumContextIdentity, 1u);
+        using Params = RenderLightWorkParams<GlobalState, RayStateCommon, LG, TG>;
+
+        MR_HF_DECL
+        static void Call(const Light&, RNGDispenser&, const SpectrumConv&,
+                         const Params& params, RayIndex rayIndex, uint32_t laneId);
+    };
 
 }
 
-template<PrimitiveC Prim, MaterialC Material,
-         class Surface, class TContext,
-         PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+namespace SurfRDetail
+{
+
+template<PrimitiveGroupC P, MaterialGroupC M, TransformGroupC T>
 MR_HF_DEF
-void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface& surf,
-                                     const RayConeSurface&, const TContext& tContext,
-                                     const SpectrumConverterIdentity&, RNGDispenser&,
-                                     const RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>& params,
-                                     RayIndex rayIndex)
+void WorkFunctionCommon<P, M, T>::Call(const Primitive&, const Material&, const Surface& surf,
+                                       const RayConeSurface&, const TContext& tContext,
+                                       const SpectrumConv&, RNGDispenser&,
+                                       const Params& params,
+                                       RayIndex rayIndex, uint32_t)
 {
     Vector3 color = Vector3::Zero();
     Mode::E mode = params.globalState.mode.e;
@@ -241,18 +263,16 @@ void SurfRDetail::WorkFunctionCommon(const Prim&, const Material&, const Surface
     params.rayState.dOutputData[rayIndex] = Spectrum(color, Float(0));
 }
 
-template<PrimitiveC Prim, MaterialC Material,
-         class Surface, class TContext,
-         PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+template<PrimitiveGroupC P, MaterialGroupC M, TransformGroupC T>
 MR_HF_DEF
-void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, const Surface& surf,
-                                          const RayConeSurface&, const TContext& tContext,
-                                          const SpectrumConverterIdentity&, RNGDispenser& rng,
-                                          const RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>& params,
-                                          RayIndex rayIndex)
+void WorkFunctionFurnaceOrAO<P, M, T>::Call(const Primitive&, const Material& mat, const Surface& surf,
+                                            const RayConeSurface&, const TContext& tContext,
+                                            const SpectrumConv&, RNGDispenser& rng,
+                                            const Params& params,
+                                            RayIndex rayIndex, uint32_t)
 {
-    assert(params.globalState.mode.e == Mode::AO ||
-           params.globalState.mode.e == Mode::FURNACE);
+     assert(params.globalState.mode.e == Mode::AO ||
+            params.globalState.mode.e == Mode::FURNACE);
 
     if(params.globalState.mode.e == Mode::FURNACE)
     {
@@ -307,16 +327,15 @@ void SurfRDetail::WorkFunctionFurnaceOrAO(const Prim&, const Material& mat, cons
     else params.rayState.dOutputData[rayIndex] = Spectrum(BIG_MAGENTA(), 0);
 }
 
-template<LightC Light, LightGroupC LG, TransformGroupC TG>
+template<LightGroupC L, TransformGroupC T>
 MR_HF_DEF
-void SurfRDetail::LightWorkFunctionCommon(const Light&, RNGDispenser&,
-                                          const SpectrumConverterIdentity&,
-                                          const RenderLightWorkParams<GlobalState,
-                                                                      RayStateCommon, LG, TG>& params,
-                                          RayIndex rayIndex)
+void LightWorkFunctionCommon<L, T>::Call(const Light&, RNGDispenser&, const SpectrumConv&,
+                                         const Params& params, RayIndex rayIndex, uint32_t)
 {
-    if constexpr (Light::IsPrimitiveBackedLight)
+    if constexpr(Light::IsPrimitiveBackedLight)
         params.rayState.dOutputData[rayIndex] = Spectrum(1, 1, 1, 0);
     else
         params.rayState.dOutputData[rayIndex] = Spectrum::Zero();
+}
+
 }

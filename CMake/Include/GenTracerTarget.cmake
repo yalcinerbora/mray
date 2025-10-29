@@ -101,6 +101,9 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/RenderWork.kt.h
         ${CURRENT_SOURCE_DIR}/RendererC.h
         ${CURRENT_SOURCE_DIR}/RendererCommon.h
+        ${CURRENT_SOURCE_DIR}/RendererCommon.cu
+        ${CURRENT_SOURCE_DIR}/PathTracerRendererBase.h
+        ${CURRENT_SOURCE_DIR}/PathTracerRendererBase.cu
         ${CURRENT_SOURCE_DIR}/RenderImage.cpp
         ${CURRENT_SOURCE_DIR}/RenderImage.h
         ${CURRENT_SOURCE_DIR}/RayGenKernels.h
@@ -116,6 +119,11 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/SurfaceRendererShaders.h
         ${CURRENT_SOURCE_DIR}/SurfaceRenderer.h
         ${CURRENT_SOURCE_DIR}/SurfaceRenderer.cu)
+
+    set(SRC_RENDERERS_HASH_GRID
+        ${CURRENT_SOURCE_DIR}/HashGridRendererShaders.h
+        ${CURRENT_SOURCE_DIR}/HashGridRenderer.h
+        ${CURRENT_SOURCE_DIR}/HashGridRenderer.cu)
 
     set(SRC_RANDOM
         ${CURRENT_SOURCE_DIR}/Random.cu
@@ -141,7 +149,9 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/TypeFormat.h
         ${CURRENT_SOURCE_DIR}/Hit.h
         ${CURRENT_SOURCE_DIR}/Filters.h
-        ${CURRENT_SOURCE_DIR}/SurfaceComparators.h)
+        ${CURRENT_SOURCE_DIR}/SurfaceComparators.h
+        ${CURRENT_SOURCE_DIR}/HashGrid.h
+        ${CURRENT_SOURCE_DIR}/HashGrid.cu)
 
     set(SRC_COMMON
         ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
@@ -164,6 +174,7 @@ function(gen_tracer_target)
         ${SRC_RENDERERS}
         ${SRC_RENDERERS_TEX_VIEW}
         ${SRC_RENDERERS_SURFACE}
+        ${SRC_RENDERERS_HASH_GRID}
         ${SRC_RANDOM}
         ${SRC_SPECTRUM}
         ${SRC_UTILITY}
@@ -182,6 +193,7 @@ function(gen_tracer_target)
     source_group("Renderers" FILES ${SRC_RENDERERS})
     source_group("Renderers/Surface" FILES ${SRC_RENDERERS_SURFACE})
     source_group("Renderers/TexView" FILES ${SRC_RENDERERS_TEX_VIEW})
+    source_group("Renderers/HashGrid" FILES ${SRC_RENDERERS_HASH_GRID})
     source_group("Spectrum" FILES ${SRC_SPECTRUM})
     source_group("Utility" FILES ${SRC_UTILITY})
     source_group("" FILES ${SRC_COMMON})
@@ -201,10 +213,14 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/AcceleratorLBVH.cu
         ${CURRENT_SOURCE_DIR}/TexViewRenderer.cu
         ${CURRENT_SOURCE_DIR}/SurfaceRenderer.cu
+        ${CURRENT_SOURCE_DIR}/HashGridRenderer.cu
         ${CURRENT_SOURCE_DIR}/Random.cu
         ${CURRENT_SOURCE_DIR}/Distributions.cu
         ${CURRENT_SOURCE_DIR}/RayPartitioner.cu
         ${CURRENT_SOURCE_DIR}/SpectrumContext.cu
+        ${CURRENT_SOURCE_DIR}/HashGrid.cu
+        ${CURRENT_SOURCE_DIR}/RendererCommon.cu
+        ${CURRENT_SOURCE_DIR}/PathTracerRendererBase.cu
     )
 
     # Add sources for OptiX (Backend: CUDA, Enable HW Acceleration ON)

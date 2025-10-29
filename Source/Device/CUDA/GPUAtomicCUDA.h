@@ -3,18 +3,22 @@
 
 namespace mray::cuda::atomic::detail
 {
-    template <class T> struct IntegralOf;
+    template <class T> struct IntegralOf
+    {
+        static_assert(!std::is_same_v<T, T>,
+                      "Type does not have a proper integral wrapper!");
+    };
 
     template <class T>
-    requires (sizeof(T) == 8)
+    requires (sizeof(T) == 8 && alignof(T) >= alignof(uint64_t))
     struct IntegralOf<T> { using type = uint64_t; };
 
     template <class T>
-    requires (sizeof(T) == 4)
+    requires (sizeof(T) == 4 && alignof(T) >= alignof(uint32_t))
     struct IntegralOf<T> { using type = uint32_t; };
 
     template <class T>
-    requires (sizeof(T) == 2)
+    requires (sizeof(T) == 2 && alignof(T) >= alignof(uint16_t))
     struct IntegralOf<T> { using type = uint16_t; };
 
     template<class T, class Func>
@@ -37,6 +41,9 @@ namespace mray::cuda::atomic
     template<class T>
     requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
     MR_GF_DECL T AtomicXor(T& t, T v);
+
+    template<class T>
+    MR_GF_DECL T AtomicCompSwap(T& t, T compVal, T storeVal);
 }
 
 // A dirty fix to host side to not whine about
@@ -226,6 +233,21 @@ T AtomicXor(T& t, T v)
         return atomicXor(&t, v);
     #else
         return t + v;
+    #endif
+}
+
+template<class T>
+MR_GF_DEF
+T AtomicCompSwap(T& t, T compVal, T storeVal)
+{
+    #ifdef __CUDA_ARCH__
+        using Int = typename detail::IntegralOf<T>::type;
+        auto* tp = reinterpret_cast<Int*>(&t);
+        return T(atomicCAS(tp,
+                           static_cast<Int>(compVal),
+                           static_cast<Int>(storeVal)));
+    #else
+        return t + compVal + storeVal;
     #endif
 }
 

@@ -3,7 +3,10 @@
 #include<cstddef>
 
 // Simple type package, usefull while metaprograming
-template<class... T> struct TypePack {};
+template<class... T> struct TypePack
+{
+    static constexpr auto TypeCount = sizeof...(T);
+};
 
 namespace TypePackDetail
 {
@@ -59,9 +62,7 @@ template<size_t I, class... Ts>
 struct TypePackElementT<I, TypePack<Ts...>>
 {
     #ifdef MRAY_MSVC
-        //using Type = TypePackDetail::FindLinearT<I, Ts...>::Type;
-
-        using  TF = TypePackDetail::FindViaOverloadT<std::index_sequence_for<Ts...>, Ts...>;
+        using TF = TypePackDetail::FindViaOverloadT<std::index_sequence_for<Ts...>, Ts...>;
         using Type = decltype(TypePackDetail::Finder<I>(std::declval<TF>()))::Type;
 
     #elif defined(MRAY_CLANG) || defined(MRAY_GCC)

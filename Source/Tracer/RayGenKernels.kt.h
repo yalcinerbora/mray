@@ -28,6 +28,27 @@ void KCGenerateSubCamera(// Output
 }
 
 template<CameraC Camera, TransformGroupC TransG>
+MRAY_KERNEL
+void KCGenerateCameraPosition(// Output
+                              MRAY_GRID_CONSTANT const Span<Vector3, 1> dCameraPosition,
+                              // Input
+                              MRAY_GRID_CONSTANT const Camera* const dCamera,
+                              MRAY_GRID_CONSTANT const TransformKey transformKey,
+                              MRAY_GRID_CONSTANT const typename TransG::DataSoA transSoA)
+{
+    KernelCallParams kp;
+    if(kp.GlobalId() != 0) return;
+
+    using TransformContext = TransG::DefaultContext;
+    TransformContext transform(transSoA, transformKey);
+
+    // Construction
+    Vector3 localCamPos = dCamera->GetCameraPosition();
+    Vector3 worldCamPos = transform.ApplyP(localCamPos);
+    dCameraPosition[0] = worldCamPos;
+}
+
+template<CameraC Camera, TransformGroupC TransG>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenerateCamRays(// Output (Only dRayIndices pointed data should be written)
                        MRAY_GRID_CONSTANT const Span<RayCone> dRayCones,

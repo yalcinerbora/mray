@@ -528,7 +528,8 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Vector2 eMax = Vector2(M * edges[maxIndex]);
     //
     Float a1L = Math::Length(a1), a2L = Math::Length(a2);
-    Float a1LSqr = a1L * a1L, a2LSqr = a2L * a2L;
+    Float a1LSqr = a1L * a1L;
+    Float a2LSqr = a2L * a2L;
     Float a12L = a1L * a2L;
     Float l0 = a12L * Math::RSqrt(a1LSqr * eMin[0] * eMin[0] +
                                   a2LSqr * eMin[1] * eMin[1]);

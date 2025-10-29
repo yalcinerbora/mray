@@ -20,6 +20,9 @@ namespace mray::host::atomic
     template<class T>
     requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
     MR_GF_DECL T AtomicXor(T& t, T v);
+
+    template<class T>
+    MR_GF_DECL T AtomicCompSwap(T& t, T compVal, T val);
 }
 
 namespace mray::host::atomic
@@ -66,6 +69,15 @@ MR_GF_DEF
 T AtomicXor(T& t, T v)
 {
     return std::atomic_ref<T>(t).fetch_xor(v);
+}
+
+template<class T>
+MR_GF_DEF
+T AtomicCompSwap(T& t, T compVal, T val)
+{
+    std::atomic_ref<T> ref(t);
+    ref.compare_exchange_strong(compVal, val);
+    return compVal;
 }
 
 }

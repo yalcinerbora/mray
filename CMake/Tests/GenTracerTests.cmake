@@ -41,6 +41,7 @@ function(gen_tracer_test)
         ${CURRENT_SOURCE_DIR}/T_StreamingTexture.cu
         ${CURRENT_SOURCE_DIR}/T_RayCone.cu
         ${CURRENT_SOURCE_DIR}/T_Color.cu
+        ${CURRENT_SOURCE_DIR}/T_SpatialQuery.cu
     )
 
     set(TARGET_FULL_NAME "TTracer${GEN_TRACER_TEST_NAME}")

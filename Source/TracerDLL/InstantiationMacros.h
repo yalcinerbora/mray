@@ -6,48 +6,80 @@
 
 // These are for instantiation convenience
 // Work functions has quite a bit for template parameters
+// ===================== //
+//  Get Work Metaprogram //
+// ===================== //
 template <class R, class PG, class MG, class TG, uint32_t I>
-static constexpr auto GetWorkFunction()
+struct GetWFT
 {
-    using TC = typename PrimTransformContextType<PG, TG>::Result;
-    using M = typename MG:: template Material<typename R::SpectrumContext>;
-    using P = typename PG:: template Primitive<TC>;
-    using S = typename M::Surface;
-    constexpr auto WF = R::template WorkFunctions<P, M, S, TC, PG, MG, TG>;
-    return get<I>(WF);
-}
+    private:
+    using WFList = R::template WorkFunctions<PG, MG, TG>;
+    public:
+    using Type = std::conditional_t<I < WFList::TypeCount, TypePackElement<I, WFList>, void>;
+};
+
+template <class R, class PG, class MG, class TG, uint32_t I>
+using GetWF = GetWFT<R, PG, MG, TG, I>::Type;
+
+// =========================== //
+//  Get Light Work Metaprogram //
+// =========================== //
+template <class R, class LG, class TG, uint32_t I>
+struct GetLWFT
+{
+    private:
+    using WFList = R::template LightWorkFunctions<LG, TG>;
+    public:
+    using Type = std::conditional_t<I < WFList::TypeCount, TypePackElement<I, WFList>, void>;
+};
 
 template <class R, class LG, class TG, uint32_t I>
-static constexpr auto GetLightWorkFunction()
+using GetLWF = GetLWFT<R, LG, TG, I>::Type;
+
+// ==========================//
+//  Get Cam Work Metaprogram //
+// ========================= //
+template <class R, class CG, class TG, uint32_t I>
+struct GetCWFT
 {
-    using PG = typename LG::PrimGroup;
-    using TC = typename PrimTransformContextType<PG, TG>::Result;
-    using L = typename LG::template Light<TC, typename R::SpectrumContext>;
-    constexpr auto WF = R:: template LightWorkFunctions<L, LG, TG>;
-    return get<I>(WF);
-}
+    private:
+    using WFList = R::template CamWorkFunctions<CG, TG>;
+    public:
+    using Type = std::conditional_t<I < WFList::TypeCount, TypePackElement<I, WFList>, void>;
+};
 
 template <class R, class CG, class TG, uint32_t I>
-static constexpr auto GetCamWorkFunction()
-{
-    using C = typename CG::Camera;
-    constexpr auto WF = R:: template CamWorkFunctions<C, CG, TG>;
-    return get<I>(WF);
-
-}
+using GetCWF = GetCWFT<R, CG, TG, I>::Type;
 
 // Renderer Related
-#define MRAY_RENDERER_KERNEL_INSTANTIATE(R, P, M, T, I)     \
-    template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT  \
-    void KCRenderWork<R, I, P, M, T, GetWorkFunction<R, P, M, T, I>(), MRAY_PRIM_TGEN_FUNCTION(P, T)>(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, P, M, T>)
+#define MRAY_RENDERER_KERNEL_INSTANTIATE(R, P, M, T, I)                \
+    template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT             \
+    void KCRenderWork                                                  \
+    <                                                                  \
+        GetWF<R, P, M, T, I>,                                          \
+        AcquireSpectrumConverterGenerator<R, GetWF<R, P, M, T, I>>(),  \
+        MRAY_PRIM_TGEN_FUNCTION(P, T)                                  \
+    >                                                                  \
+    (MRAY_GRID_CONSTANT const typename GetWF<R, P, M, T, I>::Params)
 
-#define MRAY_RENDERER_LIGHT_KERNEL_INSTANTIATE(R, L, T, I)  \
-    template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT  \
-    void KCRenderLightWork<R, I, L, T, GetLightWorkFunction<R, L, T, I>(), MRAY_PRIM_TGEN_FUNCTION(typename L::PrimGroup, T)>(MRAY_GRID_CONSTANT const RenderLightWorkParamsR<R, I, L, T>)
 
-#define MRAY_RENDERER_CAM_KERNEL_INSTANTIATE(R, C, T, I)    \
-    template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT  \
-    void KCRenderCameraWork<R, I, C, T, GetCamWorkFunction<R, C, T, I>()>(MRAY_GRID_CONSTANT const RenderCameraWorkParamsR<R, I, C, T>)
+#define MRAY_RENDERER_LIGHT_KERNEL_INSTANTIATE(R, L, T, I)          \
+    template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT          \
+    void KCRenderLightWork                                          \
+    <                                                               \
+        GetLWF<R, L, T, I>,                                         \
+        AcquireSpectrumConverterGenerator<R, GetLWF<R, L, T, I>>(), \
+        MRAY_PRIM_TGEN_FUNCTION(typename L::PrimGroup, T)           \
+    >                                                               \
+    (MRAY_GRID_CONSTANT const typename GetLWF<R, L, T, I>::Params)
+
+#define MRAY_RENDERER_CAM_KERNEL_INSTANTIATE(R, C, T, I)            \
+    template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT          \
+    void KCRenderCameraWork                                         \
+    <                                                               \
+        GetLCWF<R, C, T, I>                                         \
+    >                                                               \
+    (MRAY_GRID_CONSTANT const typename GetLCWF<R, C, T, I>::Params)
 
 // Accelerator Related
 #define MRAY_ACCEL_PRIM_CENTER_KERNEL_INSTANTIATE(A, P, T)                                                              \
@@ -119,18 +151,25 @@ static constexpr auto GetCamWorkFunction()
                                    MRAY_GRID_CONSTANT const Vector2ui,                  \
                                    MRAY_GRID_CONSTANT const Vector2ui)
 
-#define MRAY_RAYGEN_GENRAYS_KERNEL_INSTANTIATE(C, T)                                                \
-    template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT                                          \
-    void KCGenerateCamRays<typename C::Camera, T>(MRAY_GRID_CONSTANT const Span<RayCone>,           \
-                                                  MRAY_GRID_CONSTANT const Span<RayGMem>,           \
-                                                  MRAY_GRID_CONSTANT const Span<ImageCoordinate>,   \
-                                                  MRAY_GRID_CONSTANT const Span<Float>,             \
-                                                  MRAY_GRID_CONSTANT const Span<const uint32_t>,    \
-                                                  MRAY_GRID_CONSTANT const Span<const RandomNumber>,\
-                                                  MRAY_GRID_CONSTANT const C::Camera* const,        \
-                                                  MRAY_GRID_CONSTANT const TransformKey,            \
-                                                  MRAY_GRID_CONSTANT const typename T::DataSoA,     \
-                                                  MRAY_GRID_CONSTANT const uint64_t,                \
+#define MRAY_RAYGEN_CAMERA_POS_KERNEL_INSTANTIATE(C, T)                                                       \
+    template MRAY_KERNEL                                                                                     \
+    void KCGenerateCameraPosition<typename C::Camera, T>(MRAY_GRID_CONSTANT const Span<Vector3, 1>,          \
+                                                         MRAY_GRID_CONSTANT const typename C::Camera* const, \
+                                                         MRAY_GRID_CONSTANT const TransformKey,              \
+                                                         MRAY_GRID_CONSTANT const typename T::DataSoA)
+
+#define MRAY_RAYGEN_GENRAYS_KERNEL_INSTANTIATE(C, T)                                                  \
+    template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT                                            \
+    void KCGenerateCamRays<typename C::Camera, T>(MRAY_GRID_CONSTANT const Span<RayCone>,             \
+                                                  MRAY_GRID_CONSTANT const Span<RayGMem>,             \
+                                                  MRAY_GRID_CONSTANT const Span<ImageCoordinate>,     \
+                                                  MRAY_GRID_CONSTANT const Span<Float>,               \
+                                                  MRAY_GRID_CONSTANT const Span<const uint32_t>,      \
+                                                  MRAY_GRID_CONSTANT const Span<const RandomNumber>,  \
+                                                  MRAY_GRID_CONSTANT const typename C::Camera* const, \
+                                                  MRAY_GRID_CONSTANT const TransformKey,              \
+                                                  MRAY_GRID_CONSTANT const typename T::DataSoA,       \
+                                                  MRAY_GRID_CONSTANT const uint64_t,                  \
                                                   MRAY_GRID_CONSTANT const Vector2ui)
 
 #define MRAY_RAYGEN_GENRAYS_STOCHASTIC_KERNEL_INSTANTIATE(C, T, F)                                                  \

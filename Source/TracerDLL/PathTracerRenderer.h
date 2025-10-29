@@ -7,61 +7,20 @@
 #include "PathTracerRendererShaders.h"
 #include "SpectrumContext.h"
 
-// Due to NVCC error
-// "An extended __host__ __device__
-// lambda cannot be defined inside a generic lambda expression."
-//
-// We make this a functor
-// TODO: This is somewhat related to the RNG (at least currently)
-// maybe change this later.
-class ConstAddFunctor_U16
-{
-    private:
-    uint16_t constant;
-
-    public:
-    ConstAddFunctor_U16(uint16_t c) : constant(c) {}
-
-    MR_GF_DECL
-    void operator()(uint16_t& i) const noexcept
-    {
-        i += constant;
-    }
-};
-
-class SetFunctor_U16
-{
-    private:
-    uint16_t constant;
-
-    public:
-    SetFunctor_U16(uint16_t c) : constant(c) {}
-
-    MR_GF_DECL
-    void operator()(uint16_t& i) const noexcept
-    {
-        i = constant;
-    }
-};
-
 template<SpectrumContextC SpectrumContextT>
-class PathTracerRendererT final : public RendererT<PathTracerRendererT<SpectrumContextT>>
+class PathTracerRendererT final : public RendererBase
 {
     using This              = PathTracerRendererT<SpectrumContextT>;
-    using Base              = RendererT<This>;
     using FilmFilterPtr     = std::unique_ptr<TextureFilterI>;
-    using CameraWorkPtr     = std::unique_ptr<RenderCameraWorkT<This>>;
     using Options           = PathTraceRDetail::Options;
     using SampleMode        = PathTraceRDetail::SampleMode;
     using LightSamplerType  = PathTraceRDetail::LightSamplerType;
     using RayState          = PathTraceRDetail::RayState;
 
     public:
-    static std::string_view TypeName();
-    static typename Base::AttribInfoList StaticAttributeInfo();
     //
     using UniformLightSampler   = DirectLightSamplerUniform<MetaLightList>;
-    using AttribInfoList        = typename Base::AttribInfoList;
+    using AttribInfoList        = typename RendererBase::AttribInfoList;
     using SpectrumContext       = SpectrumContextT;
     using SpectrumConverter     = typename SpectrumContext::Converter;
     using SpecContextPtr        = std::unique_ptr<SpectrumContext>;
@@ -72,21 +31,23 @@ class PathTracerRendererT final : public RendererT<PathTracerRendererT<SpectrumC
     using RayStateList          = TypePack<PathTraceRDetail::RayState, PathTraceRDetail::RayState>;
 
     // Work Functions
-    template<PrimitiveC P, MaterialC M, class S, class TContext,
-             PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    static constexpr auto WorkFunctions = Tuple
-    {
-        &PathTraceRDetail::WorkFunction<P, M, S, TContext, SpectrumConverter, PG, MG, TG>,
-        &PathTraceRDetail::WorkFunctionNEE<UniformLightSampler, P, M, S, TContext, SpectrumConverter, PG, MG, TG>
-    };
-    template<LightC L, LightGroupC LG, TransformGroupC TG>
-    static constexpr auto LightWorkFunctions = Tuple
-    {
-        &PathTraceRDetail::LightWorkFunction<L, SpectrumConverter, LG, TG>,
-        &PathTraceRDetail::LightWorkFunctionWithNEE<UniformLightSampler, L, SpectrumConverter, LG, TG>
-    };
-    template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
-    static constexpr auto CamWorkFunctions = Tuple{};
+    template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+    using WorkFunctions = TypePack
+    <
+        PathTraceRDetail::WorkFunction<PG, MG, TG, SpectrumContext>,
+        PathTraceRDetail::WorkFunctionNEE<PG, MG, TG, SpectrumContext, UniformLightSampler>
+    >;
+    template<LightGroupC LG, TransformGroupC TG>
+    using LightWorkFunctions = TypePack
+    <
+        PathTraceRDetail::LightWorkFunction<LG, TG, SpectrumContext>,
+        PathTraceRDetail::LightWorkFunctionWithNEE<LG, TG, SpectrumContext, UniformLightSampler>
+    >;
+    template<CameraGroupC CG, TransformGroupC TG>
+    using CamWorkFunctions = TypePack<>;
+
+    static std::string_view TypeName();
+    static AttribInfoList   StaticAttributeInfo();
 
     // Spectrum Converter Generator
     template<class RenderWorkParams>
@@ -110,7 +71,7 @@ class PathTracerRendererT final : public RendererT<PathTracerRendererT<SpectrumC
     CameraSurfaceParams         curCamSurfaceParams;
     TransformKey                curCamTransformKey;
     CameraKey                   curCamKey;
-    const CameraWorkPtr*        curCamWork;
+    const RenderCameraWorkI*    curCamWork;
     std::vector<uint64_t>       tilePathCounts;
     std::vector<uint64_t>       tileSPPs;
     uint64_t                    totalDeadRayCount = 0;
@@ -150,6 +111,7 @@ class PathTracerRendererT final : public RendererT<PathTracerRendererT<SpectrumC
     void                ResetAllPaths(const GPUQueue& queue);
     Span<RayIndex>      DoRenderPass(uint32_t sppLimit,
                                      const GPUQueue& queue);
+    //
     RendererOutput      DoThroughputSingleTileRender(const GPUDevice& device,
                                                      const GPUQueue& queue);
     RendererOutput      DoLatencyRender(uint32_t passCount,

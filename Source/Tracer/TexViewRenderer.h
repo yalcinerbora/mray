@@ -6,7 +6,7 @@
 
 class SpectrumContextJakob2019;
 
-class TexViewRenderer final : public RendererT<TexViewRenderer>
+class TexViewRenderer final : public RendererBase
 {
     public:
     static std::string_view TypeName();
@@ -16,15 +16,14 @@ class TexViewRenderer final : public RendererT<TexViewRenderer>
     using RayStateList      = TypePack<>;
     using SpectrumContext = SpectrumContextIdentity;
 
-    template<PrimitiveC P, MaterialC M, class S, class TContext,
-             PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    static constexpr auto WorkFunctions = Tuple{};
+    template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+    using WorkFunctions = TypePack<>;
 
-    template<LightC L, LightGroupC LG, TransformGroupC TG>
-    static constexpr auto LightWorkFunctions = Tuple{};
+    template<LightGroupC LG, TransformGroupC TG>
+    using LightWorkFunctions = TypePack<>;
 
-    template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
-    static constexpr auto CamWorkFunctions = Tuple{};
+    template<CameraGroupC CG, TransformGroupC TG>
+    using CamWorkFunctions = TypePack<>;
 
     enum Mode
     {

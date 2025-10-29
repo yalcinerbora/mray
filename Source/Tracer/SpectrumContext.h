@@ -72,7 +72,7 @@ namespace Jakob2019Detail
     };
 }
 
-class SpectrumContextJakob2019
+class SpectrumContextJakob2019 : public SpectrumContextI
 {
     using LUTTextureList = std::array<Texture<3, Float>, 9>;
 
@@ -129,7 +129,7 @@ class SpectrumContextJakob2019
                                            Span<const RandomNumber> dRandomNumbers,
                                            Span<const RayIndex> dRayIndices,
                                            // Constants
-                                           const GPUQueue& queue) const;
+                                           const GPUQueue& queue) const override;
     RNRequestList SampleSpectrumRNList() const;
 
     //
@@ -147,10 +147,10 @@ class SpectrumContextJakob2019
                                       Span<const Spectrum> dWavePDFs,
                                       Span<const RayIndex> dRayIndices,
                                       // Constants
-                                      const GPUQueue& queue) const;
+                                      const GPUQueue& queue) const override;
     //
-    MRayColorSpaceEnum  ColorSpace() const;
-    size_t              GPUMemoryUsage() const;
+    MRayColorSpaceEnum  ColorSpace() const override;
+    size_t              GPUMemoryUsage() const override;
 };
 
 inline Jakob2019Detail::Data

@@ -2,30 +2,30 @@
 
 #include "RenderWork.h"
 
-template<RendererC R, uint32_t I, PrimitiveGroupC PG,
-         MaterialGroupC MG, TransformGroupC TG,
-         auto WorkFunction, auto GenerateTransformContext>
+template<WorkFuncC WorkFunction,
+         auto GenSpectrumConverter, auto GenerateTransformContext>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG, TG> params)
+void KCRenderWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params params)
 {
-    using SpectrumConv  = typename R::SpectrumContext;
+    using SpectrumConv = typename WorkFunction::SpectrumConv;
     // Define the types
     // First, this kernel uses a transform context.
     // This will be used to transform the primitive.
     // We may not be able act on the primitive without the primitive's data
     // (For example skinned meshes, we need weights and transform indices)
     // "TransformContext" abstraction handles these
-    using TransContext = typename PrimTransformContextType<PG, TG>::Result;
+    using TransContext = typename WorkFunction::TContext;
     // Similarly Renderer may not be RGB, but Material is
     // So it sends the spectrum converter context, which is either identity
     // or a function that is constructed via wavelengths etc.
-    using Material = typename MG:: template Material<SpectrumConv>;
+    using Material = typename WorkFunction::Material;
     // Primitive is straightforward but we get a type with the proper
     // transform context
-    using Primitive = typename PG:: template Primitive<TransContext>;
+    using PG = typename WorkFunction::PG;
+    using Primitive = typename WorkFunction::Primitive;
     // And finally, the the definition of the surface that is dictated
     // by the material group
-    using Surface = typename Material::Surface;
+    using Surface = typename WorkFunction::Surface;
     // We need to compile-time check that this primitive supports such a surface
     static_assert(PrimitiveWithSurfaceC<Primitive, PG, Surface>,
                   "This primitive does not support the surface "
@@ -34,10 +34,17 @@ void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG, TG> p
     using Hit = typename Primitive::Hit;
 
     // Now finally we can start the runtime stuff
-    uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
+    // Statically dedicate multiple threads per work
+    // If requested by the
     KernelCallParams kp;
-    for(uint32_t globalId = kp.GlobalId();
-        globalId < rayCount; globalId += kp.TotalSize())
+    static constexpr auto THREAD_PER_WARP = WorkFunction::THREAD_PER_WORK;
+    uint32_t laneId          = kp.threadId    % THREAD_PER_WARP;
+    uint32_t globalWarpId    = kp.GlobalId()  / THREAD_PER_WARP;
+    uint32_t globalWarpCount = kp.TotalSize() / THREAD_PER_WARP;
+
+    uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
+    for(uint32_t globalId = globalWarpId;
+        globalId < rayCount; globalId += globalWarpCount)
     {
         RNGDispenser rng(params.in.dRandomNumbers, globalId, rayCount);
         // Here is the potential drawback of sorting based
@@ -58,10 +65,9 @@ void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG, TG> p
         RayCone rayCone = params.in.dRayCones[rIndex].Advance(tMM[1]);
 
         // Get instantiation of converter
-        using SpecConverter = typename SpectrumConv::Converter;
         // Converter is per ray, since it needs wavelengths of
         // the current trace, which is accessed by rIndex.
-        SpecConverter specConverter = R::GenSpectrumConverter(params, rIndex);
+        SpectrumConv specConverter = GenSpectrumConverter(params, rIndex);
 
         // Create transform context
         TransContext tContext = GenerateTransformContext(params.transSoA,
@@ -69,9 +75,7 @@ void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG, TG> p
                                                          keys.transKey,
                                                          keys.primKey);
         // Construct Primitive
-        auto primitive = Primitive(tContext,
-                                   params.primSoA,
-                                   keys.primKey);
+        auto primitive = Primitive(tContext, params.primSoA, keys.primKey);
         // Generate the surface
         Surface surface;
         RayConeSurface rayConeSurface;
@@ -81,37 +85,45 @@ void KCRenderWork(MRAY_GRID_CONSTANT const RenderWorkParamsR<R, I, PG, MG, TG> p
         auto material = Material(specConverter, surface, params.matSoA,
                                  std::bit_cast<MaterialKey>(keys.lightOrMatKey));
         // Call the function
-        WorkFunction(primitive, material, surface, rayConeSurface,
-                     tContext, specConverter, rng, params, rIndex);
+        WorkFunction::Call(primitive, material, surface, rayConeSurface,
+                           tContext, specConverter, rng, params, rIndex,
+                           laneId);
         // All Done!
     }
 }
 
-template<RendererC R, uint32_t I, LightGroupC LG, TransformGroupC TG,
-         auto WorkFunction, auto GenerateTransformContext>
+template<LightWorkFuncC WorkFunction,
+         auto GenSpectrumConverter, auto GenerateTransformContext>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParamsR<R, I, LG, TG> params)
+void KCRenderLightWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params params)
 {
-    using SpectrumConv = typename R::SpectrumContext;
+    using SpectrumConv = typename WorkFunction::SpectrumConv;
     //
-    using PG = typename LG::PrimGroup;
+    using PG = typename WorkFunction::PG;
     // Define the types
     // First, this kernel uses a transform context.
     // This will be used to transform the primitive.
     // We may not be able act on the primitive without the primitive's data
     // (For example skinned meshes, we need weights and transform indices)
     // "TransformContext" abstraction handles these
-    using TransContext = typename PrimTransformContextType<PG, TG>::Result;
+    using TransContext = typename WorkFunction::TContext;
     // Primitive is straightforward but we get a type with the proper
     // transform context
-    using Primitive = typename PG:: template Primitive<TransContext>;
+    using Primitive = typename WorkFunction::Primitive;
     // Light
-    using Light = typename LG:: template Light<TransContext, SpectrumConv>;
-    // Now finally we can start the runtime stuff
-    uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
+    using Light = typename WorkFunction::Light;
+
+    // Statically dedicate multiple threads per work
+    // If requested by the
     KernelCallParams kp;
-    for(uint32_t globalId = kp.GlobalId();
-        globalId < rayCount; globalId += kp.TotalSize())
+    static constexpr auto THREAD_PER_WARP = WorkFunction::THREAD_PER_WORK;
+    uint32_t laneId          = kp.threadId    % THREAD_PER_WARP;
+    uint32_t globalWarpId    = kp.GlobalId()  / THREAD_PER_WARP;
+    uint32_t globalWarpCount = kp.TotalSize() / THREAD_PER_WARP;
+
+    uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
+    for(uint32_t globalId = globalWarpId;
+        globalId < rayCount; globalId += globalWarpCount)
     {
         RNGDispenser rng(params.in.dRandomNumbers, globalId, rayCount);
         RayIndex rIndex = params.in.dRayIndices[globalId];
@@ -126,10 +138,9 @@ void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParamsR<R, I, LG,
                                                          keys.primKey);
 
         // Get instantiation of converter
-        using SpecConverter = typename SpectrumConv::Converter;
         // Converter is per ray, since it needs wavelengths of
         // the current trace, which is accessed by rIndex.
-        SpecConverter specConverter = R::GenSpectrumConverter(params, rIndex);
+        SpectrumConv specConverter = GenSpectrumConverter(params, rIndex);
 
         // Construct Primitive
         auto primitive = Primitive(tContext,
@@ -139,15 +150,14 @@ void KCRenderLightWork(MRAY_GRID_CONSTANT const RenderLightWorkParamsR<R, I, LG,
         auto light = Light(specConverter, primitive, params.lightSoA, lKey);
 
         // Call the function
-        WorkFunction(light, rng, specConverter, params, rIndex);
+        WorkFunction::Call(light, rng, specConverter, params, rIndex, laneId);
         // All Done!
     }
 }
 
-template<RendererC R, uint32_t I, CameraGroupC CG, TransformGroupC TG,
-         auto WorkFunction>
+template<CamWorkFuncC WorkFunction>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCRenderCameraWork(MRAY_GRID_CONSTANT const RenderCameraWorkParamsR<R, I, CG, TG>)
+void KCRenderCameraWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params)
 {
     // TODO: This will be needed for light tracers
     // (Light -> Camera)

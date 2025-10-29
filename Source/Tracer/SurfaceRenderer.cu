@@ -8,6 +8,8 @@
 #include "Device/GPUAlgGeneric.h"
 #include "Device/GPUAlgBinaryPartition.h"
 
+#include "RendererCommon.h"
+
 struct IsValidRayFunctor
 {
     private:
@@ -73,69 +75,12 @@ void KCIsVisibleToSpectrum(MRAY_GRID_CONSTANT const Span<Spectrum> dOutputData,
     }
 }
 
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
-                        MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
-                        MRAY_GRID_CONSTANT const RenderWorkHasher workHasher)
-{
-    assert(dWorkKey.size() == dInputKeys.size());
-
-    KernelCallParams kp;
-    uint32_t keyCount = static_cast<uint32_t>(dInputKeys.size());
-    for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
-    {
-        dWorkKey[i] = workHasher.GenerateWorkKeyGPU(dInputKeys[i], i);
-    }
-}
-
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCGenerateWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
-                                MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
-                                MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
-                                MRAY_GRID_CONSTANT const RenderWorkHasher workHasher)
-{
-    KernelCallParams kp;
-    uint32_t keyCount = static_cast<uint32_t>(dIndices.size());
-    for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
-    {
-        RayIndex keyIndex = dIndices[i];
-        auto keyPack = dInputKeys[keyIndex];
-        dWorkKey[i] = workHasher.GenerateWorkKeyGPU(keyPack, keyIndex);
-    }
-}
-
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCSetBoundaryWorkKeys(MRAY_GRID_CONSTANT const Span<HitKeyPack> dWorkKey,
-                           MRAY_GRID_CONSTANT const HitKeyPack boundaryWorkKey)
-{
-    KernelCallParams kp;
-    uint32_t keyCount = static_cast<uint32_t>(dWorkKey.size());
-    for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
-    {
-        dWorkKey[i] = boundaryWorkKey;
-    }
-}
-
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCSetBoundaryWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<HitKeyPack> dWorkKey,
-                                   MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
-                                   MRAY_GRID_CONSTANT const HitKeyPack boundaryWorkKey)
-{
-    KernelCallParams kp;
-    uint32_t keyCount = static_cast<uint32_t>(dIndices.size());
-    for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
-    {
-        RayIndex keyIndex = dIndices[i];
-        dWorkKey[keyIndex] = boundaryWorkKey;
-    }
-}
-
 SurfaceRenderer::SurfaceRenderer(const RenderImagePtr& rb,
                                  TracerView tv,
                                  ThreadPool& tp,
                                  const GPUSystem& s,
                                  const RenderWorkPack& wp)
-    : RendererT(rb, wp, tv, s, tp)
+    : RendererBase(rb, wp, tv, s, tp, TypeName())
     , rayPartitioner(s)
     , rendererGlobalMem(s.AllGPUs(), 32_MiB, 512_MiB)
     , saveImage(true)
@@ -195,8 +140,8 @@ uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount, SurfRDeta
 {
     using enum SurfRDetail::Mode::E;
     uint32_t camSample = (doStochasticFilter)
-        ? (*curCamWork)->StochasticFilterSampleRayRNList().TotalRNCount()
-        : (*curCamWork)->SampleRayRNList().TotalRNCount();
+        ? curCamWork->StochasticFilterSampleRayRNList().TotalRNCount()
+        : curCamWork->SampleRayRNList().TotalRNCount();
 
     uint32_t maxSample = camSample;
     if(mode == AO)
@@ -284,7 +229,8 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     {
         return (pack.cgId == camGroupId && pack.tgId == transGroupId);
     });
-    curCamWork = &packLoc->workPtr;
+    assert(packLoc != currentCameraWorks.cend());
+    curCamWork = packLoc->workPtr.get();
 
     // Allocate the ray state buffers
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
@@ -397,7 +343,7 @@ RendererOutput SurfaceRenderer::DoRender()
     // we are using single queue (thus single GPU)
     // change this later
     Timer timer; timer.Start();
-    const auto& cameraWork = (*curCamWork->get());
+    const auto& cameraWork = *curCamWork;
     const GPUDevice& device = gpuSystem.BestDevice();
     const GPUQueue& processQueue = device.GetComputeQueue(0);
 
@@ -441,12 +387,12 @@ RendererOutput SurfaceRenderer::DoRender()
                             processQueue);
     // Generate RN for camera rays
     RNRequestList camSamplePerRayList = currentOptions.doStochasticFilter
-                        ? (*curCamWork)->SampleRayRNList()
-                        : (*curCamWork)->StochasticFilterSampleRayRNList();
+                        ? curCamWork->SampleRayRNList()
+                        : curCamWork->StochasticFilterSampleRayRNList();
     uint32_t camRayGenRNCount = rayCount * camSamplePerRayList.TotalRNCount();
     auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
     rnGenerator->IncrementSampleId(processQueue);
-    rnGenerator->GenerateNumbers(dCamRayGenRNBuffer, 0, 
+    rnGenerator->GenerateNumbers(dCamRayGenRNBuffer, 0,
                                  camSamplePerRayList, processQueue);
 
     uint64_t& tilePixIndex = tilePathCounts[imageTiler.CurrentTileIndex1D()];
@@ -573,7 +519,7 @@ RendererOutput SurfaceRenderer::DoRender()
                currentOptions.mode == SurfRDetail::Mode::FURNACE)
             {
                 using enum SurfRDetail::Mode::E;
-                const auto& workI = *wLoc->workPtr.get();
+                const auto& workI = UpcastRenderWork<SurfaceRenderer>(wLoc->workPtr);
 
                 RNRequestList rnCountList = (currentOptions.mode == AO)
                                                 ? GenRNRequestList<2>()
@@ -602,7 +548,7 @@ RendererOutput SurfaceRenderer::DoRender()
             }
             else
             {
-                const auto& workI = *wLoc->workPtr.get();
+                const auto& workI = UpcastRenderWork<SurfaceRenderer>(wLoc->workPtr);
                 workI.DoWork_0(dRayStateCommon,
                                dLocalIndices,
                                Span<const RandomNumber>{},
@@ -617,7 +563,7 @@ RendererOutput SurfaceRenderer::DoRender()
         }
         else if(lightWLoc != currentLightWorks.cend())
         {
-            const auto& workI = *lightWLoc->workPtr.get();
+            const auto& workI = UpcastRenderLightWork<SurfaceRenderer>(lightWLoc->workPtr);
             workI.DoBoundaryWork_0(dRayStateCommon,
                                    dLocalIndices,
                                    Span<const RandomNumber>{},

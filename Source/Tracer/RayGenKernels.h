@@ -22,6 +22,15 @@ void KCGenerateSubCamera(// Output
                          MRAY_GRID_CONSTANT const Vector2ui stratumCount);
 
 template<CameraC Camera, TransformGroupC TransG>
+MRAY_KERNEL
+void KCGenerateCameraPosition(// Output
+                              MRAY_GRID_CONSTANT const Span<Vector3, 1> dCameraPosition,
+                              // Input
+                              MRAY_GRID_CONSTANT const Camera* const dCamera,
+                              MRAY_GRID_CONSTANT const TransformKey transformKey,
+                              MRAY_GRID_CONSTANT const typename TransG::DataSoA transSoA);
+
+template<CameraC Camera, TransformGroupC TransG>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenerateCamRays(// Output (Only dRayIndices pointed data should be written)
                        MRAY_GRID_CONSTANT const Span<RayCone> dRayCones,

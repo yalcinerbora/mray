@@ -74,7 +74,7 @@ namespace PathTraceRDetail
         DEAD                = 0,
         // Invalid rays are slightly different, sometimes due to exactly
         // meeting the spp requirement, renderer may not launch rays,
-        // ıt will mark these as invalid in the pool
+        // it will mark these as invalid in the pool
         INVALID             = 1,
         // TODO: These are not used yet, but here for future use.
         // Path did scatter because of the medium. It should not go
@@ -149,54 +149,75 @@ namespace PathTraceRDetail
         LG, TG
     >;
 
-    template<PrimitiveC Prim, MaterialC Material, class Surface,
-             class TContext, class SpectrumConverter,
-             PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    MR_HF_DECL
-    void WorkFunction(const Prim&, const Material&, const Surface&,
-                      const RayConeSurface&, const TContext&,
-                      SpectrumConverter&, RNGDispenser&,
-                      const WorkParams<EmptyType, SpectrumConverter, PG, MG, TG>& params,
-                      RayIndex rayIndex);
+    template<PrimitiveGroupC PGType, MaterialGroupC MGType, TransformGroupC TGType,
+             class SpectrumCtxType>
+    struct WorkFunction
+    {
+        MRAY_WORK_FUNCTOR_DEFINE_TYPES(PGType, MGType, TGType, SpectrumCtxType, 1u);
+        using Params = WorkParams<EmptyType, SpectrumConv, PG, MG, TG>;
 
-    template<class LightSampler,
-             PrimitiveC Prim, MaterialC Material, class Surface,
-             class TContext, class SpectrumConverter,
-             PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    MR_HF_DECL
-    void WorkFunctionNEE(const Prim&, const Material&, const Surface&,
+        MR_HF_DECL
+        static void Call(const Primitive&, const Material&, const Surface&,
                          const RayConeSurface&, const TContext&,
-                         const SpectrumConverter&, RNGDispenser&,
-                         const WorkParams<LightSampler, SpectrumConverter, PG, MG, TG>& params,
-                         RayIndex rayIndex);
+                         SpectrumConv&, RNGDispenser&,
+                         const Params& params,
+                         RayIndex rayIndex, uint32_t laneId);
+    };
 
-    template<LightC Light, class SpectrumConverter, LightGroupC LG, TransformGroupC TG>
-    MR_HF_DECL
-    void LightWorkFunction(const Light&, RNGDispenser&, const SpectrumConverter&,
-                           const LightWorkParams<EmptyType, SpectrumConverter, LG, TG>& params,
-                           RayIndex rayIndex);
-    template<class LightSampler,
-             LightC Light, class SpectrumConverter,
-             LightGroupC LG, TransformGroupC TG>
-    MR_HF_DECL
-    void LightWorkFunctionWithNEE(const Light&, RNGDispenser&,
-                                  const SpectrumConverter&,
-                                  const LightWorkParams<LightSampler, SpectrumConverter, LG, TG>& params,
-                                  RayIndex rayIndex);
+    template<PrimitiveGroupC PGType, MaterialGroupC MGType, TransformGroupC TGType,
+             class SpectrumCtxType, class LightSampler>
+    struct WorkFunctionNEE
+    {
+        MRAY_WORK_FUNCTOR_DEFINE_TYPES(PGType, MGType, TGType, SpectrumCtxType, 1u);
+        using Params = WorkParams<LightSampler, SpectrumConv, PG, MG, TG>;
+
+        MR_HF_DECL
+        static void Call(const Primitive&, const Material&, const Surface&,
+                         const RayConeSurface&, const TContext&,
+                         const SpectrumConv&, RNGDispenser&,
+                         const Params& params,
+                         RayIndex rayIndex, uint32_t laneId);
+    };
+
+    template<LightGroupC LGType, TransformGroupC TGType, class SpectrumCtxType>
+    struct LightWorkFunction
+    {
+        MRAY_LIGHT_WORK_FUNCTOR_DEFINE_TYPES(LGType, TGType, SpectrumCtxType, 1u);
+        using Params = LightWorkParams<EmptyType, SpectrumConv, LG, TG>;
+
+        MR_HF_DECL
+        static void Call(const Light&, RNGDispenser&, const SpectrumConv&,
+                         const LightWorkParams<EmptyType, SpectrumConv, LG, TG>& params,
+                         RayIndex rayIndex, uint32_t laneId);
+
+    };
+
+    template<LightGroupC LGType, TransformGroupC TGType,
+             class SpectrumCtxType, class LightSampler>
+    struct LightWorkFunctionWithNEE
+    {
+        MRAY_LIGHT_WORK_FUNCTOR_DEFINE_TYPES(LGType, TGType, SpectrumCtxType, 1u);
+        using Params = LightWorkParams<LightSampler, SpectrumConv, LG, TG>;
+
+        MR_HF_DECL
+        static void Call(const Light&, RNGDispenser&, const SpectrumConv&,
+                         const Params& params,
+                         RayIndex rayIndex, uint32_t laneId);
+    };
 }
+
+namespace PathTraceRDetail
+{
 
 // ======================== //
 //     PURE PATH TRACE      //
 // ======================== //
-template<PrimitiveC Prim, MaterialC Material,
-         class Surface, class TContext, class SpectrumConverter,
-         PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+template<PrimitiveGroupC P, MaterialGroupC M, TransformGroupC T, class SC>
 MR_HF_DEF
-void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surface& surf,
-                                    const RayConeSurface& surfRayCone, const TContext& tContext,
-                                    SpectrumConverter& spectrumConverter, RNGDispenser& rng,
-                                    const WorkParams<EmptyType, SpectrumConverter, PG, MG, TG>& params,
-                                    RayIndex rayIndex)
+void WorkFunction<P, M, T, SC>::Call(const Primitive&, const Material& mat, const Surface& surf,
+                                     const RayConeSurface& surfRayCone, const TContext& tContext,
+                                     SpectrumConv& spectrumConverter, RNGDispenser& rng, const Params& params,
+                                     RayIndex rayIndex, uint32_t)
 {
     PathDataPack dataPack = params.rayState.dPathDataPack[rayIndex];
     if(dataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
@@ -220,7 +241,7 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
     // ================ //
     //    Dispersion    //
     // ================ //
-    if constexpr(!SpectrumConverter::IsRGB)
+    if constexpr(!SpectrumConv::IsRGB)
     {
         if(raySample.value.isDispersed)
         {
@@ -289,13 +310,10 @@ void PathTraceRDetail::WorkFunction(const Prim&, const Material& mat, const Surf
 // ======================== //
 //   PURE PATH TRACE LIGHT  //
 // ======================== //
-template<LightC Light, class SpectrumConverter,
-         LightGroupC LG, TransformGroupC TG>
+template<LightGroupC L, TransformGroupC T, class SC>
 MR_HF_DEF
-void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
-                                         const SpectrumConverter&,
-                                         const LightWorkParams<EmptyType, SpectrumConverter, LG, TG>& params,
-                                         RayIndex rayIndex)
+void LightWorkFunction<L, T, SC>::Call(const Light& l, RNGDispenser&, const SpectrumConv&,
+                                       const Params& params, RayIndex rayIndex, uint32_t)
 {
     PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
     if(pathDataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
@@ -338,17 +356,15 @@ void PathTraceRDetail::LightWorkFunction(const Light& l, RNGDispenser&,
 // =============================== //
 //    NEE AND/OR MIS EXTENSIONS    //
 // =============================== //
-template<class LightSampler, PrimitiveC Prim, MaterialC Material,
-         class Surface, class TContext, class SpectrumConverter,
-         PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
+template<PrimitiveGroupC P, MaterialGroupC M, TransformGroupC T, class SC, class LS>
 MR_HF_DEF
-void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const Surface& surf,
-                                       const RayConeSurface& surfRayCone, const TContext& tContext,
-                                       const SpectrumConverter& specConverter,
-                                       RNGDispenser& rng,
-                                       const WorkParams<LightSampler, SpectrumConverter, PG, MG, TG>& params,
-                                       RayIndex rayIndex)
+void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& mat, const Surface& surf,
+                                            const RayConeSurface& surfRayCone, const TContext& tContext,
+                                            const SpectrumConv& specConverter, RNGDispenser& rng,
+                                            const Params& params, RayIndex rayIndex, uint32_t)
 {
+    using LightSampler = LS;
+
     PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
     if(pathDataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
 
@@ -416,13 +432,10 @@ void PathTraceRDetail::WorkFunctionNEE(const Prim&, const Material& mat, const S
 // ======================== //
 // NEE/MIS PATH TRACE LIGHT //
 // ======================== //
-template<class LightSampler, LightC Light, class SpectrumConverter,
-         LightGroupC LG, TransformGroupC TG>
+template<LightGroupC L, TransformGroupC T, class SC, class LS>
 MR_HF_DEF
-void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
-                                                const SpectrumConverter&,
-                                                const LightWorkParams<LightSampler, SpectrumConverter, LG, TG>& params,
-                                                RayIndex rayIndex)
+void LightWorkFunctionWithNEE<L, T, SC, LS>::Call(const Light& l, RNGDispenser&, const SpectrumConv&,
+                                                  const Params& params, RayIndex rayIndex, uint32_t)
 {
     PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
     if(pathDataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
@@ -491,4 +504,6 @@ void PathTraceRDetail::LightWorkFunctionWithNEE(const Light& l, RNGDispenser&,
     // Set the path as dead
     pathDataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
     params.rayState.dPathDataPack[rayIndex] = pathDataPack;
+}
+
 }
