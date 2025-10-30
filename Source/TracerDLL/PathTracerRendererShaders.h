@@ -10,6 +10,7 @@
 #include "Tracer/DistributionFunctions.h"
 #include "Tracer/LightSampler.h"
 #include "Tracer/SpectrumContext.h"
+#include "Tracer/PathTracerRendererBase.h"
 
 template<SpectrumContextC SC>
 class PathTracerRendererT;
@@ -46,46 +47,6 @@ namespace PathTraceRDetail
     };
     using SampleMode = NamedEnum<SampleModeEnum, SampleModeNames>;
 
-    enum class RenderModeEnum
-    {
-        THROUGHPUT,
-        LATENCY,
-        //
-        END
-    };
-    inline constexpr std::array RenderModeNames =
-    {
-        "Throughput",
-        "Latency"
-    };
-    using RenderMode = NamedEnum<RenderModeEnum, RenderModeNames>;
-
-    enum class RayType : uint8_t
-    {
-        SHADOW_RAY,
-        SPECULAR_RAY,
-        PATH_RAY,
-        CAMERA_RAY
-    };
-
-    enum class PathStatusEnum : uint8_t
-    {
-        // Path is dead (due to russian roulette or hitting a light source)
-        DEAD                = 0,
-        // Invalid rays are slightly different, sometimes due to exactly
-        // meeting the spp requirement, renderer may not launch rays,
-        // it will mark these as invalid in the pool
-        INVALID             = 1,
-        // TODO: These are not used yet, but here for future use.
-        // Path did scatter because of the medium. It should not go
-        // Material scattering
-        MEDIUM_SCATTERED    = 2,
-        // TODO: Maybe incorporate ray type?
-        //
-        END
-    };
-    using PathStatus = Bitset<static_cast<size_t>(PathStatusEnum::END)>;
-
     struct Options
     {
         uint32_t            totalSPP = 16'384;
@@ -96,7 +57,6 @@ namespace PathTraceRDetail
         RenderMode          renderMode = RenderMode::E::THROUGHPUT;
     };
 
-
     template<class LightSampler, class SpectrumConverter>
     struct GlobalState
     {
@@ -106,13 +66,6 @@ namespace PathTraceRDetail
         SampleMode          sampleMode;
         LightSampler        lightSampler;
         SpecConverterData   specContextData;
-    };
-
-    struct alignas(4) PathDataPack
-    {
-        uint8_t     depth;
-        PathStatus  status;
-        RayType     type;
     };
 
     struct RayState

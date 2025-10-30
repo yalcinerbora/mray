@@ -554,7 +554,6 @@ class RendererBase : public RendererI
     RenderCameraWorkList    currentCameraWorks;
     HitKeyPack              boundaryLightKeyPack;
     // Current Canvas info
-    MRayColorSpaceEnum      curColorSpace;
     ImageTiler              imageTiler;
     uint64_t                totalIterationCount;
 

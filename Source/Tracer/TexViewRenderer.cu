@@ -353,7 +353,6 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     // does this move to a templated intermediate class
     // on the inheritance chain
     currentOptions = newOptions;
-    curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
     totalIterationCount = 0;
 
     // Skip if nothing to show
@@ -399,14 +398,15 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
 
 
     // Load spectral system if spectral mode is enabled
+    auto colorSpace = tracerView.tracerParams.globalTextureColorSpace;
     if(currentOptions.isSpectral && t->IsColor() == AttributeIsColor::IS_COLOR)
     {
         // Don't bother reloading context if colorspace is same
-        if(!spectrumContext || spectrumContext->ColorSpace() != curColorSpace)
+        if(!spectrumContext || spectrumContext->ColorSpace() != colorSpace)
         {
             using SC = SpectrumContextJakob2019;
-            spectrumContext = std::make_unique<SC>(curColorSpace,
-                                                   tracerView.tracerParams.wavelengthSampleMode,
+            auto wlSampleMode = tracerView.tracerParams.wavelengthSampleMode;
+            spectrumContext = std::make_unique<SC>(colorSpace, wlSampleMode,
                                                    gpuSystem);
         }
 
@@ -438,7 +438,7 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     {
         .data = bufferPtrAndSize.first,
         .totalSize = bufferPtrAndSize.second,
-        .renderColorSpace = curColorSpace,
+        .renderColorSpace = colorSpace,
         .resolution = imageTiler.FullResolution(),
         .curRenderLogic0 = textureIndex,
         .curRenderLogic1 = mipIndex

@@ -8,78 +8,6 @@
 
 #include "Core/Timer.h"
 
-struct SetPathStateFunctor
-{
-    PathStatusEnum e;
-    bool firstInit;
-
-    MRAY_HOST inline
-    SetPathStateFunctor(PathStatusEnum eIn, bool firstInit = false)
-        : e(eIn)
-        , firstInit(firstInit)
-    {}
-
-    MR_HF_DECL
-    void operator()(PathDataPack& s) const
-    {
-        if(firstInit) s.status.Reset();
-
-        if(e == PathStatusEnum::INVALID)
-            s.status.Set(uint32_t(PathStatusEnum::DEAD), false);
-        else if(e == PathStatusEnum::DEAD)
-            s.status.Set(uint32_t(PathStatusEnum::INVALID), false);
-        //
-        s.status.Set(uint32_t(e));
-    }
-};
-
-class IsDeadAliveInvalidFunctor
-{
-    Span<const PathDataPack> dPathDataPack;
-
-    public:
-    IsDeadAliveInvalidFunctor(Span<const PathDataPack> dPathDataPackIn)
-        : dPathDataPack(dPathDataPackIn)
-    {}
-
-    MR_HF_DECL
-    uint32_t operator()(RayIndex index) const noexcept
-    {
-        const PathStatus state = dPathDataPack[index].status;
-
-        bool isDead = state[uint32_t(PathStatusEnum::DEAD)];
-        bool isInvalid = state[uint32_t(PathStatusEnum::INVALID)];
-        assert(!isDead || !isInvalid);
-
-        if(isDead)          return 0;
-        else if(isInvalid)  return 1;
-        else                return 2;
-    }
-};
-
-class IsAliveFunctor
-{
-    Span<const PathDataPack> dPathDataPack;
-    bool checkInvalidAsDead;
-
-    public:
-    IsAliveFunctor(Span<const PathDataPack> dPathDataPackIn,
-                   bool checkInvalidAsDeadIn = false)
-        : dPathDataPack(dPathDataPackIn)
-        , checkInvalidAsDead(checkInvalidAsDeadIn)
-    {}
-
-    MR_HF_DECL
-    bool operator()(RayIndex index) const
-    {
-        const PathStatus state = dPathDataPack[index].status;
-        bool result = state[uint32_t(PathStatusEnum::DEAD)];
-        if(checkInvalidAsDead)
-            result = result || state[uint32_t(PathStatusEnum::INVALID)];
-        return !result;
-    }
-};
-
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static
 void KCWriteInvalidRaysIndirect(MRAY_GRID_CONSTANT const Span<PathDataPack> dPathDataPack,
@@ -331,7 +259,7 @@ PathTracerRendererBase::AddRadianceToRenderBufferThroughput(Span<const RayIndex>
 
 void
 PathTracerRendererBase::AddRadianceToRenderBufferLatency(Span<const RayIndex> dDeadRayIndices,
-                                                         const GPUQueue& processQueue)
+                                                         const GPUQueue& processQueue) const
 {
     if(dDeadRayIndices.empty()) return;
 
@@ -354,7 +282,7 @@ PathTracerRendererBase::AddRadianceToRenderBufferLatency(Span<const RayIndex> dD
         );
     }
 
-    ImageSpan filmSpan = this->imageTiler.GetTileSpan();
+    ImageSpan filmSpan = imageTiler.GetTileSpan();
     SetImagePixelsIndirect
     (
         filmSpan,
@@ -367,12 +295,12 @@ PathTracerRendererBase::AddRadianceToRenderBufferLatency(Span<const RayIndex> dD
 }
 
 RendererAnalyticData
-PathTracerRendererBase::CalculateAnalyticDataThroughput(size_t deadRayCount, const Timer& timer)
+PathTracerRendererBase::CalculateAnalyticDataThroughput(size_t deadRayCount, uint32_t totalSPP,
+                                                        const Timer& timer)
 {
-    totalIterationCount++;
+    totalDeadRayCount += deadRayCount;
     // Basic Idea is to track how fast we kill (complete) paths
     // per iteration
-    totalDeadRayCount += deadRayCount;
     double timeSec = timer.Elapsed<Second>();
     double pathPerSec = static_cast<double>(deadRayCount);
     pathPerSec /= timeSec;
@@ -389,7 +317,7 @@ PathTracerRendererBase::CalculateAnalyticDataThroughput(size_t deadRayCount, con
         "spp",
         float(timer.Elapsed<Millisecond>()),
         imageTiler.FullResolution(),
-        MRayColorSpaceEnum::MR_ACES_CG,
+        tracerView.tracerParams.globalTextureColorSpace,
         GPUMemoryUsage(),
         0,
         0
@@ -397,12 +325,13 @@ PathTracerRendererBase::CalculateAnalyticDataThroughput(size_t deadRayCount, con
 }
 
 RendererAnalyticData
-PathTracerRendererBase::CalculateAnalyticDataLatency(uint32_t passPathCount, const Timer& timer)
+PathTracerRendererBase::CalculateAnalyticDataLatency(uint32_t passPathCount,
+                                                     uint32_t totalSPP,
+                                                     const Timer& timer) const
 {
-    totalIterationCount++;
     uint32_t tileCount1D = imageTiler.TileCount().Multiply();
 
-    double timeSec = timer.Elapsed<Millisecond>();
+    double timeSec = timer.Elapsed<Second>();
     double pathPerSec = static_cast<double>(passPathCount);
     pathPerSec /= timeSec;
     pathPerSec /= 1'000'000;
@@ -419,21 +348,21 @@ PathTracerRendererBase::CalculateAnalyticDataLatency(uint32_t passPathCount, con
         "spp",
         float(timer.Elapsed<Millisecond>()),
         imageTiler.FullResolution(),
-        MRayColorSpaceEnum::MR_ACES_CG,
+        tracerView.tracerParams.globalTextureColorSpace,
         GPUMemoryUsage(),
         0,
         0
     };
 }
 
-void
+typename PathTracerRendererBase::InitOutput
 PathTracerRendererBase::InitializeForRender(CamSurfaceId camSurfId,
-                                            uint32_t maxWorkCount,
                                             uint32_t sppLimit,
                                             bool retainCameraTransform,
                                             const RenderImageParams& renderImgParams)
 {
-    GenerateWorks();
+    // Create work classes specific for this renderer
+    uint32_t totalWorkCount = GenerateWorks();
 
     // ========================= //
     //     Camera and Stuff      //
@@ -441,12 +370,12 @@ PathTracerRendererBase::InitializeForRender(CamSurfaceId camSurfId,
     assert(currentCameraWorks.size() != 0);
     // Find camera surface and get keys work instance for that
     // camera etc.
-    auto surfLoc = std::find_if (tracerView.camSurfs.cbegin(),
-                                 tracerView.camSurfs.cend(),
-                                 [camSurfId](const auto& pair)
-                                 {
-                                     return pair.first == camSurfId;
-                                 });
+    auto surfLoc = std::find_if(tracerView.camSurfs.cbegin(),
+                                tracerView.camSurfs.cend(),
+                                [camSurfId](const auto& pair)
+                                {
+                                    return pair.first == camSurfId;
+                                });
     if(surfLoc == tracerView.camSurfs.cend())
         throw MRayError("[{:s}]: Unknown camera surface id ({:d})",
                         rendererName, uint32_t(camSurfId));
@@ -497,7 +426,7 @@ PathTracerRendererBase::InitializeForRender(CamSurfaceId camSurfId,
     // Initialize ray partitioner with worst case scenario,
     // All work types are used. (We do not use camera work
     // for this type of renderer)
-    rayPartitioner = RayPartitioner(gpuSystem, maxRayCount, maxWorkCount);
+    rayPartitioner = RayPartitioner(gpuSystem, maxRayCount, totalWorkCount);
 
     // ========================= //
     //  Base Accelerator Tracer  //
@@ -538,6 +467,11 @@ PathTracerRendererBase::InitializeForRender(CamSurfaceId camSurfId,
         cameraTransform = std::nullopt;
         curCamTransformOverride = std::nullopt;
     }
+    return InitOutput
+    {
+        .maxRayCount = maxRayCount,
+        .totalWorkCount = totalWorkCount
+    };
 }
 
 PathTracerRendererBase::PathTracerRendererBase(const RenderImagePtr& rip,

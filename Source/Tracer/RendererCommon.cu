@@ -64,11 +64,11 @@ void KCSetBoundaryWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<HitKeyPack> dWo
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCCopyRays(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
-                MRAY_GRID_CONSTANT const Span<RayCone> dRayDiffOut,
-                MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
-                MRAY_GRID_CONSTANT const Span<const RayGMem> dRaysIn,
-                MRAY_GRID_CONSTANT const Span<const RayCone> dRayDiffIn)
+void KCCopyRaysIndirect(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
+                        MRAY_GRID_CONSTANT const Span<RayCone> dRayDiffOut,
+                        MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
+                        MRAY_GRID_CONSTANT const Span<const RayGMem> dRaysIn,
+                        MRAY_GRID_CONSTANT const Span<const RayCone> dRayDiffIn)
 {
     KernelCallParams kp;
     uint32_t pathCount = static_cast<uint32_t>(dIndices.size());

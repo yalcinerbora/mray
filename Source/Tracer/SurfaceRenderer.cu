@@ -173,9 +173,9 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // TODO: These may be  common operations, every renderer
     // does this move to a templated intermediate class
     // on the inheritance chain
+    auto colorSpace = tracerView.tracerParams.globalTextureColorSpace;
     cameraTransform = std::nullopt;
     curCamTransformOverride = std::nullopt;
-    curColorSpace = tracerView.tracerParams.globalTextureColorSpace;
     currentOptions = newOptions;
     anchorMode = currentOptions.mode;
     totalIterationCount = 0;
@@ -325,7 +325,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     {
         .data = bufferPtrAndSize.first,
         .totalSize = bufferPtrAndSize.second,
-        .renderColorSpace = curColorSpace,
+        .renderColorSpace = colorSpace,
         .resolution = imageTiler.FullResolution(),
         .curRenderLogic0 = sendMode,
         .curRenderLogic1 = std::numeric_limits<uint32_t>::max()

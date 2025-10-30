@@ -285,9 +285,9 @@ bool HashGridRenderer::CopyAliveRays(uint32_t rayCount, uint32_t maxWorkCount,
     if(dIndices.empty()) return false;
 
     uint32_t aliveRayCount = static_cast<uint32_t>(dIndices.size());
-    processQueue.IssueWorkKernel<KCCopyRays>
+    processQueue.IssueWorkKernel<KCCopyRaysIndirect>
     (
-        "KCCopyRays",
+        "KCCopyRaysIndirect",
         DeviceWorkIssueParams{.workCount = aliveRayCount},
         dRays, dRayCones,
         dIndices,

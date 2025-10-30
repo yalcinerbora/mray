@@ -62,7 +62,11 @@ concept SpectrumContextC = requires(const C c, const GPUQueue & queue)
 
 struct SpectrumContextI
 {
-    virtual                     ~SpectrumContextI() = default;
+    // TODO: This is risky since, parent class will be sent to GPU
+    // and it may get destroyed there and this virtual pointer will be
+    // unaccessable from GPU. Currently it works but we need to change
+    // the design later (constexpr makes it GPU-capable).
+    virtual constexpr           ~SpectrumContextI() = default;
     //
     virtual MRayColorSpaceEnum  ColorSpace() const = 0;
     virtual RNRequestList       SampleSpectrumRNList() const = 0;

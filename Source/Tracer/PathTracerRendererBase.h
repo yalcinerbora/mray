@@ -2,7 +2,7 @@
 
 #include "Tracer/RendererC.h"
 #include "Tracer/RayPartitioner.h"
-#include "SpectrumContext.h"
+#include "SpectrumC.h"
 
 #include "Core/NamedEnum.h"
 
@@ -55,6 +55,79 @@ struct alignas(4) PathDataPack
     RayType     type;
 };
 
+struct SetPathStateFunctor
+{
+    PathStatusEnum e;
+    bool firstInit;
+
+    MRAY_HOST inline
+    SetPathStateFunctor(PathStatusEnum eIn, bool firstInit = false)
+        : e(eIn)
+        , firstInit(firstInit)
+    {}
+
+    MR_HF_DECL
+    void operator()(PathDataPack& s) const
+    {
+        if(firstInit) s.status.Reset();
+
+        if(e == PathStatusEnum::INVALID)
+            s.status.Set(uint32_t(PathStatusEnum::DEAD), false);
+        else if(e == PathStatusEnum::DEAD)
+            s.status.Set(uint32_t(PathStatusEnum::INVALID), false);
+        //
+        s.status.Set(uint32_t(e));
+    }
+};
+
+class IsDeadAliveInvalidFunctor
+{
+    Span<const PathDataPack> dPathDataPack;
+
+    public:
+    IsDeadAliveInvalidFunctor(Span<const PathDataPack> dPathDataPackIn)
+        : dPathDataPack(dPathDataPackIn)
+    {}
+
+    MR_HF_DECL
+    uint32_t operator()(RayIndex index) const noexcept
+    {
+        const PathStatus state = dPathDataPack[index].status;
+
+        bool isDead = state[uint32_t(PathStatusEnum::DEAD)];
+        bool isInvalid = state[uint32_t(PathStatusEnum::INVALID)];
+        assert(!isDead || !isInvalid);
+
+        if(isDead)          return 0;
+        else if(isInvalid)  return 1;
+        else                return 2;
+    }
+};
+
+class IsAliveFunctor
+{
+    Span<const PathDataPack> dPathDataPack;
+    bool checkInvalidAsDead;
+
+    public:
+    IsAliveFunctor(Span<const PathDataPack> dPathDataPackIn,
+                   bool checkInvalidAsDeadIn = false)
+        : dPathDataPack(dPathDataPackIn)
+        , checkInvalidAsDead(checkInvalidAsDeadIn)
+    {}
+
+    MR_HF_DECL
+    bool operator()(RayIndex index) const
+    {
+        const PathStatus state = dPathDataPack[index].status;
+        bool result = state[uint32_t(PathStatusEnum::DEAD)];
+        if(checkInvalidAsDead)
+            result = result || state[uint32_t(PathStatusEnum::INVALID)];
+        return !result;
+    }
+};
+
+
 struct PathTracerRendererBase : public RendererBase
 {
     public:
@@ -63,16 +136,22 @@ struct PathTracerRendererBase : public RendererBase
         Span<RayIndex> dIndices;
         uint32_t aliveRayCount;
     };
+    struct InitOutput
+    {
+        uint32_t maxRayCount;
+        uint32_t totalWorkCount;
+    };
+
     using RenderImageSectionOpt = Optional<RenderImageSection>;
 
-    private:
+    protected:
     using FilmFilterPtr = std::unique_ptr<TextureFilterI>;
+    using SpectrumContextPtr = std::unique_ptr<SpectrumContextI>;
     // On throughput mode, we do this burst, on latency mode
     // burst is implicit and is 1
     static constexpr uint32_t BurstSize = 32u;
     //
     FilmFilterPtr               filmFilter;
-    RenderWorkHasher            workHasher;
     //
     Optional<CameraTransform>   curCamTransformOverride;
     CameraSurfaceParams         curCamSurfaceParams;
@@ -84,7 +163,6 @@ struct PathTracerRendererBase : public RendererBase
     uint64_t                    totalDeadRayCount = 0;
     RenderMode                  renderMode;
     uint32_t                    burstSize;
-    uint32_t                    totalSPP;
     //
     RayPartitioner              rayPartitioner;
     RNGeneratorPtr              rnGenerator;
@@ -93,7 +171,7 @@ struct PathTracerRendererBase : public RendererBase
     //  Camera Ray Generation Related  //
     // =============================== //
     // If spectral mode is enabled, these must be set.
-    const SpectrumContextI*     spectrumContext;
+    SpectrumContextPtr          spectrumContext;
     Span<SpectrumWaves>         dPathWavelengths;
     Span<Spectrum>              dSpectrumWavePDFs;
     // ================================ //
@@ -112,9 +190,11 @@ struct PathTracerRendererBase : public RendererBase
 
     // Helpers
     uint64_t              TotalSampleLimit(uint32_t spp) const;
-    RendererAnalyticData  CalculateAnalyticDataThroughput(size_t deadRayCount, const Timer& timer);
+    RendererAnalyticData  CalculateAnalyticDataThroughput(size_t deadRayCount, uint32_t totalSPP,
+                                                          const Timer& timer);
 
-    RendererAnalyticData  CalculateAnalyticDataLatency(uint32_t passPathCount, const Timer& timer);
+    RendererAnalyticData  CalculateAnalyticDataLatency(uint32_t passPathCount, uint32_t totalSPP,
+                                                       const Timer& timer) const;
     ReloadPathOutput      ReloadPaths(Span<const RayIndex> dIndices,
                                       uint32_t sppLimit, const GPUQueue& processQueue);
     void                  ResetAllPaths(const GPUQueue& queue);
@@ -123,9 +203,8 @@ struct PathTracerRendererBase : public RendererBase
                                                               const GPUQueue& processQueue,
                                                               const GPUQueue& transferQueue);
     void                  AddRadianceToRenderBufferLatency(Span<const RayIndex> dDeadRayIndices,
-                                                           const GPUQueue& processQueue);
-    void                  InitializeForRender(CamSurfaceId camSurfId,
-                                              uint32_t maxRayCount,
+                                                           const GPUQueue& processQueue) const;
+    InitOutput            InitializeForRender(CamSurfaceId camSurfId,
                                               uint32_t sppLimit,
                                               bool retainCameraTransform,
                                               const RenderImageParams& renderImgParams);

@@ -98,7 +98,7 @@ class ImageTiler
     Vector2ui   TileCount() const;
     void        NextTile();
 
-    ImageSpan   GetTileSpan();
+    ImageSpan   GetTileSpan() const;
 
     Optional<RenderImageSection>
     TransferToHost(const GPUQueue& processQueue,
@@ -150,8 +150,8 @@ class RenderImage
 
     // Members
     // Access
-    std::array<Span<Float>, 3>  Pixels();
-    Span<Float>                 Weights();
+    std::array<Span<Float>, 3>  Pixels() const;
+    Span<Float>                 Weights() const;
     //
     Vector2ui           Extents() const;
     uint32_t            ChannelCount() const;
@@ -267,13 +267,11 @@ Vector3 ImageSpan::AddToPixelAtomic(const Vector3& val,
 }
 
 inline
-ImageSpan ImageTiler::GetTileSpan()
+ImageSpan ImageTiler::GetTileSpan() const
 {
     std::array<Span<Float>, 3> pixels = renderBuffer->Pixels();
 
-    return ImageSpan(pixels[0],
-                     pixels[1],
-                     pixels[2],
+    return ImageSpan(pixels[0], pixels[1], pixels[2],
                      renderBuffer->Weights(),
                      Vector2i(CurrentTileSize()),
                      // TODO: Add padding
@@ -283,13 +281,13 @@ ImageSpan ImageTiler::GetTileSpan()
 
 
 inline
-std::array<Span<Float>, 3> RenderImage::Pixels()
+std::array<Span<Float>, 3> RenderImage::Pixels() const
 {
     return {dPixelsR, dPixelsG, dPixelsB};
 }
 
 inline
-Span<Float> RenderImage::Weights()
+Span<Float> RenderImage::Weights() const
 {
     return dWeights;
 }

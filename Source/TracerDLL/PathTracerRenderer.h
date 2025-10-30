@@ -1,17 +1,16 @@
 #pragma once
 
-#include "Tracer/RendererC.h"
-#include "Tracer/RayPartitioner.h"
+#include "Tracer/PathTracerRendererBase.h"
 
 #include "RequestedTypes.h" // IWYU pragma: keep
 #include "PathTracerRendererShaders.h"
 #include "SpectrumContext.h"
 
 template<SpectrumContextC SpectrumContextT>
-class PathTracerRendererT final : public RendererBase
+class PathTracerRendererT final : public PathTracerRendererBase
 {
     using This              = PathTracerRendererT<SpectrumContextT>;
-    using FilmFilterPtr     = std::unique_ptr<TextureFilterI>;
+    using Base              = PathTracerRendererBase;
     using Options           = PathTraceRDetail::Options;
     using SampleMode        = PathTraceRDetail::SampleMode;
     using LightSamplerType  = PathTraceRDetail::LightSamplerType;
@@ -54,69 +53,38 @@ class PathTracerRendererT final : public RendererBase
     MR_HF_DECL
     static SpectrumConverter GenSpectrumConverter(const RenderWorkParams&, RayIndex rIndex);
 
-    // On throughput mode, we do this burst, on latency mode
-    // burst is implicit and is 1
-    static constexpr uint32_t BurstSize = 32;
-
     private:
     Options     currentOptions  = {};
     Options     newOptions      = {};
     //
-    MetaLightList               metaLightArray;
-    //
-    FilmFilterPtr               filmFilter;
-    RenderWorkHasher            workHasher;
-    //
-    Optional<CameraTransform>   curCamTransformOverride;
-    CameraSurfaceParams         curCamSurfaceParams;
-    TransformKey                curCamTransformKey;
-    CameraKey                   curCamKey;
-    const RenderCameraWorkI*    curCamWork;
-    std::vector<uint64_t>       tilePathCounts;
-    std::vector<uint64_t>       tileSPPs;
-    uint64_t                    totalDeadRayCount = 0;
-    SampleMode                  anchorSampleMode;
-    //
-    RayPartitioner              rayPartitioner;
-    RNGeneratorPtr              rnGenerator;
-    //
+    MetaLightList       metaLightArray;
+    // Memory
     DeviceMemory        rendererGlobalMem;
-    Span<MetaHit>       dHits;
-    Span<HitKeyPack>    dHitKeys;
-    Span<RayGMem>       dRays;
-    Span<RayCone>       dRayCones;
-    Span<uint32_t>      dShadowRayVisibilities;
-    Span<RandomNumber>  dRandomNumBuffer;
-    Span<Byte>          dSubCameraBuffer;
-    Span<uint16_t>      dPathRNGDimensions;
-    RayState            dRayState;
     // Work Hash related
+    RenderWorkHasher    workHasher;
     Span<CommonKey>     dWorkHashes;
     Span<CommonKey>     dWorkBatchIds;
+    // Ray-cast Related
+    Span<MetaHit>       dHits;
+    Span<HitKeyPack>    dHitKeys;
+    Span<uint32_t>      dShadowRayVisibilities;
+    // Buffer for next set of rays
+    Span<RayGMem>       dOutRays;
+    Span<RayCone>       dOutRayCones;
     //
-    bool                saveImage;
+    Span<Float>         dPrevMatPDF;
+    Span<Spectrum>      dShadowRayRadiance;
     //
-    uint64_t            SPPLimit(uint32_t spp) const;
+    bool                saveImage  = false;
+
+    // Helpers
+    void                CopyAliveRays(Span<const RayIndex> dAliveRayIndices, const GPUQueue&);
     uint32_t            FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
-    //
-    SpecContextPtr      spectrumContext;
-    bool                isSpectral = IsSpectral;
-    Span<Spectrum>      dSpectrumWavePDFs;
-
-    Pair<Span<RayIndex>, uint32_t>
-    ReloadPaths(Span<const RayIndex> dIndices,
-                uint32_t sppLimit,
-                const GPUQueue& processQueue);
-
-    void                ResetAllPaths(const GPUQueue& queue);
-    Span<RayIndex>      DoRenderPass(uint32_t sppLimit,
-                                     const GPUQueue& queue);
-    //
-    RendererOutput      DoThroughputSingleTileRender(const GPUDevice& device,
-                                                     const GPUQueue& queue);
-    RendererOutput      DoLatencyRender(uint32_t passCount,
-                                        const GPUDevice& device,
-                                        const GPUQueue& queue);
+    Span<RayIndex>      DoRenderPass(uint32_t sppLimit, const GPUQueue&);
+    // Implementations
+    RendererOutput      DoThroughputSingleTileRender(const GPUDevice&, const GPUQueue&) override;
+    RendererOutput      DoLatencyRender(uint32_t passCount, const GPUDevice&,
+                                        const GPUQueue&) override;
 
     public:
     // Constructors & Destructor
@@ -140,7 +108,6 @@ class PathTracerRendererT final : public RendererBase
                                     CamSurfaceId camSurfId,
                                     uint32_t customLogicIndex0 = 0,
                                     uint32_t customLogicIndex1 = 0) override;
-    RendererOutput      DoRender() override;
     void                StopRender() override;
     size_t              GPUMemoryUsage() const override;
 };
