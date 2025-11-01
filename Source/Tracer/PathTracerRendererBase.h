@@ -139,6 +139,12 @@ class IsAliveFunctor
     }
 };
 
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCAccumulateShadowRays(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,
+                            MRAY_GRID_CONSTANT const Span<const Spectrum> dShadowRayRadiance,
+                            MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer,
+                            MRAY_GRID_CONSTANT const Span<const PathDataPack> dPathDataPack,
+                            MRAY_GRID_CONSTANT const Vector2ui rrRange);
 
 struct PathTracerRendererBase : public RendererBase
 {

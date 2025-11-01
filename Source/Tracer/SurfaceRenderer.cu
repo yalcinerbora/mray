@@ -537,10 +537,10 @@ RendererOutput SurfaceRenderer::DoRender()
                 }
 
                 workI.DoWork_1(dRayStateAO,
+                               dRays,
+                               dRayCones,
                                dLocalIndices,
                                dRandomNumBuffer,
-                               dRayCones,
-                               dRays,
                                dHits,
                                dHitKeys,
                                globalState,
@@ -550,10 +550,10 @@ RendererOutput SurfaceRenderer::DoRender()
             {
                 const auto& workI = UpcastRenderWork<SurfaceRenderer>(wLoc->workPtr);
                 workI.DoWork_0(dRayStateCommon,
+                               dRays,
+                               dRayCones,
                                dLocalIndices,
                                Span<const RandomNumber>{},
-                               dRayCones,
-                               dRays,
                                dHits,
                                dHitKeys,
                                globalState,
@@ -565,10 +565,10 @@ RendererOutput SurfaceRenderer::DoRender()
         {
             const auto& workI = UpcastRenderLightWork<SurfaceRenderer>(lightWLoc->workPtr);
             workI.DoBoundaryWork_0(dRayStateCommon,
+                                   dRays,
+                                   dRayCones,
                                    dLocalIndices,
                                    Span<const RandomNumber>{},
-                                   dRayCones,
-                                   dRays,
                                    dHits,
                                    dHitKeys,
                                    globalState,

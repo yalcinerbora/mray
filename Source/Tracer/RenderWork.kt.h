@@ -42,11 +42,11 @@ void KCRenderWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params params)
     uint32_t globalWarpId    = kp.GlobalId()  / THREAD_PER_WARP;
     uint32_t globalWarpCount = kp.TotalSize() / THREAD_PER_WARP;
 
-    uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
+    uint32_t rayCount = uint32_t(params.common.dRayIndices.size());
     for(uint32_t globalId = globalWarpId;
         globalId < rayCount; globalId += globalWarpCount)
     {
-        RNGDispenser rng(params.in.dRandomNumbers, globalId, rayCount);
+        RNGDispenser rng(params.common.dRandomNumbers, globalId, rayCount);
         // Here is the potential drawback of sorting based
         // partitioning, all of the parameters are loaded
         // via scattered reads.
@@ -55,14 +55,14 @@ void KCRenderWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params params)
         // so we transferred the non-contigious memory I/O to
         // here
         // Ray
-        RayIndex rIndex = params.in.dRayIndices[globalId];
-        auto [ray, tMM] = RayFromGMem(params.in.dRays, rIndex);
+        RayIndex rIndex = params.common.dRayIndices[globalId];
+        auto [ray, tMM] = RayFromGMem(params.common.dRays, rIndex);
         // Keys
-        HitKeyPack keys = params.in.dKeys[rIndex];
+        HitKeyPack keys = params.common.dKeys[rIndex];
         // Hit (TODO: What about single parameters?)
-        Hit hit = params.in.dHits[rIndex].template AsVector<Hit::Dims>();
+        Hit hit = params.common.dHits[rIndex].template AsVector<Hit::Dims>();
         // Advance the differential to the hit location
-        RayCone rayCone = params.in.dRayCones[rIndex].Advance(tMM[1]);
+        RayCone rayCone = params.common.dRayCones[rIndex].Advance(tMM[1]);
 
         // Get instantiation of converter
         // Converter is per ray, since it needs wavelengths of
@@ -121,14 +121,14 @@ void KCRenderLightWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params pa
     uint32_t globalWarpId    = kp.GlobalId()  / THREAD_PER_WARP;
     uint32_t globalWarpCount = kp.TotalSize() / THREAD_PER_WARP;
 
-    uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
+    uint32_t rayCount = uint32_t(params.common.dRayIndices.size());
     for(uint32_t globalId = globalWarpId;
         globalId < rayCount; globalId += globalWarpCount)
     {
-        RNGDispenser rng(params.in.dRandomNumbers, globalId, rayCount);
-        RayIndex rIndex = params.in.dRayIndices[globalId];
+        RNGDispenser rng(params.common.dRandomNumbers, globalId, rayCount);
+        RayIndex rIndex = params.common.dRayIndices[globalId];
         // Keys
-        HitKeyPack keys = params.in.dKeys[rIndex];
+        HitKeyPack keys = params.common.dKeys[rIndex];
         LightKey lKey = LightKey::CombinedKey(keys.lightOrMatKey.FetchBatchPortion(),
                                               keys.lightOrMatKey.FetchIndexPortion());
         // Create transform context

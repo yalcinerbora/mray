@@ -115,6 +115,12 @@ namespace GuidedPTRDetail
         Span<MCIrradiance>  dMarkovIrradParams;
     };
 
+    struct alignas(8) PrevReflectance
+    {
+        Float avgReflectance;
+        Float pdf;
+    };
+
     struct RayState
     {
         Span<Spectrum>          dPathRadiance;
@@ -125,16 +131,15 @@ namespace GuidedPTRDetail
         Span<Spectrum>          dThroughput;
         Span<PathDataPack>      dPathDataPack;
         Span<Float>             dPDFChain;
-        // Next set of rays
-        Span<RayGMem>           dOutRays;
-        Span<RayCone>           dOutRayCones;
+        Span<PrevReflectance>   dPrevPathReflectance;
         // Backup RNG State
         Span<BackupRNGState>    dBackupRNGStates;
         // NEE Related
-        Span<Float>             dPrevMatPDF;
         Span<Spectrum>          dShadowRayRadiance;
+        Span<RayGMem>           dShadowRays;
+        Span<RayCone>           dShadowRayCones;
+        Span<PrevReflectance>   dPrevShadowReflectance;
         // Current lifted markov chain
-        Span<SpatioDirCode>     dPrevHitCodes;
         Span<uint32_t>          dLiftedMarkovChainIndex;
     };
 
@@ -205,18 +210,12 @@ namespace GuidedPTRDetail
                                        uint32_t mcSampleCount,
                                        const Vector3& samplePos);
 
-    template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-    using WorkParams = RenderWorkParams<GlobalState, RayState, PG, MG, TG>;
-
-    template<LightGroupC LG, TransformGroupC TG>
-    using LightWorkParams = RenderLightWorkParams<GlobalState, RayState, LG, TG>;
-
     template<PrimitiveGroupC PGType, MaterialGroupC MGType, TransformGroupC TGType>
     struct WorkFunction
     {
         MRAY_WORK_FUNCTOR_DEFINE_TYPES(PGType, MGType, TGType,
                                        SpectrumContextJakob2019, 1u);
-        using Params = WorkParams<PG, MG, TG>;
+        using Params = RenderWorkParams<GlobalState, RayState, PG, MG, TG>;
 
         MR_GF_DECL
         static void Call(const Primitive&, const Material&, const Surface&,
@@ -231,7 +230,7 @@ namespace GuidedPTRDetail
     {
         MRAY_LIGHT_WORK_FUNCTOR_DEFINE_TYPES(LGType, TGType,
                                              SpectrumContextJakob2019, 1u);
-        using Params = LightWorkParams<LG, TG>;
+        using Params = RenderLightWorkParams<GlobalState, RayState, LG, TG>;
 
         MR_HF_DECL
         static void Call(const Light&, RNGDispenser&, const SpectrumConv&,
@@ -466,7 +465,7 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
 
     if(dataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
 
-    auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
+    auto [rayIn, tMM] = RayFromGMem(params.common.dRays, rayIndex);
     Vector3 wOWorld = Math::Normalize(-rayIn.dir);
     Vector3 wO = Math::Normalize(tContext.InvApplyN(wOWorld));
     RayConeSurface rConeRefract = mat.RefractRayCone(surfRayCone, wO);
@@ -540,27 +539,43 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     //   NEE Throughput   //
     // ================== //
     Spectrum shadowRadiance = throughput;
-    shadowRadiance *= mat.Evaluate(lightWILocalRay, wO).reflectance;
+    BxDFEval shadowRayEval = mat.Evaluate(lightWILocalRay, wO);
+    shadowRadiance *= shadowRayEval.reflectance;
     shadowRadiance *= lightSample.value.emission;
     shadowRadiance = DivideByPDF(shadowRadiance, prevPDF * pdfShadow);
-
+    RayCone shadowRayConeOut = rConeRefract.ConeAfterScatter(shadowRay.dir,
+                                                             surf.geoNormal);
     // ================== //
     //   Path Throughput  //
     // ================== //
     throughput *= combinedSample.eval.reflectance;
-    RayCone rayConeOut = rConeRefract.ConeAfterScatter(combinedSample.wI.dir,
-                                                       surf.geoNormal);
+    RayCone pathRayConeOut = rConeRefract.ConeAfterScatter(combinedSample.wI.dir,
+                                                           surf.geoNormal);
 
     // ================ //
     //    Dispersion    //
     // ================ //
+    static constexpr Float SpectrumCountInv = Float(1) / Float(SpectraPerSpectrum);
+    Float avgPathReflectance, avgShadowReflectance;
     if constexpr(!SpectrumConv::IsRGB)
     {
+        // Path
         if(combinedSample.eval.isDispersed)
         {
             spectrumConverter.DisperseWaves();
             spectrumConverter.StoreWaves();
+            avgPathReflectance = combinedSample.eval.reflectance[0];
         }
+        else avgPathReflectance = combinedSample.eval.reflectance.Sum() * SpectrumCountInv;
+        // NEE
+        if(shadowRayEval.isDispersed)
+        {
+            Float first = shadowRadiance[0];
+            shadowRadiance = Spectrum::Zero();
+            shadowRadiance[0] = first;
+            avgShadowReflectance = shadowRayEval.reflectance[0];
+        }
+        else avgShadowReflectance = shadowRayEval.reflectance.Sum() * SpectrumCountInv;
     }
 
     // ================ //
@@ -587,28 +602,41 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     // Selectively write if path is alive
     if(!isPathDead)
     {
-        // If alive update state
-        rayState.dThroughput[rayIndex] = throughput;
-        rayState.dPDFChain[rayIndex]   = prevPDF * pdfPath;
-        rayState.dPrevMatPDF[rayIndex] = pdfPath;
-
-        //// Store this pdf for path ray's potential light hit
-        prevPDF *= pdfPath;
-
         // ================ //
         //  Scattered Ray   //
         // ================ //
         Vector3 nudgeNormal = surf.geoNormal;
         if(combinedSample.eval.isPassedThrough)
             nudgeNormal *= Float(-1);
-        Ray rayOut = combinedSample.wI.Nudge(nudgeNormal);
-
+        Ray pathRayOut = combinedSample.wI.Nudge(nudgeNormal);
         // If I remember correctly, OptiX does not like INF on rays,
         // so we put flt_max here.
-        Vector2 tMMOut = Vector2(0, std::numeric_limits<Float>::max());
-        RayToGMem(params.rayState.dOutRays, rayIndex, rayOut, tMMOut);
-        // Continue the ray cone
-        rayState.dOutRayCones[rayIndex] = rayConeOut;
+        Vector2 pathTMMOut = Vector2(0, std::numeric_limits<Float>::max());
+        RayToGMem(params.common.dRays, rayIndex, pathRayOut, pathTMMOut);
+        params.common.dRayCones[rayIndex] = pathRayConeOut;
+        rayState.dThroughput[rayIndex] = throughput;
+        rayState.dPDFChain[rayIndex] = prevPDF * pdfPath;
+        // Store this pdf for path ray's potential light hit
+        rayState.dPrevPathReflectance[rayIndex] = PrevReflectance
+        {
+            .avgReflectance = avgPathReflectance,
+            .pdf = pdfPath
+        };
+        // ================= //
+        //  Shadow(NEE) Ray  //
+        // ================= //
+        nudgeNormal = surf.geoNormal;
+        if(shadowRayEval.isPassedThrough)
+            nudgeNormal *= Float(-1);
+        shadowRay = shadowRay.Nudge(nudgeNormal);
+        RayToGMem(rayState.dShadowRays, rayIndex, pathRayOut, shadowTMM);
+        rayState.dShadowRayCones[rayIndex] = shadowRayConeOut;
+        rayState.dShadowRayRadiance[rayIndex] = shadowRadiance;
+        rayState.dPrevShadowReflectance[rayIndex] = PrevReflectance
+        {
+            .avgReflectance = avgShadowReflectance,
+            .pdf = pdfShadow
+        };
     }
     else
     {
@@ -630,9 +658,8 @@ void LightWorkFunction<L, T>::Call(const Light& l, RNGDispenser&, const Spectrum
     if(pathDataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
 
     bool switchToMISPdf = pathDataPack.type == RayType::PATH_RAY;
-    Spectrum throughput = params.rayState.dThroughput[rayIndex];
-    auto [ray, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-    RayCone rayCone = params.in.dRayCones[rayIndex].Advance(tMM[1]);
+    auto [ray, tMM] = RayFromGMem(params.common.dRays, rayIndex);
+    RayCone rayCone = params.common.dRayCones[rayIndex].Advance(tMM[1]);
     if(switchToMISPdf)
     {
         using Distribution::MIS::BalanceCancelled;
@@ -640,18 +667,20 @@ void LightWorkFunction<L, T>::Call(const Light& l, RNGDispenser&, const Spectrum
         //
         std::array<Float, 2> weights = {1, 1};
         std::array<Float, 2> pdfs;
-        //pdfs[0] = params.rayState.dPrevMatPDF[rayIndex];
+        pdfs[0] = params.rayState.dPrevPathReflectance[rayIndex].pdf;
         // We need to find the index of this specific light
         // Light sampler will handle it
-        HitKeyPack hitKeyPack = params.in.dKeys[rayIndex];
-        MetaHit hit = params.in.dHits[rayIndex];
+        HitKeyPack hitKeyPack = params.common.dKeys[rayIndex];
+        MetaHit hit = params.common.dHits[rayIndex];
         pdfs[1] = params.globalState.lightSampler.PdfLight(hitKeyPack, hit, ray);
         Float misPdf = BalanceCancelled<2>(pdfs, weights);
         // We premultiply the throughput under the assumption this will not hit a light,
         // but we did. So revert the multiplication first then multiply with
         // MIS weight.
-        throughput *= pdfs[0];
-        throughput = DivideByPDF(throughput, misPdf);
+        Float pdfChain = params.rayState.dPDFChain[rayIndex];
+        pdfChain /= pdfs[0];
+        pdfChain *= misPdf;
+        params.rayState.dPDFChain[rayIndex] = pdfChain;
     }
 
     Vector3 wO = -ray.dir;
@@ -661,7 +690,7 @@ void LightWorkFunction<L, T>::Call(const Light& l, RNGDispenser&, const Spectrum
         // It is more accurate to use hit if we actually hit the material
         using Hit = typename Light::Primitive::Hit;
         static constexpr uint32_t N = Hit::Dims;
-        MetaHit metaHit = params.in.dHits[rayIndex];
+        MetaHit metaHit = params.common.dHits[rayIndex];
         Hit hit = metaHit.AsVector<N>();
         emission = l.EmitViaHit(wO, hit, rayCone);
     }
@@ -676,6 +705,7 @@ void LightWorkFunction<L, T>::Call(const Light& l, RNGDispenser&, const Spectrum
     Vector2ui rrRange = params.globalState.russianRouletteRange;
     if((pathDataPack.depth + 1u) <= rrRange[1])
     {
+        Spectrum throughput = params.rayState.dThroughput[rayIndex];
         Spectrum radianceEstimate = emission * throughput;
         params.rayState.dPathRadiance[rayIndex] += radianceEstimate;
     }

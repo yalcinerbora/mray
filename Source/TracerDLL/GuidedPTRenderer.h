@@ -16,10 +16,7 @@ class GuidedPTRenderer final : public PathTracerRendererBase
     using AttribInfoList        = typename RendererBase::AttribInfoList;
     using SpectrumContext       = SpectrumContextJakob2019;
     using SpectrumConverter     = typename SpectrumContext::Converter;
-    //
-    ////using SpecContextPtr        = std::unique_ptr<SpectrumContext>;
-    //using SpecContextPtr = std::unique_ptr<SpectrumContext>;
-    //static constexpr bool IsSpectral = !std::is_same_v<SpectrumContext, SpectrumContextIdentity>;
+    static constexpr bool IsSpectral = !std::is_same_v<SpectrumContext, SpectrumContextIdentity>;
 
     using GlobalStateList       = TypePack<GuidedPTRDetail::GlobalState>;
     using RayStateList          = TypePack<GuidedPTRDetail::RayState>;
@@ -61,17 +58,21 @@ class GuidedPTRenderer final : public PathTracerRendererBase
     Span<MetaHit>       dHits;
     Span<HitKeyPack>    dHitKeys;
     Span<uint32_t>      dShadowRayVisibilities;
-    // Buffer for next set of rays
-    Span<RayGMem>       dOutRays;
-    Span<RayCone>       dOutRayCones;
-    //
-    Span<Float>         dPrevMatPDF;
+    // NEE Related
+    Span<RayGMem>       dShadowRays;
+    Span<RayCone>       dShadowRayCones;
     Span<Spectrum>      dShadowRayRadiance;
+    Span<Float>         dPrevMatPDF;
+    Span<Float>         dPrevAvgReflectance;
+    // Technique Related
+    Span<Float>         dPDFChains;
+    Span<uint32_t>      dLiftedMarkovChainIndex;
+
     //
     bool                saveImage  = false;
 
     // Helpers
-    void                CopyAliveRays(Span<const RayIndex> dAliveRayIndices, const GPUQueue&);
+    //void                CopyAliveRays(Span<const RayIndex> dAliveRayIndices, const GPUQueue&);
     uint32_t            FindMaxSamplePerIteration(uint32_t rayCount);
     Span<RayIndex>      DoRenderPass(uint32_t sppLimit, const GPUQueue&);
     // Implementations

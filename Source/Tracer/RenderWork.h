@@ -11,16 +11,19 @@
 // Render work kernel parameters
 // There are too many parameters so these are
 // packed in structs
-struct RenderWorkInputs
+struct RenderWorkCommonParams
 {
     // Contiguous
     Span<const RayIndex>    dRayIndices;
     Span<const uint32_t>    dRandomNumbers;
-    // Accessed by index
-    Span<const RayCone>     dRayCones;
-    Span<const RayGMem>     dRays;
+    // Accessed by "RayIndex"
     Span<const MetaHit>     dHits;
     Span<const HitKeyPack>  dKeys;
+    // These may be I-O due to path trace
+    // recursion so we make them non-const.
+    // These are also accessed by "RayIndex".
+    Span<RayGMem>           dRays;
+    Span<RayCone>           dRayCones;
 };
 
 template<class GlobalState, class RayState,
@@ -32,14 +35,15 @@ struct RenderWorkParams
     using MatSoA        = typename MatGroup::DataSoA;
     using TransSoA      = typename TransGroup::DataSoA;
     //
-    using Inputs        = RenderWorkInputs;
+    using CommonParams  = RenderWorkCommonParams;
     //
-    RayState    rayState;
-    Inputs      in;
-    GlobalState globalState;
-    PrimSoA     primSoA;
-    MatSoA      matSoA;
-    TransSoA    transSoA;
+    RayState     rayState;
+    GlobalState  globalState;
+    CommonParams common;
+    // Type related
+    PrimSoA      primSoA;
+    MatSoA       matSoA;
+    TransSoA     transSoA;
 };
 
 template<class GlobalState, class RayState,
@@ -50,14 +54,15 @@ struct RenderLightWorkParams
     using LightSoA  = typename LightGroup::DataSoA;
     using TransSoA  = typename TransGroup::DataSoA;
     //
-    using Inputs        = RenderWorkInputs;
+    using CommonParams = RenderWorkCommonParams;
     //
-    RayState    rayState;
-    Inputs      in;
-    GlobalState globalState;
-    PrimSoA     primSoA;
-    LightSoA    lightSoA;
-    TransSoA    transSoA;
+    RayState     rayState;
+    GlobalState  globalState;
+    CommonParams common;
+    // Type related
+    PrimSoA      primSoA;
+    LightSoA     lightSoA;
+    TransSoA     transSoA;
 };
 
 template<class GlobalState, class RayState,
@@ -67,13 +72,13 @@ struct RenderCameraWorkParams
     using CamSoA    = typename CamGroup::DataSoA;
     using TransSoA  = typename TransGroup::DataSoA;
     //
-    using Inputs = RenderWorkInputs;
+    using CommonParams = RenderWorkCommonParams;
     //
-    RayState    rayState;
-    Inputs      in;
-    GlobalState globalState;
-    CamSoA      camsSoA;
-    TransSoA    transSoA;
+    RayState     rayState;
+    CommonParams common;
+    GlobalState  globalState;
+    CamSoA       camsSoA;
+    TransSoA     transSoA;
 };
 
 // Some aliases for clarity
@@ -181,13 +186,13 @@ class RenderWork : public RenderWorkT<R>
     template<uint32_t I>
     void DoWorkInternal(// I-O
                         const RenderRayState<R, I>& dRayStates,
+                        Span<RayGMem> dRaysIO,
+                        Span<RayCone> dRayDiffsIO,
                         // Input
                         // Contiguous
                         Span<const RayIndex> dRayIndicesIn,
                         Span<const RandomNumber> dRandomNumbers,
                         // Accessed by index
-                        Span<const RayCone> dRayDiffsIn,
-                        Span<const RayGMem> dRaysIn,
                         Span<const MetaHit> dHitsIn,
                         Span<const HitKeyPack> dKeysIn,
                         // Constants
@@ -222,13 +227,13 @@ class RenderLightWork : public RenderLightWorkT<R>
     template<uint32_t I>
     void    DoBoundaryWorkInternal(// I-O
                                    const RenderRayState<R, I>& dRayStates,
+                                   Span<RayGMem> dRaysIn,
+                                   Span<RayCone> dRayDiffsIn,
                                    // Input
                                    // Contiguous
                                    Span<const RayIndex> dRayIndicesIn,
                                    Span<const uint32_t> dRandomNumbers,
                                    // Accessed by index
-                                   Span<const RayCone> dRayDiffsIn,
-                                   Span<const RayGMem> dRaysIn,
                                    Span<const MetaHit> dHitsIn,
                                    Span<const HitKeyPack> dKeysIn,
                                    // Constants
@@ -360,13 +365,13 @@ template<RendererC R, PrimitiveGroupC PG,
 template<uint32_t I>
 void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
                                                const RenderRayState<R, I>& dRayStates,
+                                               Span<RayGMem> dRaysIO,
+                                               Span<RayCone> dRayDiffsIO,
                                                // Input
                                                // Contiguous
                                                Span<const RayIndex> dRayIndicesIn,
                                                Span<const RandomNumber> dRandomNumbers,
                                                // Accessed by index
-                                               Span<const RayCone> dRayDiffsIn,
-                                               Span<const RayGMem> dRaysIn,
                                                Span<const MetaHit> dHitsIn,
                                                Span<const HitKeyPack> dKeysIn,
                                                // Constants
@@ -388,22 +393,22 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
         const RWParams params =
         {
             .rayState = dRayStates,
-            .in =
+            .globalState = globalState,
+            .common =
             {
                 .dRayIndices    = dRayIndicesIn,
                 .dRandomNumbers = dRandomNumbers,
-                .dRayCones      = dRayDiffsIn,
-                .dRays          = dRaysIn,
                 .dHits          = dHitsIn,
-                .dKeys          = dKeysIn
+                .dKeys          = dKeysIn,
+                .dRays          = dRaysIO,
+                .dRayCones      = dRayDiffsIO
             },
-            .globalState = globalState,
             .primSoA        = pg.SoA(),
             .matSoA         = mg.SoA(),
             .transSoA       = tg.SoA()
         };
 
-        uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
+        uint32_t rayCount = static_cast<uint32_t>(params.common.dRayIndices.size());
         using namespace std::string_literals;
         static const std::string KernelName = std::string(TypeName()) + "-Work"s;
         using WF = TypePackElement<I, WFList>;
@@ -460,13 +465,13 @@ template<RendererC R, LightGroupC LG, TransformGroupC TG>
 template<uint32_t I>
 void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
                                                         const RenderRayState<R, I>& dRayStates,
+                                                        Span<RayGMem> dRaysIO,
+                                                        Span<RayCone> dRayDiffsIO,
                                                         // Input
                                                         // Contiguous
                                                         Span<const RayIndex> dRayIndicesIn,
                                                         Span<const uint32_t> dRandomNumbers,
                                                         // Accessed by index
-                                                        Span<const RayCone> dRayDiffsIn,
-                                                        Span<const RayGMem> dRaysIn,
                                                         Span<const MetaHit> dHitsIn,
                                                         Span<const HitKeyPack> dKeysIn,
                                                         // Constants
@@ -488,22 +493,22 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
         const RWParams params =
         {
             .rayState = dRayStates,
-            .in =
+            .globalState = globalState,
+            .common =
             {
                 .dRayIndices    = dRayIndicesIn,
                 .dRandomNumbers = dRandomNumbers,
-                .dRayCones      = dRayDiffsIn,
-                .dRays          = dRaysIn,
                 .dHits          = dHitsIn,
-                .dKeys          = dKeysIn
+                .dKeys          = dKeysIn,
+                .dRays          = dRaysIO,
+                .dRayCones      = dRayDiffsIO
             },
-            .globalState    = globalState,
             .primSoA        = pg.SoA(),
             .lightSoA       = lg.SoA(),
             .transSoA       = tg.SoA()
         };
 
-        uint32_t rayCount = static_cast<uint32_t>(params.in.dRayIndices.size());
+        uint32_t rayCount = static_cast<uint32_t>(params.common.dRayIndices.size());
         using namespace std::string_literals;
         static const std::string KernelName = std::string(TypeName()) + "-BoundaryWork"s;
         using WF = TypePackElement<I, WFList>;

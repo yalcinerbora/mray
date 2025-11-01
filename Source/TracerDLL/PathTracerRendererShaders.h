@@ -164,7 +164,7 @@ void WorkFunction<P, M, T, SC>::Call(const Primitive&, const Material& mat, cons
     // ================ //
     // Sample Material  //
     // ================ //
-    auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
+    auto [rayIn, tMM] = RayFromGMem(params.common.dRays, rayIndex);
     Vector3 wO = Math::Normalize(tContext.InvApplyN(-rayIn.dir));
     RayConeSurface rConeRefract = mat.RefractRayCone(surfRayCone, wO);
     BxDFSample raySample = mat.SampleBxDF(wO, rng);
@@ -256,9 +256,9 @@ void LightWorkFunction<L, T, SC>::Call(const Light& l, RNGDispenser&, const Spec
     PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
     if(pathDataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
 
-    auto [ray, tMM] = RayFromGMem(params.in.dRays, rayIndex);
+    auto [ray, tMM] = RayFromGMem(params.common.dRays, rayIndex);
     Vector3 wO = -ray.dir;
-    RayCone rayCone = params.in.dRayCones[rayIndex].Advance(tMM[1]);
+    RayCone rayCone = params.common.dRayCones[rayIndex].Advance(tMM[1]);
 
     Spectrum emission;
     if constexpr(Light::IsPrimitiveBackedLight)
@@ -266,7 +266,7 @@ void LightWorkFunction<L, T, SC>::Call(const Light& l, RNGDispenser&, const Spec
         // It is more accurate to use hit if we actually hit the material
         using Hit = typename Light::Primitive::Hit;
         static constexpr uint32_t N = Hit::Dims;
-        MetaHit metaHit = params.in.dHits[rayIndex];
+        MetaHit metaHit = params.common.dHits[rayIndex];
         Hit hit = metaHit.AsVector<N>();
         emission = l.EmitViaHit(wO, hit, rayCone);
     }
@@ -311,7 +311,7 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
     // ================ //
     //       NEE        //
     // ================ //
-    auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
+    auto [rayIn, tMM] = RayFromGMem(params.common.dRays, rayIndex);
     Vector3 wO = Math::Normalize(-tContext.InvApplyN(rayIn.dir));
     const LightSampler& lightSampler = params.globalState.lightSampler;
     Vector3 worldPos = surf.position;
@@ -322,7 +322,8 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
     auto [shadowRay, shadowTMM] = lightSample.value.SampledRay(worldPos);
     Ray wI = tContext.InvApply(shadowRay);
 
-    Spectrum reflectance = mat.Evaluate(wI, wO).reflectance;
+    BxDFEval matEval = mat.Evaluate(wI, wO);
+    Spectrum reflectance = matEval.reflectance;
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= reflectance;
 
@@ -341,6 +342,19 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
     // check and if it succeeds we accumulate later
     Spectrum shadowRadiance = throughput * lightSample.value.emission;
     shadowRadiance = DivideByPDF(shadowRadiance, pdf);
+
+    // ================ //
+    //    Dispersion    //
+    // ================ //
+    if constexpr(!SpectrumConv::IsRGB)
+    {
+        if(matEval.isDispersed)
+        {
+            Float first = shadowRadiance[0];
+            shadowRadiance = Spectrum::Zero();
+            shadowRadiance[0] = first;
+        }
+    }
 
     // Writing
     if(MaterialCommon::IsSpecular(mat.Specularity()))
@@ -391,8 +405,8 @@ void LightWorkFunctionWithNEE<L, T, SC, LS>::Call(const Light& l, RNGDispenser&,
     bool switchToMISPdf = (params.globalState.sampleMode == SampleMode::E::NEE_WITH_MIS &&
                            pathDataPack.type == RayType::PATH_RAY);
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
-    auto [ray, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-    RayCone rayCone = params.in.dRayCones[rayIndex].Advance(tMM[1]);
+    auto [ray, tMM] = RayFromGMem(params.common.dRays, rayIndex);
+    RayCone rayCone = params.common.dRayCones[rayIndex].Advance(tMM[1]);
     if(switchToMISPdf)
     {
         using Distribution::MIS::BalanceCancelled;
@@ -403,8 +417,8 @@ void LightWorkFunctionWithNEE<L, T, SC, LS>::Call(const Light& l, RNGDispenser&,
         pdfs[0] = params.rayState.dPrevMatPDF[rayIndex];
         // We need to find the index of this specific light
         // Light sampler will handle it
-        HitKeyPack hitKeyPack = params.in.dKeys[rayIndex];
-        MetaHit hit = params.in.dHits[rayIndex];
+        HitKeyPack hitKeyPack = params.common.dKeys[rayIndex];
+        MetaHit hit = params.common.dHits[rayIndex];
         pdfs[1] = params.globalState.lightSampler.PdfLight(hitKeyPack, hit, ray);
         Float misPdf = BalanceCancelled<2>(pdfs, weights);
         // We premultiply the throughput under the assumption this will not hit a light,
@@ -421,7 +435,7 @@ void LightWorkFunctionWithNEE<L, T, SC, LS>::Call(const Light& l, RNGDispenser&,
         // It is more accurate to use hit if we actually hit the material
         using Hit = typename Light::Primitive::Hit;
         static constexpr uint32_t N = Hit::Dims;
-        MetaHit metaHit = params.in.dHits[rayIndex];
+        MetaHit metaHit = params.common.dHits[rayIndex];
         Hit hit = metaHit.AsVector<N>();
         emission = l.EmitViaHit(wO, hit, rayCone);
     }

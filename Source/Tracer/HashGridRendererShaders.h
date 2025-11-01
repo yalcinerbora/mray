@@ -83,7 +83,7 @@ void BounceWork<P, M, T>::Call(const Primitive&, const Material& mat, const Surf
     // ================ //
     // Sample Material  //
     // ================ //
-    auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
+    auto [rayIn, tMM] = RayFromGMem(params.common.dRays, rayIndex);
     Vector3 wO = rayIn.dir;
     wO = Math::Normalize(tContext.InvApplyN(wO));
     auto raySample = mat.SampleBxDF(-wO, rng);
@@ -148,8 +148,8 @@ void LightBounceWork<L, T>::Call(const Light&, RNGDispenser&,
 
     if constexpr(Light::IsPrimitiveBackedLight)
     {
-        auto [ray, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-        RayCone rayCone = params.in.dRayCones[rayIndex].Advance(tMM[1]);
+        auto [ray, tMM] = RayFromGMem(params.common.dRays, rayIndex);
+        RayCone rayCone = params.common.dRayCones[rayIndex].Advance(tMM[1]);
         Vector3 position = ray.AdvancedPos(tMM[1]);
         // What about normal?
         // We do not have surface information here

@@ -294,28 +294,28 @@ using RenderRayState = RendererDetail::RenderRayState<R, I, I < TypePackSize<typ
 // RendererWork instances will implement these functions.
 // These macros are here to reduce boilerplate since
 // function argument count is quite large
-#define MRAY_RENDER_DO_WORK_DECL(tag)               \
-void DoWork_##tag                                   \
-(                                                   \
-    const RenderRayState<R, tag>& dRayStates,       \
-    Span<const RayIndex> dRayIndicesIn,             \
-    Span<const RandomNumber> dRandomNumbers,        \
-    Span<const RayCone> dRayDiffsIn,                \
-    Span<const RayGMem> dRaysIn,                    \
-    Span<const MetaHit> dHitsIn,                    \
-    Span<const HitKeyPack> dKeysIn,                 \
-    const RenderGlobalState<R, tag>& globalState,   \
-    const GPUQueue& queue                           \
+#define MRAY_RENDER_DO_WORK_DECL(tag)             \
+void DoWork_##tag                                 \
+(                                                 \
+    const RenderRayState<R, tag>& dRayStates,     \
+    Span<RayGMem> dRaysIn,                        \
+    Span<RayCone> dRayDiffsIn,                    \
+    Span<const RayIndex> dRayIndicesIn,           \
+    Span<const RandomNumber> dRandomNumbers,      \
+    Span<const MetaHit> dHitsIn,                  \
+    Span<const HitKeyPack> dKeysIn,               \
+    const RenderGlobalState<R, tag>& globalState, \
+    const GPUQueue& queue                         \
 ) const
 
 #define MRAY_RENDER_DO_WORK_DEF(tag)    \
 void DoWork_##tag                       \
 (                                       \
     const RenderRayState<R, tag>& a,    \
-    Span<const RayIndex> b,             \
-    Span<const RandomNumber> c,         \
-    Span<const RayCone> d,              \
-    Span<const RayGMem> e,              \
+    Span<RayGMem> b,                    \
+    Span<RayCone> c,                    \
+    Span<const RayIndex> d,             \
+    Span<const RandomNumber> e,         \
     Span<const MetaHit> f,              \
     Span<const HitKeyPack> g,           \
     const RenderGlobalState<R, tag>& h, \
@@ -326,28 +326,28 @@ void DoWork_##tag                       \
                         e, f, g, h, i); \
 }
 
-#define MRAY_RENDER_DO_LIGHT_WORK_DECL(tag)         \
-void DoBoundaryWork_##tag                           \
-(                                                   \
-    const RenderRayState<R, tag>& dRayStates,       \
-    Span<const RayIndex> dRayIndicesIn,             \
-    Span<const uint32_t> dRandomNumbers,            \
-    Span<const RayCone> dRayDiffsIn,                \
-    Span<const RayGMem> dRaysIn,                    \
-    Span<const MetaHit> dHitsIn,                    \
-    Span<const HitKeyPack> dKeysIn,                 \
-    const RenderGlobalState<R, tag>& globalState,   \
-    const GPUQueue& queue                           \
+#define MRAY_RENDER_DO_LIGHT_WORK_DECL(tag)       \
+void DoBoundaryWork_##tag                         \
+(                                                 \
+    const RenderRayState<R, tag>& dRayStates,     \
+    Span<RayGMem> dRaysIO,                        \
+    Span<RayCone> dRayDiffsIO,                    \
+    Span<const RayIndex> dRayIndicesIn,           \
+    Span<const uint32_t> dRandomNumbers,          \
+    Span<const MetaHit> dHitsIn,                  \
+    Span<const HitKeyPack> dKeysIn,               \
+    const RenderGlobalState<R, tag>& globalState, \
+    const GPUQueue& queue                         \
 ) const
 
 #define MRAY_RENDER_DO_LIGHT_WORK_DEF(tag)  \
 void DoBoundaryWork_##tag                   \
 (                                           \
     const RenderRayState<R, tag>& a,        \
-    Span<const RayIndex> b,                 \
-    Span<const uint32_t> c,                 \
-    Span<const RayCone> d,                  \
-    Span<const RayGMem> e,                  \
+    Span<RayGMem> b,                        \
+    Span<RayCone> c,                        \
+    Span<const RayIndex> d,                 \
+    Span<const uint32_t> e,                 \
     Span<const MetaHit> f,                  \
     Span<const HitKeyPack> g,               \
     const RenderGlobalState<R, tag>& h,     \

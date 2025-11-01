@@ -210,7 +210,7 @@ void WorkFunctionCommon<P, M, T>::Call(const Primitive&, const Material&, const 
         }
         case HIT_PARAMS:
         {
-            MetaHit metaHit = params.in.dHits[rayIndex];
+            MetaHit metaHit = params.common.dHits[rayIndex];
             Vector3 hit = Vector3(metaHit.AsVector<2u>(), Float(0));
             // We need to check the type here for triangles
             if constexpr(TrianglePrimGroupC<PG>)
@@ -222,7 +222,7 @@ void WorkFunctionCommon<P, M, T>::Call(const Primitive&, const Material&, const 
         }
         case MAT_ID:
         {
-            LightOrMatKey lmKey = params.in.dKeys[rayIndex].lightOrMatKey;
+            LightOrMatKey lmKey = params.common.dKeys[rayIndex].lightOrMatKey;
             MaterialKey mKey = MaterialKey::CombinedKey(lmKey.FetchBatchPortion(),
                                                         lmKey.FetchIndexPortion());
             CommonKey k = mKey.FetchBatchPortion() ^ mKey.FetchIndexPortion();
@@ -231,21 +231,21 @@ void WorkFunctionCommon<P, M, T>::Call(const Primitive&, const Material&, const 
         }
         case PRIM_ID:
         {
-            PrimitiveKey pKey = params.in.dKeys[rayIndex].primKey;
+            PrimitiveKey pKey = params.common.dKeys[rayIndex].primKey;
             CommonKey k = pKey.FetchBatchPortion() ^ pKey.FetchIndexPortion();
             color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
         case ACCEL_ID:
         {
-            AcceleratorKey aKey = params.in.dKeys[rayIndex].accelKey;
+            AcceleratorKey aKey = params.common.dKeys[rayIndex].accelKey;
             CommonKey k = aKey.FetchBatchPortion() ^ aKey.FetchIndexPortion();
             color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
         case TRANSFORM_ID:
         {
-            TransformKey tKey = params.in.dKeys[rayIndex].transKey;
+            TransformKey tKey = params.common.dKeys[rayIndex].transKey;
             CommonKey k = tKey.FetchBatchPortion() ^ tKey.FetchIndexPortion();
             color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
@@ -277,7 +277,7 @@ void WorkFunctionFurnaceOrAO<P, M, T>::Call(const Primitive&, const Material& ma
     if(params.globalState.mode.e == Mode::FURNACE)
     {
         using Distribution::Common::DivideByPDF;
-        auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
+        auto [rayIn, tMM] = RayFromGMem(params.common.dRays, rayIndex);
         Vector3 wO = rayIn.dir;
         wO = Math::Normalize(tContext.InvApplyN(wO));
         auto raySample = mat.SampleBxDF(-wO, rng);

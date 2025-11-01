@@ -6,27 +6,41 @@
 
 #include "Device/GPUAlgBinaryPartition.h"
 
-//MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-//static void KCAccumulateShadowRays(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,
-//                                   MRAY_GRID_CONSTANT const Span<const Spectrum> dShadowRayRadiance,
-//                                   MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer,
-//                                   MRAY_GRID_CONSTANT const Span<const PathDataPack> dPathDataPack,
-//                                   MRAY_GRID_CONSTANT const Vector2ui rrRange)
-//{
-//    KernelCallParams kp;
-//    uint32_t shadowRayCount = static_cast<uint32_t>(dShadowRayRadiance.size());
-//    for(uint32_t i = kp.GlobalId(); i < shadowRayCount; i += kp.TotalSize())
-//    {
-//        PathDataPack dataPack = dPathDataPack[i];
-//
-//        using enum RayType;
-//        bool isShadowRay = (dataPack.type == SHADOW_RAY);
-//        // +2 is correct here, we did not increment the depth yet
-//        bool inDepthLimit = ((dataPack.depth + 2u) <= rrRange[1]);
-//        if(inDepthLimit && isShadowRay && dIsVisibleBuffer[i])
-//            dRadianceOut[i] += dShadowRayRadiance[i];
-//    }
-//}
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static void KCDivideByPDFIndirect(// I-O
+                                  MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,
+                                  // Input
+                                  MRAY_GRID_CONSTANT const Span<const Float> dPDFChains,
+                                  MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
+{
+    KernelCallParams kp;
+    uint32_t deadRayCount = uint32_t(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < deadRayCount; i += kp.TotalSize())
+    {
+        RayIndex index = dRayIndices[i];
+        Spectrum radiance = dRadianceOut[index];
+        radiance = Distribution::Common::DivideByPDF(radiance, dPDFChains[index]);
+        dRadianceOut[index] = radiance;
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static void KCCacheIrradianceFromShadowRays()
+{
+    //....................
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static void KCBackpropagateIrradiance()
+{
+
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static void KCUpdateMarkovChain()
+{
+    //....................
+}
 
 GuidedPTRenderer::GuidedPTRenderer(const RenderImagePtr& rb,
                                    TracerView tv,
@@ -104,23 +118,23 @@ void GuidedPTRenderer::PushAttribute(uint32_t attributeIndex,
     //}
 }
 
-void GuidedPTRenderer::CopyAliveRays(Span<const RayIndex> dAliveRayIndices,
-                                     const GPUQueue& processQueue)
-{
-    if(dAliveRayIndices.empty()) return;
-
-    uint32_t aliveRayCount = static_cast<uint32_t>(dAliveRayIndices.size());
-    processQueue.IssueWorkKernel<KCCopyRaysIndirect>
-    (
-        "KCCopyRaysIndirect",
-        DeviceWorkIssueParams{.workCount = aliveRayCount},
-        //
-        dRays, dRayCones,
-        dAliveRayIndices,
-        dOutRays,
-        dOutRayCones
-    );
-}
+//void GuidedPTRenderer::CopyAliveRays(Span<const RayIndex> dAliveRayIndices,
+//                                     const GPUQueue& processQueue)
+//{
+//    if(dAliveRayIndices.empty()) return;
+//
+//    //uint32_t aliveRayCount = static_cast<uint32_t>(dAliveRayIndices.size());
+//    //processQueue.IssueWorkKernel<KCCopyRaysIndirect>
+//    //(
+//    //    "KCCopyRaysIndirect",
+//    //    DeviceWorkIssueParams{.workCount = aliveRayCount},
+//    //    //
+//    //    dRays, dRayCones,
+//    //    dAliveRayIndices,
+//    //    dOutRays,
+//    //    dOutRayCones
+//    //);
+//}
 
 uint32_t
 GuidedPTRenderer::FindMaxSamplePerIteration(uint32_t rayCount)
@@ -433,7 +447,7 @@ GuidedPTRenderer::DoThroughputSingleTileRender(const GPUDevice& device,
                                                     transferQueue);
 
     // Copy continuing set of rays to actual ray buffer for next iteration
-    CopyAliveRays(dAliveRayIndices, processQueue);
+    //CopyAliveRays(dAliveRayIndices, processQueue);
 
     // We exhausted all alive rays while doing SPP limit.
     bool triggerSave = (saveImage && tilePathCounts[0] == TotalSampleLimit(currentOptions.totalSPP));
@@ -522,7 +536,7 @@ GuidedPTRenderer::DoLatencyRender(uint32_t passCount,
             deadAlivePartitionOut.Spanify();
 
         AddRadianceToRenderBufferLatency(dDeadRayIndices, processQueue);
-        CopyAliveRays(dAliveRayIndices, processQueue);
+        //CopyAliveRays(dAliveRayIndices, processQueue);
 
         assert(dInvalidRayIndices.size() == 0);
         invalidRayCount += (static_cast<uint32_t>(dDeadRayIndices.size()));
@@ -581,10 +595,10 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
                               uint32_t customLogicIndex0,
                               uint32_t)
 {
-    //currentOptions = newOptions;
-    //const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
+    currentOptions = newOptions;
+    const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
 
-    //// Change the mode according to the render logic
+    // Change the mode according to the render logic
     //using Math::Roll;
     //int32_t modeIndex = (int32_t(SampleMode::E(currentOptions.sampleMode)) +
     //                     int32_t(customLogicIndex0));
@@ -593,151 +607,111 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
     //uint32_t newMode = uint32_t(Roll(modeIndex, 0, int32_t(SampleMode::E::END)));
     //currentOptions.sampleMode = SampleMode::E(newMode);
 
-    //// ================================ //
-    //// Initialize common sub components //
-    //// ================================ //
-    //uint32_t sppLimit = currentOptions.totalSPP;
-    //auto [maxRayCount, totalWorkCount] = InitializeForRender(camSurfId, sppLimit,
-    //                                                         false, rIP);
-    //renderMode = currentOptions.renderMode;
-    //burstSize = currentOptions.burstSize;
+    // ================================ //
+    // Initialize common sub components //
+    // ================================ //
+    uint32_t sppLimit = currentOptions.totalSPP;
+    auto [maxRayCount, totalWorkCount] = InitializeForRender(camSurfId, sppLimit,
+                                                             false, rIP);
+    renderMode = currentOptions.renderMode;
+    burstSize = currentOptions.burstSize;
 
-    //// ========================= //
-    ////      Spectrum Context     //
-    //// ========================= //
-    //uint32_t wavelengthCount = (IsSpectral) ? maxRayCount : 0u;
-    //auto colorSpace = tracerView.tracerParams.globalTextureColorSpace;
-    //if constexpr(IsSpectral)
-    //{
-    //    // Don't bother reloading context if colorspace is same
-    //    if(!spectrumContext || colorSpace != spectrumContext->ColorSpace())
-    //    {
-    //        auto wlSampleMode = tracerView.tracerParams.wavelengthSampleMode;
-    //        spectrumContext = std::make_unique<SC>(colorSpace, wlSampleMode,
-    //                                               gpuSystem);
-    //    }
-    //}
+    // ========================= //
+    //      Spectrum Context     //
+    // ========================= //
+    uint32_t wavelengthCount = (IsSpectral) ? maxRayCount : 0u;
+    auto colorSpace = tracerView.tracerParams.globalTextureColorSpace;
+    if constexpr(IsSpectral)
+    {
+        // Don't bother reloading context if colorspace is same
+        if(!spectrumContext || colorSpace != spectrumContext->ColorSpace())
+        {
+            using SC = SpectrumContext;
+            auto wlSampleMode = tracerView.tracerParams.wavelengthSampleMode;
+            spectrumContext = std::make_unique<SC>(colorSpace, wlSampleMode,
+                                                   gpuSystem);
+        }
+    }
 
-    //// ========================= //
-    ////   Path State Allocation   //
-    //// ========================= //
-    //// You can see why wavefront approach uses
-    //// quite a bit memory (and this is somewhat optimized).
-    //uint32_t maxSampleCount = FindMaxSamplePerIteration(maxRayCount, currentOptions.sampleMode);
-    //if(currentOptions.sampleMode == SampleMode::E::PURE)
-    //{
-    //    MemAlloc::AllocateMultiData
-    //    (
-    //        Tie
-    //        (
-    //            // Per path
-    //            dHits, dHitKeys, dRays, dRayCones,
-    //            dPathRadiance, dImageCoordinates,
-    //            dFilmFilterWeights, dThroughputs,
-    //            dPathDataPack, dOutRays,
-    //            dOutRayCones, dPathRNGDimensions,
-    //            // Per path (but can be zero if not spectral)
-    //            dPathWavelengths,
-    //            dSpectrumWavePDFs,
-    //            // Per path bounce, max used random number of that bounce
-    //            dRandomNumBuffer,
-    //            // Per render work
-    //            dWorkHashes, dWorkBatchIds,
-    //            //
-    //            dSubCameraBuffer
-    //        ),
-    //        rendererGlobalMem,
-    //        {
-    //            // Per path
-    //            maxRayCount, maxRayCount, maxRayCount, maxRayCount,
-    //            maxRayCount, maxRayCount, maxRayCount, maxRayCount,
-    //            maxRayCount, maxRayCount, maxRayCount, maxRayCount,
-    //            // Per path (but can be zero if not spectral)
-    //            wavelengthCount, wavelengthCount,
-    //            // Per path bounce, max used random number of that bounce
-    //            maxSampleCount,
-    //            // Per render work
-    //            totalWorkCount, totalWorkCount,
-    //            //
-    //            RendererBase::SUB_CAMERA_BUFFER_SIZE});
-    //}
-    //else
-    //{
-    //    uint32_t isVisibleIntCount = Bitspan<uint32_t>::CountT(maxRayCount);
-    //    MemAlloc::AllocateMultiData
-    //    (
-    //        Tie
-    //        (
-    //            // Per path
-    //            dHits, dHitKeys, dRays, dRayCones,
-    //            dPathRadiance, dImageCoordinates,
-    //            dFilmFilterWeights, dThroughputs,
-    //            dPathDataPack, dOutRays, dOutRayCones,
-    //            dPrevMatPDF, dShadowRayRadiance,
-    //            dPathRNGDimensions,
-    //            // Per path (but can be zero if not spectral)
-    //            dPathWavelengths,
-    //            dSpectrumWavePDFs,
-    //            // Per path but a single bit is used
-    //            dShadowRayVisibilities,
-    //            // Per path bounce, max used random number of that bounce
-    //            dRandomNumBuffer,
-    //            // Per render work
-    //            dWorkHashes, dWorkBatchIds,
-    //            //
-    //            dSubCameraBuffer
-    //        ),
-    //        rendererGlobalMem,
-    //        {
-    //            // Per path
-    //            maxRayCount, maxRayCount, maxRayCount, maxRayCount,
-    //            maxRayCount, maxRayCount, maxRayCount, maxRayCount,
-    //            maxRayCount, maxRayCount, maxRayCount, maxRayCount,
-    //            maxRayCount, maxRayCount,
-    //            // Per path (but can be zero if not spectral)
-    //            wavelengthCount, wavelengthCount,
-    //            // Per path but a single bit is used
-    //            isVisibleIntCount,
-    //            // Per path bounce, max used random number of that bounce
-    //            maxSampleCount,
-    //            // Per render work
-    //            totalWorkCount, totalWorkCount,
-    //            //
-    //            RendererBase::SUB_CAMERA_BUFFER_SIZE
-    //        }
-    //    );
-    //    // Since NEE is active generate meta light list
-    //    MetaLightListConstructionParams mlParams =
-    //    {
-    //        .lightGroups = tracerView.lightGroups,
-    //        .transformGroups = tracerView.transGroups,
-    //        .lSurfList = Span<const Pair<LightSurfaceId, LightSurfaceParams>>(tracerView.lightSurfs)
-    //    };
-    //    metaLightArray.Construct(mlParams, tracerView.boundarySurface, queue);
-    //}
+    // ========================= //
+    //   Path State Allocation   //
+    // ========================= //
+    // You can see why wavefront approach uses
+    // quite a bit memory (and this is somewhat optimized).
+    uint32_t maxSampleCount = FindMaxSamplePerIteration(maxRayCount);
 
-    //// ===================== //
-    //// After Allocation Init //
-    //// ===================== //
-    //workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds,
-    //                              maxRayCount, queue);
+    uint32_t isVisibleIntCount = Bitspan<uint32_t>::CountT(maxRayCount);
+    MemAlloc::AllocateMultiData
+    (
+        Tie
+        (
+            // Per path
+            dHits, dHitKeys, dRays, dRayCones,
+            dPathRadiance, dImageCoordinates,
+            dFilmFilterWeights, dThroughputs,
+            dPathDataPack, dPDFChains,
+            dShadowRays, dShadowRayCones,
+            dPrevMatPDF, dShadowRayRadiance,
+            dPathRNGDimensions, dLiftedMarkovChainIndex,
+            // Per path (but can be zero if not spectral)
+            dPathWavelengths,
+            dSpectrumWavePDFs,
+            // Per path but a single bit is used
+            dShadowRayVisibilities,
+            // Per path bounce, max used random number of that bounce
+            dRandomNumBuffer,
+            // Per render work
+            dWorkHashes, dWorkBatchIds,
+            //
+            dSubCameraBuffer
+        ),
+        rendererGlobalMem,
+        {
+            // Per path
+            maxRayCount, maxRayCount, maxRayCount, maxRayCount,
+            maxRayCount, maxRayCount, maxRayCount, maxRayCount,
+            maxRayCount, maxRayCount, maxRayCount, maxRayCount,
+            maxRayCount, maxRayCount, maxRayCount, maxRayCount,
+            // Per path (but can be zero if not spectral)
+            wavelengthCount, wavelengthCount,
+            // Per path but a single bit is used
+            isVisibleIntCount,
+            // Per path bounce, max used random number of that bounce
+            maxSampleCount,
+            // Per render work
+            totalWorkCount, totalWorkCount,
+            //
+            RendererBase::SUB_CAMERA_BUFFER_SIZE
+        }
+    );
+    MetaLightListConstructionParams mlParams =
+    {
+        .lightGroups = tracerView.lightGroups,
+        .transformGroups = tracerView.transGroups,
+        .lSurfList = Span<const Pair<LightSurfaceId, LightSurfaceParams>>(tracerView.lightSurfs)
+    };
+    metaLightArray.Construct(mlParams, tracerView.boundarySurface, queue);
 
-    //// Reset hits and paths
-    //queue.MemsetAsync(dHits, 0x00);
-    //ResetAllPaths(queue);
+    // ===================== //
+    // After Allocation Init //
+    // ===================== //
+    workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds,
+                                  maxRayCount, queue);
 
-    //auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
-    //return RenderBufferInfo
-    //{
-    //    .data = bufferPtrAndSize.first,
-    //    .totalSize = bufferPtrAndSize.second,
-    //    .renderColorSpace = colorSpace,
-    //    .resolution = imageTiler.FullResolution(),
-    //    .curRenderLogic0 = sendMode,
-    //    .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
-    //};
+    // Reset hits and paths
+    queue.MemsetAsync(dHits, 0x00);
+    ResetAllPaths(queue);
 
-    return RenderBufferInfo{};
+    auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
+    return RenderBufferInfo
+    {
+        .data = bufferPtrAndSize.first,
+        .totalSize = bufferPtrAndSize.second,
+        .renderColorSpace = colorSpace,
+        .resolution = imageTiler.FullResolution(),
+        .curRenderLogic0 = std::numeric_limits<uint32_t>::max(),//
+        .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
+    };
 }
 
 

@@ -459,18 +459,20 @@ void HashGridRenderer::PathTraceAndQuery()
                 dPathRNGDimensions, dLocalIndices, processQueue,
                 ConstAddFunctor_U16(uint16_t(rnCount))
             );
-            workI.DoWork_0(dRayState, dLocalIndices,
-                           dRandomNumBuffer, dRayCones,
-                           dRays, dHits, dHitKeys,
+            workI.DoWork_0(dRayState, dRays,
+                           dRayCones, dLocalIndices,
+                           dRandomNumBuffer,
+                           dHits, dHitKeys,
                            globalState, processQueue);
         },
         //
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t)
         {
-            workI.DoBoundaryWork_0(dRayState, dLocalIndices,
+            workI.DoBoundaryWork_0(dRayState,
+                                   dRays, dRayCones,
+                                   dLocalIndices,
                                    Span<const RandomNumber>{},
-                                   dRayCones, dRays,
                                    dHits, dHitKeys,
                                    globalState, processQueue);
         });
