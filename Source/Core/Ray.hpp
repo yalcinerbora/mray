@@ -251,9 +251,9 @@ MR_PF_DEF RayT<T> RayT<T>::Nudge(const Vector<3, T>& nudgeDir) const noexcept
     pInt[1] = Bit::BitCast<Int>(p[1]);
     pInt[2] = Bit::BitCast<Int>(p[2]);
 
-    pInt[0] += ((p[0] < 0) ? -ofi[0] : ofi[0]);
-    pInt[1] += ((p[1] < 0) ? -ofi[1] : ofi[1]);
-    pInt[2] += ((p[2] < 0) ? -ofi[2] : ofi[2]);
+    pInt[0] += ((p[0] < T(0)) ? -ofi[0] : ofi[0]);
+    pInt[1] += ((p[1] < T(0)) ? -ofi[1] : ofi[1]);
+    pInt[2] += ((p[2] < T(0)) ? -ofi[2] : ofi[2]);
 
     pointI[0] = Bit::BitCast<T>(pInt[0]);
     pointI[1] = Bit::BitCast<T>(pInt[1]);
