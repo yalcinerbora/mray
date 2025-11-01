@@ -208,13 +208,19 @@ struct IntersectionT
     Float           t;
 };
 
-struct BxDFResult
+struct BxDFEval
 {
-    Ray         wI;
     Spectrum    reflectance;
     MediumKey   mediumKey;
     bool        isPassedThrough = false;
-    bool        isDispersed = false;
+    bool        isDispersed     = false;
+};
+
+struct BxDFSample
+{
+    Ray      wI;
+    Float    pdf;
+    BxDFEval eval;
 };
 
 struct VoxelizationParameters
@@ -277,9 +283,9 @@ void RayToGMem(Span<RayGMem> gRays, RayIndex index,
 {
     RayGMem rayGMem =
     {
-        .pos = r.Pos(),
+        .pos = r.pos,
         .tMin = tMinMax[0],
-        .dir = r.Dir(),
+        .dir = r.dir,
         .tMax = tMinMax[1]
     };
     gRays[index] = rayGMem;

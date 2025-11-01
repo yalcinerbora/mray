@@ -17,20 +17,6 @@ class PathTracerRendererT;
 
 namespace PathTraceRDetail
 {
-    enum class LightSamplerEnum
-    {
-        UNIFORM,
-        IRRAD_WEIGHTED,
-        //
-        END
-    };
-    inline constexpr std::array LightSamplerNames =
-    {
-        "Uniform",
-        "IrradianceWeighted"
-    };
-    using LightSamplerType = NamedEnum<LightSamplerEnum, LightSamplerNames>;
-
     enum class SampleModeEnum
     {
         PURE,
@@ -140,8 +126,7 @@ namespace PathTraceRDetail
 
         MR_HF_DECL
         static void Call(const Light&, RNGDispenser&, const SpectrumConv&,
-                         const LightWorkParams<EmptyType, SpectrumConv, LG, TG>& params,
-                         RayIndex rayIndex, uint32_t laneId);
+                         const Params&, RayIndex rayIndex, uint32_t laneId);
 
     };
 
@@ -154,8 +139,7 @@ namespace PathTraceRDetail
 
         MR_HF_DECL
         static void Call(const Light&, RNGDispenser&, const SpectrumConv&,
-                         const Params& params,
-                         RayIndex rayIndex, uint32_t laneId);
+                         const Params& params, RayIndex rayIndex, uint32_t laneId);
     };
 }
 
@@ -181,22 +165,23 @@ void WorkFunction<P, M, T, SC>::Call(const Primitive&, const Material& mat, cons
     // Sample Material  //
     // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-    Vector3 wO = Math::Normalize(tContext.InvApplyN(-rayIn.Dir()));
+    Vector3 wO = Math::Normalize(tContext.InvApplyN(-rayIn.dir));
     RayConeSurface rConeRefract = mat.RefractRayCone(surfRayCone, wO);
-    SampleT<BxDFResult> raySample = mat.SampleBxDF(wO, rng);
-    Vector3 wI = Math::Normalize(tContext.ApplyN(raySample.value.wI.Dir()));
+    BxDFSample raySample = mat.SampleBxDF(wO, rng);
+    raySample.wI.dir = Math::Normalize(tContext.ApplyN(raySample.wI.dir));
 
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
-    throughput *= raySample.value.reflectance;
+    throughput *= raySample.eval.reflectance;
 
-    RayCone rayConeOut = rConeRefract.ConeAfterScatter(wI, surf.geoNormal);
+    RayCone rayConeOut = rConeRefract.ConeAfterScatter(raySample.wI.dir,
+                                                       surf.geoNormal);
 
     // ================ //
     //    Dispersion    //
     // ================ //
     if constexpr(!SpectrumConv::IsRGB)
     {
-        if(raySample.value.isDispersed)
+        if(raySample.eval.isDispersed)
         {
             spectrumConverter.DisperseWaves();
             spectrumConverter.StoreWaves();
@@ -241,9 +226,9 @@ void WorkFunction<P, M, T, SC>::Call(const Primitive&, const Material& mat, cons
         //  Scattered Ray   //
         // ================ //
         Vector3 nudgeNormal = surf.geoNormal;
-        if(raySample.value.isPassedThrough)
+        if(raySample.eval.isPassedThrough)
             nudgeNormal *= Float(-1);
-        Ray rayOut = Ray(wI, surf.position).Nudge(nudgeNormal);
+        Ray rayOut = raySample.wI.Nudge(nudgeNormal);
 
         // If I remember correctly, OptiX does not like INF on rays,
         // so we put flt_max here.
@@ -272,7 +257,7 @@ void LightWorkFunction<L, T, SC>::Call(const Light& l, RNGDispenser&, const Spec
     if(pathDataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
 
     auto [ray, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-    Vector3 wO = -ray.Dir();
+    Vector3 wO = -ray.dir;
     RayCone rayCone = params.in.dRayCones[rayIndex].Advance(tMM[1]);
 
     Spectrum emission;
@@ -327,7 +312,7 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
     //       NEE        //
     // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-    Vector3 wO = Math::Normalize(-tContext.InvApplyN(rayIn.Dir()));
+    Vector3 wO = Math::Normalize(-tContext.InvApplyN(rayIn.dir));
     const LightSampler& lightSampler = params.globalState.lightSampler;
     Vector3 worldPos = surf.position;
     RayConeSurface refractedRayCone = mat.RefractRayCone(surfRayCone, wO);
@@ -337,7 +322,7 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
     auto [shadowRay, shadowTMM] = lightSample.value.SampledRay(worldPos);
     Ray wI = tContext.InvApply(shadowRay);
 
-    Spectrum reflectance = mat.Evaluate(wI, wO);
+    Spectrum reflectance = mat.Evaluate(wI, wO).reflectance;
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= reflectance;
 
@@ -429,7 +414,7 @@ void LightWorkFunctionWithNEE<L, T, SC, LS>::Call(const Light& l, RNGDispenser&,
         throughput = DivideByPDF(throughput, misPdf);
     }
 
-    Vector3 wO = -ray.Dir();
+    Vector3 wO = -ray.dir;
     Spectrum emission;
     if constexpr(Light::IsPrimitiveBackedLight)
     {

@@ -98,8 +98,7 @@ void SingleSampleSpectrumWavelength(// Output
 
                 auto pdfs = std::array{sample.pdf, otherPDF};
                 auto weights = std::array{MIS[sampleI], MIS[otherI]};
-                auto pdf = MIS::BalanceCancelled(Span<Float, 2>(pdfs),
-                                                 Span<Float, 2>(weights));
+                auto pdf = MIS::BalanceCancelled<2>(pdfs, weights);
                 // Gaussian can be funky, check the values
                 assert(Math::IsFinite(pdf));
                 assert(Math::IsFinite(sample.value));

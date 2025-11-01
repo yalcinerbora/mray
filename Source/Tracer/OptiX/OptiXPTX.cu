@@ -314,8 +314,8 @@ void KCRayGenOptix()
     optixTrace(// Accelerator
                traversable,
                // Ray Input
-               make_float3(ray.Pos()[0], ray.Pos()[1], ray.Pos()[2]),
-               make_float3(ray.Dir()[0], ray.Dir()[1], ray.Dir()[2]),
+               make_float3(ray.pos[0], ray.pos[1], ray.pos[2]),
+               make_float3(ray.dir[0], ray.dir[1], ray.dir[2]),
                tMM[0], tMM[1],
                0.0f,
                //
@@ -352,8 +352,8 @@ void KCLocalRayGenOptix()
     OptixTraversableHandle traversable = params.lParams.dGlobalInstanceTraversables[globalIndex];
 
     Matrix4x4 invTransform = params.lParams.dGlobalInstanceInvTransforms[globalIndex];
-    Vector3 dir = invTransform * ray.Dir();
-    Vector3 pos = Vector3(invTransform * Vector4(ray.Pos(), Float(1)));
+    Vector3 dir = invTransform * ray.dir;
+    Vector3 pos = Vector3(invTransform * Vector4(ray.pos, Float(1)));
     ray = Ray(dir, pos);
 
     // Set the RNG state as payload, any hit shaders will
@@ -366,8 +366,8 @@ void KCLocalRayGenOptix()
     optixTrace(// Accelerator
               traversable,
               // Ray Input
-              make_float3(ray.Pos()[0], ray.Pos()[1], ray.Pos()[2]),
-              make_float3(ray.Dir()[0], ray.Dir()[1], ray.Dir()[2]),
+              make_float3(ray.pos[0], ray.pos[1], ray.pos[2]),
+              make_float3(ray.dir[0], ray.dir[1], ray.dir[2]),
               tMM[0], tMM[1],
               0.0f,
               //

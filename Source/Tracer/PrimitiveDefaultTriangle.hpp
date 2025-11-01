@@ -421,7 +421,7 @@ void Triangle<T>::GenerateSurface(BasicSurface& result,
     using Shape::Triangle::Normal;
     Vector3 geoNormal = Normal(positions);
 
-    bool backSide = (Math::Dot(geoNormal, ray.Dir()) > 0.0f);
+    bool backSide = (Math::Dot(geoNormal, ray.dir) > 0.0f);
     if(backSide) geoNormal = -geoNormal;
 
     result = BasicSurface
@@ -472,7 +472,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     Vector2 uv = uv0 * a + uv1 * b + uv2 * c;
 
     // Flip the surface definitions (normal, geometric normal)
-    Float dDotN = Math::Dot(geoNormal, Math::Normalize(ray.Dir()));
+    Float dDotN = Math::Dot(geoNormal, Math::Normalize(ray.dir));
     bool backSide = (dDotN) > Float(0);
     if(backSide)
     {
@@ -491,7 +491,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     // https://www.jcgt.org/published/0010/01/01/
     using Math::Normalize;
     Vector3 f = geoNormal;
-    Vector3 d = Normalize(ray.Dir());
+    Vector3 d = Normalize(ray.dir);
     auto [a1, a2] = rayCone.Project(f, d);
     assert(Math::IsFinite(a1) && Math::IsFinite(a2));
     Matrix3x3 M = Matrix3x3(Normalize(a1), Normalize(a2), geoNormal);

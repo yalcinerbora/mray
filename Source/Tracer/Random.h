@@ -171,6 +171,7 @@ struct RNGDispenserT
     MR_HF_DECL Float   NextFloat();
     template<uint32_t I>
     MR_HF_DECL Vector2 NextFloat2D();
+    MR_HF_DECL void    Advance(uint32_t offset);
 };
 
 using RandomNumber = uint32_t;

@@ -1,44 +1,39 @@
 #pragma once
 
-#include "Tracer/PathTracerRendererBase.h"
+#include "GuidedPTRendererShaders.h"
 
-#include "RequestedTypes.h" // IWYU pragma: keep
-#include "PathTracerRendererShaders.h"
-#include "SpectrumContext.h"
-
-template<SpectrumContextC SpectrumContextT>
-class PathTracerRendererT final : public PathTracerRendererBase
+class GuidedPTRenderer final : public PathTracerRendererBase
 {
-    using This              = PathTracerRendererT<SpectrumContextT>;
+    using This              = GuidedPTRenderer;
     using Base              = PathTracerRendererBase;
-    using Options           = PathTraceRDetail::Options;
-    using SampleMode        = PathTraceRDetail::SampleMode;
-    using RayState          = PathTraceRDetail::RayState;
+    using Options           = GuidedPTRDetail::Options;
+    using DisplayMode       = GuidedPTRDetail::DisplayMode;
+    using RayState          = GuidedPTRDetail::RayState;
 
     public:
     //
     using UniformLightSampler   = DirectLightSamplerUniform<MetaLightList>;
     using AttribInfoList        = typename RendererBase::AttribInfoList;
-    using SpectrumContext       = SpectrumContextT;
+    using SpectrumContext       = SpectrumContextJakob2019;
     using SpectrumConverter     = typename SpectrumContext::Converter;
-    static constexpr bool IsSpectral = !std::is_same_v<SpectrumContext, SpectrumContextIdentity>;
     //
-    using GlobalStateList       = TypePack<PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>,
-                                           PathTraceRDetail::GlobalState<UniformLightSampler, SpectrumConverter>>;
-    using RayStateList          = TypePack<PathTraceRDetail::RayState, PathTraceRDetail::RayState>;
+    ////using SpecContextPtr        = std::unique_ptr<SpectrumContext>;
+    //using SpecContextPtr = std::unique_ptr<SpectrumContext>;
+    //static constexpr bool IsSpectral = !std::is_same_v<SpectrumContext, SpectrumContextIdentity>;
+
+    using GlobalStateList       = TypePack<GuidedPTRDetail::GlobalState>;
+    using RayStateList          = TypePack<GuidedPTRDetail::RayState>;
 
     // Work Functions
     template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     using WorkFunctions = TypePack
     <
-        PathTraceRDetail::WorkFunction<PG, MG, TG, SpectrumContext>,
-        PathTraceRDetail::WorkFunctionNEE<PG, MG, TG, SpectrumContext, UniformLightSampler>
+        GuidedPTRDetail::WorkFunction<PG, MG, TG>
     >;
     template<LightGroupC LG, TransformGroupC TG>
     using LightWorkFunctions = TypePack
     <
-        PathTraceRDetail::LightWorkFunction<LG, TG, SpectrumContext>,
-        PathTraceRDetail::LightWorkFunctionWithNEE<LG, TG, SpectrumContext, UniformLightSampler>
+        GuidedPTRDetail::LightWorkFunction<LG, TG>
     >;
     template<CameraGroupC CG, TransformGroupC TG>
     using CamWorkFunctions = TypePack<>;
@@ -77,7 +72,7 @@ class PathTracerRendererT final : public PathTracerRendererBase
 
     // Helpers
     void                CopyAliveRays(Span<const RayIndex> dAliveRayIndices, const GPUQueue&);
-    uint32_t            FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
+    uint32_t            FindMaxSamplePerIteration(uint32_t rayCount);
     Span<RayIndex>      DoRenderPass(uint32_t sppLimit, const GPUQueue&);
     // Implementations
     RendererOutput      DoThroughputSingleTileRender(const GPUDevice&, const GPUQueue&) override;
@@ -86,15 +81,15 @@ class PathTracerRendererT final : public PathTracerRendererBase
 
     public:
     // Constructors & Destructor
-                         PathTracerRendererT(const RenderImagePtr&,
-                                             TracerView,
-                                             ThreadPool&,
-                                             const GPUSystem&,
-                                             const RenderWorkPack&);
-                         PathTracerRendererT(const PathTracerRendererT&) = delete;
-                         PathTracerRendererT(PathTracerRendererT&&) = delete;
-    PathTracerRendererT& operator=(const PathTracerRendererT&) = delete;
-    PathTracerRendererT& operator=(PathTracerRendererT&&) = delete;
+                         GuidedPTRenderer(const RenderImagePtr&,
+                                          TracerView,
+                                          ThreadPool&,
+                                          const GPUSystem&,
+                                          const RenderWorkPack&);
+                         GuidedPTRenderer(const This&) = delete;
+                         GuidedPTRenderer(This&&) = delete;
+    This&                operator=(const This&) = delete;
+    This&                operator=(This&&) = delete;
     //
     AttribInfoList      AttributeInfo() const override;
     RendererOptionPack  CurrentAttributes() const override;
@@ -110,19 +105,11 @@ class PathTracerRendererT final : public PathTracerRendererBase
     size_t              GPUMemoryUsage() const override;
 };
 
-extern template class PathTracerRendererT<SpectrumContextIdentity>;
-extern template class PathTracerRendererT<SpectrumContextJakob2019>;
-
-using PathTracerRendererRGB = PathTracerRendererT<SpectrumContextIdentity>;
-using PathTracerRendererSpectral = PathTracerRendererT<SpectrumContextJakob2019>;
-
-static_assert(RendererC<PathTracerRendererRGB>, "\"PathTracerRendererRGB\" does not "
-              "satisfy renderer concept.");
-static_assert(RendererC<PathTracerRendererSpectral>, "\"PathTracerRendererSpectral\" does not "
+static_assert(RendererC<GuidedPTRenderer>, "\"GuidedPTRenderer\" does not "
               "satisfy renderer concept.");
 
 template<RendererC R, PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
-class PathTracerRenderWork : public RenderWork<R, PG, MG, TG>
+class GuidedPTRenderWork : public RenderWork<R, PG, MG, TG>
 {
     using Base = RenderWork<R, PG, MG, TG>;
 
@@ -142,22 +129,20 @@ class PathTracerRenderWork : public RenderWork<R, PG, MG, TG>
 };
 
 template<RendererC R, LightGroupC LG, TransformGroupC TG>
-using PathTracerRenderLightWork = RenderLightWork<R, LG, TG>;
+using GuidedPTRenderLightWork = RenderLightWork<R, LG, TG>;
 
 template<RendererC R, CameraGroupC CG, TransformGroupC TG>
-using PathTracerRenderCamWork = RenderCameraWork<R, CG, TG>;
+using GuidedPTRenderCamWork = RenderCameraWork<R, CG, TG>;
 
-template<SpectrumContextC SpectrumContext>
 template<class RenderWorkParams>
 MR_HF_DEF
-typename SpectrumContext::Converter
-PathTracerRendererT<SpectrumContext>::GenSpectrumConverter(const RenderWorkParams& params,
-                                                           RayIndex rIndex)
+typename SpectrumContextJakob2019::Converter
+GuidedPTRenderer::GenSpectrumConverter(const RenderWorkParams& params,
+                                       RayIndex rIndex)
 {
-    if constexpr(!std::is_same_v<SpectrumContext, SpectrumContextIdentity>)
-    {
-        return SpectrumConverter(params.rayState.dPathWavelengths[rIndex],
-                                 params.globalState.specContextData);
-    }
-    else return SpectrumConverterIdentity();
+    return SpectrumConverter(params.rayState.dPathWavelengths[rIndex],
+                             params.globalState.specContextData);
 }
+
+// TODO: We may add not spectral version later
+using GuidedPTRendererSpectral = GuidedPTRenderer;

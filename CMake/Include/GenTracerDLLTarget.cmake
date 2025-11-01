@@ -18,7 +18,13 @@ function(gen_tracer_dll_target)
         ${CURRENT_SOURCE_DIR}/PathTracerRenderer.h
         ${CURRENT_SOURCE_DIR}/PathTracerRendererShaders.h)
 
+    set(SRC_RENDERERS_GUIDED_PATH_TRACER
+        ${CURRENT_SOURCE_DIR}/GuidedPTRenderer.cu
+        ${CURRENT_SOURCE_DIR}/GuidedPTRenderer.h
+        ${CURRENT_SOURCE_DIR}/GuidedPTRendererShaders.h)
+
     set(SRC_COMMON
+        ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
         ${CURRENT_SOURCE_DIR}/EntryPoint.h
         ${CURRENT_SOURCE_DIR}/EntryPoint.cpp
         ${CURRENT_SOURCE_DIR}/RequestedTypes.h
@@ -28,10 +34,12 @@ function(gen_tracer_dll_target)
         ${CURRENT_SOURCE_DIR}/Tracer.cu)
 
     set(SRC_ALL
+        ${SRC_RENDERERS_GUIDED_PATH_TRACER}
         ${SRC_RENDERERS_PATH_TRACER}
         ${SRC_COMMON})
 
     source_group("Renderers/PathTracer" FILES ${SRC_RENDERERS_PATH_TRACER})
+    source_group("Renderers/GuidedPathTracer" FILES ${SRC_RENDERERS_GUIDED_PATH_TRACER})
     source_group("" FILES ${SRC_COMMON})
 
     # Target Generation
@@ -84,6 +92,7 @@ function(gen_tracer_dll_target)
         ${GEN_TRACER_DLL_MACRO}
         SOURCE_FILES
         ${CURRENT_SOURCE_DIR}/PathTracerRenderer.cu
+        ${CURRENT_SOURCE_DIR}/GuidedPTRenderer.cu
         ${CURRENT_SOURCE_DIR}/Tracer.cu
         ${TRACER_KERNEL_GEN_INSTANTIATIONS}
     )

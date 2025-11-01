@@ -39,11 +39,11 @@ namespace LambertMatDetail
                         const DataSoA& soa, MaterialKey mk);
 
         MR_GF_DECL
-        SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
+        BxDFSample          SampleBxDF(const Vector3& wO,
                                        RNGDispenser& dispenser) const;
         MR_GF_DECL Float    Pdf(const Ray& wI, const Vector3& wO) const;
 
-        MR_GF_DECL Spectrum Evaluate(const Ray& wI, const Vector3& wO) const;
+        MR_GF_DECL BxDFEval Evaluate(const Ray& wI, const Vector3& wO) const;
         MR_GF_DECL bool     IsEmissive() const;
         MR_GF_DECL Spectrum Emit(const Vector3& wO) const;
         MR_GF_DECL Float    Specularity() const;
@@ -83,10 +83,10 @@ namespace ReflectMatDetail
                         const DataSoA& soa, MaterialKey mk);
 
         MR_GF_DECL
-        SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
+        BxDFSample          SampleBxDF(const Vector3& wO,
                                        RNGDispenser& dispenser) const;
         MR_GF_DECL Float    Pdf(const Ray& wI, const Vector3& wO) const;
-        MR_GF_DECL Spectrum Evaluate(const Ray& wI, const Vector3& wO) const;
+        MR_GF_DECL BxDFEval Evaluate(const Ray& wI, const Vector3& wO) const;
         MR_GF_DECL bool     IsEmissive() const;
         MR_GF_DECL Spectrum Emit(const Vector3& wO) const;
         MR_GF_DECL Float    Specularity() const;
@@ -129,11 +129,11 @@ namespace RefractMatDetail
                         const DataSoA& soa, MaterialKey mk);
 
         MR_GF_DECL
-        SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
+        BxDFSample          SampleBxDF(const Vector3& wO,
                                        RNGDispenser& dispenser) const;
         MR_GF_DECL Float    Pdf(const Ray& wI, const Vector3& wO) const;
 
-        MR_GF_DECL Spectrum Evaluate(const Ray& wI, const Vector3& wO) const;
+        MR_GF_DECL BxDFEval Evaluate(const Ray& wI, const Vector3& wO) const;
         MR_GF_DECL bool     IsEmissive() const;
         MR_GF_DECL Spectrum Emit(const Vector3& wO) const;
         MR_GF_DECL Float    Specularity() const;
@@ -195,11 +195,11 @@ namespace UnrealMatDetail
                        const DataSoA& soa, MaterialKey mk);
 
         MR_GF_DECL
-        SampleT<BxDFResult> SampleBxDF(const Vector3& wO,
+        BxDFSample          SampleBxDF(const Vector3& wO,
                                        RNGDispenser& dispenser) const;
         MR_GF_DECL Float    Pdf(const Ray& wI, const Vector3& wO) const;
 
-        MR_GF_DECL Spectrum Evaluate(const Ray& wI, const Vector3& wO) const;
+        MR_GF_DECL BxDFEval Evaluate(const Ray& wI, const Vector3& wO) const;
         MR_GF_DECL bool     IsEmissive() const;
         MR_GF_DECL Spectrum Emit(const Vector3& wO) const;
         MR_GF_DECL Float    Specularity() const;

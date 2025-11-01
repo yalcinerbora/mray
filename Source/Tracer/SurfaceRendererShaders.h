@@ -278,15 +278,15 @@ void WorkFunctionFurnaceOrAO<P, M, T>::Call(const Primitive&, const Material& ma
     {
         using Distribution::Common::DivideByPDF;
         auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-        Vector3 wO = rayIn.Dir();
+        Vector3 wO = rayIn.dir;
         wO = Math::Normalize(tContext.InvApplyN(wO));
         auto raySample = mat.SampleBxDF(-wO, rng);
 
         Spectrum refl;
-        if(!Math::IsFinite(raySample.value.reflectance) || Math::IsNaN(raySample.pdf))
+        if(!Math::IsFinite(raySample.eval.reflectance) || Math::IsNaN(raySample.pdf))
             refl = Spectrum(BIG_MAGENTA(), 0.0);
         else
-            refl = DivideByPDF(raySample.value.reflectance, raySample.pdf);
+            refl = DivideByPDF(raySample.eval.reflectance, raySample.pdf);
 
         params.rayState.dOutputData[rayIndex] = refl;
     }

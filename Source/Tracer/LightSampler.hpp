@@ -10,7 +10,7 @@ Pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) co
     // Nudge the position back here, this will be used
     // for visibility check
     // TODO: Bad usage of API, constructing a ray to nudge a position
-    Vector3 pos = Ray(Vector3::Zero(), position).Nudge(-dir).Pos();
+    Vector3 pos = Ray(Vector3::Zero(), position).Nudge(-dir).pos;
     Float length = Math::Length(pos - distantPoint);
     return RetT(Ray(dir, distantPoint), Vector2(0, length * 0.999f));
 }
@@ -86,7 +86,7 @@ Float DirectLightSamplerUniform<ML>::PdfLight(uint32_t index,
 
     // Probability of sampling such direction from the particular light
     MetaLightView light = dMetaLights(specContext, index);
-    Float lightPDF = light.PdfSolidAngle(hit, ray.Pos(), ray.Dir());
+    Float lightPDF = light.PdfSolidAngle(hit, ray.pos, ray.dir);
     return lightPDF * selectionPDF;
 }
 

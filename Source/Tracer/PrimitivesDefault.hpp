@@ -32,7 +32,7 @@ Optional<SphereIntersection> Sphere<T>::Intersects(const Ray& ray, bool cullBack
     Vector3 unitDir = Math::Normalize(hitPos - center);
     Vector2 hit = Graphics::CartesianToUnitSpherical(unitDir);
 
-    bool isInside = Math::Length(transformedRay.Pos() - center) < radius;
+    bool isInside = Math::Length(transformedRay.pos - center) < radius;
     if(cullBackFace && isInside)
         return std::nullopt;
 
@@ -240,7 +240,7 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
     Quaternion tbn = Quaternion::RotationBetweenZAxis(Math::Normalize(normal)).Conjugate();
 
     // Spheres are always two sided, check if we are inside
-    Vector3 rDir = Math::Normalize(ray.Dir());
+    Vector3 rDir = Math::Normalize(ray.dir);
     Float dDotN = Math::Dot(geoNormal, rDir);
     bool backSide = (dDotN > Float(0));
     if(backSide)

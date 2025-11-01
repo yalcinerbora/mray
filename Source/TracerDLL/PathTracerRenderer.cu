@@ -94,14 +94,15 @@ PathTracerRendererT<SC>::CurrentAttributes() const
 template<SpectrumContextC SC>
 void PathTracerRendererT<SC>::PushAttribute(uint32_t attributeIndex,
                                             TransientData data, const GPUQueue&)
-{    switch(attributeIndex)
+{
+    switch(attributeIndex)
     {
         case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
         case 1: newOptions.burstSize = data.AccessAs<uint32_t>()[0]; break;
         case 2: newOptions.renderMode = RenderMode(std::as_const(data).AccessAsString()); break;
         case 3: newOptions.sampleMode = PathTraceRDetail::SampleMode(std::as_const(data).AccessAsString()); break;
         case 4: newOptions.russianRouletteRange = data.AccessAs<Vector2ui>()[0]; break;
-        case 5: newOptions.lightSampler = PathTraceRDetail::LightSamplerType(std::as_const(data).AccessAsString()); break;
+        case 5: newOptions.lightSampler = LightSamplerType(std::as_const(data).AccessAsString()); break;
         default:
             throw MRayError("{} Unknown attribute index {}", TypeName(), attributeIndex);
     }
@@ -824,10 +825,13 @@ PathTracerRendererT<SC>::StaticAttributeInfo()
 template<SpectrumContextC SC>
 size_t PathTracerRendererT<SC>::GPUMemoryUsage() const
 {
-    return (rayPartitioner.GPUMemoryUsage() +
-            rnGenerator->GPUMemoryUsage() +
-            spectrumContext->GPUMemoryUsage() +
-            rendererGlobalMem.Size());
+    size_t total = (rayPartitioner.GPUMemoryUsage() +
+                    rnGenerator->GPUMemoryUsage() +
+                    rendererGlobalMem.Size());
+    if(spectrumContext)
+        total += spectrumContext->GPUMemoryUsage();
+
+    return total;
 }
 
 template class PathTracerRendererT<SpectrumContextIdentity>;

@@ -506,14 +506,14 @@ MR_PF_DEF Matrix<N, T> Matrix<N, T>::Zero() noexcept
 template <unsigned int N, ArithmeticC T>
 MR_PF_DEF RayT<T> Matrix<N, T>::TransformRay(const RayT<T>& r) const noexcept requires (N == 3)
 {
-    return RayT<T>((*this) * r.Dir(), (*this) * r.Pos());
+    return RayT<T>((*this) * r.dir, (*this) * r.pos);
 }
 
 template <unsigned int N, ArithmeticC T>
 MR_PF_DEF RayT<T> Matrix<N, T>::TransformRay(const RayT<T>& r) const noexcept requires (N == 4)
 {
-    auto tDir = Vector<N - 1, T>((*this) * Vector<N, T>(r.Dir(), T{0}));
-    auto tPos = Vector<N - 1, T>((*this) * Vector<N, T>(r.Pos(), T{1}));
+    auto tDir = Vector<N - 1, T>((*this) * Vector<N, T>(r.dir, T{0}));
+    auto tPos = Vector<N - 1, T>((*this) * Vector<N, T>(r.pos, T{1}));
 
     return RayT<T>(tDir, tPos);
 }

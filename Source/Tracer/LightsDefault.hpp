@@ -103,13 +103,13 @@ Float LightPrim<P, SC>::PdfRay(const Ray& ray) const
     using Distribution::Common::PDFUniformDirection;
 
     const P& primitive = prim.get();
-    Optional<Hit> hit = primitive.ProjectedHit(ray.Pos());
+    Optional<Hit> hit = primitive.ProjectedHit(ray.pos);
     if(!hit.has_value()) return Float(0);
 
     Optional<BasicSurface> surf = primitive.SurfaceFromHit(*hit);
     if(!surf.has_value()) return Float(0);
 
-    Float NdL = Math::Dot((*surf).normal, ray.Dir());
+    Float NdL = Math::Dot((*surf).normal, ray.dir);
     if(!isTwoSided && NdL <= Float(0))
         return Float(0);
 
@@ -396,7 +396,7 @@ template<CoordConverterC CC, TransformContextC TC, class SC>
 MR_HF_DEF
 Float LightSkysphere<CC, TC, SC>::PdfRay(const Ray& ray) const
 {
-    Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(-ray.Dir());
+    Vector3 dirYUp = prim.get().GetTransformContext().InvApplyV(-ray.dir);
     Vector2 uv = CC::DirToUV(dirYUp);
     Float pdf = PdfUV(uv);
     pdf = CC::ToSolidAnglePdf(pdf, uv);

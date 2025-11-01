@@ -84,10 +84,10 @@ void BounceWork<P, M, T>::Call(const Primitive&, const Material& mat, const Surf
     // Sample Material  //
     // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.in.dRays, rayIndex);
-    Vector3 wO = rayIn.Dir();
+    Vector3 wO = rayIn.dir;
     wO = Math::Normalize(tContext.InvApplyN(wO));
     auto raySample = mat.SampleBxDF(-wO, rng);
-    Vector3 wI = Math::Normalize(tContext.ApplyN(raySample.value.wI.Dir()));
+    Vector3 wI = Math::Normalize(tContext.ApplyN(raySample.wI.dir));
     Float specularity = mat.Specularity();
 
     // Refract the ray cone for russian roulette
@@ -127,7 +127,7 @@ void BounceWork<P, M, T>::Call(const Primitive&, const Material& mat, const Surf
 
     // Write back the new ray
     Vector3 nudgeNormal = surf.geoNormal;
-    if(raySample.value.isPassedThrough)
+    if(raySample.eval.isPassedThrough)
         nudgeNormal *= Float(-1);
     //
     Ray rayOut = Ray(wI, surf.position).Nudge(nudgeNormal);
@@ -154,7 +154,7 @@ void LightBounceWork<L, T>::Call(const Light&, RNGDispenser&,
         // What about normal?
         // We do not have surface information here
         // just fake normal as "wO"
-        Vector3 wO = -ray.Dir();
+        Vector3 wO = -ray.dir;
 
         const auto& hashGrid = params.globalState.hashGrid;
         auto [spatialDataIndex, _] = hashGrid.TryInsertAtomic(position, wO);

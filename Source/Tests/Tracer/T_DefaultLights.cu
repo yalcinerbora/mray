@@ -143,8 +143,8 @@ void KCReadLights(MRAY_GRID_CONSTANT const MetaLightArrayView lightArrayView,
                      sampleVec.value[0], sampleVec.value[1], sampleVec.value[2],
                      sampleVec.pdf, pdfSolidAngle, solidRNCount,
                      //
-                     sampleRay.value.Dir()[0], sampleRay.value.Dir()[1], sampleRay.value.Dir()[2],
-                     sampleRay.value.Pos()[0], sampleRay.value.Pos()[1], sampleRay.value.Pos()[2],
+                     sampleRay.value.dir[0], sampleRay.value.dir[1], sampleRay.value.dir[2],
+                     sampleRay.value.pos[0], sampleRay.value.pos[1], sampleRay.value.pos[2],
                      sampleRay.pdf, pdfRay, rayRNCount,
                      //
                      radiance0[0], radiance0[1], radiance0[2],
@@ -163,8 +163,8 @@ void KCReadLights(MRAY_GRID_CONSTANT const MetaLightArrayView lightArrayView,
                    sampleVec.value[0], sampleVec.value[1], sampleVec.value[2],
                    sampleVec.pdf, pdfSolidAngle, solidRNCount,
                    //
-                   sampleRay.value.Dir()[0], sampleRay.value.Dir()[1], sampleRay.value.Dir()[2],
-                   sampleRay.value.Pos()[0], sampleRay.value.Pos()[1], sampleRay.value.Pos()[2],
+                   sampleRay.value.dir[0], sampleRay.value.dir[1], sampleRay.value.dir[2],
+                   sampleRay.value.pos[0], sampleRay.value.pos[1], sampleRay.value.pos[2],
                    sampleRay.pdf, pdfRay, rayRNCount,
                    //
                    radiance0[0], radiance0[1], radiance0[2],
@@ -382,9 +382,9 @@ TEST(DefaultLights, PrimLight_Triangle)
         Ray r1 = Ray(Normalize(sample1.value), Vector3::Zero());
 
         Float pdf0 = l0.PdfSolidAngle(tri0.Intersects(r0, false).value().hit,
-                                      r0.Pos(), r0.Dir());
+                                      r0.pos, r0.dir);
         Float pdf1 = l1.PdfSolidAngle(tri1.Intersects(r1, false).value().hit,
-                                      r1.Pos(), r1.Dir());
+                                      r1.pos, r1.dir);
 
         EXPECT_FLOAT_EQ(pdf0, sample0.pdf);
         EXPECT_FLOAT_EQ(pdf1, sample1.pdf);

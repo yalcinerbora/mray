@@ -48,6 +48,18 @@ inline constexpr std::array RenderModeNames =
 };
 using RenderMode = NamedEnum<RenderModeEnum, RenderModeNames>;
 
+enum class LightSamplerEnum
+{
+    UNIFORM,
+    //
+    END
+};
+inline constexpr std::array LightSamplerNames =
+{
+    "Uniform"
+};
+using LightSamplerType = NamedEnum<LightSamplerEnum, LightSamplerNames>;
+
 struct alignas(4) PathDataPack
 {
     uint8_t     depth;

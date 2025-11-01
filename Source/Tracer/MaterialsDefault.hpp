@@ -23,8 +23,8 @@ LambertMaterial<SpectrumContext>::LambertMaterial(const SpectrumConverter& specT
 
 template <class SC>
 MR_GF_DEF
-SampleT<BxDFResult> LambertMaterial<SC>::SampleBxDF(const Vector3&,
-                                                    RNGDispenser& dispenser) const
+BxDFSample LambertMaterial<SC>::SampleBxDF(const Vector3&,
+                                           RNGDispenser& dispenser) const
 {
     using Distribution::Common::SampleCosDirection;
     // Sampling a vector from cosine weighted hemispherical distribution
@@ -55,15 +55,15 @@ SampleT<BxDFResult> LambertMaterial<SC>::SampleBxDF(const Vector3&,
     Ray wIRay = Ray(wI, surface.position);
     MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
 
-    return SampleT<BxDFResult>
+    return BxDFSample
     {
-        .value = BxDFResult
+        .wI = wIRay,
+        .pdf = pdf,
+        .eval = BxDFEval
         {
-            .wI = wIRay,
             .reflectance = reflectance,
             .mediumKey = outMedium
-        },
-        .pdf = pdf
+        }
     };
 }
 
@@ -72,7 +72,7 @@ MR_GF_DEF
 Float LambertMaterial<SC>::Pdf(const Ray& wI, const Vector3&) const
 {
     using Distribution::Common::PDFCosDirection;
-    Vector3 wILocal = surface.shadingTBN.ApplyRotation(wI.Dir());
+    Vector3 wILocal = surface.shadingTBN.ApplyRotation(wI.dir);
     Vector3 normal = (optNormal) ? (*optNormal) : Vector3::ZAxis();
     normal = Math::Normalize(normal);
     Float pdf = PDFCosDirection(wILocal, normal);
@@ -81,7 +81,7 @@ Float LambertMaterial<SC>::Pdf(const Ray& wI, const Vector3&) const
 
 template <class SC>
 MR_GF_DEF
-Spectrum LambertMaterial<SC>::Evaluate(const Ray& wI, const Vector3&) const
+BxDFEval LambertMaterial<SC>::Evaluate(const Ray& wI, const Vector3&) const
 {
     // Check normal Mapping
     Quaternion toTangentSpace = surface.shadingTBN;
@@ -93,9 +93,14 @@ Spectrum LambertMaterial<SC>::Evaluate(const Ray& wI, const Vector3&) const
         toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
     }
     // Calculate lightning tangent space
-    Vector3 wILocal = toTangentSpace.ApplyRotation(wI.Dir());
+    Vector3 wILocal = toTangentSpace.ApplyRotation(wI.dir);
     Float nDotL = Math::Max(wILocal[2], Float(0));
-    return nDotL * albedo * MathConstants::InvPi<Float>();
+    MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
+    return BxDFEval
+    {
+        .reflectance = nDotL * albedo * MathConstants::InvPi<Float>(),
+        .mediumKey = outMedium
+    };
 }
 
 template <class SC>
@@ -157,8 +162,8 @@ ReflectMaterial<SC>::ReflectMaterial(const SpectrumConverter&,
 
 template <class SC>
 MR_GF_DEF
-SampleT<BxDFResult> ReflectMaterial<SC>::SampleBxDF(const Vector3& wO,
-                                                    RNGDispenser&) const
+BxDFSample ReflectMaterial<SC>::SampleBxDF(const Vector3& wO,
+                                           RNGDispenser&) const
 {
     // It is less operations to convert the normal to local space
     // since we will need to put wI to local space then convert wO
@@ -169,16 +174,16 @@ SampleT<BxDFResult> ReflectMaterial<SC>::SampleBxDF(const Vector3& wO,
     // Directly delegate position, this is not a subsurface material
     Ray wIRay = Ray(wI, surface.position);
     MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
-    return SampleT<BxDFResult>
+    return BxDFSample
     {
-        .value = BxDFResult
+        .wI = wIRay,
+        .pdf = Float(1.0),
+        .eval = BxDFEval
         {
-            .wI = wIRay,
             .reflectance = Spectrum(1.0),
             // TODO: Change this later
             .mediumKey = outMedium
-        },
-        .pdf = Float(1.0)
+        }
     };
 }
 
@@ -192,9 +197,14 @@ Float ReflectMaterial<SC>::Pdf(const Ray&, const Vector3&) const
 
 template <class SC>
 MR_GF_DEF
-Spectrum ReflectMaterial<SC>::Evaluate(const Ray&, const Vector3&) const
+BxDFEval ReflectMaterial<SC>::Evaluate(const Ray&, const Vector3&) const
 {
-    return Spectrum(1);
+    MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
+    return BxDFEval
+    {
+        .reflectance = Spectrum(1),
+        .mediumKey = outMedium
+    };
 }
 
 template <class SC>
@@ -268,8 +278,8 @@ RefractMaterial<SC>::RefractMaterial(const SpectrumConverter& sTransContext,
 
 template <class SC>
 MR_GF_DEF
-SampleT<BxDFResult> RefractMaterial<SC>::SampleBxDF(const Vector3& wO,
-                                                    RNGDispenser& rng) const
+BxDFSample RefractMaterial<SC>::SampleBxDF(const Vector3& wO,
+                                           RNGDispenser& rng) const
 {
     Float fromEta = frontIoR;
     Float toEta = backIoR;
@@ -304,17 +314,17 @@ SampleT<BxDFResult> RefractMaterial<SC>::SampleBxDF(const Vector3& wO,
     MediumKey outMedium = (doReflection) ? fromMedium : toMedium;
     Float pdf           = (doReflection) ? f : (Float(1) - f);
     //
-    return SampleT<BxDFResult>
+    return BxDFSample
     {
-        .value = BxDFResult
+        .wI = Ray(wI, surface.position).Nudge(nLocal),
+        .pdf = pdf,
+        .eval = BxDFEval
         {
-            .wI = Ray(wI, surface.position).Nudge(nLocal),
-            .reflectance = Spectrum(pdf),
-            .mediumKey = outMedium,
+            .reflectance     = Spectrum(pdf),
+            .mediumKey       = outMedium,
             .isPassedThrough = !doReflection,
-            .isDispersed = true
-        },
-        .pdf = pdf
+            .isDispersed     = true
+        }
     };
 }
 
@@ -328,9 +338,22 @@ Float RefractMaterial<SC>::Pdf(const Ray&, const Vector3&) const
 
 template <class SC>
 MR_GF_DEF
-Spectrum RefractMaterial<SC>::Evaluate(const Ray&, const Vector3&) const
+BxDFEval RefractMaterial<SC>::Evaluate(const Ray& wI, const Vector3&) const
 {
-    return Spectrum(1);
+    MediumKey fromMedium = mediumKeys.Front();
+    MediumKey toMedium   = mediumKeys.Back();
+    //
+    if(surface.backSide) std::swap(fromMedium, toMedium);
+    //
+    bool isFront = Math::Dot(surface.geoNormal, wI.dir) > Float(0);
+    MediumKey outMedium = (isFront) ? fromMedium : toMedium;
+
+    return BxDFEval
+    {
+        .reflectance = Spectrum(1),
+        .mediumKey   = outMedium,
+        .isDispersed = true
+    };
 }
 
 template <class SC>
@@ -539,8 +562,8 @@ UnrealMaterial<SpectrumContext>::UnrealMaterial(const SpectrumConverter& specTra
 
 template <class SC>
 MR_GF_DEF
-SampleT<BxDFResult> UnrealMaterial<SC>::SampleBxDF(const Vector3& wO,
-                                                   RNGDispenser& dispenser) const
+BxDFSample UnrealMaterial<SC>::SampleBxDF(const Vector3& wO,
+                                          RNGDispenser& dispenser) const
 {
     static constexpr int DIFFUSE = 0;
     static constexpr int SPECULAR = 1;
@@ -639,15 +662,15 @@ SampleT<BxDFResult> UnrealMaterial<SC>::SampleBxDF(const Vector3& wO,
     Spectrum reflectance = diffuseTerm + specularTerm;
     MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
     // All done!
-    return SampleT<BxDFResult>
+    return BxDFSample
     {
-        .value = BxDFResult
+        .wI = Ray(L, surface.position),
+        .pdf = pdfOut,
+        .eval = BxDFEval
         {
-            .wI = Ray(L, surface.position),
             .reflectance = reflectance,
-            .mediumKey = outMedium
-        },
-        .pdf = pdfOut
+            .mediumKey   = outMedium
+        }
     };
 }
 
@@ -672,7 +695,7 @@ Float UnrealMaterial<SC>::Pdf(const Ray& wI,
     }
     // Bring wO, wI all the way to the tangent space
     Vector3 V = toTangentSpace.ApplyRotation(wO);
-    Vector3 L = toTangentSpace.ApplyRotation(wI.Dir());
+    Vector3 L = toTangentSpace.ApplyRotation(wI.dir);
     Vector3 H = Math::Normalize(L + V);
     //
     Float misRatio = MISRatio(avgAlbedo);
@@ -694,7 +717,7 @@ Float UnrealMaterial<SC>::Pdf(const Ray& wI,
 
 template <class SC>
 MR_GF_DEF
-Spectrum UnrealMaterial<SC>::Evaluate(const Ray& wI, const Vector3& wO) const
+BxDFEval UnrealMaterial<SC>::Evaluate(const Ray& wI, const Vector3& wO) const
 {
     using namespace Distribution;
     // Get the data first
@@ -710,7 +733,7 @@ Spectrum UnrealMaterial<SC>::Evaluate(const Ray& wI, const Vector3& wO) const
     }
     // Bring wO, wI all the way to the tangent space
     Vector3 V = toTangentSpace.ApplyRotation(wO);
-    Vector3 L = toTangentSpace.ApplyRotation(wI.Dir());
+    Vector3 L = toTangentSpace.ApplyRotation(wI.dir);
     Vector3 H = Math::Normalize(L + V);
 
     //=======================//
@@ -748,7 +771,12 @@ Spectrum UnrealMaterial<SC>::Evaluate(const Ray& wI, const Vector3& wO) const
     diffuseTerm *= BxDF::BurleyDiffuseCorrection(NdL, NdV, LdH, roughness);
 
     // All Done!
-    return diffuseTerm + specularTerm;
+    MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
+    return BxDFEval
+    {
+        .reflectance = diffuseTerm + specularTerm,
+        .mediumKey = outMedium
+    };
 }
 
 template <class SC>

@@ -46,7 +46,7 @@ concept MaterialC = requires(MatType mt,
     // instead of a direction)
     // This means for other types ray.pos == surface.pos
     // At the same time we sample a reflection
-    {mt.SampleBxDF(Vector3{}, rng)} -> std::same_as<SampleT<BxDFResult>>;
+    {mt.SampleBxDF(Vector3{}, rng)} -> std::same_as<BxDFSample>;
 
     // Given wO (with outgoing position)
     // and wI (with incoming position)
@@ -60,7 +60,7 @@ concept MaterialC = requires(MatType mt,
     requires std::is_same_v<decltype(MatType::SampleRNList), const RNRequestList>;
 
     // Evaluate material given w0, wI
-    {mt.Evaluate(Ray{}, Vector3{})}-> std::same_as<Spectrum>;
+    {mt.Evaluate(Ray{}, Vector3{})}-> std::same_as<BxDFEval>;
 
     // Emissive Query
     {mt.IsEmissive()} -> std::same_as<bool>;
