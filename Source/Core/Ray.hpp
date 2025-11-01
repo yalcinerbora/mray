@@ -227,81 +227,46 @@ MR_PF_DEF Vector<3, T> RayT<T>::AdvancedPos(T t) const noexcept
     return pos + t * dir;
 }
 
-template<>
-MR_PF_DEF RayT<float> RayT<float>::Nudge(const Vector3f& nudgeDir) const noexcept
+template<FloatC T>
+MR_PF_DEF RayT<T> RayT<T>::Nudge(const Vector<3, T>& nudgeDir) const noexcept
 {
+    using Int = IntegralSister<T>;
+    using Vec3Int = Vector<3, Int>;
+    using Vec3Float = Vector<3, T>;
+
     // From RayTracing Gems I
     // Chapter 6
-    constexpr float ORIGIN = 1.0f / 32.0f;
-    constexpr float FLOAT_SCALE = 1.0f / 65536.0f;
-    constexpr float INT_SCALE = 256.0f;
+    constexpr T ORIGIN = T(1) / T(32);
+    constexpr T FLOAT_SCALE = T(1) / T(65536);
+    constexpr T INT_SCALE = T(256);
 
-    const Vector3f& p = pos;
-    Vector3i ofi = Vector3i(INT_SCALE * nudgeDir[0],
-                            INT_SCALE * nudgeDir[1],
-                            INT_SCALE * nudgeDir[2]);
+    const Vec3Float& p = pos;
+    Vec3Int ofi = Vec3Int(INT_SCALE * nudgeDir[0],
+                          INT_SCALE * nudgeDir[1],
+                          INT_SCALE * nudgeDir[2]);
 
-    Vector3f pointI;
-    Vector3i pInt;
-    pInt[0] = Bit::BitCast<int32_t>(p[0]);
-    pInt[1] = Bit::BitCast<int32_t>(p[1]);
-    pInt[2] = Bit::BitCast<int32_t>(p[2]);
+    Vec3Float pointI;
+    Vec3Int pInt;
+    pInt[0] = Bit::BitCast<Int>(p[0]);
+    pInt[1] = Bit::BitCast<Int>(p[1]);
+    pInt[2] = Bit::BitCast<Int>(p[2]);
 
     pInt[0] += ((p[0] < 0) ? -ofi[0] : ofi[0]);
     pInt[1] += ((p[1] < 0) ? -ofi[1] : ofi[1]);
     pInt[2] += ((p[2] < 0) ? -ofi[2] : ofi[2]);
 
-    pointI[0] = Bit::BitCast<float>(pInt[0]);
-    pointI[1] = Bit::BitCast<float>(pInt[1]);
-    pointI[2] = Bit::BitCast<float>(pInt[2]);
+    pointI[0] = Bit::BitCast<T>(pInt[0]);
+    pointI[1] = Bit::BitCast<T>(pInt[1]);
+    pointI[2] = Bit::BitCast<T>(pInt[2]);
 
     // Find the next floating point towards
     // Either use an epsilon (float_scale in this case)
     // or use the calculated offset
     using Math::Abs;
-    Vector3f nextPos;
+    Vec3Float nextPos;
     nextPos[0] = (Abs(p[0]) < ORIGIN) ? (p[0] + FLOAT_SCALE * nudgeDir[0]) : pointI[0];
     nextPos[1] = (Abs(p[1]) < ORIGIN) ? (p[1] + FLOAT_SCALE * nudgeDir[1]) : pointI[1];
     nextPos[2] = (Abs(p[2]) < ORIGIN) ? (p[2] + FLOAT_SCALE * nudgeDir[2]) : pointI[2];
 
-    return RayT(dir, nextPos);
-}
-
-template<>
-MR_PF_DEF RayT<double> RayT<double>::Nudge(const Vector3d& nudgeDir) const noexcept
-{
-    // From RayTracing Gems I
-    // Chapter 6
-    constexpr double ORIGIN = 1.0 / 32.0;
-    constexpr double FLOAT_SCALE = 1.0 / 65536.0;
-    constexpr double INT_SCALE = 256.0;
-
-    const Vector3d& p = pos;
-    Vector<3, int64_t> ofi(INT_SCALE * nudgeDir[0],
-                           INT_SCALE * nudgeDir[1],
-                           INT_SCALE * nudgeDir[2]);
-
-    Vector3d pointI;
-    Vector3l pInt;
-    pInt[0] = Bit::BitCast<int64_t>(p[0]);
-    pInt[1] = Bit::BitCast<int64_t>(p[1]);
-    pInt[2] = Bit::BitCast<int64_t>(p[2]);
-
-    pInt[0] += ((p[0] < 0) ? -ofi[0] : ofi[0]);
-    pInt[1] += ((p[1] < 0) ? -ofi[1] : ofi[1]);
-    pInt[2] += ((p[2] < 0) ? -ofi[2] : ofi[2]);
-
-    pointI[0] = Bit::BitCast<double>(pInt[0]);
-    pointI[1] = Bit::BitCast<double>(pInt[1]);
-    pointI[2] = Bit::BitCast<double>(pInt[2]);
-
-    // Find the next floating point towards
-    // Either use an epsilon (float_scale in this case)
-    // or use the calculated offset
-    using Math::Abs;
-    Vector3d nextPos;
-    nextPos[0] = (Abs(p[0]) < ORIGIN) ? (p[0] + FLOAT_SCALE * nudgeDir[0]) : pointI[0];
-    nextPos[1] = (Abs(p[1]) < ORIGIN) ? (p[1] + FLOAT_SCALE * nudgeDir[1]) : pointI[1];
-    nextPos[2] = (Abs(p[2]) < ORIGIN) ? (p[2] + FLOAT_SCALE * nudgeDir[2]) : pointI[2];
     return RayT(dir, nextPos);
 }

@@ -611,7 +611,8 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
         Ray pathRayOut = combinedSample.wI.Nudge(nudgeNormal);
         // If I remember correctly, OptiX does not like INF on rays,
         // so we put flt_max here.
-        Vector2 pathTMMOut = Vector2(0, std::numeric_limits<Float>::max());
+        Vector2 pathTMMOut = Vector2(MathConstants::LargeEpsilon<Float>(),
+                                     std::numeric_limits<Float>::max());
         RayToGMem(params.common.dRays, rayIndex, pathRayOut, pathTMMOut);
         params.common.dRayCones[rayIndex] = pathRayConeOut;
         rayState.dThroughput[rayIndex] = throughput;

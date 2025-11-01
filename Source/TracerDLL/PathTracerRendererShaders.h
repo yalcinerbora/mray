@@ -232,7 +232,8 @@ void WorkFunction<P, M, T, SC>::Call(const Primitive&, const Material& mat, cons
 
         // If I remember correctly, OptiX does not like INF on rays,
         // so we put flt_max here.
-        Vector2 tMMOut = Vector2(0, std::numeric_limits<Float>::max());
+        Vector2 tMMOut = Vector2(MathConstants::LargeEpsilon<Float>(),
+                                 std::numeric_limits<Float>::max());
         RayToGMem(params.rayState.dOutRays, rayIndex, rayOut, tMMOut);
         // Continue the ray cone
         params.rayState.dOutRayCones[rayIndex] = rayConeOut;
@@ -370,7 +371,10 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
         // TODO: We need to check if material is transmissive
         // If transmissive we can set the geoNormal towards the
         // shadow ray and nudge
-        shadowRay = shadowRay.Nudge(surf.geoNormal);
+        Vector3 nudgeNormal = surf.geoNormal;
+        if(matEval.isPassedThrough)
+            nudgeNormal *= Float(-1);
+        shadowRay = shadowRay.Nudge(nudgeNormal);
         RayToGMem(params.rayState.dOutRays, rayIndex,
                   shadowRay, shadowTMM);
         // We can't overwrite the path throughput,

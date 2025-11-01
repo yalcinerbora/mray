@@ -5,6 +5,11 @@
 MR_HF_DEF
 Pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) const
 {
+    using MathConstants::Epsilon;
+    using MathConstants::LargeEpsilon;
+    static constexpr auto TMM_RANGE = Vector2(Epsilon<Float>(),
+                                              Float(1) - LargeEpsilon<Float>());
+
     using RetT = Pair<Ray, Vector2>;
     Vector3 dir = Math::Normalize(position - distantPoint);
     // Nudge the position back here, this will be used
@@ -12,7 +17,7 @@ Pair<Ray, Vector2> LightSampleOutput::SampledRay(const Vector3& distantPoint) co
     // TODO: Bad usage of API, constructing a ray to nudge a position
     Vector3 pos = Ray(Vector3::Zero(), position).Nudge(-dir).pos;
     Float length = Math::Length(pos - distantPoint);
-    return RetT(Ray(dir, distantPoint), Vector2(0, length * 0.999f));
+    return RetT(Ray(dir, distantPoint), Vector2(TMM_RANGE[0], length * TMM_RANGE[1]));
 }
 
 template<class ML>

@@ -323,7 +323,7 @@ BxDFSample RefractMaterial<SC>::SampleBxDF(const Vector3& wO,
             .reflectance     = Spectrum(pdf),
             .mediumKey       = outMedium,
             .isPassedThrough = !doReflection,
-            .isDispersed     = true
+            .isDispersed     = !doReflection
         }
     };
 }
@@ -352,7 +352,7 @@ BxDFEval RefractMaterial<SC>::Evaluate(const Ray& wI, const Vector3&) const
     {
         .reflectance = Spectrum(1),
         .mediumKey   = outMedium,
-        .isDispersed = true
+        .isDispersed = !isFront
     };
 }
 
