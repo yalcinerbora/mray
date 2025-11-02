@@ -4,11 +4,17 @@
 
 class GuidedPTRenderer final : public PathTracerRendererBase
 {
-    using This              = GuidedPTRenderer;
-    using Base              = PathTracerRendererBase;
-    using Options           = GuidedPTRDetail::Options;
-    using DisplayMode       = GuidedPTRDetail::DisplayMode;
-    using RayState          = GuidedPTRDetail::RayState;
+    using This          = GuidedPTRenderer;
+    using Base          = PathTracerRendererBase;
+    using Options       = GuidedPTRDetail::Options;
+    using DisplayMode   = GuidedPTRDetail::DisplayMode;
+    using RayState      = GuidedPTRDetail::RayState;
+    using GlobalState   = GuidedPTRDetail::GlobalState;
+    //
+    using MCState       = GuidedPTRDetail::MCState;
+    using MCLock        = GuidedPTRDetail::MCLock;
+    using MCCount       = GuidedPTRDetail::MCCount;
+    using MCIrradiance  = GuidedPTRDetail::MCIrradiance;
 
     public:
     //
@@ -48,6 +54,7 @@ class GuidedPTRenderer final : public PathTracerRendererBase
     Options     newOptions      = {};
     //
     MetaLightList       metaLightArray;
+    HashGrid            hashGrid;
     // Memory
     DeviceMemory        rendererGlobalMem;
     // Work Hash related
@@ -62,12 +69,17 @@ class GuidedPTRenderer final : public PathTracerRendererBase
     Span<RayGMem>       dShadowRays;
     Span<RayCone>       dShadowRayCones;
     Span<Spectrum>      dShadowRayRadiance;
-    Span<Float>         dPrevMatPDF;
-    Span<Float>         dPrevAvgReflectance;
-    // Technique Related
-    Span<Float>         dPDFChains;
-    Span<uint32_t>      dLiftedMarkovChainIndex;
-
+    // Technique Related (Per-path)
+    Span<Float>         dShadowPrevPathReflectance;
+    Span<Float>         dPrevPathReflectanceOrOutRadiance;
+    Span<Float>         dPrevPDF;
+    Span<Float>         dScoreSums;
+    Span<uint32_t>      dLiftedMCIndices;
+    // Technique Related (Hash Grid)
+    Span<MCState>       dMCStates;
+    Span<MCLock>        dMCLocks;
+    Span<MCCount>       dMCCounts;
+    Span<MCIrradiance>  dMCIrradiances;
     //
     bool                saveImage  = false;
 

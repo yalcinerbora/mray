@@ -18,14 +18,25 @@ namespace GuidedPTRDetail
 {
     // Slightly compressed Markov Chain data of
     // Alber et al. (2025).
-    using MCTarget     = Vector3;
-    using MCSumAndCos  = Vector2;
-    using MCIrradiance = Float;
-    //
-    struct alignas(4) MCCount
+    struct alignas(8) MCState
     {
-        uint16_t mcN;
-        uint16_t irradN;
+        Vector3  target;
+        Float    cos;
+        Float    weight;
+    };
+    using MCCount      = uint16_t;
+    using MCLock       = uint32_t; // Tied to ray index
+
+    struct alignas(8) MCIrradiance
+    {
+        Float irrad;
+        // This is a waste, paper uses up to 1024
+        // values with a 3 channel 16-bit half
+        uint32_t N;
+
+        MR_GF_DECL
+        static MCIrradiance
+        AtomicEMA(MCIrradiance& dLoc, Float radEst);
     };
 
     enum class DisplayModeEnum
@@ -103,44 +114,38 @@ namespace GuidedPTRDetail
         using SpecConverterData = typename SpectrumContextJakob2019::Data;
 
         Vector2ui           russianRouletteRange;
-        Vector3             guideBxDFNEEProbablity;
         SpecConverterData   specContextData;
         LightSampler        lightSampler;
         Float               lobeProbability;
         // Hash Grid and Alber2025 data
         HashGridView        hashGrid;
-        Span<MCTarget>      dMarkovWTargets;
-        Span<MCSumAndCos>   dMarkovWCosAndWSums;
-        Span<MCCount>       dMarkovCounts;
-        Span<MCIrradiance>  dMarkovIrradParams;
-    };
-
-    struct alignas(8) PrevReflectance
-    {
-        Float avgReflectance;
-        Float pdf;
+        Span<MCState>       dMCStates;
+        Span<MCCount>       dMCCounts;
+        Span<MCLock>        dMCLocks;
+        Span<MCIrradiance>  dMCIrradiances;
     };
 
     struct RayState
     {
-        Span<Spectrum>          dPathRadiance;
-        Span<ImageCoordinate>   dImageCoordinates;
-        Span<Float>             dFilmFilterWeights;
-        Span<SpectrumWaves>     dPathWavelengths;
+        Span<Spectrum>        dPathRadiance;
+        Span<ImageCoordinate> dImageCoordinates;
+        Span<Float>           dFilmFilterWeights;
+        Span<SpectrumWaves>   dPathWavelengths;
         // Path state
-        Span<Spectrum>          dThroughput;
-        Span<PathDataPack>      dPathDataPack;
-        Span<Float>             dPDFChain;
-        Span<PrevReflectance>   dPrevPathReflectance;
+        Span<Spectrum>        dThroughputs;
+        Span<PathDataPack>    dPathDataPack;
+        Span<Float>           dPrevPDF;
+        Span<Float>           dPrevPathReflectanceOrOutRadiance;
+        Span<Float>           dScoreSums;
         // Backup RNG State
-        Span<BackupRNGState>    dBackupRNGStates;
+        Span<BackupRNGState>  dBackupRNGStates;
         // NEE Related
-        Span<Spectrum>          dShadowRayRadiance;
-        Span<RayGMem>           dShadowRays;
-        Span<RayCone>           dShadowRayCones;
-        Span<PrevReflectance>   dPrevShadowReflectance;
+        Span<Spectrum>        dShadowRayRadiance;
+        Span<RayGMem>         dShadowRays;
+        Span<RayCone>         dShadowRayCones;
+        Span<Float>           dShadowPrevPathReflectance;
         // Current lifted markov chain
-        Span<uint32_t>          dLiftedMarkovChainIndex;
+        Span<uint32_t>        dLiftedMCIndices;
     };
 
     using GaussianLobe = Distribution::GaussianLobe;
@@ -164,6 +169,7 @@ namespace GuidedPTRDetail
                                                    BackupRNG& rng,
                                                    //
                                                    const GlobalState& gs);
+        MR_GF_DECL void             Product(const std::array<GaussianLobe, 2>& matLobes);
     };
 
     template<uint32_t N>
@@ -196,6 +202,7 @@ namespace GuidedPTRDetail
                                                    BackupRNG& rng,
                                                    //
                                                    const GlobalState& gs);
+        MR_GF_DECL void             Product(const std::array<GaussianLobe, 2>& matLobes);
     };
 
     static constexpr uint32_t MC_LOBE_COUNT = 8;
@@ -205,8 +212,7 @@ namespace GuidedPTRDetail
     using GaussianLobeMixture = GaussLobeMixtureT<MC_LOBE_COUNT>;
 
     MR_HF_DECL
-    GaussianLobe SufficientStatsToLobe(const Vector3& wTarget,
-                                       Float wSum, Float wCos,
+    GaussianLobe SufficientStatsToLobe(const MCState& state,
                                        uint32_t mcSampleCount,
                                        const Vector3& samplePos);
 
@@ -243,10 +249,27 @@ namespace GuidedPTRDetail
 namespace GuidedPTRDetail
 {
 
+MR_GF_DEF
+MCIrradiance
+MCIrradiance::AtomicEMA(MCIrradiance& dLoc, Float radEst)
+{
+    // TODO: Here we do atomicCAS loop
+    // this may be slow due to heavy sync (expecially on the first bounce since
+    // rays are corraleted)
+    return DeviceAtomic::EmulateAtomicOp(dLoc, [radEst](MCIrradiance e)
+    {
+        static constexpr Float MIN_EMA_RATIO_IRRAD = Float(0.01);
+        static constexpr uint32_t MAX_SAMPLE = uint32_t(2048);
+        //
+        e.N = Math::Min(e.N + 1, MAX_SAMPLE);
+        Float t = Math::Max(Float(1) / Float(e.N), MIN_EMA_RATIO_IRRAD);
+        e.irrad = Math::Lerp(e.irrad, radEst, t);
+        return e;
+    });
+}
+
 MR_HF_DEF
-GaussianLobe SufficientStatsToLobe(const Vector3& wTarget,
-                                   Float wSum,
-                                   Float wCos,
+GaussianLobe SufficientStatsToLobe(const MCState& state,
                                    uint32_t mcSampleCount,
                                    const Vector3& samplePos)
 {
@@ -255,8 +278,8 @@ GaussianLobe SufficientStatsToLobe(const Vector3& wTarget,
     static constexpr Float MaxCos        = Float(1) - Epsilon;
 
     // Fetch direction
-    Vector3 target = wTarget;
-    target = (wSum > 0) ? (target / wSum) : target;
+    Vector3 target = state.target;
+    target = (state.weight > 0) ? (target / state.weight) : target;
 
     // Dir
     Vector3 dir = target - samplePos;
@@ -266,7 +289,7 @@ GaussianLobe SufficientStatsToLobe(const Vector3& wTarget,
 
     // Kappa
     Float nSqr = Float(mcSampleCount) * Float(mcSampleCount);
-    Float meanCos = nSqr * Math::Clamp(wCos / wSum, Float(0), MaxCos);
+    Float meanCos = nSqr * Math::Clamp(state.cos / state.weight, Float(0), MaxCos);
     meanCos = nSqr / priorState;
     // Mean cosine to kappa
     Float r = meanCos;
@@ -324,15 +347,13 @@ uint32_t GaussLobeMixtureT<N>::LoadStochastic(const Vector3& position,
         Vector3 nJitter   = Math::Normalize(normal + Vector3(rng.NextFloat()));
         auto [hashGridIndex, _] = gs.hashGrid.TryInsertAtomic(posJitter, nJitter);
 
-        Vector3 wTarget = gs.dMarkovWTargets[hashGridIndex];
-        Float wSum      = gs.dMarkovWCosAndWSums[hashGridIndex][0];
-        Float wCos      = gs.dMarkovWCosAndWSums[hashGridIndex][1];
-        uint32_t mcN    = gs.dMarkovCounts[hashGridIndex].mcN;
-        lobes[i]        = SufficientStatsToLobe(wTarget, wSum, wCos, mcN, position);
-        weights[i]      = wSum;
-        sumWeight      += wSum;
+        MCState state = gs.dMCStates[hashGridIndex];
+        uint16_t mcN  = gs.dMCCounts[hashGridIndex];
+        lobes[i]      = SufficientStatsToLobe(state, mcN, position);
+        weights[i]    = state.weight;
+        sumWeight    += state.weight;
         //
-        Float sumRatio = (sumWeight != Float(0)) ? (wSum / sumWeight) : Float(1);
+        Float sumRatio = (sumWeight != Float(0)) ? (state.weight / sumWeight) : Float(1);
         if(rng.NextFloat() < sumRatio)
         {
             sampleIndex = i;
@@ -340,6 +361,13 @@ uint32_t GaussLobeMixtureT<N>::LoadStochastic(const Vector3& position,
         }
     }
     return liftedNodeIndex;
+}
+
+template<uint32_t N>
+MR_GF_DEF void GaussLobeMixtureT<N>::Product(const std::array<GaussianLobe, 2>& matLobes)
+{
+    for(uint32_t i = 0; i < N; i++)
+        lobes[i] = lobes[i].Product(matLobes[0]).Product(matLobes[1]);
 }
 
 template<uint32_t N>
@@ -419,21 +447,19 @@ uint32_t GaussLobeMixtureSharedT<N>::LoadStochastic(const Vector3& position,
         Vector3 nJitter   = Math::Normalize(normal + Vector3(rng.NextFloat()));
         auto [hashGridIndex, _] = gs.hashGrid.TryInsertAtomic(posJitter, nJitter);
 
-        Vector3 wTarget = gs.dMarkovWTargets[hashGridIndex];
-        Float wSum      = gs.dMarkovWCosAndWSums[hashGridIndex][0];
-        Float wCos      = gs.dMarkovWCosAndWSums[hashGridIndex][1];
-        uint32_t mcN    = gs.dMarkovCounts[hashGridIndex].mcN;
-        sumWeight      += wSum;
+        MCState state = gs.dMCStates[hashGridIndex];
+        uint16_t mcN  = gs.dMCCounts[hashGridIndex];
+        sumWeight    += state.weight;
 
-        auto lobe = SufficientStatsToLobe(wTarget, wSum, wCos, mcN, position);
+        auto lobe = SufficientStatsToLobe(state, mcN, position);
         SMem().sLobeX[Index(i)] = lobe.dir[0];
         SMem().sLobeY[Index(i)] = lobe.dir[1];
         SMem().sLobeZ[Index(i)] = lobe.dir[2];
         SMem().sLobeKappa[Index(i)] = lobe.kappa;
         SMem().sLobeAlpha[Index(i)] = lobe.alpha;
-        SMem().sLobeWeights[Index(i)] = wSum;
+        SMem().sLobeWeights[Index(i)] = state.weight;
 
-        Float sumRatio = (sumWeight != Float(0)) ? (wSum / sumWeight) : Float(1);
+        Float sumRatio = (sumWeight != Float(0)) ? (state.weight / sumWeight) : Float(1);
         if(rng.NextFloat() < sumRatio)
         {
             sampleIndex = i;
@@ -443,63 +469,82 @@ uint32_t GaussLobeMixtureSharedT<N>::LoadStochastic(const Vector3& position,
     return liftedNodeIndex;
 }
 
+template<uint32_t N>
+MR_GF_DEF void GaussLobeMixtureSharedT<N>::Product(const std::array<GaussianLobe, 2>& matLobes)
+{
+    for(uint32_t i = 0; i < N; i++)
+    {
+        GaussianLobe l(Vector3(SMem().sLobeX[Index(i)],
+                               SMem().sLobeY[Index(i)],
+                               SMem().sLobeZ[Index(i)]),
+                       SMem().sLobeKappa[Index(i)],
+                       SMem().sLobeAlpha[Index(i)]);
+        l = l.Product(matLobes[0]).Product(matLobes[1]);
+
+        SMem().sLobeX[Index(i)] = l.dir[0];
+        SMem().sLobeY[Index(i)] = l.dir[1];
+        SMem().sLobeZ[Index(i)] = l.dir[2];
+        SMem().sLobeKappa[Index(i)] = l.kappa;
+        SMem().sLobeAlpha[Index(i)] = l.alpha;
+    }
+
+}
+
 // ================== //
 //        PATH        //
 // ================== //
 template<PrimitiveGroupC P, MaterialGroupC M, TransformGroupC T>
 MR_GF_DEF
 void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Surface& surf,
-                                    const RayConeSurface& surfRayCone, const TContext& tContext,
-                                    SpectrumConv& spectrumConverter, RNGDispenser& rng, const Params& params,
-                                    RayIndex rayIndex, uint32_t laneId)
+                                 const RayConeSurface& surfRayCone, const TContext& tContext,
+                                 SpectrumConv& spectrumConverter, RNGDispenser& rng, const Params& params,
+                                 RayIndex rayIndex, uint32_t laneId)
 {
     using Distribution::Common::RussianRoulette;
     using Distribution::Common::DivideByPDF;
     using Distribution::MIS::BalanceCancelled;
     static constexpr auto MISSampleOffset = Math::Max(GaussianLobeMixture::SampleRNCount,
                                                       Material::SampleRNList.TotalRNCount());
-    const GlobalState& globalState = params.globalState;
-    const RayState& rayState       = params.rayState;
-    BackupRNG backupRNG   = BackupRNG(rayState.dBackupRNGStates[rayIndex]);
-    PathDataPack dataPack = params.rayState.dPathDataPack[rayIndex];
-
+    const GlobalState& gs = params.globalState;
+    const RayState& rs    = params.rayState;
+    BackupRNG backupRNG   = BackupRNG(rs.dBackupRNGStates[rayIndex]);
+    PathDataPack dataPack = rs.dPathDataPack[rayIndex];
     if(dataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
 
     auto [rayIn, tMM] = RayFromGMem(params.common.dRays, rayIndex);
     Vector3 wOWorld = Math::Normalize(-rayIn.dir);
     Vector3 wO = Math::Normalize(tContext.InvApplyN(wOWorld));
     RayConeSurface rConeRefract = mat.RefractRayCone(surfRayCone, wO);
+    Spectrum throughput = rs.dThroughputs[rayIndex];
     Float specularity = mat.Specularity();
 
-    // We do two sample mis
-    // NEE / MIS of Lobes and BxDF
     // ====================== //
-    //          NEE           //
+    //     Load Mixture       //
     // ====================== //
-    const LightSampler& lightSampler = params.globalState.lightSampler;
-    LightSample lightSample = lightSampler.SampleLight(rng, spectrumConverter,
-                                                       surf.position,
-                                                       surf.geoNormal,
-                                                       rConeRefract);
-    auto [shadowRay, shadowTMM] = lightSample.value.SampledRay(surf.position);
+    GaussianLobeMixture mixture;
+    uint32_t liftedMCIndex = mixture.LoadStochastic(surf.position,
+                                                    surf.geoNormal,
+                                                    backupRNG,
+                                                    gs);
+    // TODO: Product sampling
+    //std::array<GaussianLobe, 2> materialLobes =
+    //{
+    //    GaussianLobe(surf.geoNormal, Float(0.1)),
+    //    GaussianLobe(Graphics::Reflect(surf.geoNormal, wOWorld), Float(specularity) * Float(100))
+    //};
+    //mixture.Product(materialLobes);
 
     // ====================== //
     // Sample Material or vMF //
     // ====================== //
-    GaussianLobeMixture mixture;
-    uint32_t liftedLobeIndex = mixture.LoadStochastic(surf.position,
-                                                      surf.geoNormal,
-                                                      backupRNG,
-                                                      params.globalState);
-    //
     std::array<Float, 2> misPDFs = {};
     std::array<Float, 2> misWeights = {};
     if(!MaterialCommon::IsSpecular(specularity))
     {
-        misWeights[0] = Math::Lerp(globalState.lobeProbability,
+        misWeights[1] = Math::Lerp(gs.lobeProbability,
                                    Float(1), specularity);
     }
-    misWeights[1] = Float(1) - misWeights[0];
+    misWeights[0] = Float(1) - misWeights[1];
 
     BxDFSample combinedSample;
     if(rng.NextFloat<MISSampleOffset>() < misWeights[0])
@@ -522,41 +567,38 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     }
     Float pdfPath = BalanceCancelled<2>(misPDFs, misWeights);
 
-    // MIS of NEE
-    Vector3 lightWIWorld = shadowRay.dir;
-    Vector3 lightWILocal = Math::Normalize(tContext.InvApplyN(lightWIWorld));
-    Ray lightWILocalRay = Ray(lightWILocal, surf.position);
-    misPDFs = {mat.Pdf(lightWILocalRay, wO), mixture.Pdf(lightWIWorld)};
-    Float pdfShadow = BalanceCancelled<2>(misPDFs, misWeights);
-    misPDFs = {pdfShadow, lightSample.pdf};
-    misWeights = {Float(1), Float(1)};
-    pdfShadow = BalanceCancelled<2>(misPDFs, misWeights);
-
-
-    Spectrum throughput = rayState.dThroughput[rayIndex];
-    Float prevPDF       = rayState.dPDFChain[rayIndex];
-    // ================== //
-    //   NEE Throughput   //
-    // ================== //
-    Spectrum shadowRadiance = throughput;
-    BxDFEval shadowRayEval = mat.Evaluate(lightWILocalRay, wO);
-    shadowRadiance *= shadowRayEval.reflectance;
-    shadowRadiance *= lightSample.value.emission;
-    shadowRadiance = DivideByPDF(shadowRadiance, prevPDF * pdfShadow);
-    RayCone shadowRayConeOut = rConeRefract.ConeAfterScatter(shadowRay.dir,
-                                                             surf.geoNormal);
     // ================== //
     //   Path Throughput  //
     // ================== //
-    throughput *= combinedSample.eval.reflectance;
+    Spectrum pathThroughput = throughput * combinedSample.eval.reflectance;
     RayCone pathRayConeOut = rConeRefract.ConeAfterScatter(combinedSample.wI.dir,
                                                            surf.geoNormal);
+    // ================ //
+    // Russian Roulette //
+    // ================ //
+    bool isSpecular = MaterialCommon::IsSpecular(specularity);
+    dataPack.depth += 1u;
+    Vector2ui rrRange = gs.russianRouletteRange;
+    bool isPathDead = (dataPack.depth >= rrRange[1]);
+    if(!isPathDead && dataPack.depth >= rrRange[0] && !isSpecular)
+    {
+        Float rrXi = rng.NextFloat<Material::SampleRNList.TotalRNCount()>();
+        Float rrFactor = pathThroughput.Sum() * Float(0.33333);
+        auto result = RussianRoulette(pathThroughput, rrFactor, rrXi);
+        isPathDead = !result.has_value();
+        pathThroughput = result.value_or(pathThroughput);
+    }
+
+    // Change the ray type, if mat is highly specular
+    // we do not bother casting NEE ray. So if this ray
+    // hits a light somehow it should not assume MIS is enabled.
+    dataPack.type = isSpecular ? RayType::SPECULAR_RAY : RayType::PATH_RAY;
 
     // ================ //
     //    Dispersion    //
     // ================ //
     static constexpr Float SpectrumCountInv = Float(1) / Float(SpectraPerSpectrum);
-    Float avgPathReflectance, avgShadowReflectance;
+    Float avgPathReflectance;
     if constexpr(!SpectrumConv::IsRGB)
     {
         // Path
@@ -567,37 +609,7 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
             avgPathReflectance = combinedSample.eval.reflectance[0];
         }
         else avgPathReflectance = combinedSample.eval.reflectance.Sum() * SpectrumCountInv;
-        // NEE
-        if(shadowRayEval.isDispersed)
-        {
-            Float first = shadowRadiance[0];
-            shadowRadiance = Spectrum::Zero();
-            shadowRadiance[0] = first;
-            avgShadowReflectance = shadowRayEval.reflectance[0];
-        }
-        else avgShadowReflectance = shadowRayEval.reflectance.Sum() * SpectrumCountInv;
     }
-
-    // ================ //
-    // Russian Roulette //
-    // ================ //
-    bool isSpecular = MaterialCommon::IsSpecular(specularity);
-    dataPack.depth += 1u;
-    Vector2ui rrRange = params.globalState.russianRouletteRange;
-    bool isPathDead = (dataPack.depth >= rrRange[1]);
-    if(!isPathDead && dataPack.depth >= rrRange[0] && !isSpecular)
-    {
-        Float rrXi = rng.NextFloat<Material::SampleRNList.TotalRNCount()>();
-        Float rrFactor = throughput.Sum() * Float(0.33333);
-        auto result = RussianRoulette(throughput, rrFactor, rrXi);
-        isPathDead = !result.has_value();
-        throughput = result.value_or(throughput);
-    }
-
-    // Change the ray type, if mat is highly specular
-    // we do not bother casting NEE ray. So if this ray
-    // hits a light somehow it should not assume MIS is enabled.
-    dataPack.type = isSpecular ? RayType::SPECULAR_RAY : RayType::PATH_RAY;
 
     // Selectively write if path is alive
     if(!isPathDead)
@@ -615,36 +627,92 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
                                      std::numeric_limits<Float>::max());
         RayToGMem(params.common.dRays, rayIndex, pathRayOut, pathTMMOut);
         params.common.dRayCones[rayIndex] = pathRayConeOut;
-        rayState.dThroughput[rayIndex] = throughput;
-        rayState.dPDFChain[rayIndex] = prevPDF * pdfPath;
-        // Store this pdf for path ray's potential light hit
-        rayState.dPrevPathReflectance[rayIndex] = PrevReflectance
-        {
-            .avgReflectance = avgPathReflectance,
-            .pdf = pdfPath
-        };
-        // ================= //
-        //  Shadow(NEE) Ray  //
-        // ================= //
-        nudgeNormal = surf.geoNormal;
-        if(shadowRayEval.isPassedThrough)
-            nudgeNormal *= Float(-1);
-        shadowRay = shadowRay.Nudge(nudgeNormal);
-        RayToGMem(rayState.dShadowRays, rayIndex, pathRayOut, shadowTMM);
-        rayState.dShadowRayCones[rayIndex] = shadowRayConeOut;
-        rayState.dShadowRayRadiance[rayIndex] = shadowRadiance;
-        rayState.dPrevShadowReflectance[rayIndex] = PrevReflectance
-        {
-            .avgReflectance = avgShadowReflectance,
-            .pdf = pdfShadow
-        };
+        // We prematurely divide by the PDF as if the path will not hit a light
+        // but we store current PDF as well, so that if path hits a light,
+        // it can readjust its weight via MIS.
+        rs.dThroughputs[rayIndex] = DivideByPDF(throughput, pdfPath);
+        rs.dPrevPDF[rayIndex] = pdfPath;
+        // When we update the MC, this will be used to estimate radiant exitance
+        // and MC state termination update etc.
+        rs.dPrevPathReflectanceOrOutRadiance[rayIndex] = DivideByPDF(avgPathReflectance,
+                                                                           pdfPath);
+        // Save the score sum for MC selection as well
+        rs.dScoreSums[rayIndex] = mixture.sumWeight;
+        rs.dLiftedMCIndices[rayIndex] = liftedMCIndex;
     }
-    else
+
+    // Do not bother with NEE if specular or path is dead
+    if(isPathDead || isSpecular)
     {
         dataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
+        // Write the updated state back
+        rs.dPathDataPack[rayIndex] = dataPack;
+        return;
     }
+
+    // We do two sample mis
+    // NEE / MIS of Lobes and BxDF
+    // ====================== //
+    //          NEE           //
+    // ====================== //
+    LightSample lightSample = gs.lightSampler.SampleLight(rng, spectrumConverter,
+                                                          surf.position,
+                                                          surf.geoNormal,
+                                                          rConeRefract);
+    auto [shadowRay, shadowTMM] = lightSample.value.SampledRay(surf.position);
+
+    // MIS of NEE
+    Vector3 lightWIWorld = shadowRay.dir;
+    Vector3 lightWILocal = Math::Normalize(tContext.InvApplyN(lightWIWorld));
+    Ray lightWILocalRay = Ray(lightWILocal, surf.position);
+    misPDFs = {mat.Pdf(lightWILocalRay, wO), mixture.Pdf(lightWIWorld)};
+    Float pdfShadow = BalanceCancelled<2>(misPDFs, misWeights);
+    misPDFs = {pdfShadow, lightSample.pdf};
+    misWeights = {Float(1), Float(1)};
+    pdfShadow = BalanceCancelled<2>(misPDFs, misWeights);
+
+    // ================== //
+    //   NEE Throughput   //
+    // ================== //
+    Spectrum shadowRadiance = throughput;
+    BxDFEval shadowRayEval = mat.Evaluate(lightWILocalRay, wO);
+    shadowRadiance *= shadowRayEval.reflectance;
+    shadowRadiance *= lightSample.value.emission;
+    shadowRadiance = DivideByPDF(shadowRadiance, pdfShadow);
+    RayCone shadowRayConeOut = rConeRefract.ConeAfterScatter(shadowRay.dir,
+                                                             surf.geoNormal);
+
+    // ================ //
+    //    Dispersion    //
+    // ================ //
+    Float avgShadowReflectance;
+    if constexpr(!SpectrumConv::IsRGB)
+    {
+        // NEE
+        if(shadowRayEval.isDispersed)
+        {
+            Float first = shadowRadiance[0];
+            shadowRadiance = Spectrum::Zero();
+            shadowRadiance[0] = first;
+            avgShadowReflectance = shadowRayEval.reflectance[0];
+        }
+        else avgShadowReflectance = shadowRayEval.reflectance.Sum() * SpectrumCountInv;
+    }
+
+    // ==================== //
+    //  Shadow(NEE) Ray Out //
+    // ==================== //
+    Vector3 nudgeNormal = surf.geoNormal;
+    if(shadowRayEval.isPassedThrough)
+        nudgeNormal *= Float(-1);
+    shadowRay = shadowRay.Nudge(nudgeNormal);
+    RayToGMem(rs.dShadowRays, rayIndex, shadowRay, shadowTMM);
+    rs.dShadowRayCones[rayIndex] = shadowRayConeOut;
+    rs.dShadowRayRadiance[rayIndex] = shadowRadiance;
+    rs.dShadowPrevPathReflectance[rayIndex] = DivideByPDF(avgShadowReflectance,
+                                                                pdfShadow);
     // Write the updated state back
-    rayState.dPathDataPack[rayIndex] = dataPack;
+    rs.dPathDataPack[rayIndex] = dataPack;
 }
 
 // ================== //
@@ -661,6 +729,7 @@ void LightWorkFunction<L, T>::Call(const Light& l, RNGDispenser&, const Spectrum
     bool switchToMISPdf = pathDataPack.type == RayType::PATH_RAY;
     auto [ray, tMM] = RayFromGMem(params.common.dRays, rayIndex);
     RayCone rayCone = params.common.dRayCones[rayIndex].Advance(tMM[1]);
+    Spectrum throughput = params.rayState.dThroughputs[rayIndex];
     if(switchToMISPdf)
     {
         using Distribution::MIS::BalanceCancelled;
@@ -668,20 +737,19 @@ void LightWorkFunction<L, T>::Call(const Light& l, RNGDispenser&, const Spectrum
         //
         std::array<Float, 2> weights = {1, 1};
         std::array<Float, 2> pdfs;
-        pdfs[0] = params.rayState.dPrevPathReflectance[rayIndex].pdf;
+        pdfs[0] = params.rayState.dPrevPDF[rayIndex];
         // We need to find the index of this specific light
         // Light sampler will handle it
         HitKeyPack hitKeyPack = params.common.dKeys[rayIndex];
         MetaHit hit = params.common.dHits[rayIndex];
         pdfs[1] = params.globalState.lightSampler.PdfLight(hitKeyPack, hit, ray);
         Float misPdf = BalanceCancelled<2>(pdfs, weights);
-        // We premultiply the throughput under the assumption this will not hit a light,
-        // but we did. So revert the multiplication first then multiply with
-        // MIS weight.
-        Float pdfChain = params.rayState.dPDFChain[rayIndex];
-        pdfChain /= pdfs[0];
-        pdfChain *= misPdf;
-        params.rayState.dPDFChain[rayIndex] = pdfChain;
+
+        // We pre-divided the throughput under the assumption this
+        // will not hit a light, but we did. So revert the division
+        // first then multiply with MIS weight.
+        throughput *= pdfs[0];
+        throughput = DivideByPDF(throughput, misPdf);
     }
 
     Vector3 wO = -ray.dir;
@@ -706,7 +774,6 @@ void LightWorkFunction<L, T>::Call(const Light& l, RNGDispenser&, const Spectrum
     Vector2ui rrRange = params.globalState.russianRouletteRange;
     if((pathDataPack.depth + 1u) <= rrRange[1])
     {
-        Spectrum throughput = params.rayState.dThroughput[rayIndex];
         Spectrum radianceEstimate = emission * throughput;
         params.rayState.dPathRadiance[rayIndex] += radianceEstimate;
     }

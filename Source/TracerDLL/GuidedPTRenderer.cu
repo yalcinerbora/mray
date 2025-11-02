@@ -4,14 +4,28 @@
 #include "Core/Timer.h"
 #include "Tracer/RendererCommon.h"
 
-#include "Device/GPUAlgBinaryPartition.h"
+static constexpr auto INVALID_MC_INDEX = std::numeric_limits<uint32_t>::max();
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-static void KCDivideByPDFIndirect(// I-O
-                                  MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,
-                                  // Input
-                                  MRAY_GRID_CONSTANT const Span<const Float> dPDFChains,
-                                  MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
+static
+void KCInitGuidedPathStatesIndirect(MRAY_GRID_CONSTANT const Span<uint32_t> dLiftedMarkovChainIndex,
+                                    MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices)
+{
+    KernelCallParams kp;
+    uint32_t newPathCount = uint32_t(dIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < newPathCount; i += kp.TotalSize())
+    {
+        dLiftedMarkovChainIndex[dIndices[i]] = INVALID_MC_INDEX;
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static
+void KCDivideByPDFIndirect(// I-O
+                           MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,
+                           // Input
+                           MRAY_GRID_CONSTANT const Span<const Float> dPDFChains,
+                           MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
 {
     KernelCallParams kp;
     uint32_t deadRayCount = uint32_t(dRayIndices.size());
@@ -25,21 +39,137 @@ static void KCDivideByPDFIndirect(// I-O
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-static void KCCacheIrradianceFromShadowRays()
+static
+void KCBackpropagateIrradiance(// I-O
+                               MRAY_GRID_CONSTANT const Span<Float> dPrevPathReflectanceOrOutRadiance,
+                               MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState,
+                               MRAY_GRID_CONSTANT const Span<BackupRNGState> dRNGStates,
+                               // Input
+                               MRAY_GRID_CONSTANT const Span<const uint32_t> dLiftedMCIndices,
+                               MRAY_GRID_CONSTANT const Span<const Float> dScoreSums,
+
+                               // Determining if this is intermediate path (not hit light etc.)
+                               MRAY_GRID_CONSTANT const Span<const HitKeyPack> dHitKeys,
+                               MRAY_GRID_CONSTANT const Span<const RayGMem> dRays,
+                               MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
 {
-    //....................
+    using namespace GuidedPTRDetail;
+
+    KernelCallParams kp;
+    uint32_t rayCount = uint32_t(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        uint32_t rIndex = dRayIndices[i];
+        uint32_t isLightFlag = dHitKeys[rIndex].lightOrMatKey.FetchFlagPortion();
+        uint32_t prevMCIndex = dLiftedMCIndices[rIndex];
+        //
+        if(isLightFlag == IS_LIGHT_KEY_FLAG) continue;
+        if(prevMCIndex == INVALID_MC_INDEX) continue;
+
+        // ======================= //
+        // Irradiance Cache Update //
+        // ======================= //
+        auto [ray, tMM] = RayFromGMem(dRays, rIndex);
+        Vector3 position = ray.AdvancedPos(tMM[1]);
+        Vector3 direction = Math::Normalize(-ray.dir);
+
+        const HashGridView& hg = globalState.hashGrid;
+        auto locationOpt = hg.Search(position, direction);
+        //
+        if(!locationOpt) continue;
+        // Race condition here!
+        // We read while somebody writes to this specific location
+        // maybe. It is fine as long as it is properly updated by writers.
+        // Reading a stale value just hinders backpropogation speed maybe.
+        //
+        // TODO: Check if proper syncronization is good / bad etc.
+        auto& dIrradHashGrid = globalState.dMCIrradiances;
+        Float irrad = dIrradHashGrid[*locationOpt].irrad;
+        Float refl = dPrevPathReflectanceOrOutRadiance[rIndex];
+        Float outRadiance = refl * irrad;
+        MCIrradiance::AtomicEMA(dIrradHashGrid[prevMCIndex], outRadiance);
+
+        // ========================= //
+        //  Markov Chain Lock Update //
+        // ========================= //
+        Float weight = outRadiance;
+        BackupRNG rng = BackupRNG(dRNGStates[rIndex]);
+        Float scoreSum = dScoreSums[rIndex];
+        // Not as good as previous mixture, skip
+        if(rng.NextFloat() * scoreSum < weight * MC_LOBE_COUNT)
+        {
+            // This kernel will be used as deterministic lock mechanism
+            // where largest rIndex will be the winner
+            // At the next kernel, winners will use
+            // "dPrevPathReflectanceOrOutRadiance" value
+            // (which is outRadiance atm) to do the actual update.
+            //
+            // We lose some data here (only a single winner will update the
+            // markov chain). But paper also does this via race condition.
+            // But that is non-determistic.
+            DeviceAtomic::AtomicMax(globalState.dMCLocks[i], rIndex);
+        }
+        dPrevPathReflectanceOrOutRadiance[rIndex] = outRadiance;
+    }
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-static void KCBackpropagateIrradiance()
+static
+void KCUpdateMarkovChains(// I-O
+                          MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState,
+                          // Input
+                          MRAY_GRID_CONSTANT const Span<const Float> dPrevPathReflectanceOrOutRadiance,
+                          MRAY_GRID_CONSTANT const Span<const uint32_t> dLiftedMCIndices,
+                          // Determining if this is intermediate path (not hit light etc.)
+                          MRAY_GRID_CONSTANT const Span<const HitKeyPack> dHitKeys,
+                          MRAY_GRID_CONSTANT const Span<const RayGMem> dRays,
+                          MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
 {
+    using namespace GuidedPTRDetail;
 
-}
+    KernelCallParams kp;
+    uint32_t rayCount = uint32_t(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        uint32_t rIndex = dRayIndices[i];
+        uint32_t isLightFlag = dHitKeys[rIndex].lightOrMatKey.FetchFlagPortion();
+        uint32_t prevMCIndex = dLiftedMCIndices[rIndex];
+        uint32_t mcLock = globalState.dMCLocks[rIndex];
+        //
+        if(isLightFlag == IS_LIGHT_KEY_FLAG) continue;
+        if(prevMCIndex == INVALID_MC_INDEX) continue;
+        if(mcLock != rIndex) continue;
 
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-static void KCUpdateMarkovChain()
-{
-    //....................
+        // ====================== //
+        //   Markov Chain Update  //
+        // ====================== //
+        auto [ray, tMM] = RayFromGMem(dRays, rIndex);
+        Vector3 pos = ray.AdvancedPos(tMM[1]);
+        Vector3 dir = Math::Normalize(ray.dir);
+        // If a thread is here we have the lock,
+        // we can freely modify
+        auto& dStates = globalState.dMCStates;
+        auto& dCounts = globalState.dMCCounts;
+        MCState s     = dStates[prevMCIndex];
+        MCCount count = dCounts[prevMCIndex];
+        // Update routine
+        static constexpr Float MIN_EMA_RATIO_CM = Float(0.01);
+        static constexpr uint16_t MAX_SAMPLE_MC = uint16_t(2048);
+        Float weight = dPrevPathReflectanceOrOutRadiance[rIndex];
+        count = Math::Min<uint16_t>(count + 1, MAX_SAMPLE_MC);
+
+        Float tMC = Math::Max(Float(1) / Float(count), MIN_EMA_RATIO_CM);
+        s.weight = Math::Lerp(s.weight, weight, tMC);
+        s.target = Math::Lerp(s.target, pos * weight, tMC);
+        //
+        Vector3 stateDir = (s.weight < Float(0)) ? (s.target / s.weight) : s.target;
+        Float newCos = Math::Max(Math::Dot(dir, stateDir), Float(0));
+        s.cos = Math::Lerp(s.cos, weight * newCos, tMC);
+
+        // Finally, write back
+        dStates[prevMCIndex] = s;
+        dCounts[prevMCIndex] = count;
+    }
 }
 
 GuidedPTRenderer::GuidedPTRenderer(const RenderImagePtr& rb,
@@ -49,6 +179,7 @@ GuidedPTRenderer::GuidedPTRenderer(const RenderImagePtr& rb,
                                    const RenderWorkPack& wp)
     : Base(rb, tv, tp, s, wp, TypeName())
     , metaLightArray(s)
+    , hashGrid(s)
     , rendererGlobalMem(s.AllGPUs(), 128_MiB, 512_MiB)
     , saveImage(true)
 {}
@@ -118,24 +249,6 @@ void GuidedPTRenderer::PushAttribute(uint32_t attributeIndex,
     //}
 }
 
-//void GuidedPTRenderer::CopyAliveRays(Span<const RayIndex> dAliveRayIndices,
-//                                     const GPUQueue& processQueue)
-//{
-//    if(dAliveRayIndices.empty()) return;
-//
-//    //uint32_t aliveRayCount = static_cast<uint32_t>(dAliveRayIndices.size());
-//    //processQueue.IssueWorkKernel<KCCopyRaysIndirect>
-//    //(
-//    //    "KCCopyRaysIndirect",
-//    //    DeviceWorkIssueParams{.workCount = aliveRayCount},
-//    //    //
-//    //    dRays, dRayCones,
-//    //    dAliveRayIndices,
-//    //    dOutRays,
-//    //    dOutRayCones
-//    //);
-//}
-
 uint32_t
 GuidedPTRenderer::FindMaxSamplePerIteration(uint32_t rayCount)
 {
@@ -146,259 +259,235 @@ Span<RayIndex>
 GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
                                const GPUQueue& processQueue)
 {
-    //const SpectrumContext& typedSpectrumContext = *static_cast<const SpectrumContext*>(spectrumContext.get());
-    //RayState dRayState =
-    //{
-    //    .dPathRadiance      = dPathRadiance,
-    //    .dImageCoordinates  = dImageCoordinates,
-    //    .dFilmFilterWeights = dFilmFilterWeights,
-    //    .dThroughput        = dThroughputs,
-    //    .dPathDataPack      = dPathDataPack,
-    //    .dOutRays           = dOutRays,
-    //    .dOutRayCones       = dOutRayCones,
-    //    .dPrevMatPDF        = dPrevMatPDF,
-    //    .dShadowRayRadiance = dShadowRayRadiance,
-    //    .dPathWavelengths   = dPathWavelengths
-    //};
+    assert(sppLimit != 0);
 
-    //assert(sppLimit != 0);
-    //// Find the ray count. Ray count is tile count
-    //// but tile can exceed film boundaries so clamp,
-    //uint32_t rayCount = imageTiler.CurrentTileSize().Multiply();
-    //// Start the partitioner, again worst case work count
-    //// Get the K/V pair buffer
-    //uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
-    //auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount,
-    //                                             processQueue, true);
+    // Create RNG state for each ray
+    Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
+    rnGenerator->SetupRange(imageTiler.LocalTileStart(),
+                            imageTiler.LocalTileEnd(),
+                            processQueue);
 
-    //// Iota the indices
-    //DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
-    //// Create RNG state for each ray
-    //rnGenerator->SetupRange(imageTiler.LocalTileStart(),
-    //                        imageTiler.LocalTileEnd(),
-    //                        processQueue);
-    //// Reload dead paths with new
-    //auto [dReloadIndices, aliveRayCount] = ReloadPaths(dIndices, sppLimit,
-    //                                                   processQueue);
-    //dIndices = dReloadIndices.subspan(0, aliveRayCount);
-    //dKeys = dKeys.subspan(0, aliveRayCount);
+    RayState dRayState = RayState
+    {
+        .dPathRadiance          = dPathRadiance,
+        .dImageCoordinates      = dImageCoordinates,
+        .dFilmFilterWeights     = dFilmFilterWeights,
+        .dPathWavelengths       = dPathWavelengths,
+        //
+        .dThroughputs           = dThroughputs,
+        .dPathDataPack          = dPathDataPack,
+        .dPrevPDF               = dPrevPDF,
+        .dPrevPathReflectanceOrOutRadiance
+                                = dPrevPathReflectanceOrOutRadiance,
+        .dScoreSums             = dScoreSums,
+        //
+        .dBackupRNGStates       = dBackupRNGStates,
+        //
+        .dShadowRayRadiance     = dShadowRayRadiance,
+        .dShadowRays            = dShadowRays,
+        .dShadowRayCones        = dShadowRayCones,
+        .dShadowPrevPathReflectance
+                                = dShadowPrevPathReflectance,
+        //
+        .dLiftedMCIndices       = dLiftedMCIndices
+    };
+    //
+    const SpectrumContext& typedSpectrumContext = *static_cast<const SpectrumContext*>(spectrumContext.get());
+    auto lightSampler = UniformLightSampler(metaLightArray.Array(),
+                                            metaLightArray.IndexHashTable());
+    GlobalState globalState = GlobalState
+    {
+        .russianRouletteRange = currentOptions.russianRouletteRange,
+        .specContextData      = typedSpectrumContext.GetData(),
+        .lightSampler         = lightSampler,
+        .lobeProbability      = Float(0.5),
+        // Hash Grid and Data
+        .hashGrid             = hashGrid.View(),
+        .dMCStates            = dMCStates,
+        .dMCCounts            = dMCCounts,
+        .dMCLocks             = dMCLocks,
+        .dMCIrradiances       = dMCIrradiances
+    };
 
-    //// Cast rays
-    //using namespace std::string_view_literals;
-    //Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
-    //processQueue.IssueWorkKernel<KCSetBoundaryWorkKeysIndirect>
-    //(
-    //    "KCSetBoundaryWorkKeys"sv,
-    //    DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
-    //    dHitKeys,
-    //    ToConstSpan(dIndices),
-    //    this->boundaryLightKeyPack
-    //);
-    //// Actual Ray Casting
-    //tracerView.baseAccelerator.CastRays
-    //(
-    //    dHitKeys, dHits, dBackupRNGStates,
-    //    dRays, dIndices, processQueue
-    //);
+    // Fill dead rays according to the render mode
+    uint32_t rayCount = imageTiler.CurrentTileSize().Multiply();
+    uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
+    auto [dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount,
+                                                  processQueue, true);
+    DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
 
-    //// Generate work keys from hit packs
-    //using namespace std::string_literals;
-    //static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeysIndirect"s;
-    //processQueue.IssueWorkKernel<KCGenerateWorkKeysIndirect>
-    //(
-    //    GenWorkKernelName,
-    //    DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
-    //    dKeys,
-    //    ToConstSpan(dIndices),
-    //    ToConstSpan(dHitKeys),
-    //    workHasher
-    //);
+    // Reload dead paths with new
+    auto [dReloadIndices, dFilledIndices, aliveRayCount] = ReloadPaths(dIndices, sppLimit,
+                                                                       processQueue);
+    dIndices = dReloadIndices.subspan(0, aliveRayCount);
+    dKeys = dKeys.subspan(0, aliveRayCount);
 
-    //// Finally, partition using the generated keys.
-    //// Fully partitioning here by using a single sort
-    //auto& rp = rayPartitioner;
-    //auto partitionOutput = rp.MultiPartition(dKeys, dIndices,
-    //                                         workHasher.WorkBatchDataRange(),
-    //                                         workHasher.WorkBatchBitRange(),
-    //                                         processQueue, false);
-    //// Wait for results to be available in host buffers
-    //// since we need partition ranges on the CPU to Issue kernels.
-    //processQueue.Barrier().Wait();
-    //// Old Indices array (and the key) is invalidated
-    //// Change indices to the partitioned one
-    //dIndices = partitionOutput.dPartitionIndices;
+    // New rays do not have back path segment so set it
+    processQueue.IssueWorkKernel<KCInitGuidedPathStatesIndirect>
+    (
+        "KCInitGuidedPathStatesIndirect",
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dFilledIndices.size())},
+        //
+        dLiftedMCIndices,
+        ToConstSpan(dFilledIndices)
+    );
 
-    //if(currentOptions.sampleMode == SampleMode::E::PURE)
-    //{
-    //    // =================== //
-    //    //  Pure Path Tracing  //
-    //    // =================== //
-    //    // Work_0           = BxDF sample
-    //    // BoundaryWork_0   = Accumulate light radiance value to the path
-    //    using GlobalState = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
-    //    GlobalState globalState
-    //    {
-    //        .russianRouletteRange = currentOptions.russianRouletteRange,
-    //        .sampleMode = currentOptions.sampleMode,
-    //        .lightSampler = EmptyType{},
-    //        .specContextData = typedSpectrumContext.GetData()
-    //    };
+    // From this point on we have full buffers,
+    // unless we are about to reach the spp limit
+    // them some rays are marked invalid.
+    // ============ //
+    // Ray Casting  //
+    // ============ //
+    processQueue.IssueWorkKernel<KCSetBoundaryWorkKeysIndirect>
+    (
+        "KCSetBoundaryWorkKeysIndirect",
+        DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
+        dHitKeys,
+        ToConstSpan(dIndices),
+        this->boundaryLightKeyPack
+    );
+    // Actual Ray Casting
+    tracerView.baseAccelerator.CastRays
+    (
+        dHitKeys, dHits, dBackupRNGStates,
+        dRays, dIndices, processQueue
+    );
+    // Generate work keys from hit packs
+    // for partitioning
+    using namespace std::string_literals;
+    processQueue.IssueWorkKernel<KCGenerateWorkKeysIndirect>
+    (
+        "KCGenerateWorkKeysIndirect",
+        DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
+        dKeys,
+        ToConstSpan(dIndices),
+        ToConstSpan(dHitKeys),
+        workHasher
+    );
+    // Finally, partition using the generated keys.
+    // Fully partitioning here by using a single sort
+    auto& rp = rayPartitioner;
+    auto partitionOutput = rp.MultiPartition(dKeys, dIndices,
+                                             workHasher.WorkBatchDataRange(),
+                                             workHasher.WorkBatchBitRange(),
+                                             processQueue, false);
+    // Wait for results to be available in host buffers
+    // since we need partition ranges on the CPU to Issue kernels.
+    processQueue.Barrier().Wait();
+    // Old Indices array (and the key) is invalidated
+    // due to how partitioner works.
+    // Change indices to the partitioned one
+    dIndices = partitionOutput.dPartitionIndices;
 
-    //    IssueWorkKernelsToPartitions<This>(workHasher, partitionOutput,
-    //    [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
-    //              uint32_t, uint32_t partitionSize)
-    //    {
-    //        RNRequestList rnList = workI.SampleRNList(0);
-    //        uint32_t rnCount = rnList.TotalRNCount();
-    //        auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
-    //        rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-    //                                             dPathRNGDimensions,
-    //                                             rnList,
-    //                                             processQueue);
 
-    //        DeviceAlgorithms::InPlaceTransformIndirect
-    //        (
-    //            dPathRNGDimensions, dLocalIndices, processQueue,
-    //            ConstAddFunctor_U16(uint16_t(rnCount))
-    //        );
+    // Before calcuating new path, backpropogate the irradiance
+    // for non-light hitting rays.
+    // We could've does this as a "Shader" but we can get away with
+    // tMM as position, and ray direction as normal
+    //
+    // Clear locks
+    // TODO: Memset or indirect update via kernel? (which one as less elements?)
+    processQueue.MemsetAsync(dMCLocks, 0x00);
+    // Indirect irradiance backpropogation (as well as updater selection)
+    processQueue.IssueWorkKernel<KCBackpropagateIrradiance>
+    (
+        "KCBackpropagateIrradiance",
+        DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
+        //
+        dPrevPathReflectanceOrOutRadiance,
+        globalState,
+        dBackupRNGStates,
+        dLiftedMCIndices,
+        dScoreSums,
+        dHitKeys,
+        dRays,
+        dIndices
+    );
+    processQueue.IssueWorkKernel<KCUpdateMarkovChains>
+    (
+        "KCUpdateMarkovChains",
+        DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
+        //
+        globalState,
+        dPrevPathReflectanceOrOutRadiance,
+        dLiftedMCIndices,
+        dHitKeys,
+        dRays,
+        dIndices
+    );
 
-    //        workI.DoWork_0(dRayState, dLocalIndices,
-    //                       dRandomNumBuffer, dRayCones,
-    //                       dRays, dHits, dHitKeys,
-    //                       globalState, processQueue);
-    //    },
-    //    //
-    //    [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
-    //              uint32_t, uint32_t)
-    //    {
-    //        workI.DoBoundaryWork_0(dRayState, dLocalIndices,
-    //                               Span<const RandomNumber>{},
-    //                               dRayCones, dRays,
-    //                               dHits, dHitKeys,
-    //                               globalState, processQueue);
-    //    });
-    //}
-    //else
-    //{
-    //    // =================================  //
-    //    //  Path Tracing with NEE and/or MIS  //
-    //    // ================================== //
-    //    // Work_0           = BxDF sample
-    //    // Work_1           = NEE sample only
-    //    // BoundaryWork_1   = Same as light accumulation but with many states
-    //    //                    regarding NEE and MIS
-    //    UniformLightSampler lightSampler(metaLightArray.Array(),
-    //                                     metaLightArray.IndexHashTable());
+    // TODO: Do we need this?
+    // Clear the shadow ray stuff
+    processQueue.MemsetAsync(dShadowRayRadiance, 0x00);
+    processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
+    processQueue.MemsetAsync(dShadowRays, 0x00);
 
-    //    using GlobalState = PathTraceRDetail::GlobalState<UniformLightSampler, SpectrumConverter>;
-    //    GlobalState globalState
-    //    {
-    //        .russianRouletteRange = currentOptions.russianRouletteRange,
-    //        .sampleMode = currentOptions.sampleMode,
-    //        .lightSampler = lightSampler,
-    //        .specContextData = typedSpectrumContext.GetData()
-    //    };
-    //    using GlobalStateE = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
-    //    GlobalStateE globalStateE
-    //    {
-    //        .russianRouletteRange = currentOptions.russianRouletteRange,
-    //        .sampleMode = currentOptions.sampleMode,
-    //        .lightSampler = EmptyType{},
-    //        .specContextData = typedSpectrumContext.GetData()
-    //    };
+    //
+    IssueWorkKernelsToPartitions<This>
+    (
+        workHasher, partitionOutput,
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
+                  uint32_t, uint32_t partitionSize)
+        {
+            RNRequestList rnList = workI.SampleRNList(0);
+            uint32_t rnCount = rnList.TotalRNCount();
+            auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
+            rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
+                                                 dPathRNGDimensions,
+                                                 rnList,
+                                                 processQueue);
+            DeviceAlgorithms::InPlaceTransformIndirect
+            (
+                dPathRNGDimensions, dLocalIndices, processQueue,
+                ConstAddFunctor_U16(uint16_t(rnCount))
+            );
 
-    //    // Clear the shadow ray radiance buffer
-    //    processQueue.MemsetAsync(dShadowRayRadiance, 0x00);
-    //    processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
-    //    // CUDA Init check error, we access the rays even if it is not written
-    //    processQueue.MemsetAsync(dOutRays, 0x00);
-    //    // Do the NEE kernel + boundary work
-    //    IssueWorkKernelsToPartitions<This>(workHasher, partitionOutput,
-    //    [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
-    //              uint32_t, uint32_t partitionSize)
-    //    {
-    //        RNRequestList rnList = workI.SampleRNList(1);
-    //        uint32_t rnCount = rnList.TotalRNCount();
-    //        auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
-    //        rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-    //                                             dPathRNGDimensions,
-    //                                             rnList,
-    //                                             processQueue);
+            // 1. vMF Generation & Sampling / Shadow Ray Generation
+            // 2. Virtually lifting a Markov Chain
+            // 3. Path & Shadow ray single-channel irradiance
+            //    throughput generation
+            //
+            workI.DoWork_0(dRayState, dRays, dRayCones,
+                           dLocalIndices, dRandomNumBuffer,
+                           dHits, dHitKeys,
+                           globalState, processQueue);
+        },
+        // Light selection
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
+                  uint32_t, uint32_t)
+        {
+            // Light emission calculation / direct backpropogation
+            // of irradiance
+            workI.DoBoundaryWork_0(dRayState, dRays, dRayCones,
+                                   dLocalIndices,
+                                   Span<const RandomNumber>{},
+                                   dHits, dHitKeys,
+                                   globalState, processQueue);
+        }
+    );
 
-    //        DeviceAlgorithms::InPlaceTransformIndirect
-    //        (
-    //            dPathRNGDimensions, dLocalIndices, processQueue,
-    //            ConstAddFunctor_U16(uint16_t(rnCount))
-    //        );
+    // Check the shadow ray visibility
+    Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
+    tracerView.baseAccelerator.CastVisibilityRays
+    (
+        dIsVisibleBitSpan, dBackupRNGStates,
+        dShadowRays, dIndices, processQueue
+    );
 
-    //        workI.DoWork_1(dRayState, dLocalIndices,
-    //                       dRandomNumBuffer, dRayCones,
-    //                       dRays, dHits, dHitKeys,
-    //                       globalState, processQueue);
-    //    },
-    //    [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
-    //              uint32_t, uint32_t)
-    //    {
-    //        workI.DoBoundaryWork_1(dRayState, dLocalIndices,
-    //                               Span<const RandomNumber>{},
-    //                               dRayCones, dRays,
-    //                               dHits, dHitKeys,
-    //                               globalState, processQueue);
-    //    });
+    // Accumulate the pre-calculated radiance selectively
+    processQueue.IssueWorkKernel<KCAccumulateShadowRays>
+    (
+        "KCAccumulateShadowRays",
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        //
+        dPathRadiance,
+        ToConstSpan(dShadowRayRadiance),
+        ToConstSpan(dIsVisibleBitSpan),
+        ToConstSpan(dPathDataPack),
+        currentOptions.russianRouletteRange
+    );
 
-    //    // After the kernel call(s), "dOutRays" holds the
-    //    // shadow rays. Check for visibility.
-    //    Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
-    //    tracerView.baseAccelerator.CastVisibilityRays
-    //    (
-    //        dIsVisibleBitSpan, dBackupRNGStates,
-    //        dOutRays, dIndices, processQueue
-    //    );
-
-    //    // Accumulate the pre-calculated radiance selectively
-    //    processQueue.IssueWorkKernel<KCAccumulateShadowRays>
-    //    (
-    //        "KCAccumulateShadowRays",
-    //        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
-    //        //
-    //        dPathRadiance,
-    //        ToConstSpan(dShadowRayRadiance),
-    //        ToConstSpan(dIsVisibleBitSpan),
-    //        ToConstSpan(dPathDataPack),
-    //        currentOptions.russianRouletteRange
-    //    );
-
-    //    // Do the actual kernel
-    //    IssueWorkKernelsToPartitions<This>(workHasher, partitionOutput,
-    //    [&](const auto& workI, Span<uint32_t> dLocalIndices,
-    //        uint32_t, uint32_t partitionSize)
-    //    {
-    //        RNRequestList rnList = workI.SampleRNList(0);
-    //        uint32_t rnCount = rnList.TotalRNCount();
-    //        auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
-    //        rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-    //                                             dPathRNGDimensions,
-    //                                             rnList,
-    //                                             processQueue);
-
-    //        DeviceAlgorithms::InPlaceTransformIndirect
-    //        (
-    //            dPathRNGDimensions, dLocalIndices, processQueue,
-    //            ConstAddFunctor_U16(uint16_t(rnCount))
-    //        );
-
-    //        workI.DoWork_0(dRayState, dLocalIndices,
-    //                       dRandomNumBuffer, dRayCones,
-    //                       dRays, dHits, dHitKeys,
-    //                       globalStateE, processQueue);
-    //    },
-    //    // Empty Invocation for lights this pass
-    //    [&](const auto&, Span<uint32_t>, uint32_t, uint32_t) {});
-    //}
-
-    //return dIndices;
-
-    return Span<RayIndex>();
+    return dIndices;
 }
 
 RendererOutput
@@ -639,7 +728,7 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
     // You can see why wavefront approach uses
     // quite a bit memory (and this is somewhat optimized).
     uint32_t maxSampleCount = FindMaxSamplePerIteration(maxRayCount);
-
+    uint32_t hashGridEntryCount = hashGrid.EntryCapacity();
     uint32_t isVisibleIntCount = Bitspan<uint32_t>::CountT(maxRayCount);
     MemAlloc::AllocateMultiData
     (
@@ -649,10 +738,12 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
             dHits, dHitKeys, dRays, dRayCones,
             dPathRadiance, dImageCoordinates,
             dFilmFilterWeights, dThroughputs,
-            dPathDataPack, dPDFChains,
+            dPathDataPack, dPrevPDF,
+            dShadowPrevPathReflectance,
+            dPrevPathReflectanceOrOutRadiance,
+            dScoreSums, dLiftedMCIndices,
             dShadowRays, dShadowRayCones,
-            dPrevMatPDF, dShadowRayRadiance,
-            dPathRNGDimensions, dLiftedMarkovChainIndex,
+            dShadowRayRadiance, dPathRNGDimensions,
             // Per path (but can be zero if not spectral)
             dPathWavelengths,
             dSpectrumWavePDFs,
@@ -662,6 +753,9 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
             dRandomNumBuffer,
             // Per render work
             dWorkHashes, dWorkBatchIds,
+            // Hash Grid
+            dMCStates, dMCLocks,
+            dMCCounts, dMCIrradiances,
             //
             dSubCameraBuffer
         ),
@@ -672,6 +766,7 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
             maxRayCount, maxRayCount, maxRayCount, maxRayCount,
             maxRayCount, maxRayCount, maxRayCount, maxRayCount,
             maxRayCount, maxRayCount, maxRayCount, maxRayCount,
+            maxRayCount, maxRayCount,
             // Per path (but can be zero if not spectral)
             wavelengthCount, wavelengthCount,
             // Per path but a single bit is used
@@ -680,6 +775,9 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
             maxSampleCount,
             // Per render work
             totalWorkCount, totalWorkCount,
+            // Hash Grid
+            hashGridEntryCount, hashGridEntryCount,
+            hashGridEntryCount, hashGridEntryCount,
             //
             RendererBase::SUB_CAMERA_BUFFER_SIZE
         }

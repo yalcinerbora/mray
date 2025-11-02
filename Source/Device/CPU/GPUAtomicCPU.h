@@ -2,12 +2,25 @@
 // IWYU pragma: private, include "GPUAtomic.h"
 
 #include "Core/Vector.h"
+#include "../GPUTypes.h"
+
 #include <atomic>
 
 namespace mray::host::atomic
 {
+    template<class T, class Func>
+    MR_GF_DECL T EmulateAtomicOp(T&, Func&&);
+
     template<class T>
     MR_GF_DECL T AtomicAdd(T& t, T v);
+
+    template<class T>
+    requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+    MR_GF_DECL T AtomicMax(T& t, T v);
+
+    template<class T>
+    requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+    MR_GF_DECL T AtomicMin(T& t, T v);
 
     template<class T>
     requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
@@ -28,6 +41,28 @@ namespace mray::host::atomic
 namespace mray::host::atomic
 {
 
+template<class T, class Func>
+MR_GF_DECL
+T EmulateAtomicOp(T& address, Func&& F)
+{
+    // Trigger instantiation of IntegralOf
+    // to check if this is "lock-free" in comp time.
+    // is_lock_free is runtime thing on c++ also CUDA etc
+    // only have 16, 32, 64 bit (later ones have 128-bit)
+    // atomics. So this will make it is comparable.
+    static_assert(!std::is_same_v<IntegralOf<T>::type, void>);
+
+    std::atomic_ref<T> ref(t);
+    T expected = ref.load();
+    T result;
+    do
+    {
+        result = F(expected);
+    }
+    while(!ref.compare_exchange_strong(expected, result));
+    return expected;
+}
+
 template<unsigned int D, class T>
 MR_GF_DEF
 Vector<D, T> AtomicAdd(Vector<D, T>& t, Vector<D, T> v)
@@ -45,6 +80,29 @@ MR_GF_DEF
 T AtomicAdd(T& t, T v)
 {
     return std::atomic_ref<T>(t).fetch_add(v);
+}
+
+template<class T>
+requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+MR_GF_DEF
+T AtomicMax(T& t, T v)
+{
+    // No fetch_max until c++26 :(
+    return EmulateAtomicOp(t, [v](T in)
+    {
+        return Math::Max(v, in);
+    });
+}
+
+template<class T>
+requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+MR_GF_DEF T AtomicMin(T& t, T v)
+{
+    // No fetch_min until c++26 :(
+    return EmulateAtomicOp(t, [v](T in)
+    {
+        return Math::Min(v, in);
+    });
 }
 
 template<class T>

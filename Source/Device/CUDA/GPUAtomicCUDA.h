@@ -1,34 +1,24 @@
 
 #include "Core/Vector.h"
+#include "Core/BitFunctions.h"
 
-namespace mray::cuda::atomic::detail
-{
-    template <class T> struct IntegralOf
-    {
-        static_assert(!std::is_same_v<T, T>,
-                      "Type does not have a proper integral wrapper!");
-    };
-
-    template <class T>
-    requires (sizeof(T) == 8 && alignof(T) >= alignof(uint64_t))
-    struct IntegralOf<T> { using type = uint64_t; };
-
-    template <class T>
-    requires (sizeof(T) == 4 && alignof(T) >= alignof(uint32_t))
-    struct IntegralOf<T> { using type = uint32_t; };
-
-    template <class T>
-    requires (sizeof(T) == 2 && alignof(T) >= alignof(uint16_t))
-    struct IntegralOf<T> { using type = uint16_t; };
-
-    template<class T, class Func>
-    MR_GF_DECL T EmulateAtomicOp(T*, T val, Func&& f);
-}
+#include "../GPUTypes.h"
 
 namespace mray::cuda::atomic
 {
+    template<class T, class Func>
+    MR_GF_DECL T EmulateAtomicOp(T&, Func&&);
+
     template<class T>
     MR_GF_DECL T AtomicAdd(T& t, T v);
+
+    template<class T>
+    requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+    MR_GF_DECL T AtomicMax(T& t, T v);
+
+    template<class T>
+    requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+    MR_GF_DECL T AtomicMin(T& t, T v);
 
     template<class T>
     requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
@@ -46,41 +36,35 @@ namespace mray::cuda::atomic
     MR_GF_DECL T AtomicCompSwap(T& t, T compVal, T storeVal);
 }
 
-// A dirty fix to host side to not whine about
-// undefined "atomicXXX" functions.
-
-namespace mray::cuda::atomic::detail
+namespace mray::cuda::atomic
 {
 
+// A dirty fix to host side to not whine about
+// undefined "atomicXXX" functions.
 template<class T, class Func>
 MR_GF_DEF
-T EmulateAtomicOp(T* address, T val, Func&& F)
+T EmulateAtomicOp(T& address, Func&& F)
 {
     #ifdef __CUDA_ARCH__
         using I = typename IntegralOf<T>::type;
         // Classic CAS wrapper for the operation
         // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
-        I* integralAddress = std::launder(reinterpret_cast<I*>(address));
-        I old = *integralAddress;
+        I* integralAddress = std::launder(reinterpret_cast<I*>(&address));
+        I old = Bit::BitCast<I>(integralAddress);
         I assumed;
         do
         {
             assumed = old;
-            T r = F(std::bit_cast<T>(assumed), val);
-            I rI = std::bit_cast<I>(r);
+            T r = F(Bit::BitCast<T>(assumed));
+            I rI = Bit::BitCast<I>(r);
             old = atomicCAS(integralAddress, assumed, rI);
         }
         while(assumed != old);
-        return std::bit_cast<T>(old);
+        return Bit::BitCast<T>(old);
     #else
-        return F(*address + val);
+        return F(address);
     #endif
 }
-
-}
-
-namespace mray::cuda::atomic
-{
 
 template<>
 MR_GF_DEF
@@ -90,9 +74,9 @@ double AtomicAdd(double& t, double v)
         #if __CUDA_ARCH__ >= 600
             return atomicAdd(&t, v);
         #else
-            return detail::EmulateAtomicOp(&t, v, [](double l, double r)
+            return detail::EmulateAtomicOp(&t, [v](double r)
             {
-                return l + r;
+                return r + v;
             });
     #endif
     #else
@@ -201,6 +185,30 @@ T AtomicAdd(T& t, T v)
 }
 
 template<class T>
+    requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+MR_GF_DEF
+T AtomicMax(T& t, T v)
+{
+    #ifdef __CUDA_ARCH__
+        return atomicMax(&t, v);
+    #else
+        return t + v;
+    #endif
+}
+
+template<class T>
+requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+MR_GF_DEF
+T AtomicMin(T& t, T v)
+{
+    #ifdef __CUDA_ARCH__
+        return atomicMin(&t, v);
+    #else
+        return t + v;
+    #endif
+}
+
+template<class T>
 requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
 MR_GF_DEF
 T AtomicAnd(T& t, T v)
@@ -241,7 +249,7 @@ MR_GF_DEF
 T AtomicCompSwap(T& t, T compVal, T storeVal)
 {
     #ifdef __CUDA_ARCH__
-        using Int = typename detail::IntegralOf<T>::type;
+        using Int = typename IntegralOf<T>::type;
         auto* tp = reinterpret_cast<Int*>(&t);
         return T(atomicCAS(tp,
                            static_cast<Int>(compVal),

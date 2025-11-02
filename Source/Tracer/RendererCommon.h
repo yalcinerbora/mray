@@ -4,22 +4,22 @@
 #include "RayPartitioner.h"
 
 // Some common kernels
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
                         MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
                         MRAY_GRID_CONSTANT const RenderWorkHasher workHasher);
 
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenerateWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
                                 MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
                                 MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
                                 MRAY_GRID_CONSTANT const RenderWorkHasher workHasher);
 
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCSetBoundaryWorkKeys(MRAY_GRID_CONSTANT const Span<HitKeyPack> dWorkKey,
                            MRAY_GRID_CONSTANT const HitKeyPack boundaryWorkKey);
 
-MRAY_KERNEL
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCSetBoundaryWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<HitKeyPack> dWorkKey,
                                    MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
                                    MRAY_GRID_CONSTANT const HitKeyPack boundaryWorkKey);

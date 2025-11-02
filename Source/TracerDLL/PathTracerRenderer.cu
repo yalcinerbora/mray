@@ -181,8 +181,8 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
                             imageTiler.LocalTileEnd(),
                             processQueue);
     // Reload dead paths with new
-    auto [dReloadIndices, aliveRayCount] = ReloadPaths(dIndices, sppLimit,
-                                                       processQueue);
+    auto [dReloadIndices, _, aliveRayCount] = ReloadPaths(dIndices, sppLimit,
+                                                          processQueue);
     dIndices = dReloadIndices.subspan(0, aliveRayCount);
     dKeys = dKeys.subspan(0, aliveRayCount);
 
@@ -206,10 +206,9 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
 
     // Generate work keys from hit packs
     using namespace std::string_literals;
-    static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeysIndirect"s;
     processQueue.IssueWorkKernel<KCGenerateWorkKeysIndirect>
     (
-        GenWorkKernelName,
+        "KCGenerateWorkKeysIndirect"sv,
         DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         dKeys,
         ToConstSpan(dIndices),

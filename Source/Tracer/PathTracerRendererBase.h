@@ -151,8 +151,9 @@ struct PathTracerRendererBase : public RendererBase
     public:
     struct ReloadPathOutput
     {
-        Span<RayIndex> dIndices;
-        uint32_t aliveRayCount;
+        Span<RayIndex> dAllIndices;
+        Span<RayIndex> dFilledRayIndices;
+        uint32_t       aliveRayCount;
     };
     struct InitOutput
     {

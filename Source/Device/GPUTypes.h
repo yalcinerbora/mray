@@ -6,6 +6,24 @@
 
 using GPUThreadInitFunction = void(*)();
 
+template <class T> struct IntegralOf
+{
+    static_assert(!std::is_same_v<T, T>,
+                    "Type does not have a proper integral wrapper!");
+};
+
+template <class T>
+requires (sizeof(T) == 8 && alignof(T) >= alignof(uint64_t))
+struct IntegralOf<T> { using type = uint64_t; };
+
+template <class T>
+requires (sizeof(T) == 4 && alignof(T) >= alignof(uint32_t))
+struct IntegralOf<T> { using type = uint32_t; };
+
+template <class T>
+requires (sizeof(T) == 2 && alignof(T) >= alignof(uint16_t))
+struct IntegralOf<T> { using type = uint16_t; };
+
 static constexpr uint32_t ComputeQueuePerDevice = 4;
 static_assert(ComputeQueuePerDevice > 0,
               "At least one compute queue must "

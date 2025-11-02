@@ -30,10 +30,11 @@ void KCWriteInvalidRaysIndirect(MRAY_GRID_CONSTANT const Span<PathDataPack> dPat
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-static void KCInitPathStateIndirect(MRAY_GRID_CONSTANT const Span<Spectrum> dThroughputs,
-                                    MRAY_GRID_CONSTANT const Span<Spectrum> dPathRadiance,
-                                    MRAY_GRID_CONSTANT const Span<PathDataPack> dPathDataPack,
-                                    MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices)
+static
+void KCInitPathStateIndirect(MRAY_GRID_CONSTANT const Span<Spectrum> dThroughputs,
+                             MRAY_GRID_CONSTANT const Span<Spectrum> dPathRadiance,
+                             MRAY_GRID_CONSTANT const Span<PathDataPack> dPathDataPack,
+                             MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices)
 {
     KernelCallParams kp;
     uint32_t pathCount = static_cast<uint32_t>(dIndices.size());
@@ -102,9 +103,9 @@ PathTracerRendererBase::ReloadPaths(Span<const RayIndex> dIndices,
     RNRequestList camSampleRNList = curCamWork->StochasticFilterSampleRayRNList();
     uint32_t camSamplePerRay = camSampleRNList.TotalRNCount();
     uint32_t deadRayCount = hDeadRayRanges[2] - hDeadRayRanges[1];
-    auto dDeadRayIndices = dDeadAliveRayIndices.subspan(hDeadRayRanges[1],
-                                                        deadRayCount);
-
+    Span<RayIndex> dDeadRayIndices = dDeadAliveRayIndices.subspan(hDeadRayRanges[1],
+                                                                  deadRayCount);
+    Span<RayIndex> dFilledRayIndices;
     uint32_t aliveRayCount = hDeadRayRanges[1] - hDeadRayRanges[0];
     if(!dDeadRayIndices.empty())
     {
@@ -117,7 +118,7 @@ PathTracerRendererBase::ReloadPaths(Span<const RayIndex> dIndices,
 
         if(fillRayCount != 0)
         {
-            auto dFilledRayIndices = dDeadRayIndices.subspan(0, fillRayCount);
+            dFilledRayIndices = dDeadRayIndices.subspan(0, fillRayCount);
             uint32_t camRayGenRNCount = fillRayCount * camSamplePerRay;
             auto dCamRayGenRNBuffer = dRandomNumBuffer.subspan(0, camRayGenRNCount);
 
@@ -215,7 +216,8 @@ PathTracerRendererBase::ReloadPaths(Span<const RayIndex> dIndices,
     // invalidate but lets return the new buffer)
     return ReloadPathOutput
     {
-        .dIndices = dDeadAliveRayIndices,
+        .dAllIndices = dDeadAliveRayIndices,
+        .dFilledRayIndices = dFilledRayIndices,
         .aliveRayCount = aliveRayCount
     };
 }
