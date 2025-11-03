@@ -80,6 +80,8 @@ class GuidedPTRenderer final : public PathTracerRendererBase
     Span<MCLock>        dMCLocks;
     Span<MCCount>       dMCCounts;
     Span<MCIrradiance>  dMCIrradiances;
+    // For hash grid, cam position buffer
+    Span<Vector3>       dCamPosBuffer;
     //
     bool                saveImage  = false;
 
@@ -131,13 +133,26 @@ class GuidedPTRenderWork : public RenderWork<R, PG, MG, TG>
 
     RNRequestList SampleRNList(uint32_t workIndex) const override
     {
-        static constexpr auto matSampleList   = MG::template Material<>::SampleRNList;
-        static constexpr auto rrSampleList    = GenRNRequestList<1>();
-        static constexpr auto lightSampleList = R::UniformLightSampler::SampleLightRNList;
+        static constexpr auto RNList = []()
+        {
+            constexpr auto matSampleList = MG::template Material<>::SampleRNList;
+            constexpr auto lobeSampleList = GuidedPTRDetail::GaussianLobeMixture::SampleRNList;
+            constexpr auto lightSampleList = R::UniformLightSampler::SampleLightRNList;
+            // Material or Lobe MIS sample
+            auto list = matSampleList.Append(lobeSampleList);
+            // Russian Rouletted Sample
+            list = list.Append(GenRNRequestList<1>());
+            // MIS Sample (Material or Lobe Selection)
+            list = list.Append(GenRNRequestList<1>());
+            // NEE Sample
+            list = list.Append(lightSampleList);
+            return list;
+        }();
         //
-             if(workIndex == 0) return matSampleList.Append(rrSampleList);
-        else if(workIndex == 1) return lightSampleList;
-        else                    return RNRequestList();
+        if(workIndex != 0) return RNRequestList();
+        //
+
+        return RNList;
     }
 };
 

@@ -525,7 +525,7 @@ SampleT<Vector3> BxDF::VNDFGGXSmithSample(const Vector3& V, Float alpha,
     // some Dot products (with normal) are thusly represented as
     // X[2] where x is the vector is being dot product with the normal
     //
-    // Unlike most of the routines this sampling function
+    // Unlike most of the routines, this sampling function
     // consists of multiple functions (namely NDF and Shadowing)
     // because of that, it does not return the value of the function
     // it returns the generated micro-facet normal

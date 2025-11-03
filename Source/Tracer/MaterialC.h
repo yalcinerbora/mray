@@ -4,6 +4,7 @@
 
 #include "TracerTypes.h"
 #include "GenericGroup.h"
+#include "TextureView.h"
 
 class alignas(8) MediumKeyPair
 {
@@ -26,6 +27,7 @@ namespace MaterialCommon
 }
 
 using MediumKeyPairList = std::vector<MediumKeyPair>;
+using NormalMap = Optional<TracerTexView<2, Vector3>>;
 
 template <class MatType>
 concept MaterialC = requires(MatType mt,
@@ -37,6 +39,10 @@ concept MaterialC = requires(MatType mt,
     typename MatType::SpectrumConverter;
     typename MatType::Surface;
     typename MatType::DataSoA;
+
+    //
+    {MatType::GetNormalMap(typename MatType::DataSoA{}, MaterialKey{})
+    } -> std::same_as<NormalMap>;
 
     // Constructor
     MatType(sc, typename MatType::Surface{},

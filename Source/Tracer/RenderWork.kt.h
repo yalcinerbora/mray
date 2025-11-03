@@ -76,14 +76,16 @@ void KCRenderWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params params)
                                                          keys.primKey);
         // Construct Primitive
         auto primitive = Primitive(tContext, params.primSoA, keys.primKey);
+        auto matKey = Bit::BitCast<MaterialKey>(keys.lightOrMatKey);
+        NormalMap normalMap = Material::GetNormalMap(params.matSoA, matKey);
         // Generate the surface
         Surface surface;
         RayConeSurface rayConeSurface;
         primitive.GenerateSurface(surface, rayConeSurface,
-                                  hit, ray, rayCone);
+                                  normalMap, hit, ray, rayCone);
         // Generate the material
-        auto material = Material(specConverter, surface, params.matSoA,
-                                 std::bit_cast<MaterialKey>(keys.lightOrMatKey));
+        auto material = Material(specConverter, surface,
+                                 params.matSoA, matKey);
         // Call the function
         WorkFunction::Call(primitive, material, surface, rayConeSurface,
                            tContext, specConverter, rng, params, rIndex,

@@ -6,6 +6,13 @@
 namespace LambertMatDetail
 {
 
+template <class SC>
+MR_GF_DEF
+NormalMap LambertMaterial<SC>::GetNormalMap(const DataSoA& soa, MaterialKey mk)
+{
+    return soa.dNormalMaps[mk.FetchIndexPortion()];
+}
+
 template <class SpectrumContext>
 MR_GF_DEF
 LambertMaterial<SpectrumContext>::LambertMaterial(const SpectrumConverter& specTransformer,
@@ -16,9 +23,6 @@ LambertMaterial<SpectrumContext>::LambertMaterial(const SpectrumConverter& specT
 {
     const auto albedoTex = AlbedoMap(specTransformer, soa.dAlbedo[mk.FetchIndexPortion()]);
     albedo = albedoTex(surface.uv, surface.dpdx, surface.dpdy);
-
-    const auto& normalTex = soa.dNormalMaps[mk.FetchIndexPortion()];
-    if(normalTex) optNormal = (*normalTex)(surface.uv, surface.dpdx, surface.dpdy);
 }
 
 template <class SC>
@@ -35,14 +39,6 @@ BxDFSample LambertMaterial<SC>::SampleBxDF(const Vector3&,
 
     // Check normal Mapping
     Quaternion toTangentSpace = surface.shadingTBN;
-    if(optNormal)
-    {
-        Vector3 normal = *optNormal;
-        normal = Math::Normalize(normal);
-        // Due to normal change our direction sample should be aligned as well
-        toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
-    }
-
     // Before transform calculate reflectance
     Spectrum reflectance = albedo * nDotL * MathConstants::InvPi<Float>();
 
@@ -73,9 +69,7 @@ Float LambertMaterial<SC>::Pdf(const Ray& wI, const Vector3&) const
 {
     using Distribution::Common::PDFCosDirection;
     Vector3 wILocal = surface.shadingTBN.ApplyRotation(wI.dir);
-    Vector3 normal = (optNormal) ? (*optNormal) : Vector3::ZAxis();
-    normal = Math::Normalize(normal);
-    Float pdf = PDFCosDirection(wILocal, normal);
+    Float pdf = PDFCosDirection(wILocal);
     return Math::Max(pdf, Float(0));
 }
 
@@ -85,13 +79,6 @@ BxDFEval LambertMaterial<SC>::Evaluate(const Ray& wI, const Vector3&) const
 {
     // Check normal Mapping
     Quaternion toTangentSpace = surface.shadingTBN;
-    if(optNormal)
-    {
-        Vector3 normal = *optNormal;
-        normal = Math::Normalize(normal);
-        // Due to normal change our direction sample should be aligned as well
-        toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
-    }
     // Calculate lightning tangent space
     Vector3 wILocal = toTangentSpace.ApplyRotation(wI.dir);
     Float nDotL = Math::Max(wILocal[2], Float(0));
@@ -153,6 +140,13 @@ namespace ReflectMatDetail
 
 template <class SC>
 MR_GF_DEF
+NormalMap ReflectMaterial<SC>::GetNormalMap(const DataSoA&, MaterialKey)
+{
+    return std::nullopt;
+}
+
+template <class SC>
+MR_GF_DEF
 ReflectMaterial<SC>::ReflectMaterial(const SpectrumConverter&,
                                      const Surface& surface,
                                      const DataSoA& soa, MaterialKey mk)
@@ -172,7 +166,7 @@ BxDFSample ReflectMaterial<SC>::SampleBxDF(const Vector3& wO,
     Vector3 localNormal = surface.shadingTBN.OrthoBasisZ();
     Vector3 wI = Graphics::Reflect(localNormal, wO);
     // Directly delegate position, this is not a subsurface material
-    Ray wIRay = Ray(wI, surface.position);
+    Ray wIRay = Ray(Math::Normalize(wI), surface.position);
     MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
     return BxDFSample
     {
@@ -248,6 +242,13 @@ bool ReflectMaterial<SC>::IsAllTexturesAreResident(const Surface&, const DataSoA
 
 namespace RefractMatDetail
 {
+
+template <class SC>
+MR_GF_DEF
+NormalMap RefractMaterial<SC>::GetNormalMap(const DataSoA&, MaterialKey)
+{
+    return std::nullopt;
+}
 
 template <class SC>
 MR_GF_DEF
@@ -536,11 +537,18 @@ Spectrum UnrealMaterial<SC>::CalculateF0() const
     return Math::Lerp(Spectrum(specOut), albedo, metallic);
 }
 
-template <class SpectrumContext>
+template <class SC>
 MR_GF_DEF
-UnrealMaterial<SpectrumContext>::UnrealMaterial(const SpectrumConverter& specTransformer,
-                                                const Surface& surface,
-                                                const DataSoA& soa, MaterialKey mk)
+NormalMap UnrealMaterial<SC>::GetNormalMap(const DataSoA& soa, MaterialKey mk)
+{
+    return soa.dNormalMaps[mk.FetchIndexPortion()];
+}
+
+template <class SC>
+MR_GF_DEF
+UnrealMaterial<SC>::UnrealMaterial(const SpectrumConverter& specTransformer,
+                                   const Surface& surface,
+                                   const DataSoA& soa, MaterialKey mk)
     : surface(surface)
     , mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {
@@ -552,12 +560,6 @@ UnrealMaterial<SpectrumContext>::UnrealMaterial(const SpectrumConverter& specTra
     metallic = metallicTex(surface.uv, surface.dpdx, surface.dpdy);
     specular = specularTex(surface.uv, surface.dpdx, surface.dpdy);
     albedo = albedoTex(surface.uv, surface.dpdx, surface.dpdy);
-
-    const auto& normalMapTex = soa.dNormalMaps[mk.FetchIndexPortion()];
-    if(normalMapTex)
-    {
-        optNormal = (*normalMapTex)(surface.uv, surface.dpdx, surface.dpdy);
-    }
 }
 
 template <class SC>
@@ -586,13 +588,6 @@ BxDFSample UnrealMaterial<SC>::SampleBxDF(const Vector3& wO,
 
     // Microfacet dist functions are all in tangent space
     Quaternion toTangentSpace = surface.shadingTBN;
-    if(optNormal)
-    {
-        Vector3 normal = *optNormal;
-        normal = Math::Normalize(normal);
-        // Due to normal change our direction sample should be aligned as well
-        toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
-    }
     // Bring wO all the way to the tangent space
     Vector3 V = toTangentSpace.ApplyRotation(wO);
     Vector3 L, H;
@@ -686,13 +681,6 @@ Float UnrealMaterial<SC>::Pdf(const Ray& wI,
     Float avgAlbedo = albedo.Sum() * Float(0.3333);
     // Microfacet dist functions are all in tangent space
     Quaternion toTangentSpace = surface.shadingTBN;
-    if(optNormal)
-    {
-        Vector3 normal = *optNormal;
-        normal = Math::Normalize(normal);
-        // Due to normal change our direction sample should be aligned as well
-        toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
-    }
     // Bring wO, wI all the way to the tangent space
     Vector3 V = toTangentSpace.ApplyRotation(wO);
     Vector3 L = toTangentSpace.ApplyRotation(wI.dir);
@@ -720,17 +708,9 @@ MR_GF_DEF
 BxDFEval UnrealMaterial<SC>::Evaluate(const Ray& wI, const Vector3& wO) const
 {
     using namespace Distribution;
-    // Get the data first
     Float alpha = roughness * roughness;
     // Microfacet dist functions are all in tangent space
     Quaternion toTangentSpace = surface.shadingTBN;
-    if(optNormal)
-    {
-        Vector3 normal = *optNormal;
-        normal = Math::Normalize(normal);
-        // Due to normal change our direction sample should be aligned as well
-        toTangentSpace = Quaternion::RotationBetweenZAxis(normal).Conjugate() * toTangentSpace;
-    }
     // Bring wO, wI all the way to the tangent space
     Vector3 V = toTangentSpace.ApplyRotation(wO);
     Vector3 L = toTangentSpace.ApplyRotation(wI.dir);

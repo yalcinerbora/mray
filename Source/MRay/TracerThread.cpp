@@ -227,42 +227,6 @@ MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPa
             }
             tracer->PushRendererAttribute(currentRenderer, attribIndex,
                                           std::move(tData));
-
-            // MRayError e = dataType.SwitchCase([&, this](auto&& t) -> MRayError
-            // {
-            //     using enum AttributeOptionality;
-            //     using MRDataType = std::remove_cvref_t<decltype(t)>;
-            //     using T = MRDataType::Type;
-            //     auto loc = rendererNode.find(name);
-            //     if(optionality != MR_OPTIONAL && loc == rendererNode.end())
-            //         return MRayError("Config read \"{}\": Mandatory variable \"{}\" "
-            //                          "for \"{}\" is not found in config file",
-            //                          configJsonPath, name, rName);
-            //     if(loc == rendererNode.end()) return MRayError::OK;
-
-            //     T in = loc->get<T>();
-            //     if constexpr(MRDataType::Name == MRayDataEnum::MR_STRING)
-            //     {
-            //         TransientData data(std::in_place_type_t<T>{}, in.size());
-            //         data.ReserveAll();
-            //         Span<char> out = data.AccessAsString();
-            //         std::copy(in.cbegin(), in.cend(), out.begin());
-            //         tracer->PushRendererAttribute(currentRenderer, attribIndex,
-            //                                       std::move(data));
-            //     }
-            //     else
-            //     {
-            //         TransientData data(std::in_place_type_t<T>{}, 1);
-            //         data.Push(Span<const T>(&in, 1));
-            //         tracer->PushRendererAttribute(currentRenderer, attribIndex,
-            //                                       std::move(data));
-            //     }
-            //     return MRayError::OK;
-            // });
-            // if(e) return e;
-
-
-
             attribIndex++;
         }
     }

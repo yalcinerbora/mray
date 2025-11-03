@@ -388,6 +388,7 @@ MR_HF_DEF
 void Triangle<T>::GenerateSurface(EmptySurface&,
                                   RayConeSurface& rayConeSurface,
                                   // Inputs
+                                  const NormalMap&,
                                   const Hit&,
                                   const Ray&,
                                   const RayCone& rayCone) const
@@ -405,6 +406,7 @@ MR_HF_DEF
 void Triangle<T>::GenerateSurface(BasicSurface& result,
                                   RayConeSurface& rayConeSurface,
                                   // Inputs
+                                  const NormalMap&,
                                   const Hit& hit,
                                   const Ray& ray,
                                   const RayCone& rayCone) const
@@ -438,10 +440,11 @@ void Triangle<T>::GenerateSurface(BasicSurface& result,
 }
 
 template<TransformContextC T>
-MR_HF_DEF
+MR_GF_DEF
 void Triangle<T>::GenerateSurface(DefaultSurface& result,
                                   RayConeSurface& rayConeSurface,
                                   // Inputs
+                                  const NormalMap& normalMap,
                                   const Hit& hit,
                                   const Ray& ray,
                                   const RayCone& rayCone) const
@@ -563,6 +566,12 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     };
     Vector2 dpdx = TexGradient(a1);
     Vector2 dpdy = TexGradient(a2);
+
+    if(normalMap)
+    {
+        Vector3 normal = Math::Normalize((*normalMap)(uv, dpdx, dpdy));
+        tbn = Quaternion::RotationBetweenZAxis(normal).Conjugate() * tbn;
+    }
 
     // Geometry Discretization Compensation
     // This is shelved, I try to compensate for extreme geometry changes

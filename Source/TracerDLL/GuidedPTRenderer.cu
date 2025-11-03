@@ -180,7 +180,7 @@ GuidedPTRenderer::GuidedPTRenderer(const RenderImagePtr& rb,
     : Base(rb, tv, tp, s, wp, TypeName())
     , metaLightArray(s)
     , hashGrid(s)
-    , rendererGlobalMem(s.AllGPUs(), 128_MiB, 512_MiB)
+    , rendererGlobalMem(s.AllGPUs(), 128_MiB, 1024_MiB)
     , saveImage(true)
 {}
 
@@ -194,65 +194,93 @@ RendererOptionPack
 GuidedPTRenderer::CurrentAttributes() const
 {
     RendererOptionPack result;
-    //result.paramTypes = AttributeInfo();
-    ////
-    //result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
-    //result.attributes.back().Push(Span<const uint32_t>(&currentOptions.totalSPP, 1));
-    ////
-    //result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
-    //result.attributes.back().Push(Span<const uint32_t>(&currentOptions.burstSize, 1));
-    ////
-    //std::string_view curRenderModeName = currentOptions.renderMode.ToString();
-    //result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
-    //                                          curRenderModeName.size()));
-    //auto svRead = result.attributes.back().AccessAsString();
-    //assert(svRead.size() == curRenderModeName.size());
-    //std::copy(curRenderModeName.cbegin(), curRenderModeName.cend(), svRead.begin());
-    ////
-    //std::string_view curModeName = currentOptions.sampleMode.ToString();
-    //result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
-    //                                          curModeName.size()));
-    //svRead = result.attributes.back().AccessAsString();
-    //assert(svRead.size() == curModeName.size());
-    //std::copy(curModeName.cbegin(), curModeName.cend(), svRead.begin());
-    ////
-    //result.attributes.push_back(TransientData(std::in_place_type_t<Vector2>{}, 1));
-    //result.attributes.back().Push(Span<const Vector2ui>(&currentOptions.russianRouletteRange, 1));
-    ////
-    //std::string_view lightSamplerName = currentOptions.lightSampler.ToString();
-    //result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{}, lightSamplerName.size()));
-    //svRead = result.attributes.back().AccessAsString();
-    //assert(svRead.size() == lightSamplerName.size());
-    //std::copy(lightSamplerName.cbegin(), lightSamplerName.cend(), svRead.begin());
-    ////
-    //if constexpr(MRAY_IS_DEBUG)
-    //{
-    //    for([[maybe_unused]] const auto& d: result.attributes)
-    //        assert(d.IsFull());
-    //}
+    result.paramTypes = AttributeInfo();
+
+    auto Push = [&result]<class T>(const T& in)
+    {
+        using LT = std::in_place_type_t<T>;
+        result.attributes.push_back(TransientData(LT{}, 1));
+        result.attributes.back().Push(Span<const T>(&in, 1));
+    };
+    auto PushEnum = [&result]<class T>(const T& in)
+    {
+        using LT = std::in_place_type_t<std::string_view>;
+        std::string_view name = in.ToString();
+        result.attributes.push_back(TransientData(LT{}, name.size()));
+        auto buffer = result.attributes.back().AccessAsString();
+        assert(buffer.size() == name.size());
+        std::copy(name.cbegin(), name.cend(), buffer.begin());
+    };
+
+    Push(currentOptions.cacheEntryLimit);
+    Push(currentOptions.cachePosBits);
+    Push(currentOptions.cacheNormalBits);
+    Push(currentOptions.cacheLevelCount);
+    Push(currentOptions.cacheConeAperture);
+    Push(currentOptions.russianRouletteRange);
+    Push(currentOptions.totalSPP);
+    PushEnum(currentOptions.lightSampler);
+    PushEnum(currentOptions.renderMode);
+    Push(currentOptions.lobeProbablity);
+    PushEnum(currentOptions.displayMode);
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        for([[maybe_unused]] const auto& d: result.attributes)
+            assert(d.IsFull());
+    }
     return result;
 }
 
 void GuidedPTRenderer::PushAttribute(uint32_t attributeIndex,
                                      TransientData data, const GPUQueue&)
 {
-    //switch(attributeIndex)
-    //{
-    //    case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
-    //    case 1: newOptions.burstSize = data.AccessAs<uint32_t>()[0]; break;
-    //    case 2: newOptions.renderMode = RenderMode(std::as_const(data).AccessAsString()); break;
-    //    case 3: newOptions.sampleMode = PathTraceRDetail::SampleMode(std::as_const(data).AccessAsString()); break;
-    //    case 4: newOptions.russianRouletteRange = data.AccessAs<Vector2ui>()[0]; break;
-    //    case 5: newOptions.lightSampler = LightSamplerType(std::as_const(data).AccessAsString()); break;
-    //    default:
-    //        throw MRayError("{} Unknown attribute index {}", TypeName(), attributeIndex);
-    //}
+    auto Load = []<class T>(T & out, const TransientData & data)
+    {
+        out = data.AccessAs<T>()[0];
+    };
+
+    switch(attributeIndex)
+    {
+        case  0: Load(newOptions.cacheEntryLimit, data); break;
+        case  1: Load(newOptions.cachePosBits, data); break;
+        case  2: Load(newOptions.cacheNormalBits, data); break;
+        case  3: Load(newOptions.cacheLevelCount, data); break;
+        case  4: Load(newOptions.cacheConeAperture, data); break;
+        //
+        case  5: Load(newOptions.russianRouletteRange, data); break;
+        case  6: Load(newOptions.totalSPP, data); break;
+        case  7: newOptions.lightSampler = LightSamplerType(std::as_const(data).AccessAsString()); break;
+        case  8: newOptions.renderMode = RenderMode(std::as_const(data).AccessAsString()); break;
+        case  9: Load(newOptions.burstSize, data); break;
+        case 10: Load(newOptions.lobeProbablity, data); break;
+        case 11: newOptions.displayMode = DisplayMode(std::as_const(data).AccessAsString()); break;
+        default:
+            throw MRayError("{} Unknown attribute index {}", TypeName(), attributeIndex);
+    }
 }
 
 uint32_t
 GuidedPTRenderer::FindMaxSamplePerIteration(uint32_t rayCount)
 {
-    return 0;
+    uint32_t camSample = curCamWork->StochasticFilterSampleRayRNList().TotalRNCount();
+    uint32_t spectrumSample = (spectrumContext)
+                ? spectrumContext->SampleSpectrumRNList().TotalRNCount()
+                : 0u;
+
+    uint32_t maxSample = Math::Max(camSample, spectrumSample);
+    maxSample = std::transform_reduce
+    (
+        currentWorks.cbegin(), currentWorks.cend(), maxSample,
+        [](uint32_t l, uint32_t r) -> uint32_t
+        {
+            return Math::Max(l, r);
+        },
+        [](const auto& renderWorkStruct) -> uint32_t
+        {
+            return renderWorkStruct.workPtr->SampleRNList(0).TotalRNCount();
+        }
+    );
+    return rayCount * maxSample;
 }
 
 Span<RayIndex>
@@ -262,10 +290,10 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     assert(sppLimit != 0);
 
     // Create RNG state for each ray
-    Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
     rnGenerator->SetupRange(imageTiler.LocalTileStart(),
                             imageTiler.LocalTileEnd(),
                             processQueue);
+    Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
 
     RayState dRayState = RayState
     {
@@ -387,41 +415,40 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     //
     // Clear locks
     // TODO: Memset or indirect update via kernel? (which one as less elements?)
-    processQueue.MemsetAsync(dMCLocks, 0x00);
-    // Indirect irradiance backpropogation (as well as updater selection)
-    processQueue.IssueWorkKernel<KCBackpropagateIrradiance>
-    (
-        "KCBackpropagateIrradiance",
-        DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
-        //
-        dPrevPathReflectanceOrOutRadiance,
-        globalState,
-        dBackupRNGStates,
-        dLiftedMCIndices,
-        dScoreSums,
-        dHitKeys,
-        dRays,
-        dIndices
-    );
-    processQueue.IssueWorkKernel<KCUpdateMarkovChains>
-    (
-        "KCUpdateMarkovChains",
-        DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
-        //
-        globalState,
-        dPrevPathReflectanceOrOutRadiance,
-        dLiftedMCIndices,
-        dHitKeys,
-        dRays,
-        dIndices
-    );
+    //processQueue.MemsetAsync(dMCLocks, 0x00);
+    //// Indirect irradiance backpropogation (as well as updater selection)
+    //processQueue.IssueWorkKernel<KCBackpropagateIrradiance>
+    //(
+    //    "KCBackpropagateIrradiance",
+    //    DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
+    //    //
+    //    dPrevPathReflectanceOrOutRadiance,
+    //    globalState,
+    //    dBackupRNGStates,
+    //    dLiftedMCIndices,
+    //    dScoreSums,
+    //    dHitKeys,
+    //    dRays,
+    //    dIndices
+    //);
+    //processQueue.IssueWorkKernel<KCUpdateMarkovChains>
+    //(
+    //    "KCUpdateMarkovChains",
+    //    DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
+    //    //
+    //    globalState,
+    //    dPrevPathReflectanceOrOutRadiance,
+    //    dLiftedMCIndices,
+    //    dHitKeys,
+    //    dRays,
+    //    dIndices
+    //);
 
     // TODO: Do we need this?
     // Clear the shadow ray stuff
     processQueue.MemsetAsync(dShadowRayRadiance, 0x00);
     processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
     processQueue.MemsetAsync(dShadowRays, 0x00);
-
     //
     IssueWorkKernelsToPartitions<This>
     (
@@ -475,17 +502,20 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     );
 
     // Accumulate the pre-calculated radiance selectively
-    processQueue.IssueWorkKernel<KCAccumulateShadowRays>
-    (
-        "KCAccumulateShadowRays",
-        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
-        //
-        dPathRadiance,
-        ToConstSpan(dShadowRayRadiance),
-        ToConstSpan(dIsVisibleBitSpan),
-        ToConstSpan(dPathDataPack),
-        currentOptions.russianRouletteRange
-    );
+    //processQueue.IssueWorkKernel<KCAccumulateShadowRays>
+    //(
+    //    "KCAccumulateShadowRays",
+    //    DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+    //    //
+    //    dPathRadiance,
+    //    ToConstSpan(dShadowRayRadiance),
+    //    ToConstSpan(dIsVisibleBitSpan),
+    //    ToConstSpan(dPathDataPack),
+    //    currentOptions.russianRouletteRange,
+    //    1u
+    //);
+
+    // TODO: Backprop the shadow ray radiance as well
 
     return dIndices;
 }
@@ -507,6 +537,22 @@ GuidedPTRenderer::DoThroughputSingleTileRender(const GPUDevice& device,
             imageTiler.TileCount(),
             processQueue
         );
+
+        // TODO: We need a proper camera position acquisiton
+        // system sometime later. (It can be useful like scene AABB)
+        Vector3 camPos;
+        cameraWork.GenCameraPosition(Span<Vector3, 1>(dCamPosBuffer),
+                                     dSubCameraBuffer,
+                                     curCamTransformKey,
+                                     processQueue);
+        processQueue.MemcpyAsync(Span<Vector3>(&camPos, 1), ToConstSpan(dCamPosBuffer));
+        processQueue.MemsetAsync(dMCCounts, 0x00);
+        processQueue.MemsetAsync(dMCStates, 0x00);
+        processQueue.MemsetAsync(dMCIrradiances, 0x00);
+        hashGrid.ClearAllEntries(processQueue);
+
+        processQueue.Barrier().Wait();
+        hashGrid.SetCameraPos(camPos);
     }
 
     // ====================== //
@@ -587,6 +633,25 @@ GuidedPTRenderer::DoLatencyRender(uint32_t passCount,
         tileCount2D,
         processQueue
     );
+    // New camera so reset hash grid
+    if(totalIterationCount == 0)
+    {
+        // TODO: We need a proper camera position acquisiton
+        // system sometime later. (It can be useful like scene AABB)
+        Vector3 camPos;
+        cameraWork.GenCameraPosition(Span<Vector3, 1>(dCamPosBuffer),
+                                     dSubCameraBuffer,
+                                     curCamTransformKey,
+                                     processQueue);
+        processQueue.MemcpyAsync(Span<Vector3>(&camPos, 1), ToConstSpan(dCamPosBuffer));
+        processQueue.MemsetAsync(dMCCounts, 0x00);
+        processQueue.MemsetAsync(dMCStates, 0x00);
+        processQueue.MemsetAsync(dMCIrradiances, 0x00);
+        hashGrid.ClearAllEntries(processQueue);
+
+        processQueue.Barrier().Wait();
+        hashGrid.SetCameraPos(camPos);
+    }
 
     // We are waiting too early here,
     // We should wait at least on the first render buffer write
@@ -625,7 +690,6 @@ GuidedPTRenderer::DoLatencyRender(uint32_t passCount,
             deadAlivePartitionOut.Spanify();
 
         AddRadianceToRenderBufferLatency(dDeadRayIndices, processQueue);
-        //CopyAliveRays(dAliveRayIndices, processQueue);
 
         assert(dInvalidRayIndices.size() == 0);
         invalidRayCount += (static_cast<uint32_t>(dDeadRayIndices.size()));
@@ -681,7 +745,7 @@ GuidedPTRenderer::DoLatencyRender(uint32_t passCount,
 RenderBufferInfo
 GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
                               CamSurfaceId camSurfId,
-                              uint32_t customLogicIndex0,
+                              uint32_t,
                               uint32_t)
 {
     currentOptions = newOptions;
@@ -723,6 +787,19 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
     }
 
     // ========================= //
+    //         Hash Grid         //
+    // ========================= //
+    hashGrid.Reset(tracerView.baseAccelerator.SceneAABB(),
+                   // We do not know te cam pos yet,
+                   Vector3::Zero(),
+                   currentOptions.cachePosBits,
+                   currentOptions.cacheNormalBits,
+                   currentOptions.cacheLevelCount,
+                   currentOptions.cacheConeAperture,
+                   currentOptions.cacheEntryLimit,
+                   queue);
+
+    // ========================= //
     //   Path State Allocation   //
     // ========================= //
     // You can see why wavefront approach uses
@@ -757,7 +834,8 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
             dMCStates, dMCLocks,
             dMCCounts, dMCIrradiances,
             //
-            dSubCameraBuffer
+            dSubCameraBuffer,
+            dCamPosBuffer
         ),
         rendererGlobalMem,
         {
@@ -779,7 +857,8 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
             hashGridEntryCount, hashGridEntryCount,
             hashGridEntryCount, hashGridEntryCount,
             //
-            RendererBase::SUB_CAMERA_BUFFER_SIZE
+            RendererBase::SUB_CAMERA_BUFFER_SIZE,
+            size_t(1)
         }
     );
     MetaLightListConstructionParams mlParams =
@@ -807,11 +886,10 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
         .totalSize = bufferPtrAndSize.second,
         .renderColorSpace = colorSpace,
         .resolution = imageTiler.FullResolution(),
-        .curRenderLogic0 = std::numeric_limits<uint32_t>::max(),//
+        .curRenderLogic0 = std::numeric_limits<uint32_t>::max(),
         .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
     };
 }
-
 
 void GuidedPTRenderer::StopRender()
 {
@@ -836,14 +914,21 @@ GuidedPTRenderer::StaticAttributeInfo()
     using enum MRayDataEnum;
     using enum AttributeIsArray;
     using enum AttributeOptionality;
+
     return AttribInfoList
     {
-        {"totalSPP",        MRayDataTypeRT(MR_UINT32),      IS_SCALAR, MR_MANDATORY},
-        {"burstSize",       MRayDataTypeRT(MR_UINT32),      IS_SCALAR, MR_OPTIONAL},
-        {"renderMode",      MRayDataTypeRT(MR_STRING),      IS_SCALAR, MR_MANDATORY},
-        {"sampleMode",      MRayDataTypeRT(MR_STRING),      IS_SCALAR, MR_MANDATORY},
-        {"rrRange",         MRayDataTypeRT(MR_VECTOR_2UI),  IS_SCALAR, MR_MANDATORY},
-        {"neeSamplerType",  MRayDataTypeRT(MR_STRING),      IS_SCALAR, MR_MANDATORY}
+        {"cacheEntryLimit",   MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
+        {"cachePosBits",      MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
+        {"cacheNormalBits",   MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
+        {"cacheLevelCount",   MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
+        {"cacheConeAperture", MRayDataTypeRT(MR_FLOAT),      IS_SCALAR, MR_OPTIONAL },
+        {"rrRange",           MRayDataTypeRT(MR_VECTOR_2UI), IS_SCALAR, MR_MANDATORY},
+        {"totalSPP",          MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_MANDATORY},
+        {"lightSampler",      MRayDataTypeRT(MR_STRING),     IS_SCALAR, MR_OPTIONAL },
+        {"renderMode",        MRayDataTypeRT(MR_STRING),     IS_SCALAR, MR_MANDATORY},
+        {"burstSize",         MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
+        {"lobeProbability",   MRayDataTypeRT(MR_FLOAT),      IS_SCALAR, MR_OPTIONAL },
+        {"displayMode",       MRayDataTypeRT(MR_STRING),     IS_SCALAR, MR_MANDATORY},
     };
 }
 

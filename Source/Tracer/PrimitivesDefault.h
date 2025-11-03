@@ -8,6 +8,9 @@
 #include "PrimitiveC.h"
 #include "TransformsDefault.h"
 #include "Random.h"
+#include "TextureView.h"
+
+using NormalMap = Optional<TracerTexView<2, Vector3>>;
 
 namespace DefaultSphereDetail
 {
@@ -69,6 +72,7 @@ namespace DefaultSphereDetail
         MR_HF_DECL void GenerateSurface(EmptySurface&,
                                         RayConeSurface&,
                                         // Inputs
+                                        const NormalMap&,
                                         const Hit&,
                                         const Ray&,
                                         const RayCone&) const;
@@ -76,13 +80,15 @@ namespace DefaultSphereDetail
         MR_HF_DECL void GenerateSurface(BasicSurface&,
                                         RayConeSurface&,
                                         // Inputs
+                                        const NormalMap&,
                                         const Hit&,
                                         const Ray&,
                                         const RayCone&) const;
 
-        MR_HF_DECL void GenerateSurface(DefaultSurface&,
+        MR_GF_DECL void GenerateSurface(DefaultSurface&,
                                         RayConeSurface&,
                                         // Inputs
+                                        const NormalMap&,
                                         const Hit&,
                                         const Ray&,
                                         const RayCone&) const;

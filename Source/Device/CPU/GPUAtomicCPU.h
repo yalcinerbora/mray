@@ -50,9 +50,9 @@ T EmulateAtomicOp(T& address, Func&& F)
     // is_lock_free is runtime thing on c++ also CUDA etc
     // only have 16, 32, 64 bit (later ones have 128-bit)
     // atomics. So this will make it is comparable.
-    static_assert(!std::is_same_v<IntegralOf<T>::type, void>);
+    static_assert(!std::is_same_v<typename IntegralOf<T>::type, void>);
 
-    std::atomic_ref<T> ref(t);
+    std::atomic_ref<T> ref(address);
     T expected = ref.load();
     T result;
     do

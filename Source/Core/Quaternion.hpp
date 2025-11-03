@@ -180,12 +180,21 @@ MR_PF_DEF T Quat<T>::Dot(const Quat& right) const noexcept
 template<FloatC T>
 MR_PF_DEF Vector<3, T> Quat<T>::ApplyRotation(const Vector<3, T>& vtor) const noexcept
 {
-    // q * v * qInv
-    Quat qInv = Conjugate();
-    Quat vtorQ(0.0f, vtor[0], vtor[1], vtor[2]);
+    // Old version
+    //// q * v * qInv
+    //Quat qInv = Conjugate();
+    //Quat vtorQ(0.0f, vtor[0], vtor[1], vtor[2]);
+    //Quat result((*this) * (vtorQ * qInv));
+    //return Vector<3, T>(result[1], result[2], result[3]);
 
-    Quat result((*this) * (vtorQ * qInv));
-    return Vector<3, T>(result[1], result[2], result[3]);
+    // Optimized version
+    // https://gamedev.stackexchange.com/questions/28395/rotating-vector3-by-a-quaternion
+    T s = v[0];
+    Vector<3, T> u = Vector<3, T>(v[1], v[2], v[3]);
+    Vector<3, T> r = T(2) * Math::Dot(u, vtor) * u;
+    r += (s * s - Math::Dot(u, u)) * vtor;
+    r += T(2) * s * Math::Cross(u, vtor);
+    return r;
 }
 
 template<FloatC T>

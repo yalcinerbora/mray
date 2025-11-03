@@ -59,7 +59,8 @@ void KCAccumulateShadowRays(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut
                             MRAY_GRID_CONSTANT const Span<const Spectrum> dShadowRayRadiance,
                             MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer,
                             MRAY_GRID_CONSTANT const Span<const PathDataPack> dPathDataPack,
-                            MRAY_GRID_CONSTANT const Vector2ui rrRange)
+                            MRAY_GRID_CONSTANT const Vector2ui rrRange,
+                            MRAY_GRID_CONSTANT const uint32_t depthOffset)
 {
     KernelCallParams kp;
     uint32_t shadowRayCount = static_cast<uint32_t>(dShadowRayRadiance.size());
@@ -69,8 +70,7 @@ void KCAccumulateShadowRays(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut
 
         using enum RayType;
         bool isShadowRay = (dataPack.type == SHADOW_RAY);
-        // +2 is correct here, we did not increment the depth yet
-        bool inDepthLimit = ((dataPack.depth + 2u) <= rrRange[1]);
+        bool inDepthLimit = ((dataPack.depth + depthOffset) <= rrRange[1]);
         if(inDepthLimit && isShadowRay && dIsVisibleBuffer[i])
             dRadianceOut[i] += dShadowRayRadiance[i];
     }

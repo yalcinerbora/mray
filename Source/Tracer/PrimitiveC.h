@@ -12,6 +12,9 @@
 #include "TracerTypes.h"
 #include "TransformsDefault.h"
 #include "GenericGroup.h"
+#include "TextureView.h"
+
+using NormalMap = Optional<TracerTexView<2, Vector3>>;
 
 // Transform types
 // This enumeration is tied to a primitive group
@@ -44,6 +47,7 @@ using TransformContextGenFunc = TransformContext(*)(const TransformData&,
                                                     const PrimData&,
                                                     TransformKey,
                                                     PrimitiveKey);
+
 
 template <class PrimType, class TransformContext = typename PrimType::TransformContext>
 concept PrimitiveC = requires(PrimType pt,
@@ -203,6 +207,7 @@ concept PrimitiveWithSurfaceC = requires(PrimType mg,
     // signature to prevent partial updates
     // when non-derived function exists.
     {mg.GenerateSurface(surface, rcs,
+                        NormalMap{},
                         typename PrimType::Hit{},
                         Ray{},
                         RayCone{})

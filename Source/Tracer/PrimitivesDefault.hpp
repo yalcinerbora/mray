@@ -186,6 +186,7 @@ MR_HF_DEF
 void Sphere<T>::GenerateSurface(EmptySurface&,
                                 RayConeSurface& rayConeSurface,
                                 // Inputs
+                                const NormalMap&,
                                 const Hit&,
                                 const Ray&,
                                 const RayCone& rayCone) const
@@ -203,6 +204,7 @@ MR_HF_DEF
 void Sphere<T>::GenerateSurface(BasicSurface& result,
                                 RayConeSurface& rayConeSurface,
                                 // Inputs
+                                const NormalMap&,
                                 const Hit& hit,
                                 const Ray&,
                                 const RayCone& rayCone) const
@@ -217,10 +219,11 @@ void Sphere<T>::GenerateSurface(BasicSurface& result,
 }
 
 template<TransformContextC T>
-MR_HF_DEF
+MR_GF_DEF
 void Sphere<T>::GenerateSurface(DefaultSurface& result,
                                 RayConeSurface& rayConeSurface,
                                 // Inputs
+                                const NormalMap& normalMap,
                                 const Hit& hit,
                                 const Ray& ray,
                                 const RayCone& rayCone) const
@@ -229,8 +232,7 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
 
     // Convert spherical hit to cartesian
     Vector3 normal = Graphics::UnitSphericalToCartesian(hit);
-    Vector3 geoNormal = transform.ApplyN(normal);
-    geoNormal = Math::Normalize(geoNormal);
+    Vector3 geoNormal = Math::Normalize(transform.ApplyN(normal));
     // Calculate local position using the normal
     // then convert it to world position
     Vector3 position = center + normal * radius;
@@ -285,6 +287,11 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
     Vector2 dpdx = TexGradient(a1);
     Vector2 dpdy = TexGradient(a2);
 
+    if(normalMap)
+    {
+        Vector3 n = Math::Normalize((*normalMap)(uv, dpdx, dpdy));
+        tbn = Quaternion::RotationBetweenZAxis(n).Conjugate() * tbn;
+    }
     result = DefaultSurface
     {
         .position = position,

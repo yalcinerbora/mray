@@ -344,12 +344,21 @@ class HashGrid
                       uint32_t normalBits, uint32_t maxLevel,
                       Float coneApertureDegrees,
                       uint32_t maxEntryCount, const GPUQueue&);
+    void        SetCameraPos(Vector3 camLocation);
+    void        ClearAllEntries(const GPUQueue&);
+
 
     HashGridView View() const;
     size_t       GPUMemoryUsage() const;
     uint32_t     CalculateUsedGridCount(const GPUQueue&) const;
     uint32_t     EntryCapacity() const;
 };
+
+inline
+void HashGrid::SetCameraPos(Vector3 newCamLocation)
+{
+    camLocation = newCamLocation;
+}
 
 inline
 HashGridView HashGrid::View() const

@@ -19,7 +19,6 @@ namespace LambertMatDetail
     struct LambertMaterial
     {
         using Surface           = DefaultSurface;
-        using OptionalNormalMap = Optional<TracerTexView<2, Vector3>>;
         using AlbedoMap         = typename SpectrumContext:: template ParamVaryingAlbedo<2>;
         using SpectrumConverter = typename SpectrumContext::Converter;
         using DataSoA           = LambertMatData;
@@ -29,10 +28,12 @@ namespace LambertMatDetail
         private:
         const Surface&              surface;
         Spectrum                    albedo;
-        Optional<Vector3>           optNormal;
         MediumKeyPair               mediumKeys;
 
         public:
+        MR_GF_DECL
+        static NormalMap GetNormalMap(const DataSoA& soa, MaterialKey k);
+
         MR_GF_DECL
         LambertMaterial(const SpectrumConverter& sTransContext,
                         const Surface& surface,
@@ -77,6 +78,9 @@ namespace ReflectMatDetail
         MediumKeyPair  mediumKeys;
 
         public:
+        MR_GF_DECL
+        static NormalMap GetNormalMap(const DataSoA& soa, MaterialKey k);
+
         MR_GF_DECL
         ReflectMaterial(const SpectrumConverter& sTransContext,
                         const Surface& surface,
@@ -124,6 +128,9 @@ namespace RefractMatDetail
 
         public:
         MR_GF_DECL
+        static NormalMap GetNormalMap(const DataSoA& soa, MaterialKey k);
+
+        MR_GF_DECL
         RefractMaterial(const SpectrumConverter& sTransContext,
                         const Surface& surface,
                         const DataSoA& soa, MaterialKey mk);
@@ -167,7 +174,6 @@ namespace UnrealMatDetail
         using AlbedoMap         = typename SpectrumContext:: template ParamVaryingAlbedo<2>;
         using SpectrumConverter = typename SpectrumContext::Converter;
         using FloatMap          = ParamVaryingData<2, Float>;
-        using OptionalNormalMap = Optional<TracerTexView<2, Vector3>>;
         using DataSoA           = UnrealMatData;
         //
         static constexpr RNRequestList SampleRNList = GenRNRequestList<2, 1>();
@@ -175,7 +181,6 @@ namespace UnrealMatDetail
         private:
         const Surface&      surface;
         Spectrum            albedo;
-        Optional<Vector3>   optNormal;
         Float               roughness;
         Float               specular;
         Float               metallic;
@@ -189,6 +194,9 @@ namespace UnrealMatDetail
         Float ConvertProbHToL(Float VdH, Float pdfH) const;
 
         public:
+        MR_GF_DECL
+        static NormalMap GetNormalMap(const DataSoA& soa, MaterialKey k);
+
         MR_GF_DECL
         UnrealMaterial(const SpectrumConverter& sTransContext,
                        const Surface& surface,

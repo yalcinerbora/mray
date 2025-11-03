@@ -100,7 +100,7 @@ namespace MetaLightDetail
         RNRequestList worstCaseList;
         for(const RNRequestList& r : LIST_UNPACK)
         {
-            worstCaseList.CombineMax(r);
+            worstCaseList = worstCaseList.CombineMax(r);
         }
         return worstCaseList;
     }
@@ -113,9 +113,9 @@ namespace MetaLightDetail
         RNRequestList worstCaseList;
         for(const RNRequestList& r : LIST_UNPACK)
         {
-            worstCaseList.CombineMax(r);
+            worstCaseList = worstCaseList.CombineMax(r);
         }
-        return worstCaseList;     
+        return worstCaseList;
     }
 }
 

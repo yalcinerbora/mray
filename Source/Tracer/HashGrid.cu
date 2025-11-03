@@ -49,11 +49,15 @@ void HashGrid::Reset(AABB3 aabbIn, Vector3 camLocationIn,
     MemAlloc::AllocateMultiData(Tie(dSpatialCodes, dTransformReduceTempMem, dCountBuffer),
                                 mem, {htSize, tempMemSize, 1});
 
-    // Lets do some sanity check here to catch errors
+    ClearAllEntries(queue);
+}
+
+void HashGrid::ClearAllEntries(const GPUQueue& queue)
+{
+    // Sanity check
     static constexpr auto MEMSET_FILL_PATTERN = UINT64_MAX;
     static_assert(SpatioDirCode(MEMSET_FILL_PATTERN) == HashGridView::EMPTY_VAL);
     queue.MemsetAsync(dSpatialCodes, 0xFF);
-    queue.Barrier().Wait();
 }
 
 uint32_t HashGrid::CalculateUsedGridCount(const GPUQueue& queue) const

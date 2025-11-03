@@ -144,7 +144,8 @@ void KCAccumulateShadowRays(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut
                             MRAY_GRID_CONSTANT const Span<const Spectrum> dShadowRayRadiance,
                             MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer,
                             MRAY_GRID_CONSTANT const Span<const PathDataPack> dPathDataPack,
-                            MRAY_GRID_CONSTANT const Vector2ui rrRange);
+                            MRAY_GRID_CONSTANT const Vector2ui rrRange,
+                            MRAY_GRID_CONSTANT const uint32_t depthOffset);
 
 struct PathTracerRendererBase : public RendererBase
 {

@@ -265,13 +265,13 @@ void BaseAcceleratorEmbree::CastRays(// Output
                 // Rays
                 uint32_t rIndex = dRayIndices[rayStart + i];
                 auto[ray, tMM] = RayFromGMem(dRays, rIndex);
-                rh.ray.dir_x[i] = ray.Dir()[0];
-                rh.ray.dir_y[i] = ray.Dir()[1];
-                rh.ray.dir_z[i] = ray.Dir()[2];
+                rh.ray.dir_x[i] = ray.dir[0];
+                rh.ray.dir_y[i] = ray.dir[1];
+                rh.ray.dir_z[i] = ray.dir[2];
                 //
-                rh.ray.org_x[i] = ray.Pos()[0];
-                rh.ray.org_y[i] = ray.Pos()[1];
-                rh.ray.org_z[i] = ray.Pos()[2];
+                rh.ray.org_x[i] = ray.pos[0];
+                rh.ray.org_y[i] = ray.pos[1];
+                rh.ray.org_z[i] = ray.pos[2];
                 // Embree does not support negative
                 // tnear/tfar so check it
                 assert(tMM >= Vector2::Zero());
@@ -382,13 +382,13 @@ void BaseAcceleratorEmbree::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffe
                 // Rays
                 uint32_t rIndex = dRayIndices[rayStart + i];
                 auto[ray, tMM] = RayFromGMem(dRays, rIndex);
-                r.dir_x[i] = ray.Dir()[0];
-                r.dir_y[i] = ray.Dir()[1];
-                r.dir_z[i] = ray.Dir()[2];
+                r.dir_x[i] = ray.dir[0];
+                r.dir_y[i] = ray.dir[1];
+                r.dir_z[i] = ray.dir[2];
                 //
-                r.org_x[i] = ray.Pos()[0];
-                r.org_y[i] = ray.Pos()[1];
-                r.org_z[i] = ray.Pos()[2];
+                r.org_x[i] = ray.pos[0];
+                r.org_y[i] = ray.pos[1];
+                r.org_z[i] = ray.pos[2];
                 // Embree does not support negative
                 // tnear/tfar so check it
                 assert(tMM >= Vector2::Zero());
@@ -476,8 +476,8 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
             // Load the data to stack
             auto [ray, tMM] = RayFromGMem(dRays, rIndex);
             // We need to manually transform the ray here
-            Vector3 dir = transform * ray.Dir();
-            Vector3 pos = Vector3(transform * Vector4(ray.Pos(), Float(1)));
+            Vector3 dir = transform * ray.dir;
+            Vector3 pos = Vector3(transform * Vector4(ray.pos, Float(1)));
             //
             RTCRayHit rh = RTCRayHit{};
             rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;

@@ -168,9 +168,10 @@ struct RNGDispenserT
                                   uint32_t stride);
 
     template<uint32_t I>
-    MR_HF_DECL Float   NextFloat();
+    MR_HF_DECL Float   NextFloat() const;
     template<uint32_t I>
-    MR_HF_DECL Vector2 NextFloat2D();
+    MR_HF_DECL Vector2 NextFloat2D() const;
+    //
     MR_HF_DECL void    Advance(uint32_t offset);
 };
 
@@ -206,7 +207,7 @@ class RNRequestList
     MR_PF_DECL RNRequestList Append(uint32_t dimOfRequest) const;
     MR_PF_DECL RNRequestList Append(const RNRequestList&) const;
 
-    MR_PF_DECL_V void CombineMax(const RNRequestList&);
+    MR_PF_DECL RNRequestList CombineMax(const RNRequestList&) const;
 };
 
 // Convenience for constexpr generation
@@ -619,7 +620,7 @@ RNGDispenserT<T>::RNGDispenserT(Span<const T> numbers,
 template <std::unsigned_integral T>
 template<uint32_t I>
 MR_HF_DEF
-Float RNGDispenserT<T>::NextFloat()
+Float RNGDispenserT<T>::NextFloat() const
 {
     assert((globalId + I * stride) < randomNumbers.size());
     uint32_t xi0 = randomNumbers[globalId + I * stride];
@@ -630,7 +631,7 @@ Float RNGDispenserT<T>::NextFloat()
 template <std::unsigned_integral T>
 template<uint32_t I>
 MR_HF_DEF
-Vector2 RNGDispenserT<T>::NextFloat2D()
+Vector2 RNGDispenserT<T>::NextFloat2D() const
 {
     assert((globalId + (I + 1) * stride) < randomNumbers.size());
     uint32_t xi0 = randomNumbers[globalId + (I    ) * stride];
@@ -638,6 +639,13 @@ Vector2 RNGDispenserT<T>::NextFloat2D()
 
     return Vector2(RNGFunctions::ToFloat01<Float>(xi0),
                    RNGFunctions::ToFloat01<Float>(xi1));
+}
+
+template <std::unsigned_integral T>
+MR_HF_DEF
+void RNGDispenserT<T>::Advance(uint32_t delta)
+{
+    globalId = globalId + delta * stride;
 }
 
 MR_PF_DEF
@@ -692,8 +700,8 @@ RNRequestList RNRequestList::Append(const RNRequestList& other) const
     return result;
 }
 
-MR_PF_DEF_V
-void RNRequestList::CombineMax(const RNRequestList& r)
+MR_PF_DEF
+RNRequestList RNRequestList::CombineMax(const RNRequestList& r) const
 {
     // Given "this" and another RN request list
     // find the maximum required random numbers that does not
@@ -709,7 +717,7 @@ void RNRequestList::CombineMax(const RNRequestList& r)
                                       r.DimensionOfRequest(i));
         newList = newList.Append(localMax);
     }
-    *this = newList;
+    return newList;
 }
 
 template<uint32_t... Is>

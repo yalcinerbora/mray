@@ -370,7 +370,9 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
             ToConstSpan(dShadowRayRadiance),
             ToConstSpan(dIsVisibleBitSpan),
             ToConstSpan(dPathDataPack),
-            currentOptions.russianRouletteRange
+            currentOptions.russianRouletteRange,
+            // +2 is correct here, we did not increment the depth yet
+            2u
         );
 
         // Do the actual kernel

@@ -165,10 +165,10 @@ void WorkFunction<P, M, T, SC>::Call(const Primitive&, const Material& mat, cons
     // Sample Material  //
     // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.common.dRays, rayIndex);
-    Vector3 wO = Math::Normalize(tContext.InvApplyN(-rayIn.dir));
+    Vector3 wO = Math::Normalize(tContext.InvApplyV(-rayIn.dir));
     RayConeSurface rConeRefract = mat.RefractRayCone(surfRayCone, wO);
     BxDFSample raySample = mat.SampleBxDF(wO, rng);
-    raySample.wI.dir = Math::Normalize(tContext.ApplyN(raySample.wI.dir));
+    raySample.wI.dir = Math::Normalize(tContext.ApplyV(raySample.wI.dir));
 
     Spectrum throughput = params.rayState.dThroughput[rayIndex];
     throughput *= raySample.eval.reflectance;
@@ -313,7 +313,7 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
     //       NEE        //
     // ================ //
     auto [rayIn, tMM] = RayFromGMem(params.common.dRays, rayIndex);
-    Vector3 wO = Math::Normalize(-tContext.InvApplyN(rayIn.dir));
+    Vector3 wO = Math::Normalize(tContext.InvApplyV(-rayIn.dir));
     const LightSampler& lightSampler = params.globalState.lightSampler;
     Vector3 worldPos = surf.position;
     RayConeSurface refractedRayCone = mat.RefractRayCone(surfRayCone, wO);
@@ -322,6 +322,7 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
                                                        refractedRayCone);
     auto [shadowRay, shadowTMM] = lightSample.value.SampledRay(worldPos);
     Ray wI = tContext.InvApply(shadowRay);
+
 
     BxDFEval matEval = mat.Evaluate(wI, wO);
     Spectrum reflectance = matEval.reflectance;
@@ -333,7 +334,7 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
     if(params.globalState.sampleMode == SampleMode::E::NEE_WITH_MIS)
     {
         using Distribution::MIS::BalanceCancelled;
-        Float bxdfPdf = mat.Pdf(shadowRay, wO);
+        Float bxdfPdf = mat.Pdf(wI, wO);
         std::array<Float, 2> pdfs = {bxdfPdf, lightSample.pdf};
         std::array<Float, 2> weights = {1, 1};
         pdf = BalanceCancelled<2>(pdfs, weights);
