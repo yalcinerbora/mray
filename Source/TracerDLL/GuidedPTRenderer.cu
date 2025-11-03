@@ -328,7 +328,7 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
         .russianRouletteRange = currentOptions.russianRouletteRange,
         .specContextData      = typedSpectrumContext.GetData(),
         .lightSampler         = lightSampler,
-        .lobeProbability      = Float(0.5),
+        .lobeProbability      = currentOptions.lobeProbablity,
         // Hash Grid and Data
         .hashGrid             = hashGrid.View(),
         .dMCStates            = dMCStates,
@@ -502,18 +502,18 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     );
 
     // Accumulate the pre-calculated radiance selectively
-    //processQueue.IssueWorkKernel<KCAccumulateShadowRays>
-    //(
-    //    "KCAccumulateShadowRays",
-    //    DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
-    //    //
-    //    dPathRadiance,
-    //    ToConstSpan(dShadowRayRadiance),
-    //    ToConstSpan(dIsVisibleBitSpan),
-    //    ToConstSpan(dPathDataPack),
-    //    currentOptions.russianRouletteRange,
-    //    1u
-    //);
+    processQueue.IssueWorkKernel<KCAccumulateShadowRays>
+    (
+        "KCAccumulateShadowRays",
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        //
+        dPathRadiance,
+        ToConstSpan(dShadowRayRadiance),
+        ToConstSpan(dIsVisibleBitSpan),
+        ToConstSpan(dPathDataPack),
+        currentOptions.russianRouletteRange,
+        1u
+    );
 
     // TODO: Backprop the shadow ray radiance as well
 
