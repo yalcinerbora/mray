@@ -16,6 +16,7 @@ concept SpectrumConverterC = requires(const C cConst,
     {cConst.Wavelengths()} -> std::same_as<SpectrumWaves>;
     {c.DisperseWaves()} -> std::same_as<void>;
     {cConst.StoreWaves()} -> std::same_as<void>;
+    {cConst.IsDispersed()} -> std::same_as<bool>;
 
     // TODO: Why this does not work?
     // ====================
@@ -132,6 +133,7 @@ struct SpectrumConverterIdentity
     MR_PF_DECL SpectrumWaves Wavelengths() const noexcept;
     MR_PF_DECL_V void DisperseWaves() const noexcept;
     MR_PF_DECL_V void StoreWaves() const noexcept;
+    MR_PF_DECL   bool IsDispersed() const noexcept;
     // By design the identity converter is RGB
     // (MRay holds every texture, value etc. as RGB)
     static constexpr bool IsRGB = true;
@@ -260,6 +262,12 @@ void SpectrumConverterIdentity::DisperseWaves() const noexcept
 MR_PF_DEF_V
 void SpectrumConverterIdentity::StoreWaves() const noexcept
 {}
+
+MR_PF_DEF
+bool SpectrumConverterIdentity::IsDispersed() const noexcept
+{
+    return false;
+}
 
 static_assert(SpectrumConverterC<SpectrumConverterIdentity>,
               "\"SpectrumConverterIdentity\" do not satisfy \"SpectrumConverterC\" concept.");

@@ -118,6 +118,7 @@ namespace RNGFunctions
         // TODO: is there a way to prevent this min?
         return Math::Min(float(v) * SCALE, PREV_FLOAT);
     }
+
 }
 
 namespace SobolDetail
@@ -267,6 +268,32 @@ class PermutedCG32
 
 using BackupRNG = PermutedCG32;
 using BackupRNGState = typename PermutedCG32::State;
+
+// Helpers to generate random numbers from backup state
+// This is rarely useful while debugging etc.
+// GuidedPT uses this to regenerate rays while
+// debug display (To not interfere with the quality RNG).
+namespace RNGFunctions
+{
+    MRAY_HOST
+    void GenerateNumbersFromBackup(// Output
+                                   Span<RandomNumber> dRNOut,
+                                   // I-O
+                                   Span<BackupRNGState> dBackupRNGStates,
+                                   // Constants
+                                   uint32_t rnCount,
+                                   const GPUQueue&);
+    MRAY_HOST
+    void GenRandomNumbersFromBackupIndirect(// Output
+                                            Span<RandomNumber> dRNOut,
+                                            // I-O
+                                            Span<BackupRNGState> dBackupRNGStates,
+                                            // Input
+                                            Span<const RayIndex> dIndices,
+                                            // Constants
+                                            uint32_t rnCount,
+                                            const GPUQueue&);
+}
 
 // Renderers store path dimension states on their own
 // Mostly as a uint16_t buffer

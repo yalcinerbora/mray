@@ -64,3 +64,17 @@ void KCGenerateCamRaysStochastic(// Output (Only dRayIndices pointed data should
                                  MRAY_GRID_CONSTANT const uint64_t globalRegionIndex,
                                  MRAY_GRID_CONSTANT const Vector2ui regionCount,
                                  MRAY_GRID_CONSTANT const FilterType Filter);
+
+template<CameraC Camera, TransformGroupC TransG>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCReconstructCameraRays(// Output (Only dRayIndices pointed data should be written)
+                             MRAY_GRID_CONSTANT const Span<RayCone> dRayCones,
+                             MRAY_GRID_CONSTANT const Span<RayGMem> dRays,
+                             // Input (only accessed via dRayIndices)
+                             MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImageCoordinates,
+                             MRAY_GRID_CONSTANT const Span<const uint32_t> dRayIndices,
+                             // Constants
+                             MRAY_GRID_CONSTANT const Camera* const dCamera,
+                             MRAY_GRID_CONSTANT const TransformKey transformKey,
+                             MRAY_GRID_CONSTANT const typename TransG::DataSoA transSoA,
+                             MRAY_GRID_CONSTANT const Vector2ui stratumCount);

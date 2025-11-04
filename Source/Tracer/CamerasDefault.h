@@ -31,24 +31,29 @@ namespace CameraDetail
         Vector3 right;
 
         public:
-        MR_HF_DECL CameraPinhole(const DataSoA&, CameraKey);
+        MR_HF_DECL      CameraPinhole(const DataSoA&, CameraKey);
         // Ray Sampling
         MR_HF_DECL
-        RaySample   SampleRay(// Input
-                              const Vector2ui& generationIndex,
-                              const Vector2ui& stratumCount,
-                              // I-O
-                              RNGDispenser&) const;
+        CameraRaySample SampleRay(// Input
+                                  const Vector2ui& generationIndex,
+                                  const Vector2ui& stratumCount,
+                                  // I-O
+                                  RNGDispenser&) const;
         MR_HF_DECL
-        RaySample   EvaluateRay(const Vector2ui& generationIndex,
-                                const Vector2ui& stratumCount,
-                                const Vector2& stratumOffset,
-                                const Vector2& stratumRange) const;
+        CameraRaySample EvaluateRay(const Vector2ui& generationIndex,
+                                    const Vector2ui& stratumCount,
+                                    const Vector2& stratumOffset,
+                                    const Vector2& stratumRange) const;
+
         MR_HF_DECL
-        Float       PdfRay(const Ray&) const;
+        Float           PdfRay(const Ray&) const;
+
+        MR_HF_DECL
+        CameraRayOutput ReconstructRay(const ImageCoordinate&,
+                                       const Vector2ui& stratumCount) const;
         // Misc
         MR_HF_DECL
-        bool        CanBeSampled() const;
+        bool            CanBeSampled() const;
         MR_HF_DECL
         CameraTransform GetCameraTransform() const;
         MR_HF_DECL

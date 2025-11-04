@@ -90,7 +90,8 @@ void KCGenerateCamRays(// Output (Only dRayIndices pointed data should be writte
         Vector2ui regionIndex2D = Vector2ui(regionIndex % regionCount[0],
                                             regionIndex / regionCount[0]);
         // Generate the sample
-        RaySample raySample = dCam.SampleRay(regionIndex2D, regionCount, rng);
+        CameraRaySample raySample = dCam.SampleRay(regionIndex2D,
+                                                   regionCount, rng);
         // TODO: Should we normalize and push the length to tminmax
         // (Because of a scale?)
         raySample.value.ray = transform.Apply(raySample.value.ray);
@@ -108,6 +109,46 @@ void KCGenerateCamRays(// Output (Only dRayIndices pointed data should be writte
         // Finally write
         dImageCoordinates[writeIndex] = raySample.value.imgCoords;
         dFilmFilterWeights[writeIndex] = raySample.pdf;
+    }
+}
+
+template<CameraC Camera, TransformGroupC TransG>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCReconstructCameraRays(// Output (Only dRayIndices pointed data should be written)
+                             MRAY_GRID_CONSTANT const Span<RayCone> dRayCones,
+                             MRAY_GRID_CONSTANT const Span<RayGMem> dRays,
+                             // Input (only accessed via dRayIndices)
+                             MRAY_GRID_CONSTANT const Span<const ImageCoordinate> dImageCoordinates,
+                             MRAY_GRID_CONSTANT const Span<const uint32_t> dRayIndices,
+                             // Constants
+                             MRAY_GRID_CONSTANT const Camera* const dCamera,
+                             MRAY_GRID_CONSTANT const TransformKey transformKey,
+                             MRAY_GRID_CONSTANT const typename TransG::DataSoA transSoA,
+                             MRAY_GRID_CONSTANT const Vector2ui stratumCount)
+{
+    KernelCallParams kp;
+    const Camera& dCam = *dCamera;
+
+    // Get the transform
+    using TransformContext = TransG::DefaultContext;
+    TransformContext transform(transSoA, transformKey);
+
+    uint32_t rayCount = static_cast<uint32_t>(dRayIndices.size());
+    for(uint32_t globalId = kp.GlobalId(); globalId < rayCount; globalId += kp.TotalSize())
+    {
+        RayIndex rIndex = dRayIndices[globalId];
+        ImageCoordinate imgCoord = dImageCoordinates[rIndex];
+
+        CameraRayOutput rayOut = dCam.ReconstructRay(imgCoord, stratumCount);
+        // TODO: Should we normalize and push the length to tminmax
+        // (Because of a scale?)
+        rayOut.ray = transform.Apply(rayOut.ray);
+        // Ray part is easy, just write
+        RayToGMem(dRays, rIndex, rayOut.ray, rayOut.tMinMax);
+        // Write the differentials
+        assert(Math::IsFinite(rayOut.rayCone.aperture) &&
+               Math::IsFinite(rayOut.rayCone.width));
+        dRayCones[rIndex] = rayOut.rayCone;
     }
 }
 
@@ -160,9 +201,9 @@ void KCGenerateCamRaysStochastic(// Output (Only dRayIndices pointed data should
 
         // Evaluate the sample
         Float filterRadius = Filter.Radius();
-        RaySample raySample = dCam.EvaluateRay(regionIndex2D, regionCount,
-                                               offsetSample.value,
-                                               Vector2(filterRadius * Float(2)));
+        CameraRaySample raySample = dCam.EvaluateRay(regionIndex2D, regionCount,
+                                                     offsetSample.value,
+                                                     Vector2(filterRadius * Float(2)));
         // TODO: Should we normalize and push the length to tminmax
         // (Because of a scale?)
         raySample.value.ray = transform.Apply(raySample.value.ray);

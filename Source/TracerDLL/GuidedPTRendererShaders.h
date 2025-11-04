@@ -42,14 +42,22 @@ namespace GuidedPTRDetail
     enum class DisplayModeEnum
     {
         RENDER,
+        GRID,
         LIGHT_CACHE,
+        MC_DIR,
+        MC_COS,
+        MC_IRRAD,
         //
         END
     };
     inline constexpr std::array DisplayModeNames =
     {
         "Render",
-        "LightCache"
+        "Grid",
+        "LightCache",
+        "MCDirection",
+        "MCCosine",
+        "MCIrradiance",
     };
     using DisplayMode = NamedEnum<DisplayModeEnum, DisplayModeNames>;
 
@@ -143,10 +151,12 @@ namespace GuidedPTRDetail
         Span<Spectrum>        dShadowRayRadiance;
         Span<RayGMem>         dShadowRays;
         Span<RayCone>         dShadowRayCones;
-        Span<Float>           dShadowPrevPathReflectance;
+        Span<Float>           dShadowPrevPathOutRadiance;
         // Current lifted markov chain
         Span<uint32_t>        dLiftedMCIndices;
     };
+
+    static constexpr auto INVALID_MC_INDEX = std::numeric_limits<uint32_t>::max();
 
     using GaussianLobe = Distribution::GaussianLobe;
 
@@ -340,13 +350,22 @@ uint32_t GaussLobeMixtureT<N>::LoadStochastic(const Vector3& position,
                                               //
                                               const GlobalState& gs)
 {
-    uint32_t liftedNodeIndex = UINT32_MAX;
+    uint32_t liftedNodeIndex = INVALID_MC_INDEX;
     for(uint32_t i = 0; i < N; i++)
     {
         // TODO: Sample with randomness
-        Vector3 posJitter = position + Vector3(rng.NextFloat());
-        Vector3 nJitter   = Math::Normalize(normal + Vector3(rng.NextFloat()));
+        //Vector3 posJitter = position + Vector3(rng.NextFloat());
+        //Vector3 nJitter   = Math::Normalize(normal + Vector3(rng.NextFloat()));
+        Vector3 posJitter = position;
+        Vector3 nJitter = Math::Normalize(normal);
         auto [hashGridIndex, _] = gs.hashGrid.TryInsertAtomic(posJitter, nJitter);
+
+        if(hashGridIndex == HashGridView::INVALID_INDEX)
+        {
+            lobes[i] = GaussianLobe(Vector3::Zero(), 0, 0);
+            weights[i] = Float(0);
+            continue;
+        }
 
         MCState state = gs.dMCStates[hashGridIndex];
         uint16_t mcN  = gs.dMCCounts[hashGridIndex];
@@ -440,27 +459,36 @@ uint32_t GaussLobeMixtureSharedT<N>::LoadStochastic(const Vector3& position,
                                                     const GlobalState& gs)
 {
     static constexpr auto N = GaussianLobeMixture::LobeCount;
-    uint32_t liftedNodeIndex = UINT32_MAX;
+    uint32_t liftedNodeIndex = INVALID_MC_INDEX;
     for(uint32_t i = 0; i < N; i++)
     {
         // TODO: Sample with randomness
-        Vector3 posJitter = position + Vector3(rng.NextFloat());
-        Vector3 nJitter   = Math::Normalize(normal + Vector3(rng.NextFloat()));
+        //Vector3 posJitter = position + Vector3(rng.NextFloat());
+        //Vector3 nJitter   = Math::Normalize(normal + Vector3(rng.NextFloat()));
+        Vector3 posJitter = position;
+        Vector3 nJitter = Math::Normalize(normal);
         auto [hashGridIndex, _] = gs.hashGrid.TryInsertAtomic(posJitter, nJitter);
 
-        MCState state = gs.dMCStates[hashGridIndex];
-        uint16_t mcN  = gs.dMCCounts[hashGridIndex];
-        sumWeight    += state.weight;
-
-        auto lobe = SufficientStatsToLobe(state, mcN, position);
+        GaussianLobe lobe = GaussianLobe(Vector3::Zero(), 0, 0);
+        Float weight = Float(0);
+        if(hashGridIndex != HashGridView::INVALID_INDEX)
+        {
+            MCState state = gs.dMCStates[hashGridIndex];
+            uint16_t mcN = gs.dMCCounts[hashGridIndex];
+            lobe = SufficientStatsToLobe(state, mcN, position);
+            weight = state.weight;
+        }
+        sumWeight += weight;
         SMem().sLobeX[Index(i)] = lobe.dir[0];
         SMem().sLobeY[Index(i)] = lobe.dir[1];
         SMem().sLobeZ[Index(i)] = lobe.dir[2];
         SMem().sLobeKappa[Index(i)] = lobe.kappa;
         SMem().sLobeAlpha[Index(i)] = lobe.alpha;
-        SMem().sLobeWeights[Index(i)] = state.weight;
-
-        Float sumRatio = (sumWeight != Float(0)) ? (state.weight / sumWeight) : Float(1);
+        SMem().sLobeWeights[Index(i)] = weight;
+        //
+        if(hashGridIndex == HashGridView::INVALID_INDEX) continue;
+        //
+        Float sumRatio = (sumWeight != Float(0)) ? (weight / sumWeight) : Float(1);
         if(rng.NextFloat() < sumRatio)
         {
             sampleIndex = i;
@@ -522,6 +550,7 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     RayConeSurface rConeRefract = mat.RefractRayCone(surfRayCone, wO);
     Spectrum throughput = rs.dThroughputs[rayIndex];
     Float specularity = mat.Specularity();
+    bool isSpecular = MaterialCommon::IsSpecular(specularity);
 
     // ====================== //
     //     Load Mixture       //
@@ -544,8 +573,9 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     // ====================== //
     std::array<Float, 2> misPDFs = {};
     std::array<Float, 2> misWeights = {};
-    if(!MaterialCommon::IsSpecular(specularity))
-        misWeights[0] = Math::Lerp(Float(0), gs.lobeProbability, specularity);
+    if(!isSpecular)
+        misWeights[0] = Math::Lerp(Float(0), gs.lobeProbability,
+                                   Float(1) - specularity);
     misWeights[1] = Float(1) - misWeights[0];
 
     BxDFSample pathSample;
@@ -579,7 +609,6 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     // ================ //
     // Russian Roulette //
     // ================ //
-    bool isSpecular = MaterialCommon::IsSpecular(specularity);
     dataPack.depth += 1u;
     Vector2ui rrRange = gs.russianRouletteRange;
     bool isPathDead = (dataPack.depth >= rrRange[1]);
@@ -645,9 +674,10 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     }
 
     // Do not bother with NEE if specular or path is dead
+    if(isPathDead)
+        dataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
     if(isPathDead || isSpecular)
     {
-        dataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
         // Write the updated state back
         rs.dPathDataPack[rayIndex] = dataPack;
         return;
@@ -687,7 +717,7 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     // ================ //
     //    Dispersion    //
     // ================ //
-    Float avgShadowReflectance;
+    Float prevPathShadowEmission;
     if constexpr(!SpectrumConv::IsRGB)
     {
         // NEE
@@ -696,9 +726,14 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
             Float first = shadowRadiance[0];
             shadowRadiance = Spectrum::Zero();
             shadowRadiance[0] = first;
-            avgShadowReflectance = shadowRayEval.reflectance[0];
+            prevPathShadowEmission = shadowRayEval.reflectance[0];
+            prevPathShadowEmission *= lightSample.value.emission[0];
         }
-        else avgShadowReflectance = shadowRayEval.reflectance.Sum() * SpectrumCountInv;
+        else
+        {
+            prevPathShadowEmission = shadowRayEval.reflectance.Sum() * SpectrumCountInv;
+            prevPathShadowEmission *= lightSample.value.emission.Sum() * SpectrumCountInv;
+        }
     }
 
     // ==================== //
@@ -711,7 +746,7 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     RayToGMem(rs.dShadowRays, rayIndex, shadowRay, shadowTMM);
     rs.dShadowRayCones[rayIndex] = shadowRayConeOut;
     rs.dShadowRayRadiance[rayIndex] = shadowRadiance;
-    rs.dShadowPrevPathReflectance[rayIndex] = DivideByPDF(avgShadowReflectance,
+    rs.dShadowPrevPathOutRadiance[rayIndex] = DivideByPDF(prevPathShadowEmission,
                                                           pdfShadow);
     // Write the updated state back
     rs.dPathDataPack[rayIndex] = dataPack;
@@ -722,16 +757,20 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
 // ================== //
 template<LightGroupC L, TransformGroupC T>
 MR_HF_DEF
-void LightWorkFunction<L, T>::Call(const Light& l, RNGDispenser&, const SpectrumConv&,
+void LightWorkFunction<L, T>::Call(const Light& l, RNGDispenser&,
+                                   const SpectrumConv& specConv,
                                    const Params& params, RayIndex rayIndex, uint32_t)
 {
-    PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
+    const RayState& rs = params.rayState;
+    PathDataPack pathDataPack = rs.dPathDataPack[rayIndex];
     if(pathDataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
 
     bool switchToMISPdf = pathDataPack.type == RayType::PATH_RAY;
     auto [ray, tMM] = RayFromGMem(params.common.dRays, rayIndex);
     RayCone rayCone = params.common.dRayCones[rayIndex].Advance(tMM[1]);
-    Spectrum throughput = params.rayState.dThroughputs[rayIndex];
+    Spectrum throughput = rs.dThroughputs[rayIndex];
+
+    Float lcReflectance = rs.dPrevPathReflectanceOrOutRadiance[rayIndex];
     if(switchToMISPdf)
     {
         using Distribution::MIS::BalanceCancelled;
@@ -752,6 +791,9 @@ void LightWorkFunction<L, T>::Call(const Light& l, RNGDispenser&, const Spectrum
         // first then multiply with MIS weight.
         throughput *= pdfs[0];
         throughput = DivideByPDF(throughput, misPdf);
+        // Do the same for the light cache as well
+        lcReflectance *= pdfs[0];
+        lcReflectance = DivideByPDF(lcReflectance, misPdf);
     }
 
     Vector3 wO = -ray.dir;
@@ -774,30 +816,26 @@ void LightWorkFunction<L, T>::Call(const Light& l, RNGDispenser&, const Spectrum
     // Check the depth if we exceed it, do not accumulate
     // we terminate the path regardless
     Vector2ui rrRange = params.globalState.russianRouletteRange;
+    Float lcRadiance = Float(0);
     if((pathDataPack.depth + 1u) <= rrRange[1])
     {
         Spectrum radianceEstimate = emission * throughput;
         params.rayState.dPathRadiance[rayIndex] += radianceEstimate;
+
+        // Estimate light cache emission
+        static constexpr Float SpectrumCountInv = Float(1) / Float(SpectraPerSpectrum);
+        Float lcEmission = emission.Sum() * SpectrumCountInv;
+        if constexpr(!SpectrumConv::IsRGB)
+        {
+            if(specConv.IsDispersed())
+                lcEmission = emission[0];
+        }
+        lcRadiance = lcReflectance * lcEmission;
     }
     // Set the path as dead
-    pathDataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
-    params.rayState.dPathDataPack[rayIndex] = pathDataPack;
-}
-}
 
-//static constexpr uint64_t DATA_COUNT = 10'500'000;
-//static constexpr uint64_t TABLE_SIZE = Math::NextPowerOfTwo(DATA_COUNT * 2);
-//
-//static constexpr auto HASH_PER_GRID = sizeof(SpatioDirCode);
-//static constexpr auto DATA_PER_GRID = (sizeof(GuidedPTRDetail::MCAlber2025BaseParams) +
-//                                        sizeof(GuidedPTRDetail::MarkovChainCountParam) +
-//                                        sizeof(GuidedPTRDetail::IrradianceParam));
-//
-//static constexpr auto TOTAL_DATA_SIZE = DATA_COUNT * DATA_PER_GRID;
-//static constexpr auto HASH_DATA_SIZE = DATA_COUNT * HASH_PER_GRID;
-//
-//static constexpr auto TOTAL_DATA_MIB = double(TOTAL_DATA_SIZE) / 1024. / 1024.;
-//static constexpr auto HASH_DATA_MIB = double(HASH_DATA_SIZE) / 1024. / 1024.;
-//
-//static constexpr auto FULL_TOTAL_MIB = TOTAL_DATA_MIB + HASH_DATA_MIB;
-//static_assert()
+    pathDataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
+    rs.dPathDataPack[rayIndex] = pathDataPack;
+    rs.dPrevPathReflectanceOrOutRadiance[rayIndex] = lcRadiance;
+}
+}

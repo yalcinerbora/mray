@@ -165,4 +165,9 @@ MR_PF_DEF_V void Converter::StoreWaves() const noexcept
     dWavelengthsRef = wavelengths;
 }
 
+MR_PF_DEF bool Converter::IsDispersed() const noexcept
+{
+    return wavelengths.IsDispersed();
+}
+
 }

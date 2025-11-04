@@ -1,7 +1,6 @@
 #include "HashGrid.h"
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
-#include "Device/GPUAlgReduce.h"
 
 HashGrid::HashGrid(const GPUSystem& gpuSystem)
     : gpuSystem(gpuSystem)
@@ -44,10 +43,8 @@ void HashGrid::Reset(AABB3 aabbIn, Vector3 camLocationIn,
     static constexpr Float BASE_LOAD_MULT = Float(1) / BASE_LOAD_FACTOR;
     uint32_t htSize = Math::NextPowerOfTwo(uint32_t(Float(maxEntryCount) * BASE_LOAD_MULT));
 
-    using DeviceAlgorithms::TransformReduceTMSize;
-    size_t tempMemSize = TransformReduceTMSize<uint32_t, SpatioDirCode>(htSize, queue);
-    MemAlloc::AllocateMultiData(Tie(dSpatialCodes, dTransformReduceTempMem, dCountBuffer),
-                                mem, {htSize, tempMemSize, 1});
+    MemAlloc::AllocateMultiData(Tie(dSpatialCodes, dCountBuffer),
+                                mem, {htSize, 1});
 
     ClearAllEntries(queue);
 }
@@ -58,31 +55,14 @@ void HashGrid::ClearAllEntries(const GPUQueue& queue)
     static constexpr auto MEMSET_FILL_PATTERN = UINT64_MAX;
     static_assert(SpatioDirCode(MEMSET_FILL_PATTERN) == HashGridView::EMPTY_VAL);
     queue.MemsetAsync(dSpatialCodes, 0xFF);
+    queue.MemsetAsync(dCountBuffer, 0x00);
 }
 
-uint32_t HashGrid::CalculateUsedGridCount(const GPUQueue& queue) const
+uint32_t HashGrid::UsedEntryCount(const GPUQueue& queue) const
 {
-    DeviceAlgorithms::TransformReduce
-    (
-        Span<uint32_t, 1>(dCountBuffer),
-        dTransformReduceTempMem, ToConstSpan(dSpatialCodes),
-        uint32_t(0), queue,
-        [] MRAY_GPU(uint32_t a, uint32_t b) -> uint32_t
-        {
-            return a + b;
-        },
-        [] MRAY_GPU(SpatioDirCode code)->uint32_t
-        {
-            static constexpr auto E_VAL = HashGridView::EMPTY_VAL;
-            static constexpr auto S_VAL = HashGridView::SENTINEL_VAL;
-            return (code == S_VAL || code == E_VAL) ? 0 : 1;
-        }
-    );
-
-    uint32_t hCount = 0;
+    uint32_t hCount;
     queue.MemcpyAsync(Span<uint32_t>(&hCount, 1), ToConstSpan(dCountBuffer));
     queue.Barrier().Wait();
-
     return hCount;
 }
 

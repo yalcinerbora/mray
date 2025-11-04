@@ -51,7 +51,7 @@ class SpatioDirCode
     public:
     // Constructors & Destructor
                           SpatioDirCode() = default;
-    MR_PF_DECL_V explicit SpatioDirCode(uint64_t hash);
+    MR_PF_DECL_V explicit SpatioDirCode(uint64_t hash) : hashCode(hash) {};
     MR_PF_DECL_V explicit SpatioDirCode(uint64_t mcPos, uint32_t normalMC, uint32_t level);
     //
     MR_PF_DECL uint64_t PosCode() const;
@@ -62,16 +62,13 @@ class SpatioDirCode
     constexpr auto operator<=>(const SpatioDirCode&) const = default;
 };
 
-MR_PF_DEF_V
-SpatioDirCode::SpatioDirCode(uint64_t hash)
-    : hashCode(hash)
-{}
-
 // GPU-View of the hash grid
 struct HashGridView
 {
     static constexpr auto EMPTY_VAL = SpatioDirCode(UINT64_MAX);
     static constexpr auto SENTINEL_VAL = SpatioDirCode(UINT64_MAX - 1);
+    static constexpr auto INVALID_INDEX = uint32_t(UINT32_MAX);
+
     struct InsertResult
     {
         uint32_t  allocationIndex;
@@ -79,6 +76,7 @@ struct HashGridView
     };
 
     Span<SpatioDirCode> dHashes;
+    Span<uint32_t, 1>   dAllocCounter;
     // Parameters
     Vector3             camLocation;
     AABB3               hashGridRegion;  // Region of the hash grid, probably scene AABB.
@@ -88,6 +86,7 @@ struct HashGridView
     Float               normalDelta;     // Same stuff but for normals.
     uint32_t            normalRegionDim; //
     uint32_t            maxLevel;        // Maximum level that the grid can achieve
+    uint32_t            maxEntryLimit;   // Entry limit to prevent explosion of the hash table
     // Similar to ray cones, tangent of the ray's aperture.
     // (which is quite larger than the actual ray differential
     // to prevent explosion of nodes).
@@ -111,6 +110,48 @@ struct HashGridView
     MR_GF_DECL
     InsertResult        TryInsertAtomic(const Vector3& pos,
                                         const Vector3& normal) const;
+};
+
+class HashGrid
+{
+    // Rational Number
+    static constexpr Float BASE_LOAD_FACTOR = Float(0.6);
+    private:
+    const GPUSystem&    gpuSystem;
+    DeviceMemory        mem;
+    Span<SpatioDirCode> dSpatialCodes;
+    Span<uint32_t>      dCountBuffer;
+
+    AABB3       regionAABB;
+    Vector3     camLocation;
+    uint32_t    baseLevelPositionBits;
+    uint32_t    normalBits;
+    uint32_t    maxLevel;
+    Float       coneAperture;
+
+    public:
+    // Constructors & Destructor
+                HashGrid(const GPUSystem&);
+                HashGrid(const HashGrid&) = delete;
+                HashGrid(HashGrid&&) = delete;
+    HashGrid&   operator=(const HashGrid&) = delete;
+    HashGrid&   operator=(HashGrid&&) = delete;
+                ~HashGrid() = default;
+
+    //
+    void        Reset(AABB3 regionAABB, Vector3 camLocation,
+                      uint32_t baseLevelPositionBits,
+                      uint32_t normalBits, uint32_t maxLevel,
+                      Float coneApertureDegrees,
+                      uint32_t maxEntryCount, const GPUQueue&);
+    void        SetCameraPos(Vector3 camLocation);
+    void        ClearAllEntries(const GPUQueue&);
+
+
+    HashGridView View() const;
+    size_t       GPUMemoryUsage() const;
+    uint32_t     UsedEntryCount(const GPUQueue&) const;
+    uint32_t     EntryCapacity() const;
 };
 
 MR_PF_DEF
@@ -234,6 +275,9 @@ MR_HF_DEF
 typename HashGridView::InsertResult
 HashGridView::TryInsert(const Vector3& pos, const Vector3& normal) const
 {
+    if(dAllocCounter.front() >= maxEntryLimit)
+        return InsertResult{INVALID_INDEX, false};
+
     static constexpr auto E_VAL = EMPTY_VAL;
     static constexpr auto S_VAL = SENTINEL_VAL;
 
@@ -253,13 +297,14 @@ HashGridView::TryInsert(const Vector3& pos, const Vector3& normal) const
         //
         if(checkedCode == S_VAL || checkedCode == E_VAL)
         {
+            dAllocCounter.front()++;
             dHashes[i] = code;
             return InsertResult{i, true};
         }
         if(i == index - 1) break;
     }
     assert(false && "HT Full!");
-    return InsertResult{UINT32_MAX, false};
+    return InsertResult{INVALID_INDEX, false};
 }
 
 MR_GF_DEF
@@ -270,6 +315,17 @@ HashGridView::TryInsertAtomic(const Vector3& pos,
     [[maybe_unused]]
     static constexpr auto S_VAL = SENTINEL_VAL;
     static constexpr auto E_VAL = EMPTY_VAL;
+
+    // There is a race condition in a sense that
+    // since this function will be called in GPU,
+    // threads will enter to this function in bulk.
+    //
+    // In worst case, SM * ThreadPerSM
+    // (in practice, probably less than that)
+    // amount of entires will exceed this limit.
+    // Which is fine I guess.
+    if(dAllocCounter.front() >= maxEntryLimit)
+        return InsertResult{INVALID_INDEX, false};
 
     uint32_t tableSize = dHashes.size();
     uint32_t divMask = uint32_t(tableSize - 1);
@@ -299,7 +355,10 @@ HashGridView::TryInsertAtomic(const Vector3& pos,
         // iff we've seen "EMPTY"
         if(checkedCode == E_VAL)
         {
+            using DeviceAtomic::AtomicAdd;
             using DeviceAtomic::AtomicCompSwap;
+            //
+            AtomicAdd(dAllocCounter.front(), 1u);
             SpatioDirCode old = AtomicCompSwap(dHashes[i], E_VAL, code);
             // Successfull insert.
             if(old == E_VAL) return InsertResult{i, true};
@@ -308,51 +367,8 @@ HashGridView::TryInsertAtomic(const Vector3& pos,
         if(i == index - 1)   break;
     }
     assert(false && "HT Full!");
-    return InsertResult{UINT32_MAX, false};
+    return InsertResult{INVALID_INDEX, false};
 }
-
-class HashGrid
-{
-    // Rational Number
-    static constexpr Float BASE_LOAD_FACTOR = Float(0.6);
-    private:
-    const GPUSystem&    gpuSystem;
-    DeviceMemory        mem;
-    Span<SpatioDirCode> dSpatialCodes;
-    Span<Byte>          dTransformReduceTempMem;
-    Span<uint32_t>      dCountBuffer;
-
-    AABB3       regionAABB;
-    Vector3     camLocation;
-    uint32_t    baseLevelPositionBits;
-    uint32_t    normalBits;
-    uint32_t    maxLevel;
-    Float       coneAperture;
-
-    public:
-    // Constructors & Destructor
-                HashGrid(const GPUSystem&);
-                HashGrid(const HashGrid&) = delete;
-                HashGrid(HashGrid&&) = delete;
-    HashGrid&   operator=(const HashGrid&) = delete;
-    HashGrid&   operator=(HashGrid&&) = delete;
-                ~HashGrid() = default;
-
-    //
-    void        Reset(AABB3 regionAABB, Vector3 camLocation,
-                      uint32_t baseLevelPositionBits,
-                      uint32_t normalBits, uint32_t maxLevel,
-                      Float coneApertureDegrees,
-                      uint32_t maxEntryCount, const GPUQueue&);
-    void        SetCameraPos(Vector3 camLocation);
-    void        ClearAllEntries(const GPUQueue&);
-
-
-    HashGridView View() const;
-    size_t       GPUMemoryUsage() const;
-    uint32_t     CalculateUsedGridCount(const GPUQueue&) const;
-    uint32_t     EntryCapacity() const;
-};
 
 inline
 void HashGrid::SetCameraPos(Vector3 newCamLocation)
@@ -371,10 +387,12 @@ HashGridView HashGrid::View() const
     Float normalDelta = Float(normalRegionDim);
     // Pre-calculate the factor here since it is constant
     Float tanHalfTimes2 = Math::Tan(coneAperture * Float(0.5)) * 2;
+    uint32_t maxEntryLimit = uint32_t(Float(dSpatialCodes.size()) * BASE_LOAD_FACTOR);
     //
     return HashGridView
     {
         .dHashes           = dSpatialCodes,
+        .dAllocCounter     = Span<uint32_t, 1>(dCountBuffer),
         .camLocation       = camLocation,
         .hashGridRegion    = regionAABB,
         .baseRegionDelta   = Float(delta),
@@ -382,6 +400,7 @@ HashGridView HashGrid::View() const
         .normalDelta       = normalDelta,
         .normalRegionDim   = normalRegionDim,
         .maxLevel          = maxLevel,
+        .maxEntryLimit     = maxEntryLimit,
         .tanConeHalfTimes2 = tanHalfTimes2
     };
 }

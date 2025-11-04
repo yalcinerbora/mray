@@ -36,11 +36,12 @@ CameraPinhole::CameraPinhole(const DataSoA& soa, CameraKey key)
 }
 
 MR_HF_DEF
-RaySample CameraPinhole::SampleRay(// Input
-                                   const Vector2ui& generationIndex,
-                                   const Vector2ui& stratumCount,
-                                   // I-O
-                                   RNGDispenser& rng) const
+CameraRaySample
+CameraPinhole::SampleRay(// Input
+                         const Vector2ui& generationIndex,
+                         const Vector2ui& stratumCount,
+                         // I-O
+                         RNGDispenser& rng) const
 {
     Vector2ui sampleId = generationIndex % stratumCount;
     // DX DY from stratified sample
@@ -69,7 +70,7 @@ RaySample CameraPinhole::SampleRay(// Input
     };
 
     // Initialize Ray
-    return RaySample
+    return CameraRaySample
     {
         .value =
         {
@@ -89,10 +90,11 @@ RaySample CameraPinhole::SampleRay(// Input
 }
 
 MR_HF_DEF
-RaySample CameraPinhole::EvaluateRay(const Vector2ui& generationIndex,
-                                     const Vector2ui& stratumCount,
-                                     const Vector2& stratumOffset,
-                                     const Vector2& stratumRange) const
+CameraRaySample
+CameraPinhole::EvaluateRay(const Vector2ui& generationIndex,
+                           const Vector2ui& stratumCount,
+                           const Vector2& stratumOffset,
+                           const Vector2& stratumRange) const
 {
     Vector2ui sampleId = generationIndex % stratumCount;
     // DX DY from stratified sample
@@ -112,15 +114,19 @@ RaySample CameraPinhole::EvaluateRay(const Vector2ui& generationIndex,
     // of images no larger than 65536. But this is here just to
     // be sure.
     assert(sampleId <= Vector2ui(std::numeric_limits<uint16_t>::max()));
+    assert(stratumOffset <= stratumRange &&
+           stratumOffset >= -stratumRange);
 
     // Initialize Ray
-    Vector2 jitterNorm = stratumOffset / stratumRange;
+    auto jitterNorm = (stratumRange == Vector2::Zero())
+                        ? Vector2::Zero()
+                        : (stratumOffset / stratumRange);
     ImageCoordinate imgCoords =
     {
         .pixelIndex = Vector2us(sampleId),
         .offset = SNorm2x16(jitterNorm)
     };
-    return RaySample
+    return CameraRaySample
     {
         .value =
         {
@@ -142,6 +148,37 @@ Float CameraPinhole::PdfRay(const Ray&) const
 {
     // We can not request pdf of a pinhole camera
     return Float(0.0);
+}
+
+MR_HF_DEF
+CameraRayOutput
+CameraPinhole::ReconstructRay(const ImageCoordinate& imgCoords,
+                              const Vector2ui& stratumCount) const
+{
+    // DX DY from stratified sample
+    Vector2 stratumCountF = Vector2(stratumCount);
+    Vector2 delta = planeSize / stratumCountF;
+
+    Vector2 texelCoord(imgCoords.pixelIndex);
+    texelCoord += Vector2(imgCoords.offset) + Vector2(0.5);
+
+    Vector3 samplePoint = bottomLeft;
+    samplePoint += texelCoord[0] * delta[0] * right;
+    samplePoint += texelCoord[1] * delta[1] * up;
+    Vector3 rayDir = Math::Normalize(samplePoint - position);
+
+    return CameraRayOutput
+    {
+        .ray = Ray(rayDir, position),
+        .tMinMax = nearFar,
+        .imgCoords = imgCoords,
+        // Ray Tracing Gems I. Chapter2 equation 30
+        .rayCone = RayCone
+        {
+            .aperture = Float(2) * Math::Tan(fov[1] * Float(0.5)) / Float(stratumCount[1]),
+            .width = Float(0)
+        }
+    };
 }
 
 MR_HF_DEF

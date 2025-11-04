@@ -611,6 +611,50 @@ void KCGenRandomNumbersGenericIndirectDynamicDim(// Output
     }
 }
 
+
+MRAY_HOST
+void RNGFunctions::GenerateNumbersFromBackup(// Output
+                                             Span<RandomNumber> dRNOut,
+                                             // I-O
+                                             Span<BackupRNGState> dBackupRNGStates,
+                                             // Constants
+                                             uint32_t rnCount,
+                                             const GPUQueue& q)
+{
+    q.IssueWorkKernel<KCGenRandomNumbersPCG32>
+    (
+        "KCGenRandomNumbersPCG32",
+        DeviceWorkIssueParams{.workCount = uint32_t(dBackupRNGStates.size())},
+        //
+        dRNOut,
+        dBackupRNGStates,
+        rnCount
+    );
+}
+
+MRAY_HOST
+void RNGFunctions::GenRandomNumbersFromBackupIndirect(// Output
+                                                      Span<RandomNumber> dRNOut,
+                                                      // I-O
+                                                      Span<BackupRNGState> dBackupRNGStates,
+                                                      // Input
+                                                      Span<const RayIndex> dIndices,
+                                                      // Constants
+                                                      uint32_t rnCount,
+                                                      const GPUQueue& q)
+{
+    q.IssueWorkKernel<KCGenRandomNumbersPCG32Indirect>
+    (
+        "KCGenRandomNumbersPCG32Indirect",
+        DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
+        //
+        dRNOut,
+        dBackupRNGStates,
+        ToConstSpan(dIndices),
+        rnCount
+    );
+}
+
 // ============================ //
 //   Independent Implementation //
 // ============================ //

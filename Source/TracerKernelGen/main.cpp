@@ -666,6 +666,7 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
     //
     static constexpr auto CAM_SUBCAMERA_FMT = "MRAY_RAYGEN_SUBCAMERA_KERNEL_INSTANTIATE({}, {});\n"sv;
     static constexpr auto CAM_POS_GEN_FMT = "MRAY_RAYGEN_CAMERA_POS_KERNEL_INSTANTIATE({}, {});\n"sv;
+    static constexpr auto CAM_REGEN_RAYS_FMT = "MRAY_RAYGEN_RECONSTRUCT_RAYS_KERNEL_INSTANTIATE({}, {});\n"sv;
     static constexpr auto CAM_RAYGEN_FMT = "MRAY_RAYGEN_GENRAYS_KERNEL_INSTANTIATE({}, {});\n"sv;
     static constexpr auto CAM_RAYGEN_STOCHASTIC_FMT = "MRAY_RAYGEN_GENRAYS_STOCHASTIC_KERNEL_INSTANTIATE({}, {}, {});\n"sv;
 
@@ -795,6 +796,10 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
         rayGenInstantiations.emplace_back(line);
         // KCGenerateCameraPositions
         line = FormatToGlobalBuffer(CAM_POS_GEN_FMT.size(), CAM_POS_GEN_FMT,
+                                    c.typeName, t.typeName);
+        rayGenInstantiations.emplace_back(line);
+        // KCReconstructCameraRays
+        line = FormatToGlobalBuffer(CAM_REGEN_RAYS_FMT.size(), CAM_REGEN_RAYS_FMT,
                                     c.typeName, t.typeName);
         rayGenInstantiations.emplace_back(line);
         // KCGenerateCamRays

@@ -54,28 +54,6 @@ void KCInitPathStateIndirect(MRAY_GRID_CONSTANT const Span<Spectrum> dThroughput
     }
 }
 
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCAccumulateShadowRays(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,
-                            MRAY_GRID_CONSTANT const Span<const Spectrum> dShadowRayRadiance,
-                            MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer,
-                            MRAY_GRID_CONSTANT const Span<const PathDataPack> dPathDataPack,
-                            MRAY_GRID_CONSTANT const Vector2ui rrRange,
-                            MRAY_GRID_CONSTANT const uint32_t depthOffset)
-{
-    KernelCallParams kp;
-    uint32_t shadowRayCount = static_cast<uint32_t>(dShadowRayRadiance.size());
-    for(uint32_t i = kp.GlobalId(); i < shadowRayCount; i += kp.TotalSize())
-    {
-        PathDataPack dataPack = dPathDataPack[i];
-
-        using enum RayType;
-        bool isShadowRay = (dataPack.type == SHADOW_RAY);
-        bool inDepthLimit = ((dataPack.depth + depthOffset) <= rrRange[1]);
-        if(inDepthLimit && isShadowRay && dIsVisibleBuffer[i])
-            dRadianceOut[i] += dShadowRayRadiance[i];
-    }
-}
-
 uint64_t PathTracerRendererBase::TotalSampleLimit(uint32_t spp) const
 {
     if(spp == std::numeric_limits<uint32_t>::max())

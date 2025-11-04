@@ -151,12 +151,23 @@ using GetCWF = GetCWFT<R, CG, TG, I>::Type;
                                    MRAY_GRID_CONSTANT const Vector2ui,                  \
                                    MRAY_GRID_CONSTANT const Vector2ui)
 
-#define MRAY_RAYGEN_CAMERA_POS_KERNEL_INSTANTIATE(C, T)                                                       \
+#define MRAY_RAYGEN_CAMERA_POS_KERNEL_INSTANTIATE(C, T)                                                      \
     template MRAY_KERNEL                                                                                     \
     void KCGenerateCameraPosition<typename C::Camera, T>(MRAY_GRID_CONSTANT const Span<Vector3, 1>,          \
                                                          MRAY_GRID_CONSTANT const typename C::Camera* const, \
                                                          MRAY_GRID_CONSTANT const TransformKey,              \
                                                          MRAY_GRID_CONSTANT const typename T::DataSoA)
+
+#define MRAY_RAYGEN_RECONSTRUCT_RAYS_KERNEL_INSTANTIATE(C, T)                                                \
+    template MRAY_KERNEL                                                                                     \
+    void KCReconstructCameraRays<typename C::Camera, T>(MRAY_GRID_CONSTANT const Span<RayCone>,              \
+                                                        MRAY_GRID_CONSTANT const Span<RayGMem>,              \
+                                                        MRAY_GRID_CONSTANT const Span<const ImageCoordinate>,\
+                                                        MRAY_GRID_CONSTANT const Span<const uint32_t>,       \
+                                                        MRAY_GRID_CONSTANT const typename C::Camera* const,  \
+                                                        MRAY_GRID_CONSTANT const TransformKey,               \
+                                                        MRAY_GRID_CONSTANT const typename T::DataSoA,        \
+                                                        MRAY_GRID_CONSTANT const Vector2ui)
 
 #define MRAY_RAYGEN_GENRAYS_KERNEL_INSTANTIATE(C, T)                                                  \
     template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT                                            \

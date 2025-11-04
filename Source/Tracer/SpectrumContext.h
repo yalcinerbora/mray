@@ -67,6 +67,7 @@ namespace Jakob2019Detail
         MR_PF_DECL SpectrumWaves Wavelengths() const noexcept;
         MR_PF_DECL_V void        DisperseWaves() noexcept;
         MR_PF_DECL_V void        StoreWaves() const noexcept;
+        MR_PF_DECL bool          IsDispersed() const noexcept;
         //
         static constexpr bool IsRGB = false;
     };

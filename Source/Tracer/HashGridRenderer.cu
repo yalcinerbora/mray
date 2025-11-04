@@ -537,7 +537,7 @@ RendererOutput HashGridRenderer::DoRender()
     if(totalIterationCount % 50 == 0 ||
        totalIterationCount < 5)
     {
-        uint32_t used = hashGrid.CalculateUsedGridCount(processQueue);
+        uint32_t used = hashGrid.UsedEntryCount(processQueue);
         uint32_t max = hashGrid.EntryCapacity();
 
         MRAY_LOG("HashGrid {} / {} | Mem: MiB: {} / {}", used, max,

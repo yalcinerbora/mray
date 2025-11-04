@@ -266,27 +266,27 @@ class RenderCameraWork : public RenderCameraWorkT<R>
 
     public:
     // Constructors & Destructor
-            RenderCameraWork(const GenericGroupCameraT&,
-                             const GenericGroupTransformT&,
-                             const GPUSystem&);
+         RenderCameraWork(const GenericGroupCameraT&,
+                          const GenericGroupTransformT&,
+                          const GPUSystem&);
     //
-    void    GenerateSubCamera(// Output
-                              Span<Byte> dCamBuffer,
-                              // Constants
-                              CameraKey camKey,
-                              Optional<CameraTransform> camTransform,
-                              Vector2ui stratumIndex,
-                              Vector2ui stratumCount,
-                              const GPUQueue& queue) const override;
-    void    GenCameraPosition(// Output
-                              const Span<Vector3, 1>& dCamPosOut,
-                              // Input
-                              Span<const Byte> dCamBuffer,
-                              TransformKey transKey,
-                              // Constants
-                              const GPUQueue& queue) const override;
+    void GenerateSubCamera(// Output
+                           Span<Byte> dCamBuffer,
+                           // Constants
+                           CameraKey camKey,
+                           Optional<CameraTransform> camTransform,
+                           Vector2ui stratumIndex,
+                           Vector2ui stratumCount,
+                           const GPUQueue& queue) const override;
+    void GenCameraPosition(// Output
+                           const Span<Vector3, 1>& dCamPosOut,
+                           // Input
+                           Span<const Byte> dCamBuffer,
+                           TransformKey transKey,
+                           // Constants
+                           const GPUQueue& queue) const override;
 
-    void    GenerateRays(// Output
+    void GenerateRays(// Output
                          const Span<RayCone>& dRayDiffsOut,
                          const Span<RayGMem>& dRaysOut,
                          const Span<ImageCoordinate>& dImageCoordsOut,
@@ -301,22 +301,34 @@ class RenderCameraWork : public RenderCameraWorkT<R>
                          uint64_t globalPixelIndex,
                          const Vector2ui regionCount,
                          const GPUQueue& queue) const override;
-    void    GenRaysStochasticFilter(// Output
-                                    const Span<RayCone>& dRayDiffsOut,
-                                    const Span<RayGMem>& dRaysOut,
-                                    const Span<ImageCoordinate>& dImageCoordsOut,
-                                    const Span<Float>& dSampleWeightsOut,
-                                    // Input
-                                    const Span<const uint32_t>& dRayIndices,
-                                    const Span<const uint32_t>& dRandomNums,
-                                    // Type erased buffer
-                                    Span<const Byte> dCamBuffer,
-                                    TransformKey transKey,
-                                    // Constants
-                                    uint64_t globalPixelIndex,
-                                    const Vector2ui regionCount,
-                                    FilterType filterType,
-                                    const GPUQueue& queue) const override;
+    void GenRaysStochasticFilter(// Output
+                                 const Span<RayCone>& dRayDiffsOut,
+                                 const Span<RayGMem>& dRaysOut,
+                                 const Span<ImageCoordinate>& dImageCoordsOut,
+                                 const Span<Float>& dSampleWeightsOut,
+                                 // Input
+                                 const Span<const uint32_t>& dRayIndices,
+                                 const Span<const uint32_t>& dRandomNums,
+                                 // Type erased buffer
+                                 Span<const Byte> dCamBuffer,
+                                 TransformKey transKey,
+                                 // Constants
+                                 uint64_t globalPixelIndex,
+                                 const Vector2ui regionCount,
+                                 FilterType filterType,
+                                 const GPUQueue& queue) const override;
+    void ReconstructCameraRays(// Output
+                               const Span<RayCone>& dRayDiffsOut,
+                               const Span<RayGMem>& dRaysOut,
+                               // Input
+                               const Span<const ImageCoordinate>& dImageCoordsOut,
+                               const Span<const uint32_t>& dRayIndices,
+                               // The actual pair to be used
+                               Span<const Byte> dCamBuffer,
+                               TransformKey transKey,
+                               // Constants
+                               const Vector2ui regionCount,
+                               const GPUQueue& queue) const;
 
     std::string_view    Name() const override;
     RNRequestList       SampleRayRNList() const override;
@@ -710,6 +722,44 @@ void RenderCameraWork<R, C, T>::GenRaysStochasticFilter(// Output
     }
 }
 
+template<RendererC R, CameraGroupC C, TransformGroupC T>
+void RenderCameraWork<R, C, T>::ReconstructCameraRays(// Output
+                                                      const Span<RayCone>& dRayDiffsOut,
+                                                      const Span<RayGMem>& dRaysOut,
+                                                      // Input
+                                                      const Span<const ImageCoordinate>& dImageCoords,
+                                                      const Span<const uint32_t>& dRayIndices,
+                                                      // The actual pair to be used
+                                                      Span<const Byte> dCamBuffer,
+                                                      TransformKey transKey,
+                                                      // Constants
+                                                      const Vector2ui regionCount,
+                                                      const GPUQueue& queue) const
+{
+    using Camera = typename C::Camera;
+    assert(sizeof(Camera) <= dCamBuffer.size_bytes());
+    assert(uintptr_t(dCamBuffer.data()) % alignof(Camera) == 0);
+    const Camera* dCamera = reinterpret_cast<const Camera*>(dCamBuffer.data());
+    static const std::string KernelName = MRAY_FORMAT("{}-GenRays", TypeName());
+    //
+    uint32_t rayCount = uint32_t(dRayIndices.size());
+    queue.IssueWorkKernel<KCReconstructCameraRays<Camera, T>>
+    (
+        KernelName,
+        DeviceWorkIssueParams{.workCount = rayCount},
+        // Out
+        dRayDiffsOut,
+        dRaysOut,
+        // In
+        dImageCoords,
+        dRayIndices,
+        // Constants
+        dCamera,
+        transKey,
+        tg.SoA(),
+        regionCount
+    );
+}
 
 template<RendererC R, CameraGroupC C, TransformGroupC T>
 void RenderCameraWork<R, C, T>::GenCameraPosition(// Output

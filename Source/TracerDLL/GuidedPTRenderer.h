@@ -18,6 +18,7 @@ class GuidedPTRenderer final : public PathTracerRendererBase
 
     public:
     //
+    using ImageSectionOpt       = Optional<RenderImageSection>;
     using UniformLightSampler   = DirectLightSamplerUniform<MetaLightList>;
     using AttribInfoList        = typename RendererBase::AttribInfoList;
     using SpectrumContext       = SpectrumContextJakob2019;
@@ -70,7 +71,7 @@ class GuidedPTRenderer final : public PathTracerRendererBase
     Span<RayCone>       dShadowRayCones;
     Span<Spectrum>      dShadowRayRadiance;
     // Technique Related (Per-path)
-    Span<Float>         dShadowPrevPathReflectance;
+    Span<Float>         dShadowPrevPathOutRadiance;
     Span<Float>         dPrevPathReflectanceOrOutRadiance;
     Span<Float>         dPrevPDF;
     Span<Float>         dScoreSums;
@@ -86,7 +87,11 @@ class GuidedPTRenderer final : public PathTracerRendererBase
     bool                saveImage  = false;
 
     // Helpers
-    //void                CopyAliveRays(Span<const RayIndex> dAliveRayIndices, const GPUQueue&);
+    RayState            PackRayState() const;
+    GlobalState         PackGlobalState() const;
+    ImageSectionOpt     DisplayHashGrid(Span<const RayIndex> dDeadRayIndices,
+                                        const GPUQueue& processQueue,
+                                        const GPUQueue& transferQueue);
     uint32_t            FindMaxSamplePerIteration(uint32_t rayCount);
     Span<RayIndex>      DoRenderPass(uint32_t sppLimit, const GPUQueue&);
     // Implementations

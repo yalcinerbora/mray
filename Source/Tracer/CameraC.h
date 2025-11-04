@@ -9,14 +9,14 @@
 // TODO: Move camera transform somewhere proper
 #include "Common/AnalyticStructs.h"
 
-struct RaySampleT
+struct CameraRayOutput
 {
     Ray             ray;
     Vector2         tMinMax;
     ImageCoordinate imgCoords;
     RayCone         rayCone;
 };
-using RaySample = SampleT<RaySampleT>;
+using CameraRaySample = SampleT<CameraRayOutput>;
 
 template<class CameraType>
 concept CameraC = requires(CameraType c,
@@ -32,9 +32,11 @@ concept CameraC = requires(CameraType c,
     requires std::is_same_v<decltype(CameraType::SampleRayRNList), const RNRequestList>;
 
     {c.SampleRay(Vector2ui{}, Vector2ui{}, rng)
-    } -> std::same_as<RaySample>;
+    } -> std::same_as<CameraRaySample>;
     {c.EvaluateRay(Vector2ui{}, Vector2ui{}, Vector2{}, Vector2{})
-    }->std::same_as<RaySample>;
+    }->std::same_as<CameraRaySample>;
+    {c.ReconstructRay(ImageCoordinate{}, Vector2ui{})
+    }->std::same_as<CameraRayOutput>;
     {c.PdfRay(Ray{})} -> std::same_as<Float>;
     {c.CanBeSampled()} -> std::same_as<bool>;
     {c.GetCameraTransform()} -> std::same_as<CameraTransform>;

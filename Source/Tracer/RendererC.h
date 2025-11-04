@@ -149,6 +149,18 @@ class RenderCameraWorkI
                                          const Vector2ui regionCount,
                                          FilterType filterType,
                                          const GPUQueue& queue) const = 0;
+    virtual void ReconstructCameraRays(// Output
+                                       const Span<RayCone>& dRayDiffsOut,
+                                       const Span<RayGMem>& dRaysOut,
+                                       // Input
+                                       const Span<const ImageCoordinate>& dImageCoordsOut,
+                                       const Span<const uint32_t>& dRayIndices,
+                                       // The actual pair to be used
+                                       Span<const Byte> dCamBuffer,
+                                       TransformKey transKey,
+                                       // Constants
+                                       const Vector2ui regionCount,
+                                       const GPUQueue& queue) const = 0;
 };
 
 using RenderImagePtr = std::unique_ptr<RenderImage>;

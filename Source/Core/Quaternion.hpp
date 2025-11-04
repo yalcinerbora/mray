@@ -189,11 +189,18 @@ MR_PF_DEF Vector<3, T> Quat<T>::ApplyRotation(const Vector<3, T>& vtor) const no
 
     // Optimized version
     // https://gamedev.stackexchange.com/questions/28395/rotating-vector3-by-a-quaternion
-    T s = v[0];
+    //T s = v[0];
+    //Vector<3, T> u = Vector<3, T>(v[1], v[2], v[3]);
+    //Vector<3, T> r = T(2) * Math::Dot(u, vtor) * u;
+    //r += (s * s - Math::Dot(u, u)) * vtor;
+    //r += T(2) * s * Math::Cross(u, vtor);
+    //return r;
+
+    // Another version
+    // https://blog.molecular-matters.com/2013/05/24/a-faster-quaternion-vector-multiplication/
     Vector<3, T> u = Vector<3, T>(v[1], v[2], v[3]);
-    Vector<3, T> r = T(2) * Math::Dot(u, vtor) * u;
-    r += (s * s - Math::Dot(u, u)) * vtor;
-    r += T(2) * s * Math::Cross(u, vtor);
+    Vector<3, T> t = Math::Cross(u, vtor) * T(2);
+    Vector<3, T> r = vtor + v[0] * t + Math::Cross(u, t);
     return r;
 }
 
