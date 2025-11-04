@@ -740,7 +740,7 @@ void RenderCameraWork<R, C, T>::ReconstructCameraRays(// Output
     assert(sizeof(Camera) <= dCamBuffer.size_bytes());
     assert(uintptr_t(dCamBuffer.data()) % alignof(Camera) == 0);
     const Camera* dCamera = reinterpret_cast<const Camera*>(dCamBuffer.data());
-    static const std::string KernelName = MRAY_FORMAT("{}-GenRays", TypeName());
+    static const std::string KernelName = MRAY_FORMAT("{}-ReconstructRays", TypeName());
     //
     uint32_t rayCount = uint32_t(dRayIndices.size());
     queue.IssueWorkKernel<KCReconstructCameraRays<Camera, T>>
