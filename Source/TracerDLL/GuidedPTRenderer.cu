@@ -4,6 +4,12 @@
 #include "Core/Timer.h"
 #include "Tracer/RendererCommon.h"
 
+struct TransientMCState
+{
+    GuidedPTRDetail::MCState s;
+    uint32_t N;
+};
+
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static
 void KCAccumulateShadowRaysGPT(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,
@@ -36,150 +42,6 @@ void KCInitGuidedPathStatesIndirect(MRAY_GRID_CONSTANT const Span<uint32_t> dLif
     for(uint32_t i = kp.GlobalId(); i < newPathCount; i += kp.TotalSize())
     {
         dLiftedMarkovChainIndex[dIndices[i]] = GuidedPTRDetail::INVALID_MC_INDEX;
-    }
-}
-
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-static
-void KCBackpropagateIrradPath(// I-O
-                              MRAY_GRID_CONSTANT const Span<Float> dPrevPathReflectanceOrOutRadiance,
-                              MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState,
-                              MRAY_GRID_CONSTANT const Span<BackupRNGState> dRNGStates,
-                              // Input
-                              MRAY_GRID_CONSTANT const Span<const uint32_t> dLiftedMCIndices,
-                              MRAY_GRID_CONSTANT const Span<const Float> dScoreSums,
-
-                              // Determining if this is intermediate path (not hit light etc.)
-                              MRAY_GRID_CONSTANT const Span<const HitKeyPack> dHitKeys,
-                              MRAY_GRID_CONSTANT const Span<const RayGMem> dRays,
-                              MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
-{
-    using namespace GuidedPTRDetail;
-
-    KernelCallParams kp;
-    uint32_t rayCount = uint32_t(dRayIndices.size());
-    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
-    {
-        uint32_t rIndex = dRayIndices[i];
-        uint32_t isLightFlag = dHitKeys[rIndex].lightOrMatKey.FetchFlagPortion();
-        uint32_t prevMCIndex = dLiftedMCIndices[rIndex];
-        //
-        if(isLightFlag == IS_LIGHT_KEY_FLAG) continue;
-        if(prevMCIndex == INVALID_MC_INDEX) continue;
-
-        // ======================= //
-        // Irradiance Cache Update //
-        // ======================= //
-        auto [ray, tMM] = RayFromGMem(dRays, rIndex);
-        Vector3 position = ray.AdvancedPos(tMM[1]);
-        Vector3 direction = Math::Normalize(-ray.dir);
-
-        const HashGridView& hg = globalState.hashGrid;
-        auto locationOpt = hg.Search(position, direction);
-        //
-        if(!locationOpt) continue;
-        // Race condition here!
-        // We read while somebody writes to this specific location
-        // maybe. It is fine as long as it is properly updated by writers.
-        // Reading a stale value just hinders backpropogation speed maybe.
-        //
-        // TODO: Check if proper syncronization is good / bad etc.
-        auto& dIrradHashGrid = globalState.dMCIrradiances;
-        Float irrad = dIrradHashGrid[*locationOpt].irrad;
-        Float refl = dPrevPathReflectanceOrOutRadiance[rIndex];
-        Float outRadiance = refl * irrad;
-        MCIrradiance::AtomicEMA(dIrradHashGrid[prevMCIndex], outRadiance);
-
-        // ========================= //
-        //  Markov Chain Lock Update //
-        // ========================= //
-        Float weight = outRadiance;
-        BackupRNG rng = BackupRNG(dRNGStates[rIndex]);
-        Float scoreSum = dScoreSums[rIndex];
-        // Not as good as previous mixture, skip
-        if(rng.NextFloat() * scoreSum < weight * MC_LOBE_COUNT)
-        {
-            // This kernel will be used as deterministic lock mechanism
-            // where largest rIndex will be the winner
-            // At the next kernel, winners will use
-            // "dPrevPathReflectanceOrOutRadiance" value
-            // (which is outRadiance atm) to do the actual update.
-            //
-            // We lose some data here (only a single winner will update the
-            // markov chain). But paper also does this via race condition.
-            // But that is non-determistic.
-            DeviceAtomic::AtomicMax(globalState.dMCLocks[i], rIndex);
-        }
-        dPrevPathReflectanceOrOutRadiance[rIndex] = outRadiance;
-    }
-}
-
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-static
-void KCBackpropagateIrradNEE(// I-O
-                             MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState,
-                             // Indirect Inputs (accessed by ray Indices)
-                             MRAY_GRID_CONSTANT const Span<const Float> dShadowPrevPathOutRadiance,
-                             MRAY_GRID_CONSTANT const Span<const uint32_t> dLiftedMCIndices,
-                             MRAY_GRID_CONSTANT const Span<const PathDataPack> dPathDataPack,
-                             // Diret Input
-                             MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer)
-{
-    using namespace GuidedPTRDetail;
-    assert(dShadowPrevPathOutRadiance.size() == dLiftedMCIndices.size());
-    assert(dLiftedMCIndices.size() == dPathDataPack.size());
-
-    KernelCallParams kp;
-    uint32_t rayCount = uint32_t(dShadowPrevPathOutRadiance.size());
-    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
-    {
-        uint32_t prevMCIndex = dLiftedMCIndices[i];
-        PathDataPack dataPack = dPathDataPack[i];
-        bool isVisible = dIsVisibleBuffer[i];
-        bool isDead = (dataPack.status[uint32_t(PathStatusEnum::DEAD)] ||
-                       dataPack.status[uint32_t(PathStatusEnum::INVALID)]);
-        bool isSpecular = (dataPack.type == RayType::SPECULAR_RAY);
-        bool hasNoPrev = (prevMCIndex == INVALID_MC_INDEX);
-        //
-        if(!isVisible || isSpecular || isDead || hasNoPrev) continue;
-        //
-        auto& dIrradHashGrid = globalState.dMCIrradiances;
-        Float radEstimate = dShadowPrevPathOutRadiance[i];
-        MCIrradiance::AtomicEMA(dIrradHashGrid[prevMCIndex], radEstimate);
-    }
-}
-
-MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-static
-void KCBackpropagateIrradLight(// I-O
-                               MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState,
-                               // Input
-                               MRAY_GRID_CONSTANT const Span<const uint32_t> dLiftedMCIndices,
-                               MRAY_GRID_CONSTANT const Span<const Float> dPrevPathReflectanceOrOutRadiance,
-                               // Determining if this is intermediate path (not hit light etc.)
-                               MRAY_GRID_CONSTANT const Span<const HitKeyPack> dHitKeys,
-                               MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
-{
-    using namespace GuidedPTRDetail;
-
-    KernelCallParams kp;
-    uint32_t rayCount = uint32_t(dRayIndices.size());
-    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
-    {
-        uint32_t rIndex = dRayIndices[i];
-        uint32_t isLightFlag = dHitKeys[rIndex].lightOrMatKey.FetchFlagPortion();
-        uint32_t prevMCIndex = dLiftedMCIndices[rIndex];
-        //
-        if(isLightFlag != IS_LIGHT_KEY_FLAG) continue;
-        if(prevMCIndex == INVALID_MC_INDEX) continue;
-
-        // For this kernel
-        // "dPrevPathReflectanceOrOutRadiance"
-        // has full radiance estimate since the light work kernel
-        // updated it.
-        Float outRadiance = dPrevPathReflectanceOrOutRadiance[rIndex];
-        auto& dIrradHashGrid = globalState.dMCIrradiances;
-        MCIrradiance::AtomicEMA(dIrradHashGrid[prevMCIndex], outRadiance);
     }
 }
 
@@ -283,15 +145,18 @@ void KCWriteHashGridDataToImg(MRAY_GRID_CONSTANT const ImageSpan img,
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static
-void KCUpdateMarkovChains(// I-O
-                          MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState,
-                          // Input
-                          MRAY_GRID_CONSTANT const Span<const Float> dPrevPathReflectanceOrOutRadiance,
-                          MRAY_GRID_CONSTANT const Span<const uint32_t> dLiftedMCIndices,
-                          // Determining if this is intermediate path (not hit light etc.)
-                          MRAY_GRID_CONSTANT const Span<const HitKeyPack> dHitKeys,
-                          MRAY_GRID_CONSTANT const Span<const RayGMem> dRays,
-                          MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
+void KCBackpropagateIrradPath(// I-O
+                              MRAY_GRID_CONSTANT const Span<Float> dPrevPathReflectanceOrOutRadiance,
+                              MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState,
+                              MRAY_GRID_CONSTANT const Span<BackupRNGState> dRNGStates,
+                              // Input
+                              MRAY_GRID_CONSTANT const Span<const uint32_t> dLiftedMCIndices,
+                              MRAY_GRID_CONSTANT const Span<const Float> dScoreSums,
+
+                              // Determining if this is intermediate path (not hit light etc.)
+                              MRAY_GRID_CONSTANT const Span<const HitKeyPack> dHitKeys,
+                              MRAY_GRID_CONSTANT const Span<const RayGMem> dRays,
+                              MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
 {
     using namespace GuidedPTRDetail;
 
@@ -302,10 +167,156 @@ void KCUpdateMarkovChains(// I-O
         uint32_t rIndex = dRayIndices[i];
         uint32_t isLightFlag = dHitKeys[rIndex].lightOrMatKey.FetchFlagPortion();
         uint32_t prevMCIndex = dLiftedMCIndices[rIndex];
-        uint32_t mcLock = globalState.dMCLocks[rIndex];
         //
         if(isLightFlag == IS_LIGHT_KEY_FLAG) continue;
         if(prevMCIndex == INVALID_MC_INDEX) continue;
+
+        // ======================= //
+        // Irradiance Cache Update //
+        // ======================= //
+        auto [ray, tMM] = RayFromGMem(dRays, rIndex);
+        Vector3 position = ray.AdvancedPos(tMM[1]);
+        Vector3 direction = Math::Normalize(-ray.dir);
+
+        const HashGridView& hg = globalState.hashGrid;
+        auto locationOpt = hg.Search(position, direction);
+        //
+        if(!locationOpt) continue;
+        // Race condition here!
+        // We read while somebody writes to this specific location
+        // maybe. It is fine as long as it is properly updated by writers.
+        // Reading a stale value just hinders backpropogation speed maybe.
+        //
+        // TODO: Check if proper syncronization is good / bad etc.
+        auto& dIrradHashGrid = globalState.dMCIrradiances;
+        Float irrad = dIrradHashGrid[*locationOpt].irrad;
+        Float refl = dPrevPathReflectanceOrOutRadiance[rIndex];
+        Float outRadiance = refl * irrad;
+        MCIrradiance::AtomicEMA(dIrradHashGrid[prevMCIndex], outRadiance);
+
+        // ========================= //
+        //  Markov Chain Lock Update //
+        // ========================= //
+        Float weight = outRadiance;
+        BackupRNG rng = BackupRNG(dRNGStates[rIndex]);
+        Float scoreSum = dScoreSums[rIndex];
+        // Not as good as previous mixture, skip
+        if(rng.NextFloat() * scoreSum < weight * MC_LOBE_COUNT)
+        {
+            // This kernel will be used as deterministic lock mechanism
+            // where largest rIndex will be the winner
+            // At the next kernel, winners will use
+            // "dPrevPathReflectanceOrOutRadiance" value
+            // (which is outRadiance atm) to do the actual update.
+            //
+            // We lose some data here (only a single winner will update the
+            // markov chain). But paper also does this via race condition.
+            // But that is non-determistic.
+            DeviceAtomic::AtomicMax(globalState.dMCLocks[prevMCIndex], rIndex);
+        }
+        dPrevPathReflectanceOrOutRadiance[rIndex] = outRadiance;
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static
+void KCBackpropagateIrradNEE(// I-O
+                             MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState,
+                             // Indirect Inputs (accessed by ray Indices)
+                             MRAY_GRID_CONSTANT const Span<const Float> dShadowPrevPathOutRadiance,
+                             MRAY_GRID_CONSTANT const Span<const uint32_t> dLiftedMCIndices,
+                             MRAY_GRID_CONSTANT const Span<const PathDataPack> dPathDataPack,
+                             // Diret Input
+                             MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer)
+{
+    using namespace GuidedPTRDetail;
+    assert(dShadowPrevPathOutRadiance.size() == dLiftedMCIndices.size());
+    assert(dLiftedMCIndices.size() == dPathDataPack.size());
+
+    KernelCallParams kp;
+    uint32_t rayCount = uint32_t(dShadowPrevPathOutRadiance.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        uint32_t prevMCIndex = dLiftedMCIndices[i];
+        PathDataPack dataPack = dPathDataPack[i];
+        bool isVisible = dIsVisibleBuffer[i];
+        bool isDead = (dataPack.status[uint32_t(PathStatusEnum::DEAD)] ||
+                       dataPack.status[uint32_t(PathStatusEnum::INVALID)]);
+        bool isSpecular = (dataPack.type == RayType::SPECULAR_RAY);
+        bool hasNoPrev = (prevMCIndex == INVALID_MC_INDEX);
+        //
+        if(!isVisible || isSpecular || isDead || hasNoPrev) continue;
+        //
+        auto& dIrradHashGrid = globalState.dMCIrradiances;
+        Float radEstimate = dShadowPrevPathOutRadiance[i];
+        MCIrradiance::AtomicEMA(dIrradHashGrid[prevMCIndex], radEstimate);
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static
+void KCBackpropagateIrradLight(// I-O
+                               MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState,
+                               // Input
+                               MRAY_GRID_CONSTANT const Span<const uint32_t> dLiftedMCIndices,
+                               MRAY_GRID_CONSTANT const Span<const Float> dPrevPathReflectanceOrOutRadiance,
+                               // Determining if this is intermediate path (not hit light etc.)
+                               MRAY_GRID_CONSTANT const Span<const HitKeyPack> dHitKeys,
+                               MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
+{
+    using namespace GuidedPTRDetail;
+
+    KernelCallParams kp;
+    uint32_t rayCount = uint32_t(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        uint32_t rIndex = dRayIndices[i];
+        uint32_t isLightFlag = dHitKeys[rIndex].lightOrMatKey.FetchFlagPortion();
+        uint32_t prevMCIndex = dLiftedMCIndices[rIndex];
+        //
+        if(isLightFlag != IS_LIGHT_KEY_FLAG) continue;
+        if(prevMCIndex == INVALID_MC_INDEX) continue;
+
+        // For this kernel
+        // "dPrevPathReflectanceOrOutRadiance"
+        // has full radiance estimate since the light work kernel
+        // updated it.
+        Float outRadiance = dPrevPathReflectanceOrOutRadiance[rIndex];
+        auto& dIrradHashGrid = globalState.dMCIrradiances;
+        MCIrradiance::AtomicEMA(dIrradHashGrid[prevMCIndex], outRadiance);
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static
+void KCUpdateMarkovChains(// Output
+                          MRAY_GRID_CONSTANT const Span<TransientMCState> dWriteMCStates,
+                          // I-O
+                          MRAY_GRID_CONSTANT const Span<uint32_t> dLiftedOrWriteMCIndices,
+                          MRAY_GRID_CONSTANT const Span<BackupRNGState> dRNGStates,
+                          // Input
+                          MRAY_GRID_CONSTANT const Span<const Float> dPrevPathReflectanceOrOutRadiance,
+
+                          // Determining if this is intermediate path (not hit light etc.)
+                          MRAY_GRID_CONSTANT const Span<const HitKeyPack> dHitKeys,
+                          MRAY_GRID_CONSTANT const Span<const RayGMem> dRays,
+                          MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices,
+                          MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState)
+{
+    using namespace GuidedPTRDetail;
+
+    KernelCallParams kp;
+    uint32_t rayCount = uint32_t(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        uint32_t rIndex = dRayIndices[i];
+        uint32_t isLightFlag = dHitKeys[rIndex].lightOrMatKey.FetchFlagPortion();
+        uint32_t prevMCIndex = dLiftedOrWriteMCIndices[rIndex];
+        //
+        if(isLightFlag == IS_LIGHT_KEY_FLAG) continue;
+        if(prevMCIndex == INVALID_MC_INDEX) continue;
+
+        uint32_t mcLock = globalState.dMCLocks[prevMCIndex];
         if(mcLock != rIndex) continue;
 
         // ====================== //
@@ -316,17 +327,17 @@ void KCUpdateMarkovChains(// I-O
         Vector3 dir = Math::Normalize(ray.dir);
         // If a thread is here we have the lock,
         // we can freely modify
-        auto& dStates = globalState.dMCStates;
-        auto& dCounts = globalState.dMCCounts;
+        const auto& dStates = globalState.dMCStates;
+        const auto& dCounts = globalState.dMCCounts;
         MCState s     = dStates[prevMCIndex];
         MCCount count = dCounts[prevMCIndex];
         // Update routine
-        static constexpr Float MIN_EMA_RATIO_CM = Float(0.01);
-        static constexpr uint16_t MAX_SAMPLE_MC = uint16_t(2048);
+        static constexpr Float MIN_EMA_RATIO_MC = Float(0.01);
+        static constexpr uint16_t MAX_SAMPLE_MC = uint16_t(1024);
         Float weight = dPrevPathReflectanceOrOutRadiance[rIndex];
         count = Math::Min<uint16_t>(count + 1, MAX_SAMPLE_MC);
 
-        Float tMC = Math::Max(Float(1) / Float(count), MIN_EMA_RATIO_CM);
+        Float tMC = Math::Max(Float(1) / Float(count), MIN_EMA_RATIO_MC);
         s.weight = Math::Lerp(s.weight, weight, tMC);
         s.target = Math::Lerp(s.target, pos * weight, tMC);
         //
@@ -334,9 +345,65 @@ void KCUpdateMarkovChains(// I-O
         Float newCos = Math::Max(Math::Dot(dir, stateDir), Float(0));
         s.cos = Math::Lerp(s.cos, weight * newCos, tMC);
 
+        // TODO:
+        uint32_t newIndex = 33;
+
         // Finally, write back
-        dStates[prevMCIndex] = s;
-        dCounts[prevMCIndex] = count;
+        dWriteMCStates[rIndex].s = s;
+        dWriteMCStates[rIndex].N = count;
+        // New index
+        dLiftedOrWriteMCIndices[rIndex] = newIndex;
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static
+void KCLockMarkovChainLocations(MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState,
+                                MRAY_GRID_CONSTANT const Span<const uint32_t> dMCWriteIndices,
+                                MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices,
+                                MRAY_GRID_CONSTANT const Span<const HitKeyPack> dHitKeys)
+{
+    using namespace GuidedPTRDetail;
+
+    KernelCallParams kp;
+    uint32_t rayCount = uint32_t(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        uint32_t rIndex = dRayIndices[i];
+        uint32_t isLightFlag = dHitKeys[rIndex].lightOrMatKey.FetchFlagPortion();
+        uint32_t writeMCIndex = dMCWriteIndices[rIndex];
+        //
+        if(isLightFlag == IS_LIGHT_KEY_FLAG) continue;
+        if(writeMCIndex == INVALID_MC_INDEX) continue;
+
+        DeviceAtomic::AtomicMax(globalState.dMCLocks[writeMCIndex], rIndex);
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+static
+void KCWriteMarkovChains(MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState,
+                         MRAY_GRID_CONSTANT const Span<const TransientMCState> dWriteMCStates,
+                         MRAY_GRID_CONSTANT const Span<const uint32_t> dMCWriteIndices,
+                         MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices,
+                         MRAY_GRID_CONSTANT const Span<const HitKeyPack> dHitKeys)
+{
+     using namespace GuidedPTRDetail;
+
+    KernelCallParams kp;
+    uint32_t rayCount = uint32_t(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        uint32_t rIndex = dRayIndices[i];
+        uint32_t isLightFlag = dHitKeys[rIndex].lightOrMatKey.FetchFlagPortion();
+        uint32_t writeMCIndex = dMCWriteIndices[rIndex];
+        //
+        if(isLightFlag == IS_LIGHT_KEY_FLAG) continue;
+        if(writeMCIndex == INVALID_MC_INDEX) continue;
+        if(globalState.dMCLocks[writeMCIndex] != rIndex) continue;
+
+        globalState.dMCStates[writeMCIndex] = dWriteMCStates[rIndex].s;
+        globalState.dMCCounts[writeMCIndex] = uint16_t(dWriteMCStates[rIndex].N);
     }
 }
 
@@ -659,17 +726,45 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
         dRays,
         dIndices
     );
+
+    // Repurpose "shadowRays" buffer for MCStateLifting
+    Span<TransientMCState> dLiftedMCStates = MemAlloc::RepurposeAlloc<TransientMCState>(dShadowRays);
+
     processQueue.IssueWorkKernel<KCUpdateMarkovChains>
     (
         "KCUpdateMarkovChains",
         DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
         //
-        globalState,
-        dPrevPathReflectanceOrOutRadiance,
+        dLiftedMCStates,
         dLiftedMCIndices,
+        dBackupRNGStates,
+        dPrevPathReflectanceOrOutRadiance,
         dHitKeys,
         dRays,
-        dIndices
+        dIndices,
+        globalState
+    );
+    processQueue.MemsetAsync(dMCLocks, 0x00);
+    processQueue.IssueWorkKernel<KCLockMarkovChainLocations>
+    (
+        "KCLockMarkovChainLocations",
+        DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
+        //
+        globalState,
+        dIndices,
+        dLiftedMCIndices,
+        dHitKeys
+    );
+    processQueue.IssueWorkKernel<KCWriteMarkovChains>
+    (
+        "KCWriteMarkovChains",
+        DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
+        //
+        globalState,
+        dLiftedMCStates,
+        dLiftedMCIndices,
+        dIndices,
+        dHitKeys
     );
 
     // Clear the shadow ray stuff
@@ -869,7 +964,7 @@ GuidedPTRenderer::DoThroughputSingleTileRender(const GPUDevice& device,
     analyticData = CalculateAnalyticDataThroughput(dDeadRayIndices.size(),
                                                    currentOptions.totalSPP,
                                                    timer);
-    //analyticData.customLogicSize0 = uint32_t(PathTraceRDetail::SampleMode::E::END);
+    analyticData.customLogicSize0 = uint32_t(DisplayMode::E::END);
     return RendererOutput
     {
         .analytics = std::move(analyticData),
@@ -996,7 +1091,7 @@ GuidedPTRenderer::DoLatencyRender(uint32_t passCount,
     RendererAnalyticData analyticData;
     analyticData = CalculateAnalyticDataLatency(passPathCount, currentOptions.totalSPP,
                                                 timer);
-    //analyticData.customLogicSize0 = uint32_t(PathTraceRDetail::SampleMode::E::END);
+    analyticData.customLogicSize0 = uint32_t(DisplayMode::E::END);
 
     return RendererOutput
     {
@@ -1009,20 +1104,21 @@ GuidedPTRenderer::DoLatencyRender(uint32_t passCount,
 RenderBufferInfo
 GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
                               CamSurfaceId camSurfId,
-                              uint32_t,
+                              uint32_t customLogicIndex0,
                               uint32_t)
 {
     currentOptions = newOptions;
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
 
     // Change the mode according to the render logic
-    //using Math::Roll;
-    //int32_t modeIndex = (int32_t(SampleMode::E(currentOptions.sampleMode)) +
-    //                     int32_t(customLogicIndex0));
-    //uint32_t sendMode = uint32_t(Roll(int32_t(customLogicIndex0), 0,
-    //                                  int32_t(SampleMode::E::END)));
-    //uint32_t newMode = uint32_t(Roll(modeIndex, 0, int32_t(SampleMode::E::END)));
-    //currentOptions.sampleMode = SampleMode::E(newMode);
+    using Math::Roll;
+    int32_t modeIndex = (int32_t(DisplayMode::E(currentOptions.displayMode)) +
+                         int32_t(customLogicIndex0));
+    uint32_t sendMode = uint32_t(Roll(int32_t(customLogicIndex0), 0,
+                                      int32_t(DisplayMode::E::END)));
+    uint32_t newMode = uint32_t(Roll(modeIndex, 0, int32_t(DisplayMode::E::END)));
+    currentOptions.displayMode = DisplayMode::E(newMode);
+    MRAY_LOG("NewMode! {}", newMode);
 
     // ================================ //
     // Initialize common sub components //
@@ -1150,7 +1246,7 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
         .totalSize = bufferPtrAndSize.second,
         .renderColorSpace = colorSpace,
         .resolution = imageTiler.FullResolution(),
-        .curRenderLogic0 = std::numeric_limits<uint32_t>::max(),
+        .curRenderLogic0 = sendMode,
         .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
     };
 }

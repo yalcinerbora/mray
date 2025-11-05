@@ -215,7 +215,7 @@ namespace GuidedPTRDetail
         MR_GF_DECL void             Product(const std::array<GaussianLobe, 2>& matLobes);
     };
 
-    static constexpr uint32_t MC_LOBE_COUNT = 16;
+    static constexpr uint32_t MC_LOBE_COUNT = 1;
 
     // TODO: Macro for CPU/GPU after profiling
     //using GaussianLobeMixture = GaussLobeMixtureSharedT<MC_LOBE_COUNT>;
@@ -269,7 +269,7 @@ MCIrradiance::AtomicEMA(MCIrradiance& dLoc, Float radEst)
     return DeviceAtomic::EmulateAtomicOp(dLoc, [radEst](MCIrradiance e)
     {
         static constexpr Float MIN_EMA_RATIO_IRRAD = Float(0.01);
-        static constexpr uint32_t MAX_SAMPLE = uint32_t(2048);
+        static constexpr uint32_t MAX_SAMPLE = uint32_t(1024);
         //
         e.N = Math::Min(e.N + 1, MAX_SAMPLE);
         Float t = Math::Max(Float(1) / Float(e.N), MIN_EMA_RATIO_IRRAD);
@@ -289,23 +289,28 @@ GaussianLobe SufficientStatsToLobe(const MCState& state,
 
     // Fetch direction
     Vector3 target = state.target;
-    target = (state.weight > 0) ? (target / state.weight) : target;
+    Float wRecip = Float(1) / state.weight;
+    target = (state.weight > 0) ? (target * wRecip) : target;
 
     // Dir
     Vector3 dir = target - samplePos;
     Float distSqr = Math::LengthSqr(dir);
-    Float priorState = Math::Max(Epsilon, DirGuidePrior / distSqr);
-    dir /= Math::Sqrt(distSqr);
-
+    if(distSqr != Float(0))
+        dir /= Math::Sqrt(distSqr);
     // Kappa
     Float nSqr = Float(mcSampleCount) * Float(mcSampleCount);
-    Float meanCos = nSqr * Math::Clamp(state.cos / state.weight, Float(0), MaxCos);
-    meanCos = nSqr / priorState;
+    Float meanCos = nSqr * Math::Clamp(state.cos / wRecip, Float(0), MaxCos);
+    Float priorState = Math::Max(Epsilon, DirGuidePrior / distSqr);
+    meanCos /= (nSqr + priorState);
     // Mean cosine to kappa
     Float r = meanCos;
     Float r2 = r * r;
     Float r3 = r * r2;
     Float kappa = (Float(3) * r - r3) / (Float(1) - r2);
+
+    assert(Math::IsFinite(dir));
+    assert(Math::IsFinite(kappa));
+    assert(kappa >= Float(0));
     return GaussianLobe(dir, kappa);
 }
 
@@ -557,7 +562,7 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     // ====================== //
     GaussianLobeMixture mixture;
     uint32_t liftedMCIndex = mixture.LoadStochastic(surf.position,
-                                                    surf.geoNormal,
+                                                    wOWorld,
                                                     backupRNG,
                                                     gs);
     // TODO: Product sampling

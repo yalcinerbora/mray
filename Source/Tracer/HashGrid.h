@@ -230,8 +230,9 @@ SpatioDirCode HashGridView::GenCode(const Vector3& pos,
     // And finally, normal
     // Normal
     // TODO: Numeric precision stuff (should we wrap here maybe?)
-    Vector2 encodedN = Graphics::DirectionToConcentricOctahedral(normal);
-    Vector2ui texelN = Vector2ui(Math::RoundInt(encodedN * normalDelta));
+    Vector3 nZ = TransformGen::ZUpToYUp(normal);
+    Vector2 encodedN = Graphics::DirectionToConcentricOctahedral(nZ);
+    Vector2ui texelN = Vector2ui(encodedN * normalDelta);
     texelN = Math::Clamp(texelN, Vector2ui::Zero(), Vector2ui(normalRegionDim - 1));
     uint32_t mcNormal = Graphics::MortonCode::Compose2D<uint32_t>(texelN);
     //
