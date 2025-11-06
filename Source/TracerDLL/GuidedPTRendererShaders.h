@@ -68,11 +68,11 @@ namespace GuidedPTRDetail
         // ====================== //
         uint32_t cacheEntryLimit    = 2'000'000; // At most 2M entries
                                                  // (allocation is 2x 2M = nearest pow2)
-        uint32_t cachePosBits       = 16;        // Maximum subdiv of bottom level voxel
+        uint32_t cachePosBits       = 14;        // Maximum subdiv of bottom level voxel
                                                  // SceneAABB / 2^16 = voxel size
         uint32_t cacheNormalBits    = 2;         // Concentric Octrahedral map of the normal
                                                  // which will be divided on to 4x4 grid
-        uint32_t cacheLevelCount    = 8;         // Maximum upper levels of the voxel grid
+        uint32_t cacheLevelCount    = 12;        // Maximum upper levels of the voxel grid
         Float    cacheConeAperture = Float(0.6); // When a ray hits a cache entry, it will be assumed
                                                  // has a differential as if it had a ray cone with this
                                                  // aperture.
@@ -110,7 +110,7 @@ namespace GuidedPTRDetail
         // Limit probably of lobe selection.
         // At start this will be lower, this is the maximum
         // on the equilibrium.
-        Float       lobeProbablity = Float(0.0);
+        Float       lobeProbablity = Float(0.75);
         // For debugging etc.
         DisplayMode displayMode;
     };
@@ -215,7 +215,7 @@ namespace GuidedPTRDetail
         MR_GF_DECL void             Product(const std::array<GaussianLobe, 2>& matLobes);
     };
 
-    static constexpr uint32_t MC_LOBE_COUNT = 1;
+    static constexpr uint32_t MC_LOBE_COUNT = 5;
 
     // TODO: Macro for CPU/GPU after profiling
     //using GaussianLobeMixture = GaussLobeMixtureSharedT<MC_LOBE_COUNT>;
@@ -269,7 +269,7 @@ MCIrradiance::AtomicEMA(MCIrradiance& dLoc, Float radEst)
     return DeviceAtomic::EmulateAtomicOp(dLoc, [radEst](MCIrradiance e)
     {
         static constexpr Float MIN_EMA_RATIO_IRRAD = Float(0.01);
-        static constexpr uint32_t MAX_SAMPLE = uint32_t(1024);
+        static constexpr uint32_t MAX_SAMPLE = uint32_t(4096);
         //
         e.N = Math::Min(e.N + 1, MAX_SAMPLE);
         Float t = Math::Max(Float(1) / Float(e.N), MIN_EMA_RATIO_IRRAD);
@@ -323,6 +323,7 @@ GaussLobeMixtureT<N>::Sample(RNGDispenser& rng) const
     {
         return SampleT<Vector3>
         {
+            .value = Vector3::YAxis(),
             .pdf = Float(0)
         };
     }
@@ -358,12 +359,9 @@ uint32_t GaussLobeMixtureT<N>::LoadStochastic(const Vector3& position,
     uint32_t liftedNodeIndex = INVALID_MC_INDEX;
     for(uint32_t i = 0; i < N; i++)
     {
-        // TODO: Sample with randomness
-        //Vector3 posJitter = position + Vector3(rng.NextFloat());
-        //Vector3 nJitter   = Math::Normalize(normal + Vector3(rng.NextFloat()));
-        Vector3 posJitter = position;
-        Vector3 nJitter = Math::Normalize(normal);
-        auto [hashGridIndex, _] = gs.hashGrid.TryInsertAtomic(posJitter, nJitter);
+        //auto code = gs.hashGrid.GenCode(position, Math::Normalize(normal));
+        auto code = gs.hashGrid.GenCodeStochastic(position, Math::Normalize(normal), rng);
+        auto [hashGridIndex, _] = gs.hashGrid.TryInsertAtomic(code);
 
         if(hashGridIndex == HashGridView::INVALID_INDEX)
         {
@@ -467,12 +465,9 @@ uint32_t GaussLobeMixtureSharedT<N>::LoadStochastic(const Vector3& position,
     uint32_t liftedNodeIndex = INVALID_MC_INDEX;
     for(uint32_t i = 0; i < N; i++)
     {
-        // TODO: Sample with randomness
-        //Vector3 posJitter = position + Vector3(rng.NextFloat());
-        //Vector3 nJitter   = Math::Normalize(normal + Vector3(rng.NextFloat()));
-        Vector3 posJitter = position;
-        Vector3 nJitter = Math::Normalize(normal);
-        auto [hashGridIndex, _] = gs.hashGrid.TryInsertAtomic(posJitter, nJitter);
+        //auto code = gs.hashGrid.GenCode(position, Math::Normalize(normal));
+        auto code = gs.hashGrid.GenCodeStochastic(position, Math::Normalize(normal), rng);
+        auto [hashGridIndex, _] = gs.hashGrid.TryInsertAtomic(code);
 
         GaussianLobe lobe = GaussianLobe(Vector3::Zero(), 0, 0);
         Float weight = Float(0);
@@ -581,12 +576,14 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     if(!isSpecular)
         misWeights[0] = Math::Lerp(Float(0), gs.lobeProbability,
                                    Float(1) - specularity);
+    // Skip vMF sampling if sample is back (probably start of render)
+    misWeights[0] = (mixture.sumWeight == Float(0))
+                        ? Float(0)
+                        : misWeights[0];
     misWeights[1] = Float(1) - misWeights[0];
-
     BxDFSample pathSample;
     if(rng.NextFloat<MISSampleStart>() < misWeights[0])
     {
-        assert(false);
         // Sample Mixture
         auto mixtureSample = mixture.Sample(rng);
         Vector3 wILocal = Math::Normalize(tContext.InvApplyV(mixtureSample.value));
@@ -605,12 +602,6 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     }
     Float pdfPath = BalanceCancelled<2>(misPDFs, misWeights);
 
-    // ================== //
-    //   Path Throughput  //
-    // ================== //
-    Spectrum pathThroughput = throughput * pathSample.eval.reflectance;
-    RayCone pathRayConeOut = rConeRefract.ConeAfterScatter(pathSample.wI.dir,
-                                                           surf.geoNormal);
     // ================ //
     // Russian Roulette //
     // ================ //
@@ -619,12 +610,24 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     bool isPathDead = (dataPack.depth >= rrRange[1]);
     if(!isPathDead && dataPack.depth >= rrRange[0] && !isSpecular)
     {
+        // TODO: This is still wrong maybe? What about dispersion?
+        static constexpr Float ChannelCountInv = (SpectrumConv::IsRGB)
+                        ? Float(0.33333333)
+                        : Float(1) / Float(SpectraPerSpectrum);
+
         Float rrXi = rng.NextFloat<RRSampleStart>();
-        Float rrFactor = pathThroughput.Sum() * Float(0.33333);
-        auto result = RussianRoulette(pathThroughput, rrFactor, rrXi);
+        Float rrFactor = throughput.Sum() * ChannelCountInv;
+        auto result = RussianRoulette(throughput, rrFactor, rrXi);
         isPathDead = !result.has_value();
-        pathThroughput = result.value_or(pathThroughput);
+        throughput = result.value_or(throughput);
     }
+
+    // ================== //
+    //   Path Throughput  //
+    // ================== //
+    Spectrum pathThroughput = throughput * pathSample.eval.reflectance;
+    RayCone pathRayConeOut = rConeRefract.ConeAfterScatter(pathSample.wI.dir,
+                                                           surf.geoNormal);
 
     // Change the ray type, if mat is highly specular
     // we do not bother casting NEE ray. So if this ray
@@ -711,9 +714,8 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     // ================== //
     //   NEE Throughput   //
     // ================== //
-    Spectrum shadowRadiance = throughput;
     BxDFEval shadowRayEval = mat.Evaluate(wIShadow, wO);
-    shadowRadiance *= shadowRayEval.reflectance;
+    Spectrum shadowRadiance = throughput * shadowRayEval.reflectance;
     shadowRadiance *= lightSample.value.emission;
     shadowRadiance = DivideByPDF(shadowRadiance, pdfShadow);
     RayCone shadowRayConeOut = rConeRefract.ConeAfterScatter(shadowRay.dir,

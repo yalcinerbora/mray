@@ -100,16 +100,17 @@ struct HashGridView
     MR_HF_DECL
     SpatioDirCode       GenCode(const Vector3& pos,
                                 const Vector3& normal) const;
+    MR_HF_DECL
+    SpatioDirCode       GenCodeStochastic(const Vector3& pos,
+                                          const Vector3& normal,
+                                          BackupRNG& rng) const;
     public:
     MR_HF_DECL
-    Optional<uint32_t>  Search(const Vector3& pos,
-                               const Vector3& normal) const;
+    Optional<uint32_t>  Search(const SpatioDirCode& codel) const;
     MR_HF_DECL
-    InsertResult        TryInsert(const Vector3& pos,
-                                  const Vector3& normal) const;
+    InsertResult        TryInsert(const SpatioDirCode& code) const;
     MR_GF_DECL
-    InsertResult        TryInsertAtomic(const Vector3& pos,
-                                        const Vector3& normal) const;
+    InsertResult        TryInsertAtomic(const SpatioDirCode& code) const;
 };
 
 class HashGrid
@@ -217,19 +218,21 @@ SpatioDirCode HashGridView::GenCode(const Vector3& pos,
     Float coneWidth = tanConeHalfTimes2 * Math::Length(pos - camLocation);
     uint32_t ratio = uint32_t(Math::RoundInt(coneWidth * baseRegionDelta));
     uint32_t level = Bit::RequiredBitsToRepresent(ratio);
-    level = Math::Min(level, SpatioDirCode::MaxLevel());
+    level = Math::Min(level, maxLevel);
+
     // Position
-    Vector3 locF = (pos - hashGridRegion.Min()) * baseRegionDelta;
-    Vector3i loc = Math::Clamp(Math::RoundInt(locF),
-                               Vector3i::Zero(),
-                               Vector3i(baseRegionDim - 1));
-    uint64_t mcPos = Graphics::MortonCode::Compose3D<uint64_t>(Vector3ui(loc));
-    static constexpr auto MAX_SHIFT = uint32_t(sizeof(uint64_t) * CHAR_BIT - 1);
-    mcPos >>= Math::Min(MAX_SHIFT, level * 3u);
+    Float levelDelta = baseRegionDelta / Float(1u << level);
+    int32_t levelMax = (baseRegionDim >> level) - 1;
+    Vector3 locF = (pos - hashGridRegion.Min()) * levelDelta;
+    auto iX = int32_t(locF[0]);
+    auto iY = int32_t(locF[1]);
+    auto iZ = int32_t(locF[2]);
+    Vector3i loc = Math::Clamp(Vector3i(iX, iY, iZ), Vector3i::Zero(),
+                               Vector3i(levelMax));
+    using Graphics::MortonCode::Compose3D;
+    uint64_t mcPos = Compose3D<uint64_t>(Vector3ui(loc));
 
     // And finally, normal
-    // Normal
-    // TODO: Numeric precision stuff (should we wrap here maybe?)
     Vector3 nZ = TransformGen::ZUpToYUp(normal);
     Vector2 encodedN = Graphics::DirectionToConcentricOctahedral(nZ);
     Vector2ui texelN = Vector2ui(encodedN * normalDelta);
@@ -240,8 +243,50 @@ SpatioDirCode HashGridView::GenCode(const Vector3& pos,
 }
 
 MR_HF_DEF
-Optional<uint32_t> HashGridView::Search(const Vector3& pos,
-                                        const Vector3& normal) const
+SpatioDirCode HashGridView::GenCodeStochastic(const Vector3& pos,
+                                              const Vector3& normal,
+                                              BackupRNG& rng) const
+{
+    // Level
+    Float coneWidth = tanConeHalfTimes2 * Math::Length(pos - camLocation);
+    uint32_t ratio = uint32_t(Math::RoundInt(coneWidth * baseRegionDelta));
+    uint32_t level = Bit::RequiredBitsToRepresent(ratio);
+    uint32_t rndLevelOffset = uint32_t(-Math::Log2(Float(1) - rng.NextFloat()));
+    //uint32_t rndLevelOffset = 0;
+    level = Math::Min(level + rndLevelOffset, maxLevel);
+
+    // Position
+    Float levelDelta = baseRegionDelta / Float(1u << level);
+    int32_t levelMax = (baseRegionDim >> level) - 1;
+    Vector3 locF = (pos - hashGridRegion.Min()) * levelDelta;
+    auto [iX, fX] = Math::ModFInt(locF[0]);
+    auto [iY, fY] = Math::ModFInt(locF[1]);
+    auto [iZ, fZ] = Math::ModFInt(locF[2]);
+    // Select a interpolant from the fraction (a corner of the grid)
+    // If you suppose do stochastic sampling overall average of these
+    // samples should result in "pos"
+    // TODO: Paper has another impl, maybe that is faster than
+    // getting 3 random numbers? Investigate
+    iX += rng.NextFloat() > fX ? (0) : (1);
+    iY += rng.NextFloat() > fY ? (0) : (1);
+    iZ += rng.NextFloat() > fZ ? (0) : (1);
+    Vector3i loc = Math::Clamp(Vector3i(iX, iY, iZ), Vector3i::Zero(),
+                               Vector3i(levelMax));
+    using Graphics::MortonCode::Compose3D;
+    uint64_t mcPos = Compose3D<uint64_t>(Vector3ui(loc));
+
+    // And finally, normal
+    Vector3 nZ = TransformGen::ZUpToYUp(normal);
+    Vector2 encodedN = Graphics::DirectionToConcentricOctahedral(nZ);
+    Vector2ui texelN = Vector2ui(encodedN * normalDelta);
+    texelN = Math::Clamp(texelN, Vector2ui::Zero(), Vector2ui(normalRegionDim - 1));
+    uint32_t mcNormal = Graphics::MortonCode::Compose2D<uint32_t>(texelN);
+    //
+    return SpatioDirCode(mcPos, mcNormal, level);
+}
+
+MR_HF_DEF
+Optional<uint32_t> HashGridView::Search(const SpatioDirCode& code) const
 {
     [[maybe_unused]]
     static constexpr auto S_VAL = SENTINEL_VAL;
@@ -249,7 +294,6 @@ Optional<uint32_t> HashGridView::Search(const Vector3& pos,
 
     uint32_t tableSize = dHashes.size();
     uint32_t divMask = uint32_t(tableSize - 1);
-    SpatioDirCode code = GenCode(pos, normal);
     uint64_t codeInt = static_cast<uint64_t>(code);
     assert(code != S_VAL);
     assert(code != E_VAL);
@@ -274,7 +318,7 @@ Optional<uint32_t> HashGridView::Search(const Vector3& pos,
 
 MR_HF_DEF
 typename HashGridView::InsertResult
-HashGridView::TryInsert(const Vector3& pos, const Vector3& normal) const
+HashGridView::TryInsert(const SpatioDirCode& code) const
 {
     if(dAllocCounter.front() >= maxEntryLimit)
         return InsertResult{INVALID_INDEX, false};
@@ -284,7 +328,6 @@ HashGridView::TryInsert(const Vector3& pos, const Vector3& normal) const
 
     uint32_t tableSize = dHashes.size();
     uint32_t divMask = uint32_t(tableSize - 1);
-    SpatioDirCode code = GenCode(pos, normal);
     uint64_t codeInt = static_cast<uint64_t>(code);
     assert(code != S_VAL);
     assert(code != E_VAL);
@@ -310,8 +353,7 @@ HashGridView::TryInsert(const Vector3& pos, const Vector3& normal) const
 
 MR_GF_DEF
 typename HashGridView::InsertResult
-HashGridView::TryInsertAtomic(const Vector3& pos,
-                              const Vector3& normal) const
+HashGridView::TryInsertAtomic(const SpatioDirCode& code) const
 {
     [[maybe_unused]]
     static constexpr auto S_VAL = SENTINEL_VAL;
@@ -330,7 +372,6 @@ HashGridView::TryInsertAtomic(const Vector3& pos,
 
     uint32_t tableSize = dHashes.size();
     uint32_t divMask = uint32_t(tableSize - 1);
-    SpatioDirCode code = GenCode(pos, normal);
     uint64_t codeInt = static_cast<uint64_t>(code);
     assert(code != E_VAL);
     assert(code != S_VAL);
@@ -358,14 +399,21 @@ HashGridView::TryInsertAtomic(const Vector3& pos,
         {
             using DeviceAtomic::AtomicAdd;
             using DeviceAtomic::AtomicCompSwap;
-            //
-            AtomicAdd(dAllocCounter.front(), 1u);
             SpatioDirCode old = AtomicCompSwap(dHashes[i], E_VAL, code);
             // Successfull insert.
-            if(old == E_VAL) return InsertResult{i, true};
+            if(old == E_VAL)
+            {
+                AtomicAdd(dAllocCounter.front(), 1u);
+                return InsertResult{i, true};
+            }
+            // Unsuccessfull insert but we find the code
+            else if(old == code)
+            {
+                return InsertResult{i, false};
+            }
         }
         //
-        if(i == index - 1)   break;
+        if(i == index - 1) break;
     }
     assert(false && "HT Full!");
     return InsertResult{INVALID_INDEX, false};

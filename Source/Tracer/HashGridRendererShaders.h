@@ -108,15 +108,8 @@ void BounceWork<P, M, T>::Call(const Primitive&, const Material& mat, const Surf
         Vector3 checkPos = surf.position;
         Vector3 checkNormal = surf.geoNormal;
 
-        auto [spatialDataIndex, _] = hashGrid.TryInsertAtomic(checkPos, checkNormal);
-        for(uint32_t ttt = 0; ttt < 4; ttt++)
-        {
-            Vector3 delta = Vector3((rng2.NextFloat() * 2 - 1) * 10,
-                                    (rng2.NextFloat() * 2 - 1) * 10,
-                                    (rng2.NextFloat() * 2 - 1) * 10);
-            hashGrid.Search(checkPos + delta, surf.geoNormal);
-        }
-
+        auto code = hashGrid.GenCode(checkPos, checkNormal);
+        auto [spatialDataIndex, _] = hashGrid.TryInsertAtomic(code);
         if(!pathStatus[uint32_t(PathStatusEnum::COLOR_WRITTEN)])
         {
             pathStatus[uint32_t(PathStatusEnum::COLOR_WRITTEN)] = true;
@@ -157,7 +150,8 @@ void LightBounceWork<L, T>::Call(const Light&, RNGDispenser&,
         Vector3 wO = -ray.dir;
 
         const auto& hashGrid = params.globalState.hashGrid;
-        auto [spatialDataIndex, _] = hashGrid.TryInsertAtomic(position, wO);
+        auto code = hashGrid.GenCode(position, wO);
+        auto [spatialDataIndex, _] = hashGrid.TryInsertAtomic(code);
 
         if(!pathStatus[uint32_t(PathStatusEnum::COLOR_WRITTEN)])
         {

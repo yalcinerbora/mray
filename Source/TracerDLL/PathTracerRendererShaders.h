@@ -198,8 +198,13 @@ void WorkFunction<P, M, T, SC>::Call(const Primitive&, const Material& mat, cons
     if(!isPathDead && dataPack.depth >= rrRange[0] &&
        !MaterialCommon::IsSpecular(specularity))
     {
+        // TODO: This is still wrong maybe? What about dispersion?
+        static constexpr Float ChannelCountInv = (SpectrumConv::IsRGB)
+            ? Float(0.33333333)
+            : Float(1) / Float(SpectraPerSpectrum);
+
         Float rrXi = rng.NextFloat<Material::SampleRNList.TotalRNCount()>();
-        Float rrFactor = throughput.Sum() * Float(0.33333);
+        Float rrFactor = throughput.Sum() * ChannelCountInv;
         auto result = RussianRoulette(throughput, rrFactor, rrXi);
         isPathDead = !result.has_value();
         throughput = result.value_or(throughput);
@@ -307,7 +312,6 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
     PathDataPack pathDataPack = params.rayState.dPathDataPack[rayIndex];
     if(pathDataPack.status[uint32_t(PathStatusEnum::INVALID)]) return;
 
-    using Distribution::Common::RussianRoulette;
     using Distribution::Common::DivideByPDF;
     // ================ //
     //       NEE        //
