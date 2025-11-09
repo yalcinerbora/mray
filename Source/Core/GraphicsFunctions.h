@@ -127,6 +127,11 @@ namespace Graphics
                                          const Vector<C, Float>& toResolution,
                                          const Vector<C, Float>& fromResolution);
 
+    MR_PF_DECL
+    Vector3 ZUpToNSpace(const Vector3& v, const Vector3& N) noexcept;
+    MR_PF_DECL
+    Vector3 NSpaceToZUp(const Vector3& v, const Vector3& N) noexcept;
+
     namespace MortonCode
     {
         template <class T>
@@ -353,20 +358,20 @@ Vector3 ConcentricOctahedralToDirection(const Vector2& st)
     using namespace MathConstants;
     constexpr Float PiOvr4 = Pi<Float>() * Float{0.25};
     // [0,1] to [-1,1]
-    Vector2 uv = st * 2 - 1;
+    Vector2 uv = st * Float(2) - Float(1);
     Vector2 uvAbs = Math::Abs(uv);
 
     // Radius
-    Float d = 1 - uvAbs.Sum();
-    Float radius = 1 - Math::Abs(d);
-    Float phiPrime = 0;
+    Float d = Float(1) - uvAbs.Sum();
+    Float radius = Float(1) - Math::Abs(d);
+    Float phiPrime = Float(0);
     // Avoid division by zero
-    if(radius != 0) phiPrime = ((uvAbs[1] - uvAbs[0]) / radius + 1) * PiOvr4;
+    if(radius != Float(0)) phiPrime = ((uvAbs[1] - uvAbs[0]) / radius + 1) * PiOvr4;
     // Coords
     const auto& [sinPhiP, cosPhiP] = Math::SinCos(phiPrime);
     Float cosPhi = Math::SignPM1(uv[0]) * cosPhiP;
     Float sinPhi = Math::SignPM1(uv[1]) * sinPhiP;
-    Float z = Math::SignPM1(d) * (1 - radius * radius);
+    Float z = Math::SignPM1(d) * (Float(1) - radius * radius);
 
     // Now all is OK do the concentric disk stuff
     Float xyFactor = radius * Math::Sqrt(Float(2) - radius * radius);
@@ -413,7 +418,7 @@ Vector<2, T>  ConcentricOctahedralWrapInt(const Vector<2, T>& st,
 
     Vector<2, T> dimClamp = dimensions - 1;
     Vector<2, T> intPart = stConv / dimensions;
-    Vector<2, T> fracPart = (stConv % dimensions).Abs();
+    Vector<2, T> fracPart = Math::Abs(stConv % dimensions);
 
     T xOdd = (intPart[0] & 0x1);
     T yOdd = (intPart[1] & 0x1);
@@ -531,6 +536,39 @@ Vector<C, Float> ConvertPixelIndices(const Vector<C, Float>& inputIndex,
     result = Math::Clamp(result, Vector2::Zero(), toResolution - Vector2(1));
     return result;
 }
+
+MR_PF_DECL
+Vector3 ZUpToNSpace(const Vector3& v, const Vector3& N) noexcept
+{
+    // https://jcgt.org/published/0006/01/01/
+    Float s = Math::SignPM1(N[2]);
+    Float c = Float(-1) / (s + N[2]);
+    Float b = N[0] * N[1] * c;
+    Vector3 r0 = Vector3(Float(1) + s * N[0] * N[0] * c, b, N[0]);
+    Vector3 r1 = Vector3(s * b, s + N[1] * N[1] * c, N[1]);
+    Vector3 r2 = Vector3(-s * N[0], -N[1], N[2]);
+    Vector3 result = Vector3(Math::Dot(r0, v),
+                             Math::Dot(r1, v),
+                             Math::Dot(r2, v));
+    return result;
+};
+
+MR_PF_DECL
+Vector3 NSpaceToZUp(const Vector3& v, const Vector3& N) noexcept
+{
+    // https://jcgt.org/published/0006/01/01/
+    Float s = Math::SignPM1(N[2]);
+    Float c = Float(-1) / (s + N[2]);
+    Float b = N[0] * N[1] * c;
+    Float r0X = Float(1) + s * N[0] * N[0] * c;
+    Vector3 r0 = Vector3(r0X, s * b, -s * N[0]);
+    Vector3 r1 = Vector3(b, s + N[1] * N[1] * c, -N[1]);
+    Vector3 r2 = N;
+    Vector3 result = Vector3(Math::Dot(r0, v),
+                             Math::Dot(r1, v),
+                             Math::Dot(r2, v));
+    return result;
+};
 
 template <>
 MR_PF_DEF uint32_t MortonCode::MaxBits3D() noexcept

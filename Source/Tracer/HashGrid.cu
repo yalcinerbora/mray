@@ -9,30 +9,25 @@ HashGrid::HashGrid(const GPUSystem& gpuSystem)
 
 void HashGrid::Reset(AABB3 aabbIn, Vector3 camLocationIn,
                      uint32_t baseLevelPositionBitsIn,
-                     uint32_t normalBitsIn, uint32_t maxLevelIn,
+                     uint32_t normalBitsIn, uint32_t maxLvlOffsetIn,
                      Float coneApertureDegrees,
                      uint32_t maxEntryCount, const GPUQueue& queue)
 {
     regionAABB = aabbIn;
     camLocation = camLocationIn;
     normalBits = normalBitsIn;
-    maxLevel = maxLevelIn;
+    maxLevelOffset = maxLvlOffsetIn;
     baseLevelPositionBits = baseLevelPositionBitsIn;
     coneAperture = MathConstants::DegToRadCoef<Float>() * coneApertureDegrees;
 
-    if(maxLevel > SpatioDirCode::MaxLevel())
-    {
-        throw MRayError("Maximum level (which is \"{}\") for hash grid "
-                        "exceeds the maximum \"{}\"!",
-                        maxLevel, SpatioDirCode::MaxLevel());
-    }
     if(normalBits > SpatioDirCode::NORMAL_BITS_PER_DIM)
     {
         throw MRayError("Normal bits (which is \"{}\") for hash grid "
                         "exceeds the maximum \"{}\"!",
                         normalBits, SpatioDirCode::NORMAL_BITS_PER_DIM);
     }
-    if(baseLevelPositionBits > SpatioDirCode::MORTON_BITS_PER_DIM)
+    if(baseLevelPositionBits > SpatioDirCode::MORTON_BITS_PER_DIM ||
+       baseLevelPositionBits > SpatioDirCode::MaxLevel())
     {
         throw MRayError("Positional bits (which is \"{}\") for hash grid "
                         "exceeds the maximum \"{}\"!",

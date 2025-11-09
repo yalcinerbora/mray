@@ -77,7 +77,11 @@ void KCWriteHashGridDataToImg(MRAY_GRID_CONSTANT const ImageSpan img,
         Vector3 pos = ray.AdvancedPos(tMM[1]);
         Vector3 dir = Math::Normalize(-ray.dir);
 
-        auto code = hashGrid.GenCodeStochastic(pos, dir, rng);
+        SpatioDirCode code;
+        if(displayMode == DisplayMode::E::GRID)
+            code = hashGrid.GenCode(pos, dir);
+        else
+            code = hashGrid.GenCodeStochastic(pos, dir, rng);
         auto loc = hashGrid.Search(code);
         if(!loc.has_value())
         {
@@ -111,7 +115,25 @@ void KCWriteHashGridDataToImg(MRAY_GRID_CONSTANT const ImageSpan img,
                 value = Vector3(irrad);
                 break;
             }
-            case MC_DIR:
+            case MC_TARGET:
+            {
+                value = dMCStates[hgIndex].Target();
+                break;
+            }
+            case MC_COS:
+            {
+                MCState state = dMCStates[hgIndex];
+                Float cos = (state.weight > Float(0)) ? state.cosine / state.weight : state.cosine;
+                assert(Math::IsFinite(cos));
+                value = Vector3(cos);
+                break;
+            }
+            case MC_WEIGHT:
+            {
+                value = Vector3(dMCStates[hgIndex].weight);
+                break;
+            }
+            case VMF_DIR:
             {
                 MCState state = dMCStates[hgIndex];
                 uint32_t N = dMCCounts[hgIndex];
@@ -119,25 +141,11 @@ void KCWriteHashGridDataToImg(MRAY_GRID_CONSTANT const ImageSpan img,
                 value = (value + Vector3(1)) * Vector3(0.5);
                 break;
             }
-            case MC_IRRAD:
-            {
-                value = Vector3(dMCStates[hgIndex].weight);
-                break;
-            }
-            case MC_COS:
+            case VMF_KAPPA:
             {
                 MCState state = dMCStates[hgIndex];
-                if(state.weight <= Float(0))
-                {
-                    value = Vector3::Zero();
-                    break;
-                }
-                // [0, pi]
-                Float invCos = Math::ArcCos(state.cos / state.weight);
-                assert(Math::IsFinite(state.cos / state.weight));
-                // [0, 1]
-                invCos *= MathConstants::InvPi<Float>();
-                value = Vector3(invCos);
+                uint32_t N = dMCCounts[hgIndex];
+                value = Vector3(SufficientStatsToLobe(state, N, pos).kappa);
                 break;
             }
             // Should not be here
@@ -164,6 +172,7 @@ void KCBackpropagateHashGridPath(// Output
                                  // Input
                                  MRAY_GRID_CONSTANT const Span<const Float> dPrevPathReflectance,
                                  MRAY_GRID_CONSTANT const Span<const Float> dScoreSums,
+                                 MRAY_GRID_CONSTANT const Span<const Vector2> dPrevNormals,
                                  // Determining if this is intermediate path (not hit light etc.)
                                  MRAY_GRID_CONSTANT const Span<const HitKeyPack> dHitKeys,
                                  MRAY_GRID_CONSTANT const Span<const RayGMem> dRays,
@@ -178,7 +187,9 @@ void KCBackpropagateHashGridPath(// Output
         uint32_t rIndex = dRayIndices[i];
         uint32_t isLightFlag = dHitKeys[rIndex].lightOrMatKey.FetchFlagPortion();
         uint32_t prevMCIndex = dLiftedMCIndices[rIndex];
+        BackupRNGState rngState{2};
         BackupRNG rng = BackupRNG(dRNGStates[rIndex]);
+        BackupRNG rng2 = BackupRNG(rngState);
         //
         if(isLightFlag == IS_LIGHT_KEY_FLAG) continue;
         if(prevMCIndex == INVALID_MC_INDEX) continue;
@@ -187,11 +198,12 @@ void KCBackpropagateHashGridPath(// Output
         // Irradiance Cache Update //
         // ======================= //
         auto [ray, tMM] = RayFromGMem(dRays, rIndex);
-        Vector3 position = ray.AdvancedPos(tMM[1]);
+        Vector3 nextPos = ray.AdvancedPos(tMM[1]);
         Vector3 direction = Math::Normalize(-ray.dir);
 
         const HashGridView& hg = globalState.hashGrid;
-        auto code = hg.GenCodeStochastic(position, direction, rng);
+        auto code = hg.GenCodeStochastic(nextPos, direction, rng);
+        //auto code = hg.GenCode(nextPos, direction);
         auto irradLoc = hg.Search(code);
         //
         if(!irradLoc) continue;
@@ -205,27 +217,34 @@ void KCBackpropagateHashGridPath(// Output
         Float irrad = dIrradHashGrid[*irradLoc].irrad;
         Float refl = dPrevPathReflectance[rIndex];
         Float outRadiance = refl * irrad;
+        //outRadiance = Math::Min(outRadiance, Float(100.0));
+        if(!Math::IsFinite(outRadiance))
+        {
+            printf("Out Rad not finite! %f, %f\n", irrad, refl);
+            outRadiance = Float(0);
+        }
+
+        //auto codeOut = hg.GenCode(ray.pos, direction);
+        //auto outIrradLoc = hg.Search(codeOut);
+        //if(outIrradLoc)
+        //    MCIrradiance::AtomicEMA(dIrradHashGrid[*outIrradLoc], outRadiance);
         MCIrradiance::AtomicEMA(dIrradHashGrid[prevMCIndex], outRadiance);
 
         Float weight = outRadiance;
         Float scoreSum = dScoreSums[rIndex];
         // Not as good as previous mixture, skip
-        if(rng.NextFloat() * scoreSum > weight * MC_LOBE_COUNT)
+        if(rng2.NextFloat() * scoreSum > weight * MC_LOBE_COUNT)
             continue;
 
         // ========================= //
         //  Stochastic New Location  //
         // ========================= //
         Vector3 mcPos = ray.pos;
-        Vector3 mcDir = Math::Normalize(ray.dir);
-        // Try 1-2 times to find a location
+        Vector3 mcN = Graphics::ConcentricOctahedralToDirection(dPrevNormals[rIndex]);
         Optional<uint32_t> mcLoc;
-        for(uint32_t _ = 0; _ < 2; _++)
-        {
-            auto mcCode = hg.GenCodeStochastic(mcPos, mcDir, rng);
-            mcLoc = hg.Search(mcCode);
-            if(mcLoc) break;
-        }
+        auto mcCode = hg.GenCodeStochastic(mcPos, mcN, rng);
+        mcLoc = hg.Search(mcCode);
+        //
         if(!mcLoc) continue;
         // Save new index for writing
         uint32_t newIndex = *mcLoc;
@@ -243,39 +262,55 @@ void KCBackpropagateHashGridPath(// Output
         // We lose some data here (only a single winner will update the
         // markov chain). But paper also does this via race condition.
         // But that is non-determistic.
-        uint32_t lock = DeviceAtomic::AtomicMax(globalState.dMCLocks[newIndex], rIndex + 1);
+        uint32_t lock = DeviceAtomic::AtomicMin(globalState.dMCLocks[newIndex], rIndex + 1);
         // Skip chain update calculations, we did not get the lock
         // Here we could get false positives, this just prevents the extra work below
         // a little bit.
-        if(lock > (rIndex + 1)) continue;
+        if(lock < (rIndex + 1)) continue;
 
         // ====================== //
         //   Markov Chain Update  //
         // ====================== //
-        Vector3 target = position;
-        Vector3 pos = ray.pos;
-        Vector3 dir = Math::Normalize(ray.dir);
+        //Vector3 target = position;
+        //Vector3 pos = ray.pos;
+        //Vector3 dir = Math::Normalize(ray.dir);
         // If a thread is here we have the lock,
         // we can freely modify
         const auto& dStates = globalState.dMCStates;
         const auto& dCounts = globalState.dMCCounts;
         MCState s = dStates[prevMCIndex];
         MCCount count = dCounts[prevMCIndex];
+        if(!Math::IsFinite(outRadiance))
+        {
+            printf("Out Rad not finite!\n");
+            outRadiance = Float(0);
+        }
         // Update routine
-        static constexpr Float MIN_EMA_RATIO_MC = Float(0.01);
-        static constexpr uint16_t MAX_SAMPLE_MC = uint16_t(4096);
-        count = Math::Min<uint16_t>(count + 1, MAX_SAMPLE_MC);
+        count = uint16_t(s.EMA(ray.pos, nextPos, outRadiance, count));
 
-        Float tMC = Math::Max(Float(1) / Float(count), MIN_EMA_RATIO_MC);
-        s.weight = Math::Lerp(s.weight, weight, tMC);
-        s.target = Math::Lerp(s.target, target * weight, tMC);
+        //bool a = (outRadiance > Float(1e-3) * s.weight);
+        //auto cos = Math::Dot(Math::Normalize(ray.dir), s.Direction(ray.pos));
+        //bool b = cos < Float(0.9) + 0.1 * s.MeanCosine(nextPos, count);
+        //bool reset = !(a || b);
+        //if(reset)
+        //    s.weight = 0;
+
         //
-        Vector3 targetPos = (s.weight < Float(0)) ? (s.target / s.weight) : s.target;
-        Vector3 stateDir = Math::Normalize(targetPos - pos);
-        Float newCos = Math::Max(Math::Dot(dir, stateDir), Float(0));
-        //s.cos = Math::Min(Math::Lerp(s.cos, weight * newCos, tMC), s.weight);
-        s.cos = Math::Min(Math::Lerp(s.cos, weight * newCos, tMC), Float(1));
-
+        if(!Math::IsFinite(s.cosine))
+        {
+            printf("MC Cos Not finite!\n");
+            s.cosine = Float(0);
+        }
+        if(!Math::IsFinite(s.target))
+        {
+            printf("MC Target Not finite!\n");
+            s.target = Vector3::Zero();
+        }
+        if(!Math::IsFinite(s.weight))
+        {
+            printf("MC Weight Not finite!\n");
+            s.weight = Float(0);
+        }
         // Write back to intermediate buffer
         dWriteMCStates[rIndex].s = s;
         dWriteMCStates[rIndex].N = count;
@@ -307,27 +342,13 @@ void KCWriteMarkovChains(// I-O
         if(writeMCIndex == INVALID_MC_INDEX) continue;
         if(globalState.dMCLocks[writeMCIndex] != (rIndex + 1)) continue;
 
-        BackupRNG rng(dRNGStates[rIndex]);
-        if(rng.NextFloat() < globalState.lobeProbability)
-        {
-            auto mcW = dWriteMCStates[rIndex].s;
-            auto mcCountW = dWriteMCStates[rIndex].N;
-            if(!Math::IsFinite(mcW.cos))
-            {
-                printf("MC Cos Not finite!\n");
-                mcW.cos = Float(0);
-            }
-            if(!Math::IsFinite(mcW.target))
-            {
-                printf("MC Target Not finite!\n");
-                mcW.target = Vector3::Zero();
-            }
-            if(!Math::IsFinite(mcW.weight))
-            {
-                printf("MC Weight Not finite!\n");
-                mcW.weight = Float(0);
-            }
+        // Write
+        auto mcW = dWriteMCStates[rIndex].s;
+        auto mcCountW = dWriteMCStates[rIndex].N;
 
+        BackupRNG rng(dRNGStates[rIndex]);
+        if(rng.NextFloat() < Float(.25))
+        {
             globalState.dMCStates[writeMCIndex] = mcW;
             globalState.dMCCounts[writeMCIndex] = uint16_t(mcCountW);
         }
@@ -336,7 +357,7 @@ void KCWriteMarkovChains(// I-O
             GuidedPTRDetail::MCState zeroMC =
             {
                 .target = Vector3::Zero(),
-                .cos = Float(0),
+                .cosine = Float(0),
                 .weight = Float(0),
             };
             globalState.dMCStates[writeMCIndex] = zeroMC;
@@ -376,13 +397,13 @@ void KCBackpropagateIrradNEE(// I-O
         //
         auto& dIrradHashGrid = globalState.dMCIrradiances;
         Float radEstimate = dShadowPrevPathOutRadiance[i];
+        //radEstimate = Math::Min(radEstimate, Float(100.0));
 
         if(!Math::IsFinite(radEstimate))
         {
             printf("NEE Not finite!\n");
             radEstimate = Float(0);
         }
-
         MCIrradiance::AtomicEMA(dIrradHashGrid[prevMCIndex], radEstimate);
     }
 }
@@ -416,7 +437,7 @@ void KCBackpropagateIrradLight(// I-O
         // has full radiance estimate since the light work kernel
         // updated it.
         Float outRadiance = dPrevPathReflectanceOrOutRadiance[rIndex];
-
+        //outRadiance = Math::Min(outRadiance, Float(100.0));
 
         if(!Math::IsFinite(outRadiance))
         {
@@ -472,7 +493,7 @@ GuidedPTRenderer::CurrentAttributes() const
     Push(currentOptions.cacheEntryLimit);
     Push(currentOptions.cachePosBits);
     Push(currentOptions.cacheNormalBits);
-    Push(currentOptions.cacheLevelCount);
+    Push(currentOptions.cacheMaxLvlOffset);
     Push(currentOptions.cacheConeAperture);
     Push(currentOptions.russianRouletteRange);
     Push(currentOptions.totalSPP);
@@ -501,7 +522,7 @@ void GuidedPTRenderer::PushAttribute(uint32_t attributeIndex,
         case  0: Load(newOptions.cacheEntryLimit, data); break;
         case  1: Load(newOptions.cachePosBits, data); break;
         case  2: Load(newOptions.cacheNormalBits, data); break;
-        case  3: Load(newOptions.cacheLevelCount, data); break;
+        case  3: Load(newOptions.cacheMaxLvlOffset, data); break;
         case  4: Load(newOptions.cacheConeAperture, data); break;
         //
         case  5: Load(newOptions.russianRouletteRange, data); break;
@@ -528,6 +549,7 @@ GuidedPTRenderer::PackRayState() const
     rs.dPathDataPack        = dPathDataPack;
     rs.dPrevPDF             = dPrevPDF;
     rs.dScoreSums           = dScoreSums;
+    rs.dPrevNormals         = dPrevNormals;
     rs.dBackupRNGStates     = rnGenerator->GetBackupStates();
     rs.dShadowRayRadiance   = dShadowRayRadiance;
     rs.dShadowRays          = dShadowRays;
@@ -733,7 +755,7 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     //
     // Clear locks
     // TODO: Memset or indirect update via kernel? (which has better perf?)
-    processQueue.MemsetAsync(dMCLocks, 0x00);
+    processQueue.MemsetAsync(dMCLocks, 0xFF);
     // Repurpose "shadowRays" buffer for MCStateLifting
     Span<TransientMCState> dLiftedMCStates = MemAlloc::RepurposeAlloc<TransientMCState>(dShadowRays);
     // Indirect irradiance backpropogation (as well as updater selection)
@@ -748,6 +770,7 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
         dBackupRNGStates,
         dPrevPathReflectanceOrOutRadiance,
         dScoreSums,
+        dPrevNormals,
         dHitKeys,
         dRays,
         dIndices
@@ -888,21 +911,27 @@ GuidedPTRenderer::DoThroughputSingleTileRender(const GPUDevice& device,
             processQueue
         );
 
-        // TODO: We need a proper camera position acquisiton
-        // system sometime later. (It can be useful like scene AABB)
-        Vector3 camPos;
-        cameraWork.GenCameraPosition(Span<Vector3, 1>(dCamPosBuffer),
-                                     dSubCameraBuffer,
-                                     curCamTransformKey,
-                                     processQueue);
-        processQueue.MemcpyAsync(Span<Vector3>(&camPos, 1), ToConstSpan(dCamPosBuffer));
-        processQueue.MemsetAsync(dMCCounts, 0x00);
-        processQueue.MemsetAsync(dMCStates, 0x00);
-        processQueue.MemsetAsync(dMCIrradiances, 0x00);
-        hashGrid.ClearAllEntries(processQueue);
+        static bool first = true;
+        if(first)
+        {
+            // TODO: We need a proper camera position acquisiton
+            // system sometime later. (It can be useful like scene AABB)
+            Vector3 camPos;
+            cameraWork.GenCameraPosition(Span<Vector3, 1>(dCamPosBuffer),
+                                         dSubCameraBuffer,
+                                         curCamTransformKey,
+                                         processQueue);
+            processQueue.MemcpyAsync(Span<Vector3>(&camPos, 1), ToConstSpan(dCamPosBuffer));
+            processQueue.MemsetAsync(dMCCounts, 0x00);
+            processQueue.MemsetAsync(dMCStates, 0x00);
+            processQueue.MemsetAsync(dMCIrradiances, 0x00);
 
-        processQueue.Barrier().Wait();
-        hashGrid.SetCameraPos(camPos);
+            MRAY_LOG("Clear HG!");
+            hashGrid.ClearAllEntries(processQueue);
+            processQueue.Barrier().Wait();
+            hashGrid.SetCameraPos(camPos);
+            //first = false;
+        }
     }
 
     // ====================== //
@@ -1004,8 +1033,9 @@ GuidedPTRenderer::DoLatencyRender(uint32_t passCount,
         processQueue.MemsetAsync(dMCCounts, 0x00);
         processQueue.MemsetAsync(dMCStates, 0x00);
         processQueue.MemsetAsync(dMCIrradiances, 0x00);
-        hashGrid.ClearAllEntries(processQueue);
 
+
+        hashGrid.ClearAllEntries(processQueue);
         processQueue.Barrier().Wait();
         hashGrid.SetCameraPos(camPos);
     }
@@ -1147,16 +1177,23 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
     // ========================= //
     //         Hash Grid         //
     // ========================= //
-    hashGrid.Reset(tracerView.baseAccelerator.SceneAABB(),
-                   // We do not know te cam pos yet,
-                   Vector3::Zero(),
-                   currentOptions.cachePosBits,
-                   currentOptions.cacheNormalBits,
-                   currentOptions.cacheLevelCount,
-                   currentOptions.cacheConeAperture,
-                   currentOptions.cacheEntryLimit,
-                   queue);
-
+    static bool hgInit = false;
+    if(!hgInit)
+    {
+        MRAY_LOG("RESET?? {}, {}",
+                 hashGrid.EntryCapacity(),
+                 currentOptions.cacheEntryLimit);
+        hashGrid.Reset(tracerView.baseAccelerator.SceneAABB(),
+                       // We do not know te cam pos yet,
+                       Vector3::Zero(),
+                       currentOptions.cachePosBits,
+                       currentOptions.cacheNormalBits,
+                       currentOptions.cacheMaxLvlOffset,
+                       currentOptions.cacheConeAperture,
+                       currentOptions.cacheEntryLimit,
+                       queue);
+        //hgInit = true;
+    }
     // ========================= //
     //   Path State Allocation   //
     // ========================= //
@@ -1179,6 +1216,7 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
             dScoreSums, dLiftedMCIndices,
             dShadowRays, dShadowRayCones,
             dShadowRayRadiance, dPathRNGDimensions,
+            dPrevNormals,
             // Per path (but can be zero if not spectral)
             dPathWavelengths,
             dSpectrumWavePDFs,
@@ -1202,7 +1240,7 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
             maxRayCount, maxRayCount, maxRayCount, maxRayCount,
             maxRayCount, maxRayCount, maxRayCount, maxRayCount,
             maxRayCount, maxRayCount, maxRayCount, maxRayCount,
-            maxRayCount, maxRayCount,
+            maxRayCount, maxRayCount, maxRayCount,
             // Per path (but can be zero if not spectral)
             wavelengthCount, wavelengthCount,
             // Per path but a single bit is used
@@ -1278,7 +1316,7 @@ GuidedPTRenderer::StaticAttributeInfo()
         {"cacheEntryLimit",   MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
         {"cachePosBits",      MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
         {"cacheNormalBits",   MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
-        {"cacheLevelCount",   MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
+        {"cacheMaxLvlOffset", MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
         {"cacheConeAperture", MRayDataTypeRT(MR_FLOAT),      IS_SCALAR, MR_OPTIONAL },
         {"rrRange",           MRayDataTypeRT(MR_VECTOR_2UI), IS_SCALAR, MR_MANDATORY},
         {"totalSPP",          MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_MANDATORY},

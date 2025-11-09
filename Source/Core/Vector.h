@@ -120,6 +120,7 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     MR_PF_DECL static Vector XAxis() requires (N == 3);
     MR_PF_DECL static Vector YAxis() requires (N == 3);
     MR_PF_DECL static Vector ZAxis() requires (N == 3);
+
 };
 
 // Left scalar multiplication

@@ -77,9 +77,6 @@ class Quat
                                           const Quat<T>& q1,
                                           const Quat<T>& q2,
                                           T a, T b) noexcept;
-    MR_PF_DECL static Quat<T>    RotationBetween(const Vector<3, T>& a,
-                                                 const Vector<3, T>& b) noexcept;
-    MR_PF_DECL static Quat<T>    RotationBetweenZAxis(const Vector<3, T>& b) noexcept;
     MR_PF_DECL static Quat<T>    Identity() noexcept;
 };
 
@@ -97,6 +94,13 @@ MR_PF_DECL Quat<T> operator*(T, const Quat<T>&) noexcept;
 // Static Utility
 namespace TransformGen
 {
+    template<std::floating_point T>
+    MR_PF_DECL Quat<T> RotationBetween(const Vector<3, T>& a,
+                                       const Vector<3, T>& b) noexcept;
+
+    template<std::floating_point T>
+    MR_PF_DECL Quat<T> RotationBetweenZAxis(const Vector<3, T>& b) noexcept;
+
     template<std::floating_point T>
     MR_PF_DECL Quat<T> ToSpaceQuat(const Vector<3, T>& x,
                                    const Vector<3, T>& y,

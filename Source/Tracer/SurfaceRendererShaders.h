@@ -307,8 +307,7 @@ void WorkFunctionFurnaceOrAO<P, M, T>::Call(const Primitive&, const Material& ma
         auto dirSample = Distribution::Common::SampleCosDirection(xi);
         Float NdL = Distribution::Common::DotN(dirSample.value);
         // From flat space (triangle laid out on XY plane) to directly world space
-        Quaternion q = Quaternion::RotationBetweenZAxis(normal);
-        Vector3 direction = q.ApplyRotation(dirSample.value);
+        Vector3 direction = Graphics::ZUpToNSpace(dirSample.value, normal);
 
         // Technically ao multiplier should be one after division by PDF
         // This is a simple shader, the division is explicitly specified
@@ -333,7 +332,14 @@ void LightWorkFunctionCommon<L, T>::Call(const Light&, RNGDispenser&, const Spec
                                          const Params& params, RayIndex rayIndex, uint32_t)
 {
     if constexpr(Light::IsPrimitiveBackedLight)
-        params.rayState.dOutputData[rayIndex] = Spectrum(1, 1, 1, 0);
+    {
+        if(params.globalState.mode.e == Mode::WORLD_POSITION)
+        {
+            auto [ray, tMM] = RayFromGMem(params.common.dRays, rayIndex);
+            params.rayState.dOutputData[rayIndex] = Spectrum(ray.AdvancedPos(tMM[1]), 0);
+        }
+        else params.rayState.dOutputData[rayIndex] = Spectrum(1, 1, 1, 0);
+    }
     else
         params.rayState.dOutputData[rayIndex] = Spectrum::Zero();
 }

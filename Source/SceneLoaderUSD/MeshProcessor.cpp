@@ -367,7 +367,7 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
                 // Rotate each vertex position to tangent space and get (x,y)
                 // After that, normalize the coordinates (no need for normalization,
                 // but it at least be between [0,1]).
-                Quaternion rot = Quaternion::RotationBetweenZAxis(localNormals[i]);
+                Quaternion rot = TransformGen::RotationBetweenZAxis(localNormals[i]);
                 localUVs[i] = Math::Normalize(Vector2(rot.ApplyRotation(localPositions[i])));
             }
             else

@@ -197,6 +197,11 @@ namespace Distribution::Common
     Float               PDFUniformDirection();
     //
     MR_PF_DECL
+    Vector3             SampleUnitSphere(const Vector2& xi);
+    MR_PF_DECL
+    Float               PDFUnitSphere(const Vector3& p);
+    //
+    MR_PF_DECL
     Optional<Spectrum>  RussianRoulette(Spectrum, Float probability, Float xi);
 }
 
@@ -247,17 +252,18 @@ GaussianLobe::Sample(Vector2 xi) const
         r *= Math::Log1P(xi[1] * Math::ExpM1(Float(-2) * kappa));
     }
     else r = Float(-2) * xi[1];
-
+    assert(Math::IsFinite(r));
     Float cosPhi = 1 + r;
     Float sinPhi = Math::Sqrt(-Math::FMA(r, r, Float(2) * r));
+    assert(Math::Abs(cosPhi * cosPhi + sinPhi * sinPhi - Float(1))
+           < MathConstants::Epsilon<Float>());
     Float theta = Float(2) * MathConstants::Pi<Float>() * xi[0];
     auto [sinTheta, cosTheta] = Math::SinCos(theta);
     Vector3 dirZ = Graphics::UnitSphericalToCartesian(Vector2(sinTheta, cosTheta),
-                                                        Vector2(sinPhi, cosPhi));
+                                                      Vector2(sinPhi, cosPhi));
     // Do orientation
-    Quaternion rot = Quaternion::RotationBetweenZAxis(dirZ);
-    Vector3 dirWorld = rot.ApplyRotation(dir);
-    //
+    Vector3 dirWorld = Graphics::ZUpToNSpace(dirZ, dir);
+    assert(Math::IsFinite(dirWorld));
     return SampleT<Vector3>
     {
         .value = dirWorld,
@@ -295,6 +301,7 @@ GaussianLobe::Value(Vector3 wO) const
     Float result = Math::Exp(Float(-0.5) * kappa * Math::LengthSqr(d));
     result *= alpha;
     result *= MathConstants::Inv4Pi<Float>();
+    assert(Math::IsFinite(result));
     return result;
 }
 
@@ -887,6 +894,26 @@ Float Common::PDFUniformDirection()
     return MathConstants::InvPi<Float>() * Float{0.5};
 }
 
+MR_PF_DEF
+Vector3 Common::SampleUnitSphere(const Vector2& xi)
+{
+    Float theta = Float(2) * MathConstants::Pi<Float>() * xi[0];
+    Float cosPhi = Float(2) * xi[1] - Float(1);
+    Float sinPhi = Math::SqrtMax(Float(1) - cosPhi * cosPhi);
+
+    auto sinCosTheta = Vector2(Math::SinCos(theta));
+    auto sinCosPhi = Vector2(sinPhi, cosPhi);
+    Vector3 unitPos = Graphics::UnitSphericalToCartesian(sinCosTheta,
+                                                         sinCosPhi);
+    return unitPos;
+}
+
+MR_PF_DEF
+Float Common::PDFUnitSphere(const Vector3&)
+{
+    return MathConstants::Inv4Pi<Float>();
+}
+
 //
 MR_PF_DEF
 Optional<Spectrum> Common::RussianRoulette(Spectrum throughput,
@@ -981,7 +1008,7 @@ SampleT<Vector3> Medium::SampleHenyeyGreensteinPhase(const Vector3& wO, Float g,
     // This is in unit space, convert to wO's space
     // TODO: Check this
     Vector3 wI = Graphics::UnitSphericalToCartesian(sinCosPhi, sinCosTheta);
-    Quaternion rot = Quaternion::RotationBetweenZAxis(wO);
+    Quaternion rot = TransformGen::RotationBetweenZAxis(wO);
     wI = rot.ApplyRotation(wI);
 
     return SampleT<Vector3>

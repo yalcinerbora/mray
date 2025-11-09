@@ -74,6 +74,7 @@ class GuidedPTRenderer final : public PathTracerRendererBase
     Span<Float>         dShadowPrevPathOutRadiance;
     Span<Float>         dPrevPathReflectanceOrOutRadiance;
     Span<Float>         dPrevPDF;
+    Span<Vector2>       dPrevNormals;
     Span<Float>         dScoreSums;
     Span<uint32_t>      dLiftedMCIndices;
     // Technique Related (Hash Grid)

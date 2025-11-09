@@ -21,8 +21,18 @@ namespace GuidedPTRDetail
     struct alignas(8) MCState
     {
         Vector3  target;
-        Float    cos;
+        Float    cosine;
         Float    weight;
+
+        MR_PF_DECL Vector3  Direction(const Vector3& distPos) const;
+        MR_PF_DECL Vector3  Target() const;
+        MR_PF_DECL Float    MeanCosine(const Vector3& distPos, uint32_t N) const;
+        MR_PF_DECL Float    Weight() const;
+
+        MR_PF_DECL uint32_t EMA(const Vector3& distPos,
+                                const Vector3& newTarget,
+                                Float newWeight, uint32_t N);
+
     };
     using MCCount      = uint16_t;
     using MCLock       = uint32_t; // Tied to ray index
@@ -44,9 +54,11 @@ namespace GuidedPTRDetail
         RENDER,
         GRID,
         LIGHT_CACHE,
-        MC_DIR,
+        MC_TARGET,
         MC_COS,
-        MC_IRRAD,
+        MC_WEIGHT,
+        VMF_DIR,
+        VMF_KAPPA,
         //
         END
     };
@@ -55,9 +67,11 @@ namespace GuidedPTRDetail
         "Render",
         "Grid",
         "LightCache",
-        "MCDirection",
-        "MCCosine",
-        "MCIrradiance",
+        "MCTarget",
+        "MCCos",
+        "MCWeight",
+        "vMFDir",
+        "vMFKappa",
     };
     using DisplayMode = NamedEnum<DisplayModeEnum, DisplayModeNames>;
 
@@ -66,16 +80,16 @@ namespace GuidedPTRDetail
         // ====================== //
         //    Hash Grid Related   //
         // ====================== //
-        uint32_t cacheEntryLimit    = 2'000'000; // At most 2M entries
-                                                 // (allocation is 2x 2M = nearest pow2)
-        uint32_t cachePosBits       = 14;        // Maximum subdiv of bottom level voxel
-                                                 // SceneAABB / 2^16 = voxel size
-        uint32_t cacheNormalBits    = 2;         // Concentric Octrahedral map of the normal
-                                                 // which will be divided on to 4x4 grid
-        uint32_t cacheLevelCount    = 12;        // Maximum upper levels of the voxel grid
-        Float    cacheConeAperture = Float(0.6); // When a ray hits a cache entry, it will be assumed
-                                                 // has a differential as if it had a ray cone with this
-                                                 // aperture.
+        uint32_t cacheEntryLimit   = 2'000'000; // At most 2M entries
+                                                // (allocation is 2x 2M = nearest pow2)
+        uint32_t cachePosBits      = 14;        // Maximum subdiv of bottom level voxel
+                                                // SceneAABB / 2^16 = voxel size
+        uint32_t cacheNormalBits   = 2;         // Concentric Octrahedral map of the normal
+                                                // which will be divided on to 4x4 grid
+        uint32_t cacheMaxLvlOffset = 3;         // Maximum upper levels of the voxel grid
+        Float    cacheConeAperture = Float(0.6);// When a ray hits a cache entry, it will be assumed
+                                                // has a differential as if it had a ray cone with this
+                                                // aperture.
         // ====================== //
         //  Path Tracing Related  //
         // ====================== //
@@ -144,6 +158,7 @@ namespace GuidedPTRDetail
         Span<PathDataPack>    dPathDataPack;
         Span<Float>           dPrevPDF;
         Span<Float>           dPrevPathReflectanceOrOutRadiance;
+        Span<Vector2>         dPrevNormals;
         Span<Float>           dScoreSums;
         // Backup RNG State
         Span<BackupRNGState>  dBackupRNGStates;
@@ -259,6 +274,70 @@ namespace GuidedPTRDetail
 namespace GuidedPTRDetail
 {
 
+MR_PF_DEF
+Vector3 MCState::Direction(const Vector3& distPos) const
+{
+    Vector3 dir = Target() - distPos;
+    Float distSqr = Math::LengthSqr(dir);
+
+    if(distSqr != Float(0))
+    {
+        dir /= Math::Sqrt(distSqr);
+    }
+    return dir;
+}
+
+MR_PF_DEF
+Vector3 MCState::Target() const
+{
+    return (weight > Float(0))
+            ? (target / weight)
+            : target;
+}
+
+MR_PF_DEF
+Float MCState::MeanCosine(const Vector3& distPos, uint32_t N) const
+{
+    constexpr Float DirGuidePrior = Float(0.2);
+    constexpr Float Epsilon = Float(0.0001);
+
+    Float prior = DirGuidePrior / Math::LengthSqr(distPos - Target());
+    prior = Math::Max(Epsilon, prior);
+
+    Float N2 = Float(N * N);
+    Float c = (weight > Float(0)) ? (cosine / weight) : Float(0);
+    c = Math::Clamp(c, Float(0), Float(0.999999));
+    Float result = c * N2 / (N2 + prior);
+    return result;
+}
+
+MR_PF_DEF
+Float MCState::Weight() const
+{
+    return weight;
+}
+
+MR_PF_DEF
+uint32_t MCState::EMA(const Vector3& distPos,
+                      const Vector3& newTarget,
+                      Float newWeight, uint32_t N)
+{
+    constexpr Float MIN_EMA_RATIO_MC = Float(0.01);
+    constexpr uint32_t MAX_SAMPLE_MC = uint32_t(1024);
+
+    N = Math::Min(N + 1, MAX_SAMPLE_MC);
+    Float a = Math::Max(Float(1) / N, MIN_EMA_RATIO_MC);
+
+    weight = Math::Lerp(weight, newWeight, a);
+    target = Math::Lerp(target, newWeight * newTarget, a);
+    Vector3 newDir = Math::Normalize(newTarget - distPos);
+    Vector3 dir = Direction(distPos);
+    Float newCos = Math::Max(Float(0), Math::Dot(newDir, dir));
+    cosine = Math::Lerp(cosine, newWeight * newCos, a);
+    cosine = Math::Min(cosine, weight);
+    return N;
+}
+
 MR_GF_DEF
 MCIrradiance
 MCIrradiance::AtomicEMA(MCIrradiance& dLoc, Float radEst)
@@ -269,7 +348,7 @@ MCIrradiance::AtomicEMA(MCIrradiance& dLoc, Float radEst)
     return DeviceAtomic::EmulateAtomicOp(dLoc, [radEst](MCIrradiance e)
     {
         static constexpr Float MIN_EMA_RATIO_IRRAD = Float(0.01);
-        static constexpr uint32_t MAX_SAMPLE = uint32_t(4096);
+        static constexpr uint32_t MAX_SAMPLE = uint32_t(128);
         //
         e.N = Math::Min(e.N + 1, MAX_SAMPLE);
         Float t = Math::Max(Float(1) / Float(e.N), MIN_EMA_RATIO_IRRAD);
@@ -283,25 +362,9 @@ GaussianLobe SufficientStatsToLobe(const MCState& state,
                                    uint32_t mcSampleCount,
                                    const Vector3& samplePos)
 {
-    static constexpr Float DirGuidePrior = Float(0.2);
-    static constexpr Float Epsilon       = Float(0.0001);
-    static constexpr Float MaxCos        = Float(1) - Epsilon;
-
     // Fetch direction
-    Vector3 target = state.target;
-    Float wRecip = Float(1) / state.weight;
-    target = (state.weight > 0) ? (target * wRecip) : target;
-
-    // Dir
-    Vector3 dir = target - samplePos;
-    Float distSqr = Math::LengthSqr(dir);
-    if(distSqr != Float(0))
-        dir /= Math::Sqrt(distSqr);
-    // Kappa
-    Float nSqr = Float(mcSampleCount) * Float(mcSampleCount);
-    Float meanCos = nSqr * Math::Clamp(state.cos / wRecip, Float(0), MaxCos);
-    Float priorState = Math::Max(Epsilon, DirGuidePrior / distSqr);
-    meanCos /= (nSqr + priorState);
+    Vector3 dir = state.Direction(samplePos);
+    Float meanCos = state.MeanCosine(samplePos, mcSampleCount);
     // Mean cosine to kappa
     Float r = meanCos;
     Float r2 = r * r;
@@ -374,9 +437,9 @@ uint32_t GaussLobeMixtureT<N>::LoadStochastic(const Vector3& position,
         uint16_t mcN  = gs.dMCCounts[hashGridIndex];
         lobes[i]      = SufficientStatsToLobe(state, mcN, position);
         weights[i]    = state.weight;
-        sumWeight    += state.weight;
+        sumWeight    += weights[i];
         //
-        Float sumRatio = (sumWeight != Float(0)) ? (state.weight / sumWeight) : Float(1);
+        Float sumRatio = (sumWeight != Float(0)) ? (weights[i] / sumWeight) : Float(1);
         if(rng.NextFloat() < sumRatio)
         {
             sampleIndex = i;
@@ -556,10 +619,13 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     //     Load Mixture       //
     // ====================== //
     GaussianLobeMixture mixture;
+    //Vector3 wORefl = Graphics::Reflect(surf.geoNormal, wOWorld);
+    //Vector3 qN = (backupRNG.NextFloat() < Float(0.5)) ? wOWorld : wORefl;
     uint32_t liftedMCIndex = mixture.LoadStochastic(surf.position,
-                                                    wOWorld,
+                                                    surf.geoNormal,
                                                     backupRNG,
                                                     gs);
+    Vector2 cooctaN = Graphics::DirectionToConcentricOctahedral(surf.geoNormal);
     // TODO: Product sampling
     //std::array<GaussianLobe, 2> materialLobes =
     //{
@@ -622,6 +688,11 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
         throughput = result.value_or(throughput);
     }
 
+    //if(pdfPath != misPDFs[1])
+    //{
+    //    MRAY_LOG("bad!");
+    //}
+
     // ================== //
     //   Path Throughput  //
     // ================== //
@@ -674,11 +745,19 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
         rs.dPrevPDF[rayIndex] = pdfPath;
         // When we update the MC, this will be used to estimate radiant exitance
         // and MC state termination update etc.
-        rs.dPrevPathReflectanceOrOutRadiance[rayIndex] = DivideByPDF(avgPathReflectance,
-                                                                     pdfPath);
+        rs.dPrevPathReflectanceOrOutRadiance[rayIndex]
+            = DivideByPDF(avgPathReflectance,
+                          Math::Max(pdfPath, Float(100)));
+            //= DivideByPDF(avgPathReflectance, pdfPath);
         // Save the score sum for MC selection as well
         rs.dScoreSums[rayIndex] = mixture.sumWeight;
         rs.dLiftedMCIndices[rayIndex] = liftedMCIndex;
+        rs.dPrevNormals[rayIndex] = cooctaN;
+
+        if(dataPack.type == RayType::SPECULAR_RAY)
+        {
+            rs.dPrevPathReflectanceOrOutRadiance[rayIndex] *= Float(1.3);
+        }
     }
 
     // Do not bother with NEE if specular or path is dead
@@ -753,8 +832,10 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     RayToGMem(rs.dShadowRays, rayIndex, shadowRay, shadowTMM);
     rs.dShadowRayCones[rayIndex] = shadowRayConeOut;
     rs.dShadowRayRadiance[rayIndex] = shadowRadiance;
-    rs.dShadowPrevPathOutRadiance[rayIndex] = DivideByPDF(prevPathShadowEmission,
-                                                          pdfShadow);
+    rs.dShadowPrevPathOutRadiance[rayIndex]
+        = DivideByPDF(prevPathShadowEmission,
+                      Math::Max(pdfShadow, Float(100)));
+        //= DivideByPDF(prevPathShadowEmission, pdfShadow);
     // Write the updated state back
     rs.dPathDataPack[rayIndex] = dataPack;
 }

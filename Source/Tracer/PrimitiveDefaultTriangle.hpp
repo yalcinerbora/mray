@@ -570,7 +570,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     if(normalMap)
     {
         Vector3 normal = Math::Normalize((*normalMap)(uv, dpdx, dpdy));
-        tbn = Quaternion::RotationBetweenZAxis(normal).Conjugate() * tbn;
+        tbn = TransformGen::RotationBetweenZAxis(normal).Conjugate() * tbn;
     }
 
     // Geometry Discretization Compensation

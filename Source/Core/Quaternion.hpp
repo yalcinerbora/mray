@@ -353,7 +353,20 @@ MR_PF_DEF Quat<T> Quat<T>::BarySLerp(const Quat<T>& q0,
 }
 
 template<FloatC T>
-MR_PF_DEF Quat<T> Quat<T>::RotationBetween(const Vector<3, T>& a, const Vector<3, T>& b) noexcept
+MR_PF_DEF Quat<T> Quat<T>::Identity() noexcept
+{
+    return Quat<T>(1, 0, 0, 0);
+}
+
+template<FloatC T>
+MR_PF_DEF Quat<T> operator*(T t, const Quat<T>& q) noexcept
+{
+    return q * t;
+}
+
+template<std::floating_point T>
+MR_PF_DEF
+Quat<T> TransformGen::RotationBetween(const Vector<3, T>& a, const Vector<3, T>& b) noexcept
 {
     Vector<3, T> aCrossB = Math::Cross(a, b);
     T aDotB = Math::Dot(a, b);
@@ -362,8 +375,9 @@ MR_PF_DEF Quat<T> Quat<T>::RotationBetween(const Vector<3, T>& a, const Vector<3
     return Quat<T>(Math::ArcCos(aDotB), aCrossB);
 }
 
-template<FloatC T>
-MR_PF_DEF Quat<T> Quat<T>::RotationBetweenZAxis(const Vector<3, T>& b) noexcept
+template<std::floating_point T>
+MR_PF_DEF
+Quat<T> TransformGen::RotationBetweenZAxis(const Vector<3, T>& b) noexcept
 {
     using namespace MathConstants;
     Vector<3, T> zCrossD(-b[1], b[0], 0);
@@ -392,18 +406,6 @@ MR_PF_DEF Quat<T> Quat<T>::RotationBetweenZAxis(const Vector<3, T>& b) noexcept
         return Quat<T>(1, 0, 0, 0);
     }
     else return Quat<T>(w, x, y, z);
-}
-
-template<FloatC T>
-MR_PF_DEF Quat<T> Quat<T>::Identity() noexcept
-{
-    return Quat<T>(1, 0, 0, 0);
-}
-
-template<FloatC T>
-MR_PF_DEF Quat<T> operator*(T t, const Quat<T>& q) noexcept
-{
-    return q * t;
 }
 
 template<std::floating_point T>

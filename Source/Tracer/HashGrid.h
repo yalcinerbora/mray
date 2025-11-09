@@ -17,8 +17,8 @@
 class SpatioDirCode
 {
     public:
-    static constexpr uint32_t LEVEL_BITS = 6;           // At most 256-level (overkill but bits left)
-    static constexpr uint32_t NORMAL_BITS_PER_DIM = 2;  // 16-cardinal normal directions
+    static constexpr uint32_t LEVEL_BITS = 4;           // At most 256-level (overkill but bits left)
+    static constexpr uint32_t NORMAL_BITS_PER_DIM = 3;  // 16-cardinal normal directions
                                                         // (We could've put bits here but then it will be too much)
     static constexpr uint32_t MORTON_BITS_PER_DIM = 18; // 2^54 3D-positions
 
@@ -85,7 +85,7 @@ struct HashGridView
     uint32_t            baseRegionDim;   // Minimum region size of the positional codes.
     Float               normalDelta;     // Same stuff but for normals.
     uint32_t            normalRegionDim; //
-    uint32_t            maxLevel;        // Maximum level that the grid can achieve
+    uint32_t            maxLevelOffset;  // Maximum level offset that the grid can achieve
     uint32_t            maxEntryLimit;   // Entry limit to prevent explosion of the hash table
     // Similar to ray cones, tangent of the ray's aperture.
     // (which is quite larger than the actual ray differential
@@ -127,7 +127,7 @@ class HashGrid
     Vector3     camLocation;
     uint32_t    baseLevelPositionBits;
     uint32_t    normalBits;
-    uint32_t    maxLevel;
+    uint32_t    maxLevelOffset;
     Float       coneAperture;
 
     public:
@@ -142,7 +142,7 @@ class HashGrid
     //
     void        Reset(AABB3 regionAABB, Vector3 camLocation,
                       uint32_t baseLevelPositionBits,
-                      uint32_t normalBits, uint32_t maxLevel,
+                      uint32_t normalBits, uint32_t maxLvlOffset,
                       Float coneApertureDegrees,
                       uint32_t maxEntryCount, const GPUQueue&);
     void        SetCameraPos(Vector3 camLocation);
@@ -215,20 +215,21 @@ SpatioDirCode HashGridView::GenCode(const Vector3& pos,
                                     const Vector3& normal) const
 {
     // Level
+    uint32_t levelMax = Bit::RequiredBitsToRepresent(baseRegionDim) - 1;
     Float coneWidth = tanConeHalfTimes2 * Math::Length(pos - camLocation);
     uint32_t ratio = uint32_t(Math::RoundInt(coneWidth * baseRegionDelta));
     uint32_t level = Bit::RequiredBitsToRepresent(ratio);
-    level = Math::Min(level, maxLevel);
+    level = Math::Min(level, levelMax);
 
     // Position
     Float levelDelta = baseRegionDelta / Float(1u << level);
-    int32_t levelMax = (baseRegionDim >> level) - 1;
+    int32_t curLevelEdge = (baseRegionDim >> level) - 1;
     Vector3 locF = (pos - hashGridRegion.Min()) * levelDelta;
     auto iX = int32_t(locF[0]);
     auto iY = int32_t(locF[1]);
     auto iZ = int32_t(locF[2]);
     Vector3i loc = Math::Clamp(Vector3i(iX, iY, iZ), Vector3i::Zero(),
-                               Vector3i(levelMax));
+                               Vector3i(curLevelEdge));
     using Graphics::MortonCode::Compose3D;
     uint64_t mcPos = Compose3D<uint64_t>(Vector3ui(loc));
 
@@ -248,16 +249,17 @@ SpatioDirCode HashGridView::GenCodeStochastic(const Vector3& pos,
                                               BackupRNG& rng) const
 {
     // Level
+    uint32_t levelMax = Bit::RequiredBitsToRepresent(baseRegionDim) - 1;
     Float coneWidth = tanConeHalfTimes2 * Math::Length(pos - camLocation);
     uint32_t ratio = uint32_t(Math::RoundInt(coneWidth * baseRegionDelta));
     uint32_t level = Bit::RequiredBitsToRepresent(ratio);
     uint32_t rndLevelOffset = uint32_t(-Math::Log2(Float(1) - rng.NextFloat()));
-    //uint32_t rndLevelOffset = 0;
-    level = Math::Min(level + rndLevelOffset, maxLevel);
+    rndLevelOffset = Math::Min(rndLevelOffset, maxLevelOffset);
+    level = Math::Min(level + rndLevelOffset, levelMax);
 
     // Position
     Float levelDelta = baseRegionDelta / Float(1u << level);
-    int32_t levelMax = (baseRegionDim >> level) - 1;
+    int32_t curLevelEdge = (baseRegionDim >> level) - 1;
     Vector3 locF = (pos - hashGridRegion.Min()) * levelDelta;
     auto [iX, fX] = Math::ModFInt(locF[0]);
     auto [iY, fY] = Math::ModFInt(locF[1]);
@@ -271,16 +273,23 @@ SpatioDirCode HashGridView::GenCodeStochastic(const Vector3& pos,
     iY += rng.NextFloat() > fY ? (0) : (1);
     iZ += rng.NextFloat() > fZ ? (0) : (1);
     Vector3i loc = Math::Clamp(Vector3i(iX, iY, iZ), Vector3i::Zero(),
-                               Vector3i(levelMax));
+                               Vector3i(curLevelEdge));
     using Graphics::MortonCode::Compose3D;
     uint64_t mcPos = Compose3D<uint64_t>(Vector3ui(loc));
 
     // And finally, normal
     Vector3 nZ = TransformGen::ZUpToYUp(normal);
-    Vector2 encodedN = Graphics::DirectionToConcentricOctahedral(nZ);
-    Vector2ui texelN = Vector2ui(encodedN * normalDelta);
-    texelN = Math::Clamp(texelN, Vector2ui::Zero(), Vector2ui(normalRegionDim - 1));
-    uint32_t mcNormal = Graphics::MortonCode::Compose2D<uint32_t>(texelN);
+    Vector2 encodedN = Graphics::DirectionToConcentricOctahedral(nZ) * normalDelta;
+    auto [iNX, fNX] = Math::ModFInt(encodedN[0]);
+    auto [iNY, fNY] = Math::ModFInt(encodedN[1]);
+    iNX += rng.NextFloat() > fNX ? (0) : (1);
+    iNY += rng.NextFloat() > fNY ? (0) : (1);
+
+    Vector2i texelN = Vector2i::Zero();
+    if(normalRegionDim - 1 != 0)
+        texelN = Graphics::ConcentricOctahedralWrapInt(Vector2i(iNX, iNY),
+                                                       Vector2i(normalRegionDim));
+    uint32_t mcNormal = Graphics::MortonCode::Compose2D<uint32_t>(Vector2ui(texelN));
     //
     return SpatioDirCode(mcPos, mcNormal, level);
 }
@@ -448,7 +457,7 @@ HashGridView HashGrid::View() const
         .baseRegionDim     = baseLevelGridCount,
         .normalDelta       = normalDelta,
         .normalRegionDim   = normalRegionDim,
-        .maxLevel          = maxLevel,
+        .maxLevelOffset    = maxLevelOffset,
         .maxEntryLimit     = maxEntryLimit,
         .tanConeHalfTimes2 = tanHalfTimes2
     };

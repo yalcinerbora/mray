@@ -2,6 +2,7 @@
 
 #include "PrimitivesDefault.h"
 #include "Core/ShapeFunctions.h"
+#include "DistributionFunctions.h"
 
 namespace DefaultSphereDetail
 {
@@ -51,14 +52,7 @@ SampleT<BasicSurface> Sphere<T>::SampleSurface(RNGDispenser& rng) const
     // http://mathworld.wolfram.com/SpherePointPicking.html
     Vector2 xi = rng.NextFloat2D<0>();
 
-    Float theta = Float(2) * MathConstants::Pi<Float>() * xi[0];
-    Float cosPhi = Float(2) * xi[1] - Float(1);
-    Float sinPhi = sqrtf(fmaxf(Float(0), Float(1) - cosPhi * cosPhi));
-
-    auto sinCosTheta = Vector2(Math::SinCos(theta));
-    auto sinCosPhi = Vector2(sinPhi, cosPhi);
-    Vector3 unitPos = Graphics::UnitSphericalToCartesian(sinCosTheta,
-                                                         sinCosPhi);
+    Vector3 unitPos = Distribution::Common::SampleUnitSphere(xi);
 
     // Calculate PDF
     // Approximate the area with the determinant
@@ -239,7 +233,7 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
     position = transform.ApplyP(position);
 
     // Align this normal to Z axis to define tangent space rotation
-    Quaternion tbn = Quaternion::RotationBetweenZAxis(Math::Normalize(normal)).Conjugate();
+    Quaternion tbn = TransformGen::RotationBetweenZAxis(Math::Normalize(normal)).Conjugate();
 
     // Spheres are always two sided, check if we are inside
     Vector3 rDir = Math::Normalize(ray.dir);
@@ -290,7 +284,7 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
     if(normalMap)
     {
         Vector3 n = Math::Normalize((*normalMap)(uv, dpdx, dpdy));
-        tbn = Quaternion::RotationBetweenZAxis(n).Conjugate() * tbn;
+        tbn = TransformGen::RotationBetweenZAxis(n).Conjugate() * tbn;
     }
     result = DefaultSurface
     {

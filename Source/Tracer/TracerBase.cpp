@@ -188,6 +188,7 @@ void TracerBase::GenerateDefaultGroups()
 TracerBase::TracerBase(const TypeGeneratorPack& tGen,
                        const TracerParameters& tParams)
     : gpuSystem(true)
+    //: gpuSystem(true, 1)
     , globalThreadPool(nullptr)
     , typeGenerators(tGen)
     , filterGenMap(FilterGenFuncList)
