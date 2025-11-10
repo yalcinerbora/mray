@@ -144,7 +144,7 @@ T WarpReduceAdd(T varName, unsigned int mask)
         #else
             return WarpReduce(varName, mask, []MRAY_GPU(const T & a, const T & b)
             {
-                return a + b
+                return a + b;
             });
         #endif
     #else

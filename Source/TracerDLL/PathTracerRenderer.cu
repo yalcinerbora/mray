@@ -477,10 +477,6 @@ PathTracerRendererT<SC>::DoThroughputSingleTileRender(const GPUDevice& device,
     // Copy continuing set of rays to actual ray buffer for next iteration
     CopyAliveRays(dAliveRayIndices, processQueue);
 
-    // We exhausted all alive rays while doing SPP limit.
-    bool triggerSave = (saveImage && tilePathCounts[0] == TotalSampleLimit(currentOptions.totalSPP));
-    if(triggerSave) saveImage = false;
-
     // We do not need to wait here, but we time
     // from CPU side so we need to wait
     // TODO: In future we should do OpenGL, Vulkan
@@ -497,6 +493,11 @@ PathTracerRendererT<SC>::DoThroughputSingleTileRender(const GPUDevice& device,
     analyticData = CalculateAnalyticDataThroughput(dDeadRayIndices.size(),
                                                    currentOptions.totalSPP,
                                                    timer);
+
+    // We exhausted all alive rays while doing SPP limit.
+    bool triggerSave = (saveImage && totalDeadRayCount == TotalSampleLimit(currentOptions.totalSPP));
+    if(triggerSave) saveImage = false;
+
     analyticData.customLogicSize0 = uint32_t(PathTraceRDetail::SampleMode::E::END);
     return RendererOutput
     {
