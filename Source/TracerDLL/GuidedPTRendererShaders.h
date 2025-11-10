@@ -230,7 +230,8 @@ namespace GuidedPTRDetail
         MR_GF_DECL void             Product(const std::array<GaussianLobe, 2>& matLobes);
     };
 
-    static constexpr uint32_t MC_LOBE_COUNT = 5;
+    //static constexpr uint32_t MC_LOBE_COUNT = 5;
+    static constexpr uint32_t MC_LOBE_COUNT = 8;
 
     // TODO: Macro for CPU/GPU after profiling
     //using GaussianLobeMixture = GaussLobeMixtureSharedT<MC_LOBE_COUNT>;
@@ -619,13 +620,11 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     //     Load Mixture       //
     // ====================== //
     GaussianLobeMixture mixture;
-    //Vector3 wORefl = Graphics::Reflect(surf.geoNormal, wOWorld);
-    //Vector3 qN = (backupRNG.NextFloat() < Float(0.5)) ? wOWorld : wORefl;
     uint32_t liftedMCIndex = mixture.LoadStochastic(surf.position,
-                                                    surf.geoNormal,
+                                                    wOWorld,
                                                     backupRNG,
                                                     gs);
-    Vector2 cooctaN = Graphics::DirectionToConcentricOctahedral(surf.geoNormal);
+    Vector2 cooctaN = Graphics::DirectionToConcentricOctahedral(wOWorld);
     // TODO: Product sampling
     //std::array<GaussianLobe, 2> materialLobes =
     //{
@@ -639,14 +638,12 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     // ====================== //
     std::array<Float, 2> misPDFs = {};
     std::array<Float, 2> misWeights = {};
+    bool isLobeSampled = false;
     if(!isSpecular)
         misWeights[0] = Math::Lerp(Float(0), gs.lobeProbability,
                                    Float(1) - specularity);
-    // Skip vMF sampling if sample is back (probably start of render)
-    misWeights[0] = (mixture.sumWeight == Float(0))
-                        ? Float(0)
-                        : misWeights[0];
     misWeights[1] = Float(1) - misWeights[0];
+    // MIS
     BxDFSample pathSample;
     if(rng.NextFloat<MISSampleStart>() < misWeights[0])
     {
@@ -657,6 +654,7 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
         pathSample.eval = mat.Evaluate(Ray(wILocal, surf.position), wO);
         misPDFs[0] = mixtureSample.pdf;
         misPDFs[1] = mat.Pdf(Ray(wILocal, surf.position), wO);
+        isLobeSampled = true;
     }
     else
     {
@@ -687,11 +685,6 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
         isPathDead = !result.has_value();
         throughput = result.value_or(throughput);
     }
-
-    //if(pdfPath != misPDFs[1])
-    //{
-    //    MRAY_LOG("bad!");
-    //}
 
     // ================== //
     //   Path Throughput  //
@@ -745,19 +738,18 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
         rs.dPrevPDF[rayIndex] = pdfPath;
         // When we update the MC, this will be used to estimate radiant exitance
         // and MC state termination update etc.
-        rs.dPrevPathReflectanceOrOutRadiance[rayIndex]
-            = DivideByPDF(avgPathReflectance,
-                          Math::Max(pdfPath, Float(100)));
-            //= DivideByPDF(avgPathReflectance, pdfPath);
+        Float outRefl = DivideByPDF(avgPathReflectance,
+                                    Math::Max(pdfPath, Float(10)));
+        //Float outRefl = DivideByPDF(avgPathReflectance, pdfPath);
+        rs.dPrevPathReflectanceOrOutRadiance[rayIndex] = outRefl;
+
         // Save the score sum for MC selection as well
-        rs.dScoreSums[rayIndex] = mixture.sumWeight;
+                              //= DivideByPDF(avgPathReflectance, pdfPath);
+        Float outSumweight = (isLobeSampled) ? mixture.sumWeight
+                                             : std::numeric_limits<Float>::infinity();
+        rs.dScoreSums[rayIndex] = outSumweight;
         rs.dLiftedMCIndices[rayIndex] = liftedMCIndex;
         rs.dPrevNormals[rayIndex] = cooctaN;
-
-        if(dataPack.type == RayType::SPECULAR_RAY)
-        {
-            rs.dPrevPathReflectanceOrOutRadiance[rayIndex] *= Float(1.3);
-        }
     }
 
     // Do not bother with NEE if specular or path is dead
@@ -832,10 +824,11 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     RayToGMem(rs.dShadowRays, rayIndex, shadowRay, shadowTMM);
     rs.dShadowRayCones[rayIndex] = shadowRayConeOut;
     rs.dShadowRayRadiance[rayIndex] = shadowRadiance;
-    rs.dShadowPrevPathOutRadiance[rayIndex]
-        = DivideByPDF(prevPathShadowEmission,
-                      Math::Max(pdfShadow, Float(100)));
-        //= DivideByPDF(prevPathShadowEmission, pdfShadow);
+    Float outRefl = DivideByPDF(prevPathShadowEmission,
+                                Math::Max(pdfShadow, Float(10)));
+    //Float outRefl = DivideByPDF(prevPathShadowEmission, pdfShadow);
+    rs.dShadowPrevPathOutRadiance[rayIndex] = outRefl;
+
     // Write the updated state back
     rs.dPathDataPack[rayIndex] = dataPack;
 }

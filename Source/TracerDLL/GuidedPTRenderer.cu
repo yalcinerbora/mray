@@ -187,9 +187,7 @@ void KCBackpropagateHashGridPath(// Output
         uint32_t rIndex = dRayIndices[i];
         uint32_t isLightFlag = dHitKeys[rIndex].lightOrMatKey.FetchFlagPortion();
         uint32_t prevMCIndex = dLiftedMCIndices[rIndex];
-        BackupRNGState rngState{2};
         BackupRNG rng = BackupRNG(dRNGStates[rIndex]);
-        BackupRNG rng2 = BackupRNG(rngState);
         //
         if(isLightFlag == IS_LIGHT_KEY_FLAG) continue;
         if(prevMCIndex == INVALID_MC_INDEX) continue;
@@ -202,8 +200,8 @@ void KCBackpropagateHashGridPath(// Output
         Vector3 direction = Math::Normalize(-ray.dir);
 
         const HashGridView& hg = globalState.hashGrid;
-        auto code = hg.GenCodeStochastic(nextPos, direction, rng);
-        //auto code = hg.GenCode(nextPos, direction);
+        //auto code = hg.GenCodeStochastic(nextPos, direction, rng);
+        auto code = hg.GenCode(nextPos, direction);
         auto irradLoc = hg.Search(code);
         //
         if(!irradLoc) continue;
@@ -223,17 +221,16 @@ void KCBackpropagateHashGridPath(// Output
             printf("Out Rad not finite! %f, %f\n", irrad, refl);
             outRadiance = Float(0);
         }
-
-        //auto codeOut = hg.GenCode(ray.pos, direction);
-        //auto outIrradLoc = hg.Search(codeOut);
-        //if(outIrradLoc)
-        //    MCIrradiance::AtomicEMA(dIrradHashGrid[*outIrradLoc], outRadiance);
         MCIrradiance::AtomicEMA(dIrradHashGrid[prevMCIndex], outRadiance);
 
+        // ========================= //
+        //    Markov Chain Update    //
+        // ========================= //
         Float weight = outRadiance;
         Float scoreSum = dScoreSums[rIndex];
         // Not as good as previous mixture, skip
-        if(rng2.NextFloat() * scoreSum > weight * MC_LOBE_COUNT)
+        if(scoreSum != std::numeric_limits<Float>::infinity() &&
+           rng.NextFloat() * scoreSum > weight * MC_LOBE_COUNT)
             continue;
 
         // ========================= //
@@ -241,13 +238,8 @@ void KCBackpropagateHashGridPath(// Output
         // ========================= //
         Vector3 mcPos = ray.pos;
         Vector3 mcN = Graphics::ConcentricOctahedralToDirection(dPrevNormals[rIndex]);
-        Optional<uint32_t> mcLoc;
         auto mcCode = hg.GenCodeStochastic(mcPos, mcN, rng);
-        mcLoc = hg.Search(mcCode);
-        //
-        if(!mcLoc) continue;
-        // Save new index for writing
-        uint32_t newIndex = *mcLoc;
+        uint32_t newIndex = hg.Search(mcCode).value_or(prevMCIndex);
         dLiftedMCIndices[rIndex] = newIndex;
 
         // ========================= //
@@ -280,20 +272,21 @@ void KCBackpropagateHashGridPath(// Output
         const auto& dCounts = globalState.dMCCounts;
         MCState s = dStates[prevMCIndex];
         MCCount count = dCounts[prevMCIndex];
-        if(!Math::IsFinite(outRadiance))
+        if(scoreSum == std::numeric_limits<Float>::infinity())
         {
-            printf("Out Rad not finite!\n");
-            outRadiance = Float(0);
+            s = MCState{Vector3::Zero(), Float(0), Float(0)};
+            count = uint16_t(0);
         }
-        // Update routine
-        count = uint16_t(s.EMA(ray.pos, nextPos, outRadiance, count));
-
-        //bool a = (outRadiance > Float(1e-3) * s.weight);
-        //auto cos = Math::Dot(Math::Normalize(ray.dir), s.Direction(ray.pos));
-        //bool b = cos < Float(0.9) + 0.1 * s.MeanCosine(nextPos, count);
-        //bool reset = !(a || b);
-        //if(reset)
-        //    s.weight = 0;
+        else
+        {
+            if(!Math::IsFinite(outRadiance))
+            {
+                printf("Out Rad not finite!\n");
+                outRadiance = Float(0);
+            }
+            // Update routine
+            count = uint16_t(s.EMA(ray.pos, nextPos, outRadiance, count));
+        }
 
         //
         if(!Math::IsFinite(s.cosine))
@@ -345,24 +338,8 @@ void KCWriteMarkovChains(// I-O
         // Write
         auto mcW = dWriteMCStates[rIndex].s;
         auto mcCountW = dWriteMCStates[rIndex].N;
-
-        BackupRNG rng(dRNGStates[rIndex]);
-        if(rng.NextFloat() < Float(.25))
-        {
-            globalState.dMCStates[writeMCIndex] = mcW;
-            globalState.dMCCounts[writeMCIndex] = uint16_t(mcCountW);
-        }
-        else
-        {
-            GuidedPTRDetail::MCState zeroMC =
-            {
-                .target = Vector3::Zero(),
-                .cosine = Float(0),
-                .weight = Float(0),
-            };
-            globalState.dMCStates[writeMCIndex] = zeroMC;
-            globalState.dMCCounts[writeMCIndex] = uint16_t(0);
-        }
+        globalState.dMCStates[writeMCIndex] = mcW;
+        globalState.dMCCounts[writeMCIndex] = uint16_t(mcCountW);
     }
 }
 
