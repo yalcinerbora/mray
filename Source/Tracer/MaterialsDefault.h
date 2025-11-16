@@ -12,7 +12,6 @@ namespace LambertMatDetail
     {
         Span<const ParamVaryingData<2, Vector3>>        dAlbedo;
         Span<const Optional<TracerTexView<2, Vector3>>> dNormalMaps;
-        Span<const MediumKeyPair>                       dMediumKeys;
     };
 
     template <class SpectrumContext = SpectrumContextIdentity>
@@ -28,7 +27,6 @@ namespace LambertMatDetail
         private:
         const Surface&              surface;
         Spectrum                    albedo;
-        MediumKeyPair               mediumKeys;
 
         public:
         MR_GF_DECL
@@ -60,9 +58,7 @@ namespace LambertMatDetail
 namespace ReflectMatDetail
 {
     struct ReflectMatData
-    {
-        Span<const MediumKeyPair>  dMediumKeys;
-    };
+    {};
 
     template <class SpectrumContext = SpectrumContextIdentity>
     struct ReflectMaterial
@@ -75,7 +71,6 @@ namespace ReflectMatDetail
 
         private:
         const Surface& surface;
-        MediumKeyPair  mediumKeys;
 
         public:
         MR_GF_DECL
@@ -106,7 +101,6 @@ namespace RefractMatDetail
 {
     struct alignas(32) RefractMatData
     {
-        Span<const MediumKeyPair>   dMediumKeys;
         Span<const Vector3>         dFrontCauchyCoeffs;
         Span<const Vector3>         dBackCauchyCoeffs;
     };
@@ -122,7 +116,6 @@ namespace RefractMatDetail
 
         private:
         const Surface&  surface;
-        MediumKeyPair   mediumKeys;
         Float           frontIoR;
         Float           backIoR;
 
@@ -163,8 +156,6 @@ namespace UnrealMatDetail
         Span<const ParamVaryingData<2, Float>>          dRoughness;
         Span<const ParamVaryingData<2, Float>>          dSpecular;
         Span<const ParamVaryingData<2, Float>>          dMetallic;
-        //
-        Span<const MediumKeyPair>                       dMediumKeys;
     };
 
     template <class SpectrumContext = SpectrumContextIdentity>
@@ -184,7 +175,6 @@ namespace UnrealMatDetail
         Float               roughness;
         Float               specular;
         Float               metallic;
-        MediumKeyPair       mediumKeys;
 
         MR_GF_DECL
         Float MISRatio(Float avgAlbedo) const;
@@ -231,7 +221,6 @@ class MatGroupLambert final : public GenericGroupMaterial<MatGroupLambert>
     private:
     Span<ParamVaryingData<2, Vector3>>          dAlbedo;
     Span<Optional<TracerTexView<2, Vector3>>>   dNormalMaps;
-    Span<MediumKeyPair>                         dMediumKeys;
     DataSoA                                     soa;
 
     protected:
@@ -287,7 +276,6 @@ class MatGroupReflect final : public GenericGroupMaterial<MatGroupReflect>
     using Surface   = typename Material<>::Surface;
 
     private:
-    Span<MediumKeyPair> dMediumKeys;
     DataSoA             soa;
 
     protected:
@@ -343,7 +331,6 @@ class MatGroupRefract final : public GenericGroupMaterial<MatGroupRefract>
     using Surface   = typename Material<>::Surface;
 
     private:
-    Span<MediumKeyPair> dMediumKeys;
     Span<Vector3>       dFrontCauchyCoeffs;
     Span<Vector3>       dBackCauchyCoeffs;
     DataSoA             soa;
@@ -413,7 +400,6 @@ class MatGroupUnreal final : public GenericGroupMaterial<MatGroupUnreal>
     Span<ParamVaryingData<2, Float>>            dRoughness;
     Span<ParamVaryingData<2, Float>>            dSpecular;
     Span<ParamVaryingData<2, Float>>            dMetallic;
-    Span<MediumKeyPair>                         dMediumKeys;
     DataSoA                                     soa;
     protected:
 

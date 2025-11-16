@@ -223,9 +223,32 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
     // Actual Ray Casting
     tracerView.baseAccelerator.CastRays
     (
+        Span<InterfaceIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
-        dRays, dIndices, processQueue
+        dRays, dIndices, false, processQueue
     );
+
+    if(false) // currentOptions.sampleMedium
+    {
+        // Generate work keys for media
+
+        // N -way Partition wrt. medium/transform pair
+
+        // Call Media Transmit
+
+        // Binary Partition wrt. scatter/not scatter event
+
+        // For scattered rays,
+        //    set their hit pack to invalid.
+        //
+        //    Launch shadow rays and find visibility
+        //      Shadow ray launch is recursive if media is on
+        //    (if NEE is on)
+        //    Resolve transmittence on the media
+        //    Accumulate light if transmittance is ok and visibility
+        //    is ok
+    }
+
 
     // Generate work keys from hit packs
     using namespace std::string_literals;

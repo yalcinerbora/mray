@@ -151,6 +151,9 @@ class TracerBase : public TracerI
     // Render Framebuffer
     RenderImagePtr      renderImage;
 
+    // Deduplicated Interface List
+    std::vector<InterfaceKeyPack> globalInterfaceList;
+
     // Current Types
     Map<std::string_view, PrimAttributeInfoList>       primAttributeInfoMap;
     Map<std::string_view, CamAttributeInfoList>        camAttributeInfoMap;
@@ -163,6 +166,8 @@ class TracerBase : public TracerI
     void            PopulateAttribInfoAndTypeLists();
     TracerView      GenerateTracerView();
     void            GenerateDefaultGroups();
+    void            GenerateGlobalInterfaceList();
+
     public:
     // Constructors & Destructor
                     TracerBase(const TypeGeneratorPack&,
@@ -224,11 +229,8 @@ class TracerBase : public TracerI
                                         std::vector<Matrix4x4>) override;
 
     MatGroupId      CreateMaterialGroup(std::string typeName) override;
-    MaterialId      ReserveMaterial(MatGroupId, AttributeCountList,
-                                    MediumPair = TracerConstants::VacuumMediumPair) override;
-    MaterialIdList  ReserveMaterials(MatGroupId,
-                                     std::vector<AttributeCountList>,
-                                     std::vector<MediumPair> = {}) override;
+    MaterialId      ReserveMaterial(MatGroupId, AttributeCountList) override;
+    MaterialIdList  ReserveMaterials(MatGroupId, std::vector<AttributeCountList>) override;
 
     void            CommitMatReservations(MatGroupId) override;
     bool            IsMatCommitted(MatGroupId) const override;

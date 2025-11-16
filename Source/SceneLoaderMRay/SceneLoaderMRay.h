@@ -76,8 +76,7 @@ class SceneLoaderMRay : public SceneLoaderI
 
     void        LoadTextures(TracerI&, ErrorList&);
     void        LoadMediums(TracerI&, ErrorList&);
-    void        LoadMaterials(TracerI&, ErrorList&,
-                              uint32_t boundaryMediumId);
+    void        LoadMaterials(TracerI&, ErrorList&);
     void        LoadTransforms(TracerI&, ErrorList&);
     void        LoadPrimitives(TracerI&, ErrorList&);
     void        LoadCameras(TracerI&, ErrorList&);

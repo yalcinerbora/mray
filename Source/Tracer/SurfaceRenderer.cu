@@ -219,6 +219,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
         throw MRayError("[{:s}]: Unknown camera surface id ({:d})",
                         TypeName(), uint32_t(camSurfId));
     curCamSurfaceParams = surfLoc->second;
+
     // Find the transform/camera work for this specific surface
     curCamKey = std::bit_cast<CameraKey>(curCamSurfaceParams.cameraId);
     curCamTransformKey = std::bit_cast<TransformKey>(curCamSurfaceParams.transformId);
@@ -265,26 +266,33 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     }
     else
     {
-        MemAlloc::AllocateMultiData(Tie(dHits, dHitKeys,
-                                        dRays, dRayCones,
+        bool isVolumeMode = (currentOptions.mode == SurfRDetail::Mode::VOL_INTERFACE);
+        size_t rayVolCount = isVolumeMode ? maxRayCount : size_t(0);
+        size_t volListCount = isVolumeMode ? tracerView.globalInterfaceList.size() : size_t(0);
+
+        MemAlloc::AllocateMultiData(Tie(dHits, dHitKeys, dRays, dRayCones,
                                         dRayStateCommon.dImageCoordinates,
                                         dRayStateCommon.dOutputData,
                                         dRayStateCommon.dFilmFilterWeights,
+                                        dRayStateCommon.dHitInterfaceIndices,
                                         dRandomNumBuffer,
                                         dWorkHashes, dWorkBatchIds,
+                                        dGlobalInterfaceList,
                                         dSubCameraBuffer),
                                     rendererGlobalMem,
-                                    {maxRayCount, maxRayCount,
-                                     maxRayCount, maxRayCount,
-                                     maxRayCount, maxRayCount,
-                                     maxRayCount, maxSampleCount,
-                                     totalWorkCount, totalWorkCount,
+                                    {maxRayCount, maxRayCount, maxRayCount,
+                                     maxRayCount, maxRayCount, maxRayCount,
+                                     maxRayCount, rayVolCount, maxSampleCount,
+                                     totalWorkCount, totalWorkCount, volListCount,
                                      SUB_CAMERA_BUFFER_SIZE});
 
         dRayStateAO.dImageCoordinates = dRayStateCommon.dImageCoordinates;
         dRayStateAO.dOutputData = dRayStateCommon.dOutputData;
         dRayStateAO.dFilmFilterWeights = dRayStateCommon.dFilmFilterWeights;
     }
+    // Dont forget to copy the interface list :)
+    queue.MemcpyAsync(dGlobalInterfaceList,
+                      Span<const InterfaceKeyPack>(tracerView.globalInterfaceList));
 
     // And initialize the hashes
     workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds,
@@ -438,10 +446,14 @@ RendererOutput SurfaceRenderer::DoRender()
     );
 
     // Ray Casting
+    SurfRDetail::Mode::E curMode = currentOptions.mode;
     tracerView.baseAccelerator.CastRays
     (
+        dRayStateCommon.dHitInterfaceIndices,
         dHitKeysLocal, dHits, dBackupRNGStates,
-        dRays, dIndices, processQueue
+        dRays, dIndices,
+        (curMode == SurfRDetail::Mode::VOL_INTERFACE),
+        processQueue
     );
 
     // Generate work keys from hit packs
@@ -474,7 +486,6 @@ RendererOutput SurfaceRenderer::DoRender()
     // Wait for results to be available in host buffers
     processQueue.Barrier().Wait();
 
-    SurfRDetail::Mode::E curMode = currentOptions.mode;
     if(curMode == SurfRDetail::Mode::AO)
     {
         Span<RayGMem> dVisibilityRays = dRayStateAO.dVisibilityRays;
@@ -488,9 +499,16 @@ RendererOutput SurfaceRenderer::DoRender()
 
     SurfRDetail::GlobalState globalState =
     {
-        .mode = SurfRDetail::Mode(curMode),
-        .tMaxAO = curTMaxAO
+        .mode                 = SurfRDetail::Mode(curMode),
+        .tMaxAO               = curTMaxAO,
+        .dGlobalInterfaceList = dGlobalInterfaceList,
+        .cameraVolume = VolumeKeyPack
+        {
+            .medKey   = Bit::BitCast<MediumKey>(curCamSurfaceParams.volume.mediumId),
+            .transKey = Bit::BitCast<TransformKey>(curCamSurfaceParams.volume.transformId)
+        }
     };
+
     for(uint32_t i = 0; i < hPartitionCount[0]; i++)
     {
         uint32_t partitionStart = hPartitionStartOffsets[i];

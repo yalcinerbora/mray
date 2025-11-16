@@ -258,6 +258,7 @@ class AcceleratorGroupOptiX final
 
     // Functionality
     void    CastLocalRays(// Output
+                          Span<InterfaceIndex> dInterfaceIndices,
                           Span<HitKeyPack> dHitIds,
                           Span<MetaHit> dHitParams,
                           // I-O
@@ -268,6 +269,7 @@ class AcceleratorGroupOptiX final
                           Span<const CommonKey> dAccelKeys,
                           // Constants
                           CommonKey workId,
+                          bool writeInterfaceIndex,
                           const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -332,6 +334,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
 
     //
     void    CastRays(// Output
+                     Span<InterfaceIndex> dInterfaceIndices,
                      Span<HitKeyPack> dHitIds,
                      Span<MetaHit> dHitParams,
                      // I-O
@@ -339,6 +342,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
                      Span<RayGMem> dRays,
                      // Input
                      Span<const RayIndex> dRayIndices,
+                     bool writeInterfaceIndex,
                      const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -351,6 +355,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
                                const GPUQueue& queue) override;
 
     void    CastLocalRays(// Output
+                          Span<InterfaceIndex> dInterfaceIndices,
                           Span<HitKeyPack> dHitIds,
                           Span<MetaHit> dHitParams,
                           // I-O
@@ -360,6 +365,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
                           Span<const RayIndex> dRayIndices,
                           Span<const AcceleratorKey> dAccelKeys,
                           CommonKey dAccelKeyBatchPortion,
+                          bool writeInterfaceIndex,
                           const GPUQueue& queue) override;
 
     void    AllocateForTraversal(size_t maxRayCount) override;

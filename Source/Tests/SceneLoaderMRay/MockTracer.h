@@ -210,11 +210,8 @@ class TracerMock : public TracerI
                                         std::vector<Matrix4x4> transforms) override;
 
     MatGroupId      CreateMaterialGroup(std::string typeName) override;
-    MaterialId      ReserveMaterial(MatGroupId, AttributeCountList,
-                                    MediumPair = TracerConstants::VacuumMediumPair) override;
-    MaterialIdList  ReserveMaterials(MatGroupId,
-                                     std::vector<AttributeCountList>,
-                                     std::vector<MediumPair> = {}) override;
+    MaterialId      ReserveMaterial(MatGroupId, AttributeCountList) override;
+    MaterialIdList  ReserveMaterials(MatGroupId, std::vector<AttributeCountList>) override;
 
     void            CommitMatReservations(MatGroupId) override;
     bool            IsMatCommitted(MatGroupId) const override;
@@ -855,8 +852,7 @@ inline MatGroupId TracerMock::CreateMaterialGroup(std::string name)
     return id;
 }
 
-inline MaterialId TracerMock::ReserveMaterial(MatGroupId id, AttributeCountList count,
-                                              MediumPair mediumPair)
+inline MaterialId TracerMock::ReserveMaterial(MatGroupId id, AttributeCountList count)
 {
     std::atomic_size_t* atomicCounter = nullptr;
     {
@@ -873,21 +869,16 @@ inline MaterialId TracerMock::ReserveMaterial(MatGroupId id, AttributeCountList 
         }
         attribCountString += "]";
 
-        MRAY_LOG("Reserving material over MaterialGroup({}), AttribCount: {}, "
-                 "MediumPair: ({}, {})", static_cast<CommonId>(id),
-                 attribCountString,
-                 static_cast<CommonId>(mediumPair.first),
-                 static_cast<CommonId>(mediumPair.second));
+        MRAY_LOG("Reserving material over MaterialGroup({}), AttribCount: {}",
+                 static_cast<CommonId>(id), attribCountString);
     }
     size_t matId = atomicCounter->fetch_add(1);
     return MaterialId(matId);
 }
 
 inline MaterialIdList TracerMock::ReserveMaterials(MatGroupId id,
-                                                   std::vector<AttributeCountList> countList,
-                                                   std::vector<MediumPair> medPairs)
+                                                   std::vector<AttributeCountList> countList)
 {
-    assert(medPairs.size() == countList.size());
     std::atomic_size_t* atomicCounter = nullptr;
     {
         std::lock_guard<std::mutex> lock(mtGLock);
@@ -901,8 +892,6 @@ inline MaterialIdList TracerMock::ReserveMaterials(MatGroupId id,
         for(size_t i = 0; i < countList.size(); i++)
         {
             const AttributeCountList& count = countList[i];
-            const MediumPair& mediumPair = medPairs[i];
-
             std::string attribCountString = "[";
             for(const auto& c : count)
             {
@@ -910,11 +899,8 @@ inline MaterialIdList TracerMock::ReserveMaterials(MatGroupId id,
             }
             attribCountString += "]";
 
-            log += MRAY_FORMAT("Reserving material over MaterialGroup({}), AttribCount: {}, "
-                               "MediumPair: ({}, {})\n", static_cast<CommonId>(id),
-                               attribCountString,
-                               static_cast<CommonId>(mediumPair.first),
-                               static_cast<CommonId>(mediumPair.second));
+            log += MRAY_FORMAT("Reserving material over MaterialGroup({}), AttribCount: {}\n",
+                               static_cast<CommonId>(id), attribCountString);
         }
         MRAY_LOG("{}", log);
     }
@@ -1675,6 +1661,7 @@ inline SurfaceId TracerMock::CreateSurface(SurfaceParams p)
     std::string matIdString;
     std::string alphaMapString;
     std::string cullFaceString;
+    std::string interfaceString;
 
     for(size_t i = 0; i < p.primBatches.size(); i++)
     {
@@ -1684,11 +1671,20 @@ inline SurfaceId TracerMock::CreateSurface(SurfaceParams p)
         alphaMapString += (p.alphaMaps[i].has_value())
                             ? MRAY_FORMAT("{}, ", static_cast<CommonId>(p.alphaMaps[i].value()))
                             : "None, ";
+
+        interfaceString += MRAY_FORMAT("[Front: {}|{}, Back: {}|{}]",
+                                       static_cast<CommonId>(p.interfaces[i].frontVolume.mediumId),
+                                       static_cast<CommonId>(p.interfaces[i].frontVolume.transformId),
+                                       static_cast<CommonId>(p.interfaces[i].backVolume.mediumId),
+                                       static_cast<CommonId>(p.interfaces[i].backVolume.transformId));
     }
 
-    MRAY_LOG("Creating Surface({}): Trans:{}, Prim: [{}], Mat: [{}], AlphaMap: [{}], CullFace: [{}]",
+    MRAY_LOG("Creating Surface({}): Trans:{}, "
+             "Prim: [{}], Mat: [{}], AlphaMap: [{}], "
+             "CullFace: [{}], Interface: [{}]",
              surfId, static_cast<CommonId>(p.transformId),
-             primIdString, matIdString, alphaMapString, cullFaceString);
+             primIdString, matIdString, alphaMapString, cullFaceString,
+             interfaceString);
     return SurfaceId(surfId);
 }
 
@@ -1697,10 +1693,12 @@ inline LightSurfaceId TracerMock::SetBoundarySurface(LightSurfaceParams p)
     size_t lightSurfId = lightSurfaceCounter.fetch_add(1);
     if(!print) return LightSurfaceId(lightSurfId);
 
-    MRAY_LOG("Setting BoundarySurface({}): Light: {}, Trans: {}, Medium: {}",
+    MRAY_LOG("Setting BoundarySurface({}): Light: {}, Trans: {}, "
+             "Volume: [Medium: {}, Trans: {}]",
              lightSurfId, static_cast<CommonId>(p.lightId),
              static_cast<CommonId>(p.transformId),
-             static_cast<CommonId>(p.mediumId));
+             static_cast<CommonId>(p.volume.mediumId),
+             static_cast<CommonId>(p.volume.transformId));
     return LightSurfaceId(lightSurfId);
 }
 
@@ -1709,11 +1707,12 @@ inline LightSurfaceId TracerMock::CreateLightSurface(LightSurfaceParams p)
     size_t lightSurfId = lightSurfaceCounter.fetch_add(1);
     if(!print) return LightSurfaceId(lightSurfId);
 
-
-    MRAY_LOG("Creating LightSurface({}): Light: {}, Trans: {}, Medium: {}",
+    MRAY_LOG("Creating LightSurface({}): Light: {}, Trans: {}, "
+             "Volume: [Medium: {}, Trans: {}]",
              lightSurfId, static_cast<CommonId>(p.lightId),
              static_cast<CommonId>(p.transformId),
-             static_cast<CommonId>(p.mediumId));
+             static_cast<CommonId>(p.volume.mediumId),
+             static_cast<CommonId>(p.volume.transformId));
     return LightSurfaceId(lightSurfId);
 }
 
@@ -1722,10 +1721,12 @@ inline CamSurfaceId TracerMock::CreateCameraSurface(CameraSurfaceParams p)
     size_t camSurfId = camSurfaceCounter.fetch_add(1);
     if(!print) return CamSurfaceId(camSurfId);
 
-    MRAY_LOG("Creating CameraSurface({}): Camera: {}, Trans: {}, Medium: {}",
+    MRAY_LOG("Creating CameraSurface({}): Camera: {}, Trans: {}, "
+             "Volume [Medium: {}, Transform: {}]",
              camSurfId, static_cast<CommonId>(p.cameraId),
              static_cast<CommonId>(p.transformId),
-             static_cast<CommonId>(p.mediumId));
+             static_cast<CommonId>(p.volume.mediumId),
+             static_cast<CommonId>(p.volume.transformId));
     return CamSurfaceId(camSurfId);
 }
 

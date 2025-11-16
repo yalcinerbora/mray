@@ -2,6 +2,7 @@
 
 #include "RendererC.h"
 #include "SpectrumC.h"
+#include "MediumC.h"
 #include "Random.h"
 
 class SpectrumContextJakob2019;
@@ -24,6 +25,9 @@ class TexViewRenderer final : public RendererBase
 
     template<CameraGroupC CG, TransformGroupC TG>
     using CamWorkFunctions = TypePack<>;
+
+    template<MediumGroupC MG, TransformGroupC TG>
+    using MediumWorkFunctions = TypePack<>;
 
     enum Mode
     {

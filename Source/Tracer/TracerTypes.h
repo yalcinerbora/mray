@@ -175,9 +175,13 @@ using LightKey          = MaterialKey;
 using LightOrMatKey     = TriKeyT<CommonKey, 1,
                                   LightKey::BatchBits - 1,
                                   LightKey::IdBits>;
+using InterfaceIndex    = KeyT<CommonKey, 1, CommonKeyBits - 1>;
 
 static constexpr CommonKey IS_MAT_KEY_FLAG = 0u;
 static constexpr CommonKey IS_LIGHT_KEY_FLAG = 1u;
+
+static constexpr CommonKey IS_FRONTFACE_KEY_FLAG = 0u;
+static constexpr CommonKey IS_BACKFACE_KEY_FLAG = 1u;
 
 static_assert(std::is_same_v<LightKey, MaterialKey>,
               "Material and Light keys must match due to variant like usage");
@@ -201,17 +205,34 @@ struct alignas(HitKeyPackAlignment) HitKeyPack
     AcceleratorKey  accelKey;
 };
 
+static constexpr size_t InterfaceKeyPackAlignment = (sizeof(MediumKey) + sizeof(TransformKey));
+struct alignas(InterfaceKeyPackAlignment) VolumeKeyPack
+{
+    MediumKey       medKey;
+    TransformKey    transKey;
+
+    auto operator<=>(const VolumeKeyPack&) const = default;
+};
+
+struct InterfaceKeyPack
+{
+    VolumeKeyPack front;
+    VolumeKeyPack back;
+
+    auto operator<=>(const InterfaceKeyPack&) const = default;
+};
+
 template <class HitType>
 struct IntersectionT
 {
     HitType         hit;
     Float           t;
+    bool            backFace;
 };
 
 struct BxDFEval
 {
     Spectrum    reflectance;
-    MediumKey   mediumKey;
     bool        isPassedThrough = false;
     bool        isDispersed     = false;
 };
@@ -268,7 +289,7 @@ struct alignas(32) RayGMem
 
 };
 
-MR_PF_DECL
+MR_PF_DEF
 Pair<Ray, Vector2> RayFromGMem(Span<const RayGMem> gRays, RayIndex index) noexcept
 {
     RayGMem rayGMem = gRays[index];
@@ -277,7 +298,7 @@ Pair<Ray, Vector2> RayFromGMem(Span<const RayGMem> gRays, RayIndex index) noexce
                 Vector2(rayGMem.tMin, rayGMem.tMax));
 }
 
-MR_PF_DECL_V
+MR_PF_DEF_V
 void RayToGMem(Span<RayGMem> gRays, RayIndex index,
                const Ray& r, const Vector2& tMinMax) noexcept
 {
@@ -291,7 +312,7 @@ void RayToGMem(Span<RayGMem> gRays, RayIndex index,
     gRays[index] = rayGMem;
 }
 
-MR_PF_DECL_V
+MR_PF_DEF_V
 void UpdateTMax(Span<RayGMem> gRays, RayIndex index, Float tMax) noexcept
 {
     gRays[index].tMax = tMax;
@@ -384,4 +405,21 @@ bool SpectrumWavesT<SPS, T>::IsDispersed() const
     // Don't bother checking the rest if the second one is gone,
     // all gone
     else return this->operator[](1) == DISPERSED_WAVE;
+}
+
+MR_PF_DEF
+VolumeKeyPack
+DetermineCurrentVolume(const Span<const InterfaceKeyPack>& globalInterfaceList,
+                       const VolumeKeyPack& currentVolume,
+                       InterfaceIndex index)
+{
+    bool isBackFace = index.FetchBatchPortion() == IS_BACKFACE_KEY_FLAG;
+    CommonKey interfaceIndex = index.FetchIndexPortion();
+    InterfaceKeyPack kp = globalInterfaceList[interfaceIndex];
+    VolumeKeyPack vol = (isBackFace) ? kp.back : kp.front;
+    // If given volume is "don't care" just return the current
+    // volume
+    return (vol.medKey == MediumKey::InvalidKey())
+                ? currentVolume
+                : vol;
 }

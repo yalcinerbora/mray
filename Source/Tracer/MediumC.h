@@ -10,6 +10,27 @@ struct ScatterSampleT
     Float   phaseVal;
 };
 
+struct RaySegment
+{
+    Vector2 tMM;
+    Spectrum sMajor;
+};
+
+enum class MediumEvent : uint8_t
+{
+    ABSORBED    = 0,
+    SCATTERED   = 1,
+    NULL_EVENT  = 2,
+    TRANSMITTED = 3
+};
+
+template<class SegmentItType>
+concept SegmentIteratorC = requires(SegmentItType& t)
+{
+    {t.curSegment} -> std::same_as<RaySegment>;
+    {t.Advance()} -> std::same_as<bool>;
+};
+
 using ScatterSample = SampleT<ScatterSampleT>;
 
 template<class MediumType>
@@ -42,8 +63,8 @@ concept MediumC = requires(MediumType md,
     // March logic should not be here it will be the renderer's responsibility
     // Phase function should be here so we need a scatter function
     // that creates a ray.
-    {md.SampleScattering(Vector3{}, rng)} -> std::same_as<ScatterSample>;
-    {md.PdfScattering(Vector3{}, Vector3{})} -> std::same_as<Float>;
+    {md.SampleScattering(Vector3{}, Vector3{}, rng)} -> std::same_as<ScatterSample>;
+    {md.PdfScattering(Vector3{}, Vector3{}, Vector3{})} -> std::same_as<Float>;
 
     {md.SigmaA(Vector3{})} -> std::same_as<Spectrum>;
     {md.SigmaS(Vector3{})} -> std::same_as<Spectrum>;

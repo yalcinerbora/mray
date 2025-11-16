@@ -117,13 +117,14 @@ R"(#pragma once
 template <class Renderer>
 using EmptyRendererWorkTypes = RenderWorkTypePack
 <
-    Renderer, TypePack<>, TypePack<>, TypePack<>
+    Renderer, TypePack<>, TypePack<>, TypePack<>, TypePack<>
 >;
 
 template <class Renderer,
           template<class, class, class, class> class RenderWorkT,
           template<class, class, class> class RenderLightWorkT,
-          template<class, class, class> class RenderCameraWorkT>
+          template<class, class, class> class RenderCameraWorkT,
+          template<class, class, class> class RenderMediumWorkT>
 using RendererWorkTypes = RenderWorkTypePack
 <
     Renderer,
@@ -137,7 +138,12 @@ using RendererWorkTypes = RenderWorkTypePack
     <
     {}
     >,
-    // And finally Camera
+    // Camera
+    TypePack
+    <
+    {}
+    >,
+    // And finally, Media
     TypePack
     <
     {}
@@ -190,6 +196,8 @@ R"(// =========================== //
 // Kernel Light Work Instantiations
 {}
 // Kernel Camera Work Instantiations
+{}
+// Kernel Media Work Instantiations
 {}
 // Accelerator Work Instantiations
 {}

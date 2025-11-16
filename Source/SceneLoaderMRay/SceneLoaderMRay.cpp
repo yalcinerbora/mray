@@ -179,7 +179,6 @@ std::vector<TransientData> GenericAttributeLoad(const AttributeCountList& totalC
     return result;
 }
 
-
 std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountList& totalCounts,
                                                            const TexturedAttributeInfoList& list,
                                                            Span<const JsonNode> nodes,
@@ -660,10 +659,12 @@ LightSurfaceStruct SceneLoaderMRay::LoadBoundary(const nlohmann::json& n)
     LightSurfaceStruct boundary = n.get<LightSurfaceStruct>();
     if(boundary.lightId == std::numeric_limits<uint32_t>::max())
         throw MRayError("Boundary light must be set!");
-    if(boundary.mediumId == std::numeric_limits<uint32_t>::max())
-        throw MRayError("Boundary medium must be set!");
     if(boundary.transformId == std::numeric_limits<uint32_t>::max())
         throw MRayError("Boundary transform must be set!");
+    if(boundary.vol.mediumId == std::numeric_limits<uint32_t>::max())
+        throw MRayError("Boundary medium must be set!");
+    if(boundary.vol.transformId== std::numeric_limits<uint32_t>::max())
+        throw MRayError("Boundary medium transform must be set!");
     return boundary;
 }
 
@@ -680,13 +681,12 @@ std::vector<SurfaceStruct> SceneLoaderMRay::LoadSurfaces(const nlohmann::json& n
 std::vector<CameraSurfaceStruct> SceneLoaderMRay::LoadCamSurfaces(const nlohmann::json& nArray,
                                                                   uint32_t boundaryMediumId)
 {
-
     std::vector<CameraSurfaceStruct> result;
     for(const auto& n : nArray)
     {
         result.push_back(n.get<CameraSurfaceStruct>());
-        if(result.back().mediumId == std::numeric_limits<uint32_t>::max())
-            result.back().mediumId = boundaryMediumId;
+        if(result.back().vol.mediumId == EMPTY_MEDIUM)
+            result.back().vol.mediumId = boundaryMediumId;
     }
     return result;
 }
@@ -698,8 +698,8 @@ std::vector<LightSurfaceStruct> SceneLoaderMRay::LoadLightSurfaces(const nlohman
     for(const auto& n : nArray)
     {
         result.push_back(n.get<LightSurfaceStruct>());
-        if(result.back().mediumId == std::numeric_limits<uint32_t>::max())
-            result.back().mediumId = boundaryMediumId;
+        if(result.back().vol.mediumId == EMPTY_MEDIUM)
+            result.back().vol.mediumId = boundaryMediumId;
     }
     return result;
 }
@@ -1225,8 +1225,7 @@ void SceneLoaderMRay::LoadMediums(TracerI& tracer, ErrorList& exceptions)
 }
 
 void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
-                                    ErrorList& exceptions,
-                                    uint32_t boundaryMediumId)
+                                    ErrorList& exceptions)
 {
     static const ProfilerAnnotation _("LoadMaterials");
     auto annotation = _.AnnotateScope();
@@ -1235,19 +1234,13 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
     {
         private:
         TracerI&                    tracer;
-        uint32_t                    boundaryMediumId;
         const TextureIdMappings&    texMappings;
-        const MediumIdMappings&     mediumMappings;
         AttributeCountList          totalCounts;
 
         public:
-        MaterialLoader(TracerI& t, uint32_t boundaryMediumId,
-                       const TextureIdMappings& texMappings,
-                       const MediumIdMappings& mediumMappings)
+        MaterialLoader(TracerI& t, const TextureIdMappings& texMappings)
             : tracer(t)
-            , boundaryMediumId(boundaryMediumId)
             , texMappings(texMappings)
-            , mediumMappings(mediumMappings)
         {}
 
         std::string_view Name() const { return "LoadMaterials"; }
@@ -1268,24 +1261,12 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
             std::vector<AttributeCountList> attributeCounts = {};
             attributeCounts.reserve(nodes.size());
 
-            // Check mediums
-            std::vector<MediumPair> ioMediums;
-            ioMediums.reserve(nodes.size());
-            for(const JsonNode& node : nodes)
-            {
-                using namespace NodeNames;
-                uint32_t medInId = node.AccessOptionalData<uint32_t>(MEDIUM_FRONT).value_or(boundaryMediumId);
-                uint32_t medOutId = node.AccessOptionalData<uint32_t>(MEDIUM_BACK).value_or(boundaryMediumId);
-                ioMediums.emplace_back(mediumMappings.at(medInId).second,
-                                       mediumMappings.at(medOutId).second);
-            }
-
             // Find the first arrayed type in nodes
             // Accumulate the type
             // Reserve transforms accordingly
             MatAttributeInfoList list = tracer.AttributeInfo(groupId);
             totalCounts = GenericFindAttributeCounts(attributeCounts, list, nodes);
-            return tracer.ReserveMaterials(groupId, std::move(attributeCounts), ioMediums);
+            return tracer.ReserveMaterials(groupId, std::move(attributeCounts));
         }
 
         void THRDLoadEntities(MatGroupId groupId,
@@ -1316,8 +1297,7 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
 
     GenericLoadGroups<false>(matMappings, exceptions,
                              materialNodes, threadPool,
-                             MaterialLoader(tracer, boundaryMediumId,
-                                            texMappings, mediumMappings.map));
+                             MaterialLoader(tracer, texMappings));
 }
 
 void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ErrorList& exceptions)
@@ -1863,9 +1843,10 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     lightHTReady.get();
     PushToTypeMapping(lightNodes, lightHT, boundary.lightId, LIGHT_LIST);
     mediumHTReady.get();
-    PushToTypeMapping(mediumNodes, mediumHT, boundary.mediumId, MEDIUM_LIST);
+    PushToTypeMapping(mediumNodes, mediumHT, boundary.vol.mediumId, MEDIUM_LIST);
     transformHTReady.get();
     PushToTypeMapping(transformNodes, transformHT, boundary.transformId, TRANSFORM_LIST);
+    PushToTypeMapping(transformNodes, transformHT, boundary.vol.transformId, TRANSFORM_LIST);
 
     // Prim/Material Surfaces
     matHTReady.get();
@@ -1884,6 +1865,26 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
             PushToTypeMapping(transformNodes, transformHT,
                               s.transformId, TRANSFORM_LIST);
 
+            if(s.interfaces[i].front.mediumId != EMPTY_MEDIUM)
+                PushToTypeMapping(mediumNodes, mediumHT,
+                                  s.interfaces[i].front.mediumId,
+                                  MEDIUM_LIST);
+
+            if(s.interfaces[i].front.transformId != EMPTY_TRANSFORM)
+                PushToTypeMapping(transformNodes, transformHT,
+                                  s.interfaces[i].front.transformId,
+                                  TRANSFORM_LIST);
+
+            if(s.interfaces[i].back.mediumId != EMPTY_MEDIUM)
+                PushToTypeMapping(mediumNodes, mediumHT,
+                                  s.interfaces[i].back.mediumId,
+                                  MEDIUM_LIST);
+
+            if(s.interfaces[i].back.transformId != EMPTY_TRANSFORM)
+                PushToTypeMapping(transformNodes, transformHT,
+                                  s.interfaces[i].back.transformId,
+                                  TRANSFORM_LIST);
+
             if(s.alphaMaps[i].has_value())
                 textureIds.push_back(s.alphaMaps[i].value());
         }
@@ -1893,9 +1894,11 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     for(const auto& c : camSurfaces)
     {
         PushToTypeMapping(cameraNodes, camHT, c.cameraId, CAMERA_LIST);
-        PushToTypeMapping(mediumNodes, mediumHT, c.mediumId, MEDIUM_LIST);
+        PushToTypeMapping(mediumNodes, mediumHT, c.vol.mediumId, MEDIUM_LIST);
         PushToTypeMapping(transformNodes, transformHT,
                           c.transformId, TRANSFORM_LIST, true);
+        PushToTypeMapping(transformNodes, transformHT,
+                          c.vol.transformId, TRANSFORM_LIST, true);
     }
     // Light Surfaces
     // Already waited for light hash table
@@ -1939,9 +1942,11 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
         lightNodes[finalTypeName].emplace_back(std::move(node));
 
 
-        PushToTypeMapping(mediumNodes, mediumHT, l.mediumId, MEDIUM_LIST);
+        PushToTypeMapping(mediumNodes, mediumHT, l.vol.mediumId, MEDIUM_LIST);
         PushToTypeMapping(transformNodes, transformHT,
                           l.transformId, TRANSFORM_LIST, true);
+        PushToTypeMapping(transformNodes, transformHT,
+                          l.vol.transformId, TRANSFORM_LIST, true);
     }
 
     // Now double indirections...
@@ -1966,20 +1971,6 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     DryRunNodesForTex(textureIds, lightNodes, tracer,
                       &AddLightPrefix,
                       &TracerI::AttributeInfoLight);
-
-    // And finally, materials can define in/out mediums
-    for(const auto& nodes : materialNodes)
-    for(const auto& node : nodes.second)
-    {
-        auto optMedFront = node.AccessOptionalData<uint32_t>(MEDIUM_FRONT);
-        auto optMedBack = node.AccessOptionalData<uint32_t>(MEDIUM_BACK);
-        if(optMedFront.has_value())
-            PushToTypeMapping(mediumNodes, mediumHT,
-                              optMedFront.value(), MEDIUM_LIST);
-        if(optMedBack.has_value())
-            PushToTypeMapping(mediumNodes, mediumHT,
-                              optMedBack.value(), MEDIUM_LIST);
-    }
 
     // And finally create texture mappings
     textureHTReady.get();
@@ -2074,6 +2065,7 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
         SurfaceMatList matList;
         OptionalAlphaMapList alphaMaps;
         CullBackfaceFlagList cullFace;
+        InterfaceList interfaces;
 
         transformId = transformMappings.map.at(surf.transformId).second;
         for(uint8_t i = 0; i < surf.pairCount; i++)
@@ -2082,23 +2074,46 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
             static constexpr size_t MI = SurfaceStruct::MATERIAL_INDEX;
 
             PrimBatchId pId = primMappings.map.at(get<PI>(surf.matPrimBatchPairs[i])).second;
-            MaterialId mId = matMappings.map.at(get<MI>(surf.matPrimBatchPairs[i])).second;
-            Optional<TextureId> tId;
+            MaterialId matId = matMappings.map.at(get<MI>(surf.matPrimBatchPairs[i])).second;
+            Optional<TextureId> texId;
             if(surf.alphaMaps[i].has_value())
-                tId = texMappings.at(surf.alphaMaps[i].value());
+                texId = texMappings.at(surf.alphaMaps[i].value());
 
             primList.push_back(pId);
-            matList.push_back(mId);
-            alphaMaps.push_back(tId);
+            matList.push_back(matId);
+            alphaMaps.push_back(texId);
             cullFace.push_back(surf.doCullBackFace[i]);
+
+            InterfaceParams iParams = TracerConstants::IdentityIterface;
+            if(surf.interfaces[i].front.mediumId != EMPTY_MEDIUM)
+            {
+                MediumId mId = mediumMappings.map.at(surf.interfaces[i].front.mediumId).second;
+                TransformId tId = (surf.interfaces[i].front.transformId == EMPTY_TRANSFORM)
+                    ? TracerConstants::IdentityTransformId
+                    : transformMappings.map.at(surf.interfaces[i].front.transformId).second;
+                iParams.frontVolume.mediumId = mId;
+                iParams.frontVolume.transformId = tId;
+            }
+            if(surf.interfaces[i].back.mediumId != EMPTY_MEDIUM)
+            {
+                MediumId mId = mediumMappings.map.at(surf.interfaces[i].back.mediumId).second;
+                TransformId tId = (surf.interfaces[i].back.transformId == EMPTY_TRANSFORM)
+                    ? TracerConstants::IdentityTransformId
+                    : transformMappings.map.at(surf.interfaces[i].back.transformId).second;
+                iParams.backVolume.mediumId = mId;
+                iParams.backVolume.transformId = tId;
+            }
+            interfaces.push_back(iParams);
         }
+
         SurfaceParams surfParams
         {
-            primList,
-            matList,
-            transformId,
-            alphaMaps,
-            cullFace
+            .primBatches    = primList,
+            .materials      = matList,
+            .transformId    = transformId,
+            .alphaMaps      = alphaMaps,
+            .cullFaceFlags  = cullFace,
+            .interfaces     = interfaces
         };
         SurfaceId mRaySurf = tracer.CreateSurface(surfParams);
         mRaySurfaces.push_back(Pair(surfaceId++, mRaySurf));
@@ -2111,13 +2126,23 @@ void SceneLoaderMRay::CreateLightSurfaces(TracerI& tracer, const std::vector<Lig
     auto SurfStructToSurfParams = [this](const LightSurfaceStruct& surf)
     {
         LightId lId = lightMappings.map.at(surf.lightId).second;
-        MediumId mId = mediumMappings.map.at(surf.mediumId).second;
+        MediumId mId = mediumMappings.map.at(surf.vol.mediumId).second;
         TransformId tId = (surf.transformId == EMPTY_TRANSFORM)
             ? TracerConstants::IdentityTransformId
             : transformMappings.map.at(surf.transformId).second;
+        TransformId vtId = (surf.vol.transformId == EMPTY_TRANSFORM)
+            ? TracerConstants::IdentityTransformId
+            : transformMappings.map.at(surf.transformId).second;
+
         return LightSurfaceParams
         {
-            lId, tId, mId
+            .lightId = lId,
+            .transformId = tId,
+            .volume =
+            {
+                .mediumId = mId,
+                .transformId = vtId
+            }
         };
     };
     uint32_t lightSurfaceId = 0;
@@ -2139,14 +2164,23 @@ void SceneLoaderMRay::CreateCamSurfaces(TracerI& tracer, const std::vector<Camer
     for(const auto& surf : surfs)
     {
         CameraId cId = camMappings.map.at(surf.cameraId).second;
-        MediumId mId = mediumMappings.map.at(surf.mediumId).second;
+        MediumId mId = mediumMappings.map.at(surf.vol.mediumId).second;
         TransformId tId = (surf.transformId == EMPTY_TRANSFORM)
                             ? TracerConstants::IdentityTransformId
                             : transformMappings.map.at(surf.transformId).second;
+        TransformId vtId = (surf.transformId == EMPTY_TRANSFORM)
+                             ? TracerConstants::IdentityTransformId
+                             : transformMappings.map.at(surf.vol.transformId).second;
 
-        CameraSurfaceParams cSurfParams
+        CameraSurfaceParams cSurfParams =
         {
-            cId, tId, mId
+            .cameraId = cId,
+            .transformId = tId,
+            .volume =
+            {
+                .mediumId = mId,
+                .transformId = vtId
+            }
         };
         CamSurfaceId mRaySurf = tracer.CreateCameraSurface(cSurfParams);
         mRayCamSurfaces.push_back(Pair(camSurfaceId++, mRaySurf));
@@ -2191,9 +2225,9 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         LightSurfaceStruct boundary = LoadBoundary(*boundaryJson.value());
         SceneSurfList surfaces = LoadSurfaces(*surfJson.value());
         SceneCamSurfList camSurfs = LoadCamSurfaces(*camSurfJson.value(),
-                                                    boundary.mediumId);
+                                                    boundary.vol.mediumId);
         SceneLightSurfList lightSurfs = LoadLightSurfaces(*lightSurfJson.value(),
-                                                          boundary.mediumId);
+                                                          boundary.vol.mediumId);
         // Surfaces are loaded now create type/ node pairings
         // These are stored in the loader's state
         CreateTypeMapping(tracer, surfaces, camSurfs,
@@ -2241,7 +2275,7 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         // Same as above
         if(auto e = ConcatIfError(); e) return e;
 
-        LoadMaterials(tracer, exceptionList, boundary.mediumId);
+        LoadMaterials(tracer, exceptionList);
         // Does not depend on textures but may depend on later
         LoadTransforms(tracer, exceptionList);
         LoadPrimitives(tracer, exceptionList);

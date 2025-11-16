@@ -30,6 +30,7 @@ struct HitResultT
     Float           t;
     PrimitiveKey    primitiveKey;
     LightOrMatKey   lmKey;
+    InterfaceIndex  interface;
 };
 
 template <class AccelType>
@@ -123,9 +124,11 @@ using AlphaMap = TracerTexView<2, Float>;
 
 struct BaseAccelConstructParams
 {
-    using SurfPair = Pair<SurfaceId, SurfaceParams>;
-    using LightSurfPair = Pair<LightSurfaceId, LightSurfaceParams>;
+    using SurfPair           = Pair<SurfaceId, SurfaceParams>;
+    using LightSurfPair      = Pair<LightSurfaceId, LightSurfaceParams>;
+    using InterfaceParamList = std::vector<InterfaceKeyPack>;
 
+    const InterfaceParamList&                   globalInterfaceList;
     const TextureViewMap&                       texViewMap;
     const Map<PrimGroupId, PrimGroupPtr>&       primGroups;
     const Map<LightGroupId, LightGroupPtr>&     lightGroups;
@@ -140,13 +143,17 @@ struct AccelGroupConstructParams
     using LightSurfPair         = typename BaseAccelConstructParams::LightSurfPair;
     using TGroupedSurfaces      = std::vector<Pair<TransGroupId, Span<const SurfPair>>>;
     using TGroupedLightSurfaces = std::vector<Pair<TransGroupId, Span<const LightSurfPair>>>;
+    using InterfaceParamList    = std::vector<InterfaceKeyPack>;
 
     const Map<TransGroupId, TransformGroupPtr>* transformGroups;
     const TextureViewMap*                       textureViews;
+    const InterfaceParamList*       globalInterfaceList;
     const GenericGroupPrimitiveT*   primGroup;
     const GenericGroupLightT*       lightGroup;
     TGroupedSurfaces                tGroupSurfs;
     TGroupedLightSurfaces           tGroupLightSurfs;
+
+
 };
 
 class AcceleratorGroupI
@@ -155,17 +162,19 @@ class AcceleratorGroupI
     virtual         ~AcceleratorGroupI() = default;
 
     virtual void        CastLocalRays(// Output
-                                  Span<HitKeyPack> dHitIds,
-                                  Span<MetaHit> dHitParams,
-                                  // I-O
-                                  Span<BackupRNGState> dRNGStates,
-                                  Span<RayGMem> dRays,
-                                  // Input
-                                  Span<const RayIndex> dRayIndices,
-                                  Span<const CommonKey> dAccelKeys,
-                                  // Constants
-                                  CommonKey instanceId,
-                                  const GPUQueue& queue) = 0;
+                                      Span<InterfaceIndex> dInterfaceIndices,
+                                      Span<HitKeyPack> dHitIds,
+                                      Span<MetaHit> dHitParams,
+                                      // I-O
+                                      Span<BackupRNGState> dRNGStates,
+                                      Span<RayGMem> dRays,
+                                      // Input
+                                      Span<const RayIndex> dRayIndices,
+                                      Span<const CommonKey> dAccelKeys,
+                                      // Constants
+                                      CommonKey instanceId,
+                                      bool writeInterfaceIndex,
+                                      const GPUQueue& queue) = 0;
     virtual void        CastVisibilityRays(// Output
                                            Bitspan<uint32_t> dIsVisibleBuffer,
                                            // I-O
@@ -205,6 +214,7 @@ using LightOrMatKeyArray    = std::array<LightOrMatKey, TracerConstants::MaxPrim
 // this codebase becomes production level renderer (doubt)
 using CullFaceFlagArray     = Bitset<TracerConstants::MaxPrimBatchPerSurface>;
 using AlphaMapArray         = std::array<Optional<AlphaMap>, TracerConstants::MaxPrimBatchPerSurface>;
+using InterfaceIndexArray   = std::array<InterfaceIndex, TracerConstants::MaxPrimBatchPerSurface>;
 
 struct AccelLeafResult
 {
@@ -234,12 +244,13 @@ struct AccelPartitionResult
 
 struct LinearizedSurfaceData
 {
-    std::vector<PrimRangeArray>     primRanges;
-    std::vector<LightOrMatKeyArray> lightOrMatKeys;
-    std::vector<AlphaMapArray>      alphaMaps;
-    std::vector<CullFaceFlagArray>  cullFaceFlags;
-    std::vector<TransformKey>       transformKeys;
-    std::vector<SurfacePrimList>    instancePrimBatches;
+    std::vector<InterfaceIndexArray> interfaces;
+    std::vector<PrimRangeArray>      primRanges;
+    std::vector<LightOrMatKeyArray>  lightOrMatKeys;
+    std::vector<AlphaMapArray>       alphaMaps;
+    std::vector<CullFaceFlagArray>   cullFaceFlags;
+    std::vector<TransformKey>        transformKeys;
+    std::vector<SurfacePrimList>     instancePrimBatches;
 };
 
 struct PreprocessResult
@@ -371,6 +382,7 @@ class BaseAcceleratorI
     // Interface
     // Fully cast rays to entire scene
     virtual void    CastRays(// Output
+                             Span<InterfaceIndex> dInterfaceIndices,
                              Span<HitKeyPack> dHitIds,
                              Span<MetaHit> dHitParams,
                              // I-O
@@ -378,6 +390,8 @@ class BaseAcceleratorI
                              Span<RayGMem> dRays,
                              // Input
                              Span<const RayIndex> dRayIndices,
+                             //
+                             bool writeInterfaceIndex,
                              const GPUQueue& queue) = 0;
     // Fully cast rays to entire scene return true/false
     // If it hits to a surface, (this should be faster
@@ -393,6 +407,7 @@ class BaseAcceleratorI
     // Locally cast rays to a accelerator instances
     // This is multi-ray multi-accelerator instance
     virtual void    CastLocalRays(// Output
+                                  Span<InterfaceIndex> dInterfaceIndices,
                                   Span<HitKeyPack> dHitIds,
                                   Span<MetaHit> dHitParams,
                                   // I-O
@@ -401,7 +416,9 @@ class BaseAcceleratorI
                                   // Input
                                   Span<const RayIndex> dRayIndices,
                                   Span<const AcceleratorKey> dAccelKeys,
+                                  //
                                   CommonKey dAccelKeyBatchPortion,
+                                  bool writeInterfaceIndex,
                                   const GPUQueue& queue) = 0;
 
     // Construction
@@ -420,14 +437,9 @@ class BaseAccelerator : public BaseAcceleratorI
 {
     private:
     void PartitionSurfaces(std::vector<AccelGroupConstructParams>&,
-                           Span<const typename BaseAccelConstructParams::SurfPair> surfList,
-                           const Map<PrimGroupId, PrimGroupPtr>& primGroups,
-                           const Map<TransGroupId, TransformGroupPtr>& transGroups,
-                           const TextureViewMap& textureViews);
+                           const BaseAccelConstructParams& params);
     void AddLightSurfacesToPartitions(std::vector<AccelGroupConstructParams>& partitions,
-                                      Span<const typename BaseAccelConstructParams::LightSurfPair> surfList,
-                                      const Map<LightGroupId, LightGroupPtr>& lightGroups,
-                                      const Map<TransGroupId, TransformGroupPtr>& transGroups);
+                                      const BaseAccelConstructParams& params);
 
     protected:
     ThreadPool&         threadPool;

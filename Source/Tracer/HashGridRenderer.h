@@ -39,6 +39,9 @@ class HashGridRenderer final : public RendererBase
     template<CameraGroupC CG, TransformGroupC TG>
     using CamWorkFunctions = TypePack<>;
 
+    template<MediumGroupC MG, TransformGroupC TG>
+    using MediumWorkFunctions = TypePack<>;
+
     template<class RenderWorkParams>
     MR_HF_DECL
     static SpectrumConverterIdentity GenSpectrumConverter(const RenderWorkParams&, RayIndex);

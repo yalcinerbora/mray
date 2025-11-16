@@ -3,6 +3,7 @@
 #include "RendererC.h"
 #include "TransformC.h"
 #include "MaterialC.h"
+#include "MediumC.h"
 #include "PrimitiveC.h"
 #include "TracerTypes.h"
 #include "Random.h"
@@ -81,6 +82,29 @@ struct RenderCameraWorkParams
     TransSoA     transSoA;
 };
 
+template<class GlobalState, class RayState,
+         MediumGroupC MediumGroup, TransformGroupC TransGroup>
+struct RenderMediumWorkParams
+{
+    using MediumSoA = typename MediumGroup::DataSoA;
+    using TransSoA = typename TransGroup::DataSoA;
+    struct Common
+    {
+        Span<RayGMem>                dRaysIO;
+        Span<RayCone>                dRayDiffsIO;
+        Span<const RayIndex>         dRayIndicesIn;
+        Span<const RandomNumber>     dRandomNumbers;
+        Span<const InterfaceKeyPack> dKeysIn;
+    };
+    //
+    RayState    rayState;
+    GlobalState globalState;
+    Common      common;
+    // Type related
+    MediumSoA   mediumSoA;
+    TransSoA    transSoA;
+};
+
 // Some aliases for clarity
 template<class Renderer, uint32_t I, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG>
@@ -106,6 +130,15 @@ using RenderCameraWorkParamsR = RenderCameraWorkParams
     RenderGlobalState<Renderer, I>,
     RenderRayState<Renderer, I>,
     CG, TG
+>;
+
+template<class Renderer, uint32_t I,
+         MediumGroupC MG, TransformGroupC TG>
+using RenderMediumWorkParamsR = RenderMediumWorkParams
+<
+    RenderGlobalState<Renderer, I>,
+    RenderRayState<Renderer, I>,
+    MG, TG
 >;
 
 // Helper Macros for Work Generation
@@ -139,6 +172,23 @@ using RenderCameraWorkParamsR = RenderCameraWorkParams
                   "Thread per renderer work must be power of 2 and "            \
                   "at most 32!")
 
+#define MRAY_MEDIUM_WORK_FUNCTOR_DEFINE_TYPES(MG_TYPE, TG_TYPE, SPEC_CTX, TPW)  \
+    static constexpr uint32_t THREAD_PER_WORK = TPW;                            \
+    using MG            = MG_TYPE;                                              \
+    using TG            = TG_TYPE;                                              \
+    using SpectrumCtx   = SPEC_CTX;                                             \
+    using SpectrumConv  = typename SpectrumCtx::Converter;                      \
+    using TContext      = std::conditional_t                                    \
+                          <                                                     \
+                              std::is_same_v<TG, TransformGroupIdentity>,       \
+                              TransformContextIdentity,                         \
+                              TransformContextSingle                            \
+                          >;                                                    \
+    using Medium        = typename MG::template Medium<SpectrumCtx>;            \
+    static_assert(Bit::PopC(TPW) == 1u && TPW <= 32,                            \
+                  "Thread per renderer work must be power of 2 and "            \
+                  "at most 32!")
+
 // TODO: Implement these later
 template<class T>
 concept WorkFuncC = requires()
@@ -156,6 +206,12 @@ concept LightWorkFuncC = requires()
 
 template<class T>
 concept CamWorkFuncC = requires()
+{
+    true;
+};
+
+template<class T>
+concept MediumWorkFuncC = requires()
 {
     true;
 };
@@ -335,6 +391,40 @@ class RenderCameraWork : public RenderCameraWorkT<R>
     RNRequestList       StochasticFilterSampleRayRNList() const override;
 };
 
+template<RendererC R, MediumGroupC MG, TransformGroupC TG>
+class RenderMediumWork : public RenderMediumWorkT<R>
+{
+    public:
+    static std::string_view TypeName();
+
+    private:
+    const MG& mg;
+    const TG& tg;
+    const GPUSystem& gpuSystem;
+
+    template<uint32_t I>
+    void DoWorkInternal(const RenderRayState<R, I>& dRayStates,
+                        Span<RayGMem> dRaysIO,
+                        Span<RayCone> dRayDiffsIO,
+                        Span<const RayIndex> dRayIndicesIn,
+                        Span<const RandomNumber> dRandomNumbers,
+                        Span<const InterfaceKeyPack> dKeysIn,
+                        const RenderGlobalState<R, I>& globalState,
+                        const GPUQueue& queue) const;
+
+    public:
+    // Constructors & Destructor
+    RenderMediumWork(const GenericGroupMediumT&,
+                     const GenericGroupTransformT&,
+                     const GPUSystem&);
+
+    MRAY_RENDER_MEDIUM_DO_WORK_DEF(0)
+    MRAY_RENDER_MEDIUM_DO_WORK_DEF(1)
+
+    RNRequestList    SampleRNList(uint32_t workIndex) const override;
+    std::string_view Name() const override;
+};
+
 template<WorkFuncC WorkFunction,
          auto GenSpectrumConverter, auto GenerateTransformContext>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
@@ -348,6 +438,11 @@ void KCRenderLightWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params pa
 template<CamWorkFuncC WorkFunction>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCRenderCameraWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params params);
+
+template<class MediumWorkFunction,
+         auto GenSpectrumConverter, auto GenerateTransformContext>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCMediumWork(MRAY_GRID_CONSTANT const typename MediumWorkFunction::Params params);
 
 template<RendererC R, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG>
@@ -808,4 +903,96 @@ template<RendererC R, CameraGroupC C, TransformGroupC T>
 RNRequestList RenderCameraWork<R, C, T>::StochasticFilterSampleRayRNList() const
 {
     return GenRNRequestList<2>();
+}
+
+template<RendererC R, MediumGroupC MG, TransformGroupC TG>
+std::string_view RenderMediumWork<R, MG, TG>::TypeName()
+{
+    using namespace TypeNameGen::CompTime;
+    static const
+    std::string name = RenderMediumWorkTypeName(MG::TypeName(), TG::TypeName());
+
+    return name;
+}
+
+template<RendererC R, MediumGroupC MG, TransformGroupC TG>
+RenderMediumWork<R, MG, TG>::RenderMediumWork(const GenericGroupMediumT& mgIn,
+                                               const GenericGroupTransformT& tgIn,
+                                               const GPUSystem& sys)
+    : mg(static_cast<const MG&>(mgIn))
+    , tg(static_cast<const TG&>(tgIn))
+    , gpuSystem(sys)
+{}
+
+template<RendererC R, MediumGroupC MG, TransformGroupC TG>
+template<uint32_t I>
+void RenderMediumWork<R, MG, TG>::DoWorkInternal(// I-O
+                                                 const RenderRayState<R, I>& dRayStates,
+                                                 Span<RayGMem> dRaysIO,
+                                                 Span<RayCone> dRayDiffsIO,
+                                                 Span<const RayIndex> dRayIndicesIn,
+                                                 Span<const RandomNumber> dRandomNumbers,
+                                                 Span<const InterfaceKeyPack> dKeysIn,
+                                                 const RenderGlobalState<R, I>& globalState,
+                                                 const GPUQueue& queue) const
+{
+    // Please check the kernel for details
+    using WFList = R::template MediumWorkFunctions<MG, TG>;
+    if constexpr(I >= WFList::TypeCount)
+    {
+        throw MRayError("[{}]: Runtime call to \"DoWork_{}\" (for media) which does "
+                        "not have a kernel associated with it!", R::TypeName(), I);
+    }
+    else
+    {
+        using GlobalState = RenderGlobalState<R, I>;
+        using RayState    = RenderRayState<R, I>;
+        using RWParams    = RenderMediumWorkParams<GlobalState, RayState, MG, TG>;
+        const RWParams params =
+        {
+            .rayState    = dRayStates,
+            .common      =
+            {
+                dRaysIO,
+                dRayDiffsIO,
+                dRayIndicesIn,
+                dRandomNumbers,
+                dKeysIn,
+            },
+            .globalState = globalState,
+            .mediumSoA   = mg.SoA(),
+            .transSoA    = tg.SoA()
+        };
+
+        uint32_t rayCount = static_cast<uint32_t>(params.common.dRayIndices.size());
+        using namespace std::string_literals;
+        static const std::string KernelName = std::string(TypeName()) + "-MediumWork"s;
+        using WF = TypePackElement<I, WFList>;
+        static_assert(std::is_same_v<RWParams, typename WF::Params>,
+                      "WorkFunction's ParamType does not match the renderer's param type!");
+        static constexpr auto Kernel = KCMediumWork
+        <
+            WF,
+            AcquireSpectrumConverterGenerator<R, WF>(),
+            AcquireTransformContextGenerator<PrimGroupEmpty, TG>()
+        >;
+        queue.IssueWorkKernel<Kernel>
+        (
+            KernelName,
+            DeviceWorkIssueParams{.workCount = rayCount},
+            params
+        );
+    }
+}
+
+template<RendererC R, MediumGroupC MG, TransformGroupC TG>
+RNRequestList RenderMediumWork<R, MG, TG>::SampleRNList(uint32_t) const
+{
+    return RNRequestList();
+}
+
+template<RendererC R, MediumGroupC MG, TransformGroupC TG>
+std::string_view RenderMediumWork<R, MG, TG>::Name() const
+{
+    return TypeName();
 }

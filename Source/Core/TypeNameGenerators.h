@@ -122,6 +122,14 @@ namespace CompTime
         return (std::string(TracerConstants::WORK_PREFIX) +
                 std::string(camType) + std::string(transType));
     }
+
+    inline std::string RenderMediumWorkTypeName(std::string_view medType,
+                                                std::string_view transType)
+    {
+        using namespace std::string_literals;
+        return (std::string(TracerConstants::WORK_PREFIX) +
+                std::string(medType) + std::string(transType));
+    }
 }
 
 namespace Runtime
@@ -241,6 +249,16 @@ namespace Runtime
         using namespace std::string_literals;
         return (std::string(TracerConstants::WORK_PREFIX) +
                 std::string(camType) +
+                std::string(transType));
+    }
+
+    inline
+    std::string CreateRenderMediumWorkType(std::string_view medType,
+                                           std::string_view transType)
+    {
+        using namespace std::string_literals;
+        return (std::string(TracerConstants::WORK_PREFIX) +
+                std::string(medType) +
                 std::string(transType));
     }
 }

@@ -37,6 +37,9 @@ class SurfaceRenderer final : public RendererBase
     template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
     using CamWorkFunctions = TypePack<>;
 
+    template<MediumGroupC MG, TransformGroupC TG>
+    using MediumWorkFunctions = TypePack<>;
+
     // Spectrum Converter Generator
     template<class RenderWorkParams>
     MR_HF_DECL
@@ -59,26 +62,26 @@ class SurfaceRenderer final : public RendererBase
     std::vector<uint64_t>       tilePathCounts;
     Float                       curTMaxAO = std::numeric_limits<Float>::max();
     //
-    RayPartitioner      rayPartitioner;
-    RNGeneratorPtr      rnGenerator;
+    RayPartitioner       rayPartitioner;
+    RNGeneratorPtr       rnGenerator;
     //
-    DeviceMemory        rendererGlobalMem;
-    Span<MetaHit>       dHits;
-    Span<HitKeyPack>    dHitKeys;
-    Span<RayGMem>       dRays;
-    Span<RayCone>       dRayCones;
-    RayStateCommon      dRayStateCommon;
-    RayStateAO          dRayStateAO;
-
-    Span<uint32_t>      dIsVisibleBuffer;
-    Span<RandomNumber>  dRandomNumBuffer;
-    Span<Byte>          dSubCameraBuffer;
-
+    DeviceMemory            rendererGlobalMem;
+    Span<MetaHit>           dHits;
+    Span<HitKeyPack>        dHitKeys;
+    Span<RayGMem>           dRays;
+    Span<RayCone>           dRayCones;
+    RayStateCommon          dRayStateCommon;
+    RayStateAO              dRayStateAO;
+    //
+    Span<uint32_t>          dIsVisibleBuffer;
+    Span<RandomNumber>      dRandomNumBuffer;
+    Span<Byte>              dSubCameraBuffer;
+    Span<InterfaceKeyPack>  dGlobalInterfaceList;
     // Work Hash related
-    Span<CommonKey>     dWorkHashes;
-    Span<CommonKey>     dWorkBatchIds;
+    Span<CommonKey>         dWorkHashes;
+    Span<CommonKey>         dWorkBatchIds;
     //
-    bool                saveImage;
+    bool                    saveImage;
 
     uint32_t    FindMaxSamplePerIteration(uint32_t rayCount,
                                           SurfRDetail::Mode::E,

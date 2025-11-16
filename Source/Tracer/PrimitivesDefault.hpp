@@ -26,9 +26,9 @@ Optional<SphereIntersection> Sphere<T>::Intersects(const Ray& ray, bool cullBack
     // Intersection
     Float t;
     Vector3 hitPos;
-    bool intersects = transformedRay.IntersectsSphere(hitPos, t,
-                                                      center, radius);
-    if(!intersects) return std::nullopt;
+    auto result = transformedRay.IntersectsSphere(hitPos, t,
+                                                  center, radius);
+    if(!result.intersected) return std::nullopt;
 
     Vector3 unitDir = Math::Normalize(hitPos - center);
     Vector2 hit = Graphics::CartesianToUnitSpherical(unitDir);
@@ -39,8 +39,9 @@ Optional<SphereIntersection> Sphere<T>::Intersects(const Ray& ray, bool cullBack
 
     return SphereIntersection
     {
-        .hit = hit,
-        .t = t
+        .hit      = hit,
+        .t        = t,
+        .backFace = result.backFace
     };
 }
 

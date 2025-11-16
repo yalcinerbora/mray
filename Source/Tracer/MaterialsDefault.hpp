@@ -19,7 +19,6 @@ LambertMaterial<SpectrumContext>::LambertMaterial(const SpectrumConverter& specT
                                                   const Surface& surface,
                                                   const DataSoA& soa, MaterialKey mk)
     : surface(surface)
-    , mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {
     const auto albedoTex = AlbedoMap(specTransformer, soa.dAlbedo[mk.FetchIndexPortion()]);
     albedo = albedoTex(surface.uv, surface.dpdx, surface.dpdy);
@@ -49,7 +48,6 @@ BxDFSample LambertMaterial<SC>::SampleBxDF(const Vector3&,
     // Lambert material is **not** a subsurface material,
     // directly delegate the incoming position as outgoing
     Ray wIRay = Ray(wI, surface.position);
-    MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
 
     return BxDFSample
     {
@@ -58,7 +56,6 @@ BxDFSample LambertMaterial<SC>::SampleBxDF(const Vector3&,
         .eval = BxDFEval
         {
             .reflectance = reflectance,
-            .mediumKey = outMedium
         }
     };
 }
@@ -82,11 +79,9 @@ BxDFEval LambertMaterial<SC>::Evaluate(const Ray& wI, const Vector3&) const
     // Calculate lightning tangent space
     Vector3 wILocal = toTangentSpace.ApplyRotation(wI.dir);
     Float nDotL = Math::Max(wILocal[2], Float(0));
-    MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
     return BxDFEval
     {
         .reflectance = nDotL * albedo * MathConstants::InvPi<Float>(),
-        .mediumKey = outMedium
     };
 }
 
@@ -149,9 +144,8 @@ template <class SC>
 MR_GF_DEF
 ReflectMaterial<SC>::ReflectMaterial(const SpectrumConverter&,
                                      const Surface& surface,
-                                     const DataSoA& soa, MaterialKey mk)
+                                     const DataSoA&, MaterialKey)
     : surface(surface)
-    , mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {}
 
 template <class SC>
@@ -167,7 +161,6 @@ BxDFSample ReflectMaterial<SC>::SampleBxDF(const Vector3& wO,
     Vector3 wI = Graphics::Reflect(localNormal, wO);
     // Directly delegate position, this is not a subsurface material
     Ray wIRay = Ray(Math::Normalize(wI), surface.position);
-    MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
     return BxDFSample
     {
         .wI = wIRay,
@@ -175,8 +168,6 @@ BxDFSample ReflectMaterial<SC>::SampleBxDF(const Vector3& wO,
         .eval = BxDFEval
         {
             .reflectance = Spectrum(1.0),
-            // TODO: Change this later
-            .mediumKey = outMedium
         }
     };
 }
@@ -193,11 +184,9 @@ template <class SC>
 MR_GF_DEF
 BxDFEval ReflectMaterial<SC>::Evaluate(const Ray&, const Vector3&) const
 {
-    MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
     return BxDFEval
     {
-        .reflectance = Spectrum(1),
-        .mediumKey = outMedium
+        .reflectance = Spectrum(1)
     };
 }
 
@@ -256,7 +245,6 @@ RefractMaterial<SC>::RefractMaterial(const SpectrumConverter& sTransContext,
                                      const Surface& surface,
                                      const DataSoA& soa, MaterialKey mk)
     : surface(surface)
-    , mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {
     // Fetch ior
     auto CoeffsToIoR = [&](Vector3 coeffs)
@@ -284,16 +272,9 @@ BxDFSample RefractMaterial<SC>::SampleBxDF(const Vector3& wO,
 {
     Float fromEta = frontIoR;
     Float toEta = backIoR;
-    MediumKey fromMedium = mediumKeys.Front();
-    MediumKey toMedium = mediumKeys.Back();
-
     // Check if we are exiting or entering
     bool entering = !surface.backSide;
-    if(!entering)
-    {
-        std::swap(fromEta, toEta);
-        std::swap(fromMedium, toMedium);
-    }
+    if(!entering) std::swap(fromEta, toEta);
 
     // Surface is aligned with the ray (N dot Dir is always positive)
     const Vector3 nLocal = surface.shadingTBN.OrthoBasisZ();
@@ -312,8 +293,7 @@ BxDFSample RefractMaterial<SC>::SampleBxDF(const Vector3& wO,
         // should not happen
         : Graphics::Refract(nLocal, wO, fromEta, toEta).value();
     //
-    MediumKey outMedium = (doReflection) ? fromMedium : toMedium;
-    Float pdf           = (doReflection) ? f : (Float(1) - f);
+    Float pdf = (doReflection) ? f : (Float(1) - f);
     //
     return BxDFSample
     {
@@ -322,7 +302,6 @@ BxDFSample RefractMaterial<SC>::SampleBxDF(const Vector3& wO,
         .eval = BxDFEval
         {
             .reflectance     = Spectrum(pdf),
-            .mediumKey       = outMedium,
             .isPassedThrough = !doReflection,
             .isDispersed     = !doReflection
         }
@@ -341,19 +320,12 @@ template <class SC>
 MR_GF_DEF
 BxDFEval RefractMaterial<SC>::Evaluate(const Ray& wI, const Vector3&) const
 {
-    MediumKey fromMedium = mediumKeys.Front();
-    MediumKey toMedium   = mediumKeys.Back();
-    //
-    if(surface.backSide) std::swap(fromMedium, toMedium);
-    //
     bool isFront = Math::Dot(surface.geoNormal, wI.dir) > Float(0);
-    MediumKey outMedium = (isFront) ? fromMedium : toMedium;
-
     return BxDFEval
     {
-        .reflectance = Spectrum(1),
-        .mediumKey   = outMedium,
-        .isDispersed = !isFront
+        .reflectance     = Spectrum(1),
+        .isPassedThrough = !isFront,
+        .isDispersed     = !isFront
     };
 }
 
@@ -550,7 +522,6 @@ UnrealMaterial<SC>::UnrealMaterial(const SpectrumConverter& specTransformer,
                                    const Surface& surface,
                                    const DataSoA& soa, MaterialKey mk)
     : surface(surface)
-    , mediumKeys(soa.dMediumKeys[mk.FetchIndexPortion()])
 {
     auto albedoTex = AlbedoMap(specTransformer, soa.dAlbedo[mk.FetchIndexPortion()]);
     const auto& roughnessTex = soa.dRoughness[mk.FetchIndexPortion()];
@@ -655,7 +626,6 @@ BxDFSample UnrealMaterial<SC>::SampleBxDF(const Vector3& wO,
     L = toTangentSpace.ApplyInvRotation(L);
 
     Spectrum reflectance = diffuseTerm + specularTerm;
-    MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
     // All done!
     return BxDFSample
     {
@@ -664,15 +634,13 @@ BxDFSample UnrealMaterial<SC>::SampleBxDF(const Vector3& wO,
         .eval = BxDFEval
         {
             .reflectance = reflectance,
-            .mediumKey   = outMedium
         }
     };
 }
 
 template <class SC>
 MR_GF_DEF
-Float UnrealMaterial<SC>::Pdf(const Ray& wI,
-                              const Vector3& wO) const
+Float UnrealMaterial<SC>::Pdf(const Ray& wI, const Vector3& wO) const
 {
     using namespace Distribution;
     Float alpha = roughness * roughness;
@@ -751,11 +719,9 @@ BxDFEval UnrealMaterial<SC>::Evaluate(const Ray& wI, const Vector3& wO) const
     diffuseTerm *= BxDF::BurleyDiffuseCorrection(NdL, NdV, LdH, roughness);
 
     // All Done!
-    MediumKey outMedium = surface.backSide ? mediumKeys.Back() : mediumKeys.Front();
     return BxDFEval
     {
-        .reflectance = diffuseTerm + specularTerm,
-        .mediumKey = outMedium
+        .reflectance = diffuseTerm + specularTerm
     };
 }
 

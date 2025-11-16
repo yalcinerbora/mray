@@ -152,6 +152,8 @@ namespace Math
     template<FloatVectorC T> MR_PF_DECL T SqrtMax(T) noexcept;
     template<FloatVectorC T> MR_PF_DECL T RSqrt(T) noexcept;
     template<FloatVectorC T> MR_PF_DECL T RSqrtMax(T) noexcept;
+    // Vector Exp for medium stuff
+    template<FloatVectorC T> MR_PF_DECL T Exp(T) noexcept;
     // Graphics-related
     template<FloatVectorC T> MR_PF_DECL T Lerp(const T&, const T&, typename T::InnerType) noexcept;
     template<FloatVectorC T> MR_PF_DECL T Smoothstep(const T&, const T&, typename T::InnerType) noexcept;
@@ -1536,6 +1538,19 @@ MR_PF_DEF T RSqrtMax(T v) noexcept
     for(unsigned int i = 0; i < N; i++)
     {
         r[i] = RSqrtMax(v[i]);
+    }
+    return r;
+}
+
+template<FloatVectorC T>
+MR_PF_DEF T Exp(T v) noexcept
+{
+    T r;
+    constexpr unsigned int N = T::Dims;
+    MRAY_UNROLL_LOOP_N(N)
+    for(unsigned int i = 0; i < N; i++)
+    {
+        r[i] = Exp(v[i]);
     }
     return r;
 }

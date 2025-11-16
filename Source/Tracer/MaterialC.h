@@ -6,19 +6,6 @@
 #include "GenericGroup.h"
 #include "TextureView.h"
 
-class alignas(8) MediumKeyPair
-{
-    private:
-    MediumKey frontKey;
-    MediumKey backKey;
-
-    public:
-    MR_PF_DECL_V MediumKeyPair(MediumKey frontKey, MediumKey backKey) noexcept;
-
-    MR_PF_DECL MediumKey Back() const noexcept;
-    MR_PF_DECL MediumKey Front() const noexcept;
-};
-
 namespace MaterialCommon
 {
     static constexpr Float SpecularThreshold = Float(0.95);
@@ -26,7 +13,6 @@ namespace MaterialCommon
     MR_PF_DECL bool IsSpecular(Float specularity) noexcept;
 }
 
-using MediumKeyPairList = std::vector<MediumKeyPair>;
 using NormalMap = Optional<TracerTexView<2, Vector3>>;
 
 template <class MatType>
@@ -122,29 +108,7 @@ concept MaterialGroupC = requires(MGType mg)
     //requires GenericGroupC<MGType>;
 };
 
-class GenericGroupMaterialT : public GenericTexturedGroupT<MaterialKey, MatAttributeInfo>
-{
-    using Parent = GenericTexturedGroupT<MaterialKey, MatAttributeInfo>;
-    using typename Parent::IdList;
-
-    protected:
-    MediumKeyPairList allMediums;
-
-    public:
-    // Constructors & Destructor
-                    GenericGroupMaterialT(uint32_t groupId, const GPUSystem&,
-                                          const TextureViewMap&,
-                                          const TextureMap&,
-                                          size_t allocationGranularity = 2_MiB,
-                                          size_t initialReservationSize = 4_MiB);
-    // Swap the interfaces (old switcheroo)
-    private:
-    IdList          Reserve(const std::vector<AttributeCountList>&) override;
-
-    public:
-    virtual IdList  Reserve(const std::vector<AttributeCountList>&,
-                            const MediumKeyPairList&);
-};
+using GenericGroupMaterialT = GenericTexturedGroupT<MaterialKey, MatAttributeInfo>;
 
 using MaterialGroupPtr = std::unique_ptr<GenericGroupMaterialT>;
 
@@ -160,60 +124,11 @@ class GenericGroupMaterial : public GenericGroupMaterialT
     std::string_view    Name() const override;
 };
 
-MR_PF_DEF_V
-MediumKeyPair::MediumKeyPair(MediumKey f, MediumKey b) noexcept
-    : frontKey(f)
-    , backKey(b)
-{}
-
-MR_PF_DEF
-MediumKey MediumKeyPair::Back() const noexcept
-{
-    return backKey;
-}
-
-MR_PF_DEF
-MediumKey MediumKeyPair::Front() const noexcept
-{
-    return frontKey;
-}
-
 MR_PF_DEF
 bool MaterialCommon::IsSpecular(Float specularity) noexcept
 {
     constexpr auto Threshold = SpecularThreshold;
     return specularity >= Threshold;
-}
-
-inline
-GenericGroupMaterialT::GenericGroupMaterialT(uint32_t groupId, const GPUSystem& gpuSystem,
-                                             const TextureViewMap& texViewMap,
-                                             const TextureMap& texMap,
-                                             size_t allocationGranularity,
-                                             size_t initialReservationSize)
-    : Parent(groupId, gpuSystem,
-             texViewMap, texMap,
-             allocationGranularity,
-             initialReservationSize)
-{}
-
-inline typename GenericGroupMaterialT::IdList
-GenericGroupMaterialT::Reserve(const std::vector<AttributeCountList>&)
-{
-    throw MRayError("{}: Materials cannot be reserved via this function!", Name());
-}
-
-inline typename GenericGroupMaterialT::IdList
-GenericGroupMaterialT::Reserve(const std::vector<AttributeCountList>& countArrayList,
-                               const MediumKeyPairList& mediumPairs)
-{
-    // We blocked the virtual chain, but we should be able to use it here
-    // We will do the same here anyways might as well use it.
-    auto result = Parent::Reserve(countArrayList);
-    std::lock_guard lock(mutex);
-
-    allMediums.insert(allMediums.end(), mediumPairs.cbegin(), mediumPairs.cend());
-    return result;
 }
 
 template <class C>

@@ -6,6 +6,12 @@
 namespace MediumDetail
 {
 
+MR_PF_DEF
+bool DefaultSegmentIterator::Advance()
+{
+    return false;
+}
+
 //===========================//
 //           Vacuum          //
 //===========================//
@@ -15,7 +21,8 @@ MediumVacuum::MediumVacuum(const SpectrumConverter&,
 {}
 
 MR_PF_DEF
-ScatterSample MediumVacuum::SampleScattering(const Vector3&, RNGDispenser&) const noexcept
+ScatterSample MediumVacuum::SampleScattering(const Vector3&, const Vector3&,
+                                             RNGDispenser&) const noexcept
 {
     return ScatterSample
     {
@@ -29,7 +36,8 @@ ScatterSample MediumVacuum::SampleScattering(const Vector3&, RNGDispenser&) cons
 }
 
 MR_PF_DEF
-Float MediumVacuum::PdfScattering(const Vector3&, const Vector3&) const noexcept
+Float MediumVacuum::PdfScattering(const Vector3&, const Vector3&,
+                                  const Vector3&) const noexcept
 {
     return Float(0.0);
 }
@@ -52,6 +60,20 @@ Spectrum MediumVacuum::Emission(const Vector3&) const noexcept
     return Spectrum::Zero();
 }
 
+MR_PF_DEF
+typename MediumVacuum::SegmentIterator
+MediumVacuum::GenSegmentIterator(const Ray&, const Vector2& tMM)
+{
+    return SegmentIterator
+    {
+        .curSegment =
+        {
+            .tMM = tMM,
+            .sMajor = Spectrum(0)
+        }
+    };
+}
+
 //===========================//
 //        Homogeneous        //
 //===========================//
@@ -68,6 +90,7 @@ MediumHomogeneous<ST>::MediumHomogeneous(const SpectrumConverter& sc,
 template <class ST>
 MR_HF_DEF
 ScatterSample MediumHomogeneous<ST>::SampleScattering(const Vector3& wO,
+                                                      const Vector3&,
                                                       RNGDispenser& rng) const
 {
     using namespace Distribution::Medium;
@@ -90,7 +113,8 @@ ScatterSample MediumHomogeneous<ST>::SampleScattering(const Vector3& wO,
 template <class ST>
 MR_HF_DEF
 Float MediumHomogeneous<ST>::PdfScattering(const Vector3& wI,
-                                           const Vector3& wO) const
+                                           const Vector3& wO,
+                                           const Vector3&) const
 {
     using namespace Distribution::Medium;
     Float cosTheta = Math::Dot(wI, wO);
@@ -116,6 +140,21 @@ MR_HF_DEF
 Spectrum MediumHomogeneous<ST>::Emission(const Vector3&) const
 {
     return emission;
+}
+
+template <class ST>
+MR_PF_DEF
+typename MediumHomogeneous<ST>::SegmentIterator
+MediumHomogeneous<ST>::GenSegmentIterator(const Ray&, const Vector2& tMM)
+{
+    return SegmentIterator
+    {
+        .curSegment =
+        {
+            .tMM = tMM,
+            .sMajor = sigmaA + sigmaS
+        }
+    };
 }
 
 }

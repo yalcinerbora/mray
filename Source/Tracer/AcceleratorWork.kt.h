@@ -177,6 +177,7 @@ void KCTransformLocallyConstantAABBs(// Output
 template<AccelGroupC AG, TransformGroupC TG, auto GenerateTransformContext>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCLocalRayCast(// Output
+                    MRAY_GRID_CONSTANT const Span<InterfaceIndex> dInterfaceIndices,
                     MRAY_GRID_CONSTANT const Span<HitKeyPack> dHitIds,
                     MRAY_GRID_CONSTANT const Span<MetaHit> dHitParams,
                     // I-O
@@ -188,7 +189,8 @@ void KCLocalRayCast(// Output
                     // Constant
                     MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA,
                     MRAY_GRID_CONSTANT const typename AG::DataSoA aSoA,
-                    MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA)
+                    MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA,
+                    MRAY_GRID_CONSTANT const bool writeInterfaceIndex)
 {
     using PG = typename AG::PrimitiveGroup;
     using Accelerator = typename AG:: template Accelerator<TG>;
@@ -235,6 +237,9 @@ void KCLocalRayCast(// Output
         };
         UpdateTMax(dRays, index, hit.t);
         dHitParams[index] = hit.hit;
+
+        if(writeInterfaceIndex)
+            dInterfaceIndices[index] = hit.interface;
     }
 };
 

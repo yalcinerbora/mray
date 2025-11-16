@@ -61,7 +61,7 @@ uint32_t TraverseLBVH(BitStack& bitStack,
         if(traverseState == BitStack::FIRST_ENTRY &&
            ray.IntersectsAABB(Vector3(Span<const Float, 3>(currentBBox->min)),
                               Vector3(Span<const Float, 3>(currentBBox->max)),
-                              tMinMax))
+                              tMinMax).intersected)
         {
             nodeIndex = ChildIndex(currentNode->leftIndex);
             if(nodeIndex.FetchBatchPortion() != IS_LEAF)
@@ -156,7 +156,7 @@ uint32_t TraverseLBVHStack(// I-O
         }
         else if(ray.IntersectsAABB(Vector3(Span<const Float, 3>(currentBBox->min)),
                                    Vector3(Span<const Float, 3>(currentBBox->max)),
-                                   tMinMax))
+                                   tMinMax).intersected)
         {
             nodeStack.push(currentNode->rightIndex);
             nodeStack.push(currentNode->leftIndex);
@@ -281,13 +281,19 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::IntersectionCheck(const Ray& ray,
         if(xi >= alpha) return std::nullopt;
     }
 
+    CommonKey isBackFace = (intersection.value().backFace)
+            ? IS_BACKFACE_KEY_FLAG
+            : IS_FRONTFACE_KEY_FLAG;
+    CommonKey ii = interfaces[index].FetchIndexPortion();
+
     // It is a hit! Update
     return HitResult
     {
         .hit            = intersection.value().hit,
         .t              = intersection.value().t,
         .primitiveKey   = primKey,
-        .lmKey          = lmKeys[index]
+        .lmKey          = lmKeys[index],
+        .interface      = InterfaceIndex::CombinedKey(isBackFace, ii)
     };
 }
 
@@ -300,6 +306,7 @@ AcceleratorLBVH<PG, TG>::AcceleratorLBVH(const TransDataSoA& tSoA,
     : primRanges(dataSoA.dPrimitiveRanges[aId.FetchIndexPortion()])
     , cullFaceFlags(dataSoA.dCullFace[aId.FetchIndexPortion()])
     , alphaMaps(dataSoA.dAlphaMaps[aId.FetchIndexPortion()])
+    , interfaces(dataSoA.dInterfaces[aId.FetchIndexPortion()])
     , lmKeys(dataSoA.dLightOrMatKeys[aId.FetchIndexPortion()])
     , leafs(dataSoA.dLeafs[aId.FetchIndexPortion()])
     , nodes(dataSoA.dNodes[aId.FetchIndexPortion()])
@@ -464,7 +471,8 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     uint32_t totalLeafCount = this->concreteLeafRanges.back()[1];
     uint32_t totalNodeCount = hConcreteNodeRangesVec.back()[1];
     // Copy these host vectors to GPU
-    MemAlloc::AllocateMultiData(Tie(dCullFaceFlags,
+    MemAlloc::AllocateMultiData(Tie(dInstanceInterfaceIndices,
+                                    dCullFaceFlags,
                                     dAlphaMaps,
                                     dLightOrMatKeys,
                                     dPrimitiveRanges,
@@ -480,6 +488,7 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
                                  this->InstanceCount(), this->InstanceCount(),
                                  this->InstanceCount(), this->InstanceCount(),
                                  this->InstanceCount(), this->InstanceCount(),
+                                 this->InstanceCount(),
                                  totalLeafCount, totalNodeCount, totalNodeCount});
     // Generate offset spans
     using PrimKeySpanList = std::vector<Span<const PrimitiveKey>>;
@@ -493,6 +502,7 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
                                                                        hInstanceNodeRangesVec);
 
     // Actual memcpy
+    Span<InterfaceIndexArray>           hSpanInstanceInterfaceIndices(ppResult.surfData.interfaces);
     Span<CullFaceFlagArray>             hSpanCullFaceFlags(ppResult.surfData.cullFaceFlags);
     Span<AlphaMapArray>                 hSpanAlphaMaps(ppResult.surfData.alphaMaps);
     Span<LightOrMatKeyArray>            hSpanLMKeys(ppResult.surfData.lightOrMatKeys);
@@ -502,14 +512,15 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
     Span<Span<const LBVHNode>>          hSpanNodes(hInstanceNodes);
     Span<Span<const LBVHBoundingBox>>   hSpanNodeBBoxes(hInstanceNodeAABBs);
     //
-    queue.MemcpyAsync(dCullFaceFlags,   ToConstSpan(hSpanCullFaceFlags));
-    queue.MemcpyAsync(dAlphaMaps,       ToConstSpan(hSpanAlphaMaps));
-    queue.MemcpyAsync(dLightOrMatKeys,  ToConstSpan(hSpanLMKeys));
-    queue.MemcpyAsync(dPrimitiveRanges, ToConstSpan(hSpanPrimitiveRanges));
-    queue.MemcpyAsync(dTransformKeys,   ToConstSpan(hSpanTransformKeys));
-    queue.MemcpyAsync(dLeafs,           ToConstSpan(hSpanLeafs));
-    queue.MemcpyAsync(dNodes,           ToConstSpan(hSpanNodes));
-    queue.MemcpyAsync(dNodeAABBs,       ToConstSpan(hSpanNodeBBoxes));
+    queue.MemcpyAsync(dInstanceInterfaceIndices, ToConstSpan(hSpanInstanceInterfaceIndices));
+    queue.MemcpyAsync(dCullFaceFlags,            ToConstSpan(hSpanCullFaceFlags));
+    queue.MemcpyAsync(dAlphaMaps,                ToConstSpan(hSpanAlphaMaps));
+    queue.MemcpyAsync(dLightOrMatKeys,           ToConstSpan(hSpanLMKeys));
+    queue.MemcpyAsync(dPrimitiveRanges,          ToConstSpan(hSpanPrimitiveRanges));
+    queue.MemcpyAsync(dTransformKeys,            ToConstSpan(hSpanTransformKeys));
+    queue.MemcpyAsync(dLeafs,                    ToConstSpan(hSpanLeafs));
+    queue.MemcpyAsync(dNodes,                    ToConstSpan(hSpanNodes));
+    queue.MemcpyAsync(dNodeAABBs,                ToConstSpan(hSpanNodeBBoxes));
 
     // Copy Ids to the leaf buffer
     auto hConcreteLeafRanges = Span<const Vector2ui>(this->concreteLeafRanges);
@@ -554,14 +565,15 @@ void AcceleratorGroupLBVH<PG>::Construct(AccelGroupConstructParams p,
 
     data = DataSoA
     {
-        .dCullFace                  = ToConstSpan(dCullFaceFlags),
-        .dAlphaMaps                 = ToConstSpan(dAlphaMaps),
-        .dLightOrMatKeys            = ToConstSpan(dLightOrMatKeys),
-        .dPrimitiveRanges           = ToConstSpan(dPrimitiveRanges),
-        .dInstanceTransforms        = ToConstSpan(dTransformKeys),
-        .dLeafs                     = ToConstSpan(dLeafs),
-        .dNodes                     = ToConstSpan(dNodes),
-        .dBoundingBoxes             = ToConstSpan(dNodeAABBs)
+        .dInterfaces            = ToConstSpan(dInstanceInterfaceIndices),
+        .dCullFace              = ToConstSpan(dCullFaceFlags),
+        .dAlphaMaps             = ToConstSpan(dAlphaMaps),
+        .dLightOrMatKeys        = ToConstSpan(dLightOrMatKeys),
+        .dPrimitiveRanges       = ToConstSpan(dPrimitiveRanges),
+        .dInstanceTransforms    = ToConstSpan(dTransformKeys),
+        .dLeafs                 = ToConstSpan(dLeafs),
+        .dNodes                 = ToConstSpan(dNodes),
+        .dBoundingBoxes         = ToConstSpan(dNodeAABBs)
     };
     // We have temp memory + async memcopies,
     // we need to wait here.
@@ -916,17 +928,19 @@ void AcceleratorGroupLBVH<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteR
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
-                                               Span<HitKeyPack> dHitIds,
-                                               Span<MetaHit> dHitParams,
-                                               // I-O
-                                               Span<BackupRNGState> dRNGStates,
-                                               Span<RayGMem> dRays,
-                                               // Input
-                                               Span<const RayIndex> dRayIndices,
-                                               Span<const CommonKey> dAccelKeys,
-                                               // Constants
-                                               CommonKey workId,
-                                               const GPUQueue& queue)
+                                             Span<InterfaceIndex> dInterfaceIndices,
+                                             Span<HitKeyPack> dHitIds,
+                                             Span<MetaHit> dHitParams,
+                                             // I-O
+                                             Span<BackupRNGState> dRNGStates,
+                                             Span<RayGMem> dRays,
+                                             // Input
+                                             Span<const RayIndex> dRayIndices,
+                                             Span<const CommonKey> dAccelKeys,
+                                             // Constants
+                                             CommonKey workId,
+                                             bool writeInterfaceIndex,
+                                             const GPUQueue& queue)
 {
     CommonKey localWorkId = workId - this->globalWorkIdToLocalOffset;
     const auto& workOpt = this->workInstances.at(localWorkId);
@@ -937,6 +951,7 @@ void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
 
     const auto& work = workOpt.value().get();
     work->CastLocalRays(// Output
+                        dInterfaceIndices,
                         dHitIds,
                         dHitParams,
                         // I-O
@@ -946,6 +961,7 @@ void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
                         dRayIndices,
                         dAccelKeys,
                         // Constants
+                        writeInterfaceIndex,
                         queue);
 }
 

@@ -314,7 +314,7 @@ MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static
 void KCWriteMarkovChains(// I-O
                          MRAY_GRID_CONSTANT const GuidedPTRDetail::GlobalState globalState,
-                         MRAY_GRID_CONSTANT const Span<BackupRNGState> dRNGStates,
+                         MRAY_GRID_CONSTANT const Span<BackupRNGState>,
                          // Input
                          MRAY_GRID_CONSTANT const Span<const TransientMCState> dWriteMCStates,
                          MRAY_GRID_CONSTANT const Span<const uint32_t> dMCWriteIndices,
@@ -578,8 +578,9 @@ GuidedPTRenderer::DisplayHashGrid(Span<const RayIndex> dDeadRayIndices,
     // ray hit position).
     tracerView.baseAccelerator.CastRays
     (
+        Span<InterfaceIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
-        dShadowRays, dDeadRayIndices, processQueue
+        dShadowRays, dDeadRayIndices, false, processQueue
     );
 
     processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
@@ -695,8 +696,9 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     // Actual Ray Casting
     tracerView.baseAccelerator.CastRays
     (
+        Span<InterfaceIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
-        dRays, dIndices, processQueue
+        dRays, dIndices, false, processQueue
     );
     // Generate work keys from hit packs
     // for partitioning

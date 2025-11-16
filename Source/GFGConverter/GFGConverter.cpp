@@ -385,7 +385,7 @@ void THRDProcessMesh(ErrorList& errors, Span<MeshGroup> meshes,
 
                 if(warnDegenerateTangents)
                 {
-                    MRAY_WARNING_LOG("Mesh File{:s}:[{:d}] has degenerate tangents. "
+                    MRAY_WARNING_LOG("Mesh File {:s}:[{:d}] has degenerate tangents. "
                                      "These are randomly generated.",
                                      mesh.filePath, meshIndex);
                 }

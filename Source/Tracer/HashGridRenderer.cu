@@ -404,8 +404,9 @@ void HashGridRenderer::PathTraceAndQuery()
         // Actual Ray Casting
         tracerView.baseAccelerator.CastRays
         (
+            Span<InterfaceIndex>(),
             dHitKeys, dHits, dBackupRNGStates,
-            dRays, dIndices, processQueue
+            dRays, dIndices, false, processQueue
         );
 
         // Generate work keys from hit packs

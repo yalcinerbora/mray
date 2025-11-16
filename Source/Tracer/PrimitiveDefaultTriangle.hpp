@@ -32,15 +32,16 @@ Optional<TriIntersection> Triangle<T>::Intersects(const Ray& ray, bool cullBackf
     // Intersection
     Float t;
     Vector3 baryCoords;
-    bool intersects = ray.IntersectsTriangle(baryCoords, t,
-                                             positions,
-                                             cullBackface);
-    if(!intersects) return std::nullopt;
+    auto result = ray.IntersectsTriangle(baryCoords, t,
+                                         positions,
+                                         cullBackface);
+    if(!result.intersected) return std::nullopt;
 
     return TriIntersection
     {
         .hit = Vector2(baryCoords),
-        .t = t
+        .t = t,
+        .backFace = result.backFace
     };
 }
 

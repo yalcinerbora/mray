@@ -109,35 +109,49 @@ namespace TracerConstants
     static constexpr PrimBatchId EmptyPrimBatchId       = PrimBatchId{0};
 
     static constexpr TextureId InvalidTexture           = TextureId{0};
-    static constexpr MediumPair VacuumMediumPair        = MediumPair(VacuumMediumId, VacuumMediumId);
 
     static const auto NoAlphaMapList = OptionalAlphaMapList(StaticVecSize(MaxPrimBatchPerSurface),
                                                             std::nullopt);
     static const auto CullFaceTrueList = CullBackfaceFlagList(StaticVecSize(MaxPrimBatchPerSurface),
                                                               true);
+
+    static const auto IdentityIterface = InterfaceParams
+    {
+        .frontVolume =
+        {
+            MediumId(std::numeric_limits<CommonId>::max()),
+            TransformId(std::numeric_limits<CommonId>::max())
+        },
+        .backVolume =
+        {
+            MediumId(std::numeric_limits<CommonId>::max()),
+            TransformId(std::numeric_limits<CommonId>::max())
+        }
+    };
 };
 
 struct SurfaceParams
 {
-    SurfacePrimList         primBatches;
-    SurfaceMatList          materials;
-    TransformId             transformId;
-    OptionalAlphaMapList    alphaMaps;
-    CullBackfaceFlagList    cullFaceFlags;
+    SurfacePrimList      primBatches;
+    SurfaceMatList       materials;
+    TransformId          transformId;
+    OptionalAlphaMapList alphaMaps;
+    CullBackfaceFlagList cullFaceFlags;
+    InterfaceList        interfaces;
 };
 
 struct LightSurfaceParams
 {
-    LightId     lightId;
-    TransformId transformId = TracerConstants::IdentityTransformId;
-    MediumId    mediumId    = TracerConstants::VacuumMediumId;
+    LightId      lightId;
+    TransformId  transformId;
+    VolumeParams volume;
 };
 
 struct CameraSurfaceParams
 {
-    CameraId    cameraId;
-    TransformId transformId = TracerConstants::IdentityTransformId;
-    MediumId    mediumId    = TracerConstants::VacuumMediumId;
+    CameraId     cameraId;
+    TransformId  transformId;
+    VolumeParams volume;
 };
 
 class [[nodiscard]] TracerI
@@ -206,11 +220,8 @@ class [[nodiscard]] TracerI
     //            Material            //
     //================================//
     virtual MatGroupId      CreateMaterialGroup(std::string typeName) = 0;
-    virtual MaterialId      ReserveMaterial(MatGroupId, AttributeCountList,
-                                            MediumPair = TracerConstants::VacuumMediumPair) = 0;
-    virtual MaterialIdList  ReserveMaterials(MatGroupId,
-                                             std::vector<AttributeCountList>,
-                                             std::vector<MediumPair> = {}) = 0;
+    virtual MaterialId      ReserveMaterial(MatGroupId, AttributeCountList) = 0;
+    virtual MaterialIdList  ReserveMaterials(MatGroupId, std::vector<AttributeCountList>) = 0;
     //
     virtual void        CommitMatReservations(MatGroupId) = 0;
     virtual bool        IsMatCommitted(MatGroupId) const = 0;

@@ -121,7 +121,14 @@ void IntersectFuncEmbree(const RTCIntersectFunctionNArguments* args)
                 potentialHits.instID[0][i] = args->context->instID[0];
                 potentialHits.instPrimID[0][i] = args->context->instPrimID[0];
                 newTs[i] = hitResult->t;
-
+                //
+                auto ifFlagPart = (hitResult->backFace)
+                                    ? IS_BACKFACE_KEY_FLAG
+                                    : IS_FRONTFACE_KEY_FLAG;
+                auto ifIndexPart = record.interfaceIndex.FetchIndexPortion();
+                embreeContext.interfaceIndices[rh.ray.id[i]] = InterfaceIndex::CombinedKey(ifFlagPart,
+                                                                                           ifIndexPart);
+                //
                 someHasAlphaMaps |= record.alphaMap.has_value();
             }
         }
@@ -301,21 +308,27 @@ void FilterFuncEmbree(const RTCFilterFunctionNArguments* args)
             // Since we set filter function for all geometries
             // just check it here.
             // For user-defined geometries our intersection
-            // routine checked it already so only compile for triangles
+            // routine checked it already so only compile these for triangles
             Vector2 baryCoords(h.u[i], h.v[i]);
             if constexpr(TrianglePrimGroupC<PG>)
             {
+                // We lost primitive data etc. unlike intersection function
+                // So do ghetto check via normal and ray dir
+                Vector3 d = Vector3(r.dir_x[i], r.dir_y[i], r.dir_z[i]);
+                Vector3 n = Vector3(h.Ng_x[i], h.Ng_y[i], h.Ng_z[i]);
+                // TODO: Isn't this should be greater ?
+                bool isBackFace = (Math::Dot(n, d) < Float{0});
+                auto ifFlagPart = (isBackFace)
+                                    ? IS_FRONTFACE_KEY_FLAG
+                                    : IS_BACKFACE_KEY_FLAG;
+                auto ifIndexPart = record.interfaceIndex.FetchIndexPortion();
+                embreeContext.interfaceIndices[r.id[i]] = InterfaceIndex::CombinedKey(ifFlagPart,
+                                                                                      ifIndexPart);
+
                 if(record.cullFace)
                 {
-                    // We lost primitive data etc. unlike intersection function
-                    // So do ghetto check via normal and ray dir
-                    Vector3 d = Vector3(r.dir_x[i], r.dir_y[i], r.dir_z[i]);
-                    Vector3 n = Vector3(h.Ng_x[i], h.Ng_y[i], h.Ng_z[i]);
-
-                    args->valid[i] = (Math::Dot(n, d) < Float{0})
-                            ? EMBREE_VALID_RAY
-                            : EMBREE_INVALID_RAY;
-
+                    args->valid[i] = (isBackFace) ? EMBREE_VALID_RAY
+                                                  : EMBREE_INVALID_RAY;
                     if(args->valid[i] == EMBREE_INVALID_RAY) continue;
                 }
                 // We might as well switch to MRay bary coords
@@ -714,6 +727,7 @@ void AcceleratorGroupEmbree<PG>::Construct(AccelGroupConstructParams p,
                 .dPrimKeys      = hAllLeafs.subspan(leafRange[0] + localPrimKeyOffset,
                                                     localSize),
                 .alphaMap       = ppResult.surfData.alphaMaps[i][j],
+                .interfaceIndex = ppResult.surfData.interfaces[i][j],
                 .cullFace       = ppResult.surfData.cullFaceFlags[i][j],
                 .isTriangle     = IsTriangle
             };
@@ -763,6 +777,7 @@ void AcceleratorGroupEmbree<PG>::WriteInstanceKeysAndAABBs(Span<AABB3>,
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupEmbree<PG>::CastLocalRays(// Output
+                                               Span<InterfaceIndex>,
                                                Span<HitKeyPack>,
                                                Span<MetaHit>,
                                                // I-O
@@ -773,6 +788,7 @@ void AcceleratorGroupEmbree<PG>::CastLocalRays(// Output
                                                Span<const CommonKey>,
                                                // Constants
                                                CommonKey,
+                                               bool,
                                                const GPUQueue&)
 {
     throw MRayError("For Embree, this function should not be called");

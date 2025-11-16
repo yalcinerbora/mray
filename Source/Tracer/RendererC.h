@@ -31,11 +31,12 @@ struct MultiPartitionOutput;
 class GenericGroupPrimitiveT;
 class GenericGroupCameraT;
 class GenericGroupLightT;
-class GenericGroupMaterialT;
 template<class, class> class GenericGroupT;
 template<class, class> class GenericTexturedGroupT;
-using GenericGroupTransformT    = GenericGroupT<TransformKey, TransAttributeInfo>;
-using GenericGroupMediumT       = GenericTexturedGroupT<MediumKey, MediumAttributeInfo>;
+//
+using GenericGroupTransformT = GenericGroupT<TransformKey, TransAttributeInfo>;
+using GenericGroupMediumT    = GenericTexturedGroupT<MediumKey, MediumAttributeInfo>;
+using GenericGroupMaterialT  = GenericTexturedGroupT<MaterialKey, MatAttributeInfo>;
 
 struct FlatSurfParams
 {
@@ -73,6 +74,7 @@ struct TracerView
     const std::vector<Pair<LightSurfaceId, LightSurfaceParams>>&    lightSurfs;
     const std::vector<Pair<CamSurfaceId, CameraSurfaceParams>>&     camSurfs;
     const std::vector<FlatSurfParams>&                              flattenedSurfaces;
+    const std::vector<InterfaceKeyPack>&                             globalInterfaceList;
 };
 
 class RenderWorkI
@@ -163,6 +165,15 @@ class RenderCameraWorkI
                                        const GPUQueue& queue) const = 0;
 };
 
+class RenderMediumWorkI
+{
+    public:
+    virtual ~RenderMediumWorkI() = default;
+
+    virtual RNRequestList    SampleRNList(uint32_t workIndex) const = 0;
+    virtual std::string_view Name() const = 0;
+};
+
 using RenderImagePtr = std::unique_ptr<RenderImage>;
 using RenderWorkGenerator = GeneratorFuncType<RenderWorkI,
                                               const GenericGroupMaterialT&,
@@ -177,17 +188,23 @@ using RenderCameraWorkGenerator = GeneratorFuncType<RenderCameraWorkI,
                                                     const GenericGroupCameraT&,
                                                     const GenericGroupTransformT&,
                                                     const GPUSystem&>;
+using RenderMediumWorkGenerator = GeneratorFuncType<RenderMediumWorkI,
+                                                    const GenericGroupMediumT&,
+                                                    const GenericGroupTransformT&,
+                                                    const GPUSystem&>;
 
 // Work generator related
 using RenderWorkGenMap = Map<std::string_view, RenderWorkGenerator>;
 using RenderLightWorkGenMap = Map<std::string_view, RenderLightWorkGenerator>;
 using RenderCamWorkGenMap = Map<std::string_view, RenderCameraWorkGenerator>;
+using RenderMediumWorkGenMap = Map<std::string_view, RenderMediumWorkGenerator>;
 
 struct RenderWorkPack
 {
     RenderWorkGenMap        workMap;
     RenderLightWorkGenMap   lightWorkMap;
     RenderCamWorkGenMap     camWorkMap;
+    RenderMediumWorkGenMap  mediumWorkMap;
 };
 
 template<class RendererType>
@@ -234,6 +251,7 @@ concept RendererC = requires(RendererType rt,
 using RenderWorkPtr = std::unique_ptr<RenderWorkI>;
 using RenderCameraWorkPtr = std::unique_ptr<RenderCameraWorkI>;
 using RenderLightWorkPtr = std::unique_ptr<RenderLightWorkI>;
+using RenderMediumWorkPtr = std::unique_ptr<RenderMediumWorkI>;
 
 class RendererI
 {
@@ -371,6 +389,36 @@ void DoBoundaryWork_##tag                   \
                                 g, h, i);   \
 }
 
+#define MRAY_RENDER_MEDIUM_DO_WORK_DECL(tag)      \
+void DoWork_##tag                                 \
+(                                                 \
+    const RenderRayState<R, tag>& dRayStates,     \
+    Span<RayGMem> dRaysIO,                        \
+    Span<RayCone> dRayDiffsIO,                    \
+    Span<const RayIndex> dRayIndicesIn,           \
+    Span<const RandomNumber> dRandomNumbers,      \
+    Span<const InterfaceKeyPack> dKeysIn,         \
+    const RenderGlobalState<R, tag>& globalState, \
+    const GPUQueue& queue                         \
+) const
+
+#define MRAY_RENDER_MEDIUM_DO_WORK_DEF(tag) \
+void DoWork_##tag                           \
+(                                           \
+    const RenderRayState<R, tag>& a,        \
+    Span<RayGMem> b,                        \
+    Span<RayCone> c,                        \
+    Span<const RayIndex> d,                 \
+    Span<const RandomNumber> e,             \
+    Span<const InterfaceKeyPack> f,         \
+    const RenderGlobalState<R, tag>& g,     \
+    const GPUQueue& h                       \
+) const override                            \
+{                                           \
+    DoWorkInternal<tag>(a, b, c, d,         \
+                        e, f, g, h);        \
+}
+
 template<class R>
 class RenderWorkT : public RenderWorkI
 {
@@ -393,6 +441,14 @@ class RenderCameraWorkT : public RenderCameraWorkI
     // Camera may need the macro treatment
     // later, but currently all of its functionality is
     // on the actual interface. So this is empty
+};
+
+template<class R>
+class RenderMediumWorkT : public RenderMediumWorkI
+{
+    public:
+    virtual MRAY_RENDER_MEDIUM_DO_WORK_DECL(0) = 0;
+    virtual MRAY_RENDER_MEDIUM_DO_WORK_DECL(1) = 0;
 };
 
 // Renderer holds its work in a linear array.
@@ -437,9 +493,22 @@ struct RenderCameraWorkStruct
     auto operator<=>(const RenderCameraWorkStruct&) const noexcept;
 };
 
+struct RenderMediumWorkStruct
+{
+    using WorkPtr = std::unique_ptr<RenderMediumWorkI>;
+    //
+    MediumGroupId mgId;
+    TransGroupId  tgId;
+    CommonKey     workGroupId;
+    WorkPtr       workPtr;
+
+    auto operator<=>(const RenderMediumWorkStruct&) const noexcept;
+};
+
 using RenderWorkList        = std::vector<RenderWorkStruct>;
 using RenderLightWorkList   = std::vector<RenderLightWorkStruct>;
 using RenderCameraWorkList  = std::vector<RenderCameraWorkStruct>;
+using RenderMediumWorkList  = std::vector<RenderMediumWorkStruct>;
 
 template<class Renderer>
 const RenderWorkT<Renderer>&
@@ -462,6 +531,14 @@ const RenderCameraWorkT<Renderer>&
 UpcastRenderCameraWork(const std::unique_ptr<RenderCameraWorkI>& ptr)
 {
     using ResultT = RenderCameraWorkT<Renderer>*;
+    return *static_cast<const ResultT*>(ptr.get());
+}
+
+template<class Renderer>
+const RenderMediumWorkT<Renderer>&
+UpcastRenderMediumWork(const std::unique_ptr<RenderMediumWorkI>& ptr)
+{
+    using ResultT = RenderMediumWorkT<Renderer>*;
     return *static_cast<const ResultT*>(ptr.get());
 }
 
@@ -547,11 +624,14 @@ class RendererBase : public RendererI
 
     private:
     uint32_t         workCounter = 0;
+    uint32_t         mediumWorkCounter = 0;
     RenderWorkPack   workPack;
 
     uint32_t        GenerateWorkMappings(uint32_t workIdStart);
     uint32_t        GenerateLightWorkMappings(uint32_t workIdStart);
     uint32_t        GenerateCameraWorkMappings(uint32_t workIdStart);
+    //
+    uint32_t        GenerateMediumWorkMappings(uint32_t workIdStart);
 
     protected:
     std::string_view            rendererName;
@@ -565,6 +645,8 @@ class RendererBase : public RendererI
     RenderLightWorkList     currentLightWorks;
     RenderCameraWorkList    currentCameraWorks;
     HitKeyPack              boundaryLightKeyPack;
+    //
+    RenderMediumWorkList    currentMediumWorks;
     // Current Canvas info
     ImageTiler              imageTiler;
     uint64_t                totalIterationCount;
@@ -628,6 +710,12 @@ auto RenderLightWorkStruct::operator<=>(const RenderLightWorkStruct& right) cons
 
 inline
 auto RenderCameraWorkStruct::operator<=>(const RenderCameraWorkStruct& right) const noexcept
+{
+    return workGroupId <=> right.workGroupId;
+}
+
+inline
+auto RenderMediumWorkStruct::operator<=>(const RenderMediumWorkStruct& right) const noexcept
 {
     return workGroupId <=> right.workGroupId;
 }
@@ -787,6 +875,7 @@ uint32_t RendererBase::GenerateWorks()
     workCounter = GenerateWorkMappings(workCounter);
     workCounter = GenerateLightWorkMappings(workCounter);
     workCounter = GenerateCameraWorkMappings(workCounter);
+    workCounter = GenerateMediumWorkMappings(workCounter);
     return workCounter;
 }
 
@@ -836,13 +925,15 @@ std::string_view RendererBase::Name() const
 // Helper functions to instantiate works //
 //=======================================//
 // TODO: Maybe add these on a namespace
-template<class R, class Works, class LWorks, class CWorks>
+template<class R, class Works, class LWorks,
+         class CWorks, class MWorks>
 struct RenderWorkTypePack
 {
     using RendererType      = R;
     using WorkTypes         = Works;
     using LightWorkTypes    = LWorks;
     using CameraWorkTypes   = CWorks;
+    using MediumWorkTypes   = MWorks;
 };
 
 template <class RenderWorkTypePackT>
@@ -853,6 +944,7 @@ inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
     using WorkTypes         = typename RenderWorkTypePackT::WorkTypes;
     using LightWorkTypes    = typename RenderWorkTypePackT::LightWorkTypes;
     using CameraWorkTypes   = typename RenderWorkTypePackT::CameraWorkTypes;
+    using MediumWorkTypes   = typename RenderWorkTypePackT::MediumWorkTypes;
 
     RenderWorkPack& workPack = workMap.emplace(RendererType::TypeName(),
                                                RenderWorkPack()).first->second;
@@ -899,6 +991,20 @@ inline void AddSingleRenderWork(Map<std::string_view, RenderWorkPack>& workMap,
         workPack.camWorkMap,
         cameraWorkArgsResolver,
         cameraWorkTypesResolver
+    );
+    //================//
+    //  Medium Works  //
+    //================//
+    using MediumWorkGenArgs = TypePack<const GenericGroupMediumT&,
+                                       const GenericGroupTransformT&,
+                                       const GPUSystem&>;
+    MediumWorkGenArgs* medWorkArgsResolver = nullptr;
+    MediumWorkTypes* medWorkTypesResolver = nullptr;
+    GenerateMapping<RenderMediumWorkGenerator, RenderMediumWorkI>
+    (
+        workPack.mediumWorkMap,
+        medWorkArgsResolver,
+        medWorkTypesResolver
     );
 }
 

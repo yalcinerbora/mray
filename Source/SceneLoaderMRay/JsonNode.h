@@ -46,6 +46,18 @@ struct TracerSceneView
     std::vector<Surfaces>       surfaces;
 };
 
+struct VolumeStruct
+{
+    uint32_t mediumId;
+    uint32_t transformId;
+};
+
+struct InterfaceStruct
+{
+    VolumeStruct front;
+    VolumeStruct back;
+};
+
 struct SurfaceStruct
 {
     private:
@@ -57,6 +69,7 @@ struct SurfaceStruct
     using IdPairList    = std::array<IdPair, PPS>;
     using TextureList   = std::array<Optional<SceneTexId>, PPS>;
     using CullList      = std::array<bool, PPS>;
+    using InterfaceList = std::array<InterfaceStruct, PPS>;
 
     //
     uint32_t        transformId;
@@ -64,29 +77,30 @@ struct SurfaceStruct
     TextureList     alphaMaps;
     CullList        doCullBackFace;
     int8_t          pairCount;
+    InterfaceList   interfaces;
 };
 using SceneSurfList = std::vector<SurfaceStruct>;
 
-struct EndpointSurfaceStruct
+struct LightSurfaceStruct
 {
-    uint32_t        mediumId;
-    uint32_t        transformId;
-};
-
-struct LightSurfaceStruct : public EndpointSurfaceStruct
-{
-    uint32_t lightId;
+    uint32_t     lightId;
+    uint32_t     transformId;
+    VolumeStruct vol;
 };
 using SceneLightSurfList = std::vector<LightSurfaceStruct>;
 
-struct CameraSurfaceStruct : public EndpointSurfaceStruct
+struct CameraSurfaceStruct
 {
-    uint32_t cameraId;
+    uint32_t     cameraId;
+    uint32_t     transformId;
+    VolumeStruct vol;
 };
 using SceneCamSurfList = std::vector<CameraSurfaceStruct>;
 
 // Json converters
 void from_json(const nlohmann::json&, SceneTexId&);
+void from_json(const nlohmann::json&, VolumeStruct&);
+void from_json(const nlohmann::json&, InterfaceStruct&);
 void from_json(const nlohmann::json&, SurfaceStruct&);
 void from_json(const nlohmann::json&, LightSurfaceStruct&);
 void from_json(const nlohmann::json&, CameraSurfaceStruct&);

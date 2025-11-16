@@ -28,8 +28,7 @@ enum class PathStatusEnum : uint8_t
     // Path did scatter because of the medium. It should not go
     // Material scattering
     MEDIUM_SCATTERED = 2,
-    // TODO: Maybe incorporate ray type?
-    //
+    MEDIUM_TRANSMITTED = 3,
     END
 };
 using PathStatus = Bitset<static_cast<size_t>(PathStatusEnum::END)>;

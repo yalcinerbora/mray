@@ -78,17 +78,34 @@ using MatAttributeInfoList = TexturedAttributeInfoList;
 // Medium Related
 MRAY_GENERIC_ID(MediumGroupId, CommonId);
 MRAY_GENERIC_ID(MediumId, CommonId);
-using MediumPair = Pair<MediumId, MediumId>;
 using MediumAttributeInfo = TexturedAttributeInfo;
 using MediumAttributeInfoList = TexturedAttributeInfoList;
 // Surface Related
 MRAY_GENERIC_ID(SurfaceId, CommonId);
 MRAY_GENERIC_ID(LightSurfaceId, CommonId);
 MRAY_GENERIC_ID(CamSurfaceId, CommonId);
+
+struct VolumeParams
+{
+    MediumId    mediumId;
+    TransformId transformId;
+
+    auto operator<=>(const VolumeParams&) const = default;
+};
+
+struct InterfaceParams
+{
+    VolumeParams frontVolume;
+    VolumeParams backVolume;
+
+    auto operator<=>(const InterfaceParams&) const = default;
+};
+
 using SurfaceMatList        = StaticVector<MaterialId, TracerConstants::MaxPrimBatchPerSurface>;
 using SurfacePrimList       = StaticVector<PrimBatchId, TracerConstants::MaxPrimBatchPerSurface>;
 using OptionalAlphaMapList  = StaticVector<Optional<TextureId>, TracerConstants::MaxPrimBatchPerSurface>;
 using CullBackfaceFlagList  = StaticVector<bool, TracerConstants::MaxPrimBatchPerSurface>;
+using InterfaceList         = StaticVector<InterfaceParams, TracerConstants::MaxPrimBatchPerSurface>;
 // Renderer Related
 MRAY_GENERIC_ID(RendererId, CommonId);
 using RendererAttributeInfo = GenericAttributeInfo;

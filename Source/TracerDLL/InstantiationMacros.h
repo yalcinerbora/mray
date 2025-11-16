@@ -47,9 +47,23 @@ struct GetCWFT
     public:
     using Type = std::conditional_t<I < WFList::TypeCount, TypePackElement<I, WFList>, void>;
 };
-
 template <class R, class CG, class TG, uint32_t I>
 using GetCWF = GetCWFT<R, CG, TG, I>::Type;
+
+// ==========================//
+//  Get Cam Work Metaprogram //
+// ========================= //
+template <class R, class MG, class TG, uint32_t I>
+struct GetMWFT
+{
+    private:
+    using WFList = R::template MediaWorkFunctions<MG, TG>;
+    public:
+    using Type = std::conditional_t<I < WFList::TypeCount, TypePackElement<I, WFList>, void>;
+};
+template <class R, class MG, class TG, uint32_t I>
+using GetMWF = GetMWFT<R, MG, TG, I>::Type;
+
 
 // Renderer Related
 #define MRAY_RENDERER_KERNEL_INSTANTIATE(R, P, M, T, I)                \
@@ -77,9 +91,19 @@ using GetCWF = GetCWFT<R, CG, TG, I>::Type;
     template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT          \
     void KCRenderCameraWork                                         \
     <                                                               \
-        GetLCWF<R, C, T, I>                                         \
+        GetCWF<R, C, T, I>                                          \
     >                                                               \
-    (MRAY_GRID_CONSTANT const typename GetLCWF<R, C, T, I>::Params)
+    (MRAY_GRID_CONSTANT const typename GetCWF<R, C, T, I>::Params)
+
+#define MRAY_RENDERER_MEDIUM_KERNEL_INSTANTIATE(R, M, T, I)         \
+    template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT          \
+    void KCRenderMediumWork                                         \
+    <                                                               \
+        GetMWF<R, C, T, I>,                                         \
+        AcquireSpectrumConverterGenerator<R, GetMWF<R, L, T, I>>(), \
+        AcquireTransformContextGenerator<PrimGroupEmpty, TG>()      \
+    >                                                               \
+    (MRAY_GRID_CONSTANT const typename GetMWF<R, C, T, I>::Params)
 
 // Accelerator Related
 #define MRAY_ACCEL_PRIM_CENTER_KERNEL_INSTANTIATE(A, P, T)                                                              \
@@ -121,7 +145,8 @@ using GetCWF = GetCWFT<R, CG, TG, I>::Type;
 
 #define MRAY_ACCEL_LOCAL_RAY_CAST_KERNEL_INSTANTIATE(A, P, T)                                                               \
     template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT                                                                  \
-    void KCLocalRayCast<A<P>, T, MRAY_ACCEL_TGEN_FUNCTION(A<P>, T)>(MRAY_GRID_CONSTANT const Span<HitKeyPack>,              \
+    void KCLocalRayCast<A<P>, T, MRAY_ACCEL_TGEN_FUNCTION(A<P>, T)>(MRAY_GRID_CONSTANT const Span<InterfaceIndex>,          \
+                                                                    MRAY_GRID_CONSTANT const Span<HitKeyPack>,              \
                                                                     MRAY_GRID_CONSTANT const Span<MetaHit>,                 \
                                                                     MRAY_GRID_CONSTANT const Span<BackupRNGState>,          \
                                                                     MRAY_GRID_CONSTANT const Span<RayGMem>,                 \
@@ -129,7 +154,8 @@ using GetCWF = GetCWFT<R, CG, TG, I>::Type;
                                                                     MRAY_GRID_CONSTANT const Span<const CommonKey>,         \
                                                                     MRAY_GRID_CONSTANT const typename T::DataSoA,           \
                                                                     MRAY_GRID_CONSTANT const typename A<P>::DataSoA,        \
-                                                                    MRAY_GRID_CONSTANT const typename P::DataSoA)
+                                                                    MRAY_GRID_CONSTANT const typename P::DataSoA,           \
+                                                                    MRAY_GRID_CONSTANT const bool)
 
 #define MRAY_ACCEL_VISIBILITY_RAY_CAST_KERNEL_INSTANTIATE(A, P, T)                                                          \
     template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT                                                                  \

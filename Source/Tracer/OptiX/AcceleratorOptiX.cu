@@ -671,14 +671,17 @@ void BaseAcceleratorOptiX::AllocateForTraversal(size_t)
 {}
 
 void BaseAcceleratorOptiX::CastRays(// Output
-                                   Span<HitKeyPack> dHitIds,
-                                   Span<MetaHit> dHitParams,
-                                   // I-O
-                                   Span<BackupRNGState> dRNGStates,
-                                   Span<RayGMem> dRays,
-                                   // Input
-                                   Span<const RayIndex> dRayIndices,
-                                   const GPUQueue& queue)
+                                    Span<InterfaceIndex> dInterfaceIndices,
+                                    Span<HitKeyPack> dHitIds,
+                                    Span<MetaHit> dHitParams,
+                                    // I-O
+                                    Span<BackupRNGState> dRNGStates,
+                                    Span<RayGMem> dRays,
+                                    // Input
+                                    Span<const RayIndex> dRayIndices,
+                                    //
+                                    bool writeInterfaceIndex,
+                                    const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
     static const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
@@ -699,12 +702,14 @@ void BaseAcceleratorOptiX::CastRays(// Output
         .mode = RenderModeOptiX::NORMAL,
         .nParams = NormalRayCastArgPackOptiX
         {
-            .baseAccelerator    = baseAccelerator,
-            .dHitKeys           = dHitIds,
-            .dHits              = dHitParams,
-            .dRNGStates         = dRNGStates,
-            .dRays              = dRays,
-            .dRayIndices        = dRayIndices
+            .baseAccelerator     = baseAccelerator,
+            .dInterfaceIndices   = dInterfaceIndices,
+            .dHitKeys            = dHitIds,
+            .dHits               = dHitParams,
+            .dRNGStates          = dRNGStates,
+            .dRays               = dRays,
+            .dRayIndices         = dRayIndices,
+            .writeInterfaceIndex = writeInterfaceIndex
         }
     };
     queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOptiX>(&argPack, 1));
@@ -761,6 +766,7 @@ void BaseAcceleratorOptiX::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffer
 }
 
 void BaseAcceleratorOptiX::CastLocalRays(// Output
+                                         Span<InterfaceIndex> dInterfaceIndices,
                                          Span<HitKeyPack> dHitIds,
                                          Span<MetaHit> dHitParams,
                                          // I-O
@@ -769,7 +775,9 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
                                          // Input
                                          Span<const RayIndex> dRayIndices,
                                          Span<const AcceleratorKey> dAccelKeys,
+                                         //
                                          CommonKey dAccelKeyBatchPortion,
+                                         bool writeInterfaceIndex,
                                          const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -793,15 +801,17 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
         .mode = RenderModeOptiX::LOCAL,
         .lParams = LocalRayCastArgPackOptiX
         {
-            .dHitKeys= dHitIds,
-            .dHits = dHitParams,
-            .dRNGStates = dRNGStates,
-            .dRays = dRays,
-            .dRayIndices = dRayIndices,
-            .dAcceleratorKeys = dAccelKeys,
-            .dGlobalInstanceTraversables = dGlobalTraversableHandles,
+            .dInterfaceIndices   = dInterfaceIndices,
+            .dHitKeys            = dHitIds,
+            .dHits               = dHitParams,
+            .dRNGStates          = dRNGStates,
+            .dRays               = dRays,
+            .dRayIndices         = dRayIndices,
+            .dAcceleratorKeys    = dAccelKeys,
+            .dGlobalInstanceTraversables  = dGlobalTraversableHandles,
             .dGlobalInstanceInvTransforms = dGlobalInstanceInvTransforms,
-            .batchStartOffset = batchStartOffset
+            .batchStartOffset    = batchStartOffset,
+            .writeInterfaceIndex = writeInterfaceIndex
         }
     };
     queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOptiX>(&argPack, 1));

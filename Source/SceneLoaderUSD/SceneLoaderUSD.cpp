@@ -904,6 +904,22 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                 surface.primBatches.push_back(primBatchId);
                 surface.cullFaceFlags.push_back(prim.cullFace);
                 surface.alphaMaps.push_back(mat.alphaMap);
+                surface.interfaces.push_back
+                (
+                    InterfaceParams
+                    {
+                        .frontVolume =
+                        {
+                            .mediumId = TracerConstants::VacuumMediumId,
+                            .transformId = TracerConstants::IdentityTransformId
+                        },
+                        .backVolume =
+                        {
+                            .mediumId = TracerConstants::VacuumMediumId,
+                            .transformId = TracerConstants::IdentityTransformId
+                        }
+                    }
+                );
             }
             SurfaceId sId = tracer.CreateSurface(surface);
             surfaceList.emplace_back(prim.surfacePrim, sId);
@@ -934,6 +950,22 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                 surface.primBatches.push_back(primBatchId);
                 surface.cullFaceFlags.push_back(!mat.alphaMap.has_value());
                 surface.alphaMaps.push_back(mat.alphaMap);
+                surface.interfaces.push_back
+                (
+                    InterfaceParams
+                    {
+                        .frontVolume =
+                        {
+                            .mediumId = TracerConstants::VacuumMediumId,
+                            .transformId = TracerConstants::IdentityTransformId
+                        },
+                        .backVolume =
+                        {
+                            .mediumId = TracerConstants::VacuumMediumId,
+                            .transformId = TracerConstants::IdentityTransformId
+                        }
+                    }
+                );
             }
             SurfaceId sId = tracer.CreateSurface(surface);
             surfaceList.emplace_back(prim.surfacePrim, sId);
@@ -952,7 +984,11 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             .transformId = cameraSurfTIds.empty()
                                 ? TracerConstants::IdentityTransformId
                                 : cameraSurfTIds[0],
-            .mediumId = TracerConstants::VacuumMediumId,
+            .volume = VolumeParams
+            {
+                .mediumId = TracerConstants::VacuumMediumId,
+                .transformId = TracerConstants::IdentityTransformId
+            }
         };
         CamSurfaceId csId = tracer.CreateCameraSurface(surface);
         camSurfaceList.emplace_back(outCam.first, csId);
@@ -967,7 +1003,11 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             .transformId = domeLightSurfTIds.empty()
                             ? TracerConstants::IdentityTransformId
                             : domeLightSurfTIds[0],
-            .mediumId = TracerConstants::VacuumMediumId
+            .volume = VolumeParams
+            {
+                .mediumId = TracerConstants::VacuumMediumId,
+                .transformId = TracerConstants::IdentityTransformId
+            }
         }
     );
     //

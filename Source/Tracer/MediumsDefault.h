@@ -7,6 +7,13 @@
 
 namespace MediumDetail
 {
+    struct DefaultSegmentIterator
+    {
+        RaySegment curSegment;
+
+        MR_PF_DECL bool Advance();
+    };
+
     // Lets try the new SoA span on homogeneous medium
     // (Instead of 80 bytes, this is 48 bytes!)
     struct alignas(16) HomogeneousMediumData
@@ -30,8 +37,9 @@ namespace MediumDetail
     {
         public:
         using enum HomogeneousMediumData::I;
-        using DataSoA = EmptyType;
+        using DataSoA           = EmptyType;
         using SpectrumConverter = typename SpectrumContextIdentity::Converter;
+        using SegmentIterator   = DefaultSegmentIterator;
 
         static constexpr RNRequestList SampleScatteringRNList = RNRequestList();
 
@@ -40,25 +48,33 @@ namespace MediumDetail
                                      const DataSoA&, MediumKey) noexcept;
 
         MR_PF_DECL
-        ScatterSample   SampleScattering(const Vector3& wO, RNGDispenser& rng) const noexcept;
+        ScatterSample   SampleScattering(const Vector3& wO,
+                                         const Vector3& p,
+                                         RNGDispenser& rng) const noexcept;
         MR_PF_DECL
-        Float           PdfScattering(const Vector3& wI, const Vector3& wO) const noexcept;
+        Float           PdfScattering(const Vector3& wI,
+                                      const Vector3& wO,
+                                      const Vector3& p) const noexcept;
 
         MR_PF_DECL
-        Spectrum        SigmaA(const Vector3& uv) const noexcept;
+        Spectrum        SigmaA(const Vector3& p) const noexcept;
         MR_PF_DECL
-        Spectrum        SigmaS(const Vector3& uv) const noexcept;
+        Spectrum        SigmaS(const Vector3& p) const noexcept;
         MR_PF_DECL
-        Spectrum        Emission(const Vector3& uv) const noexcept;
+        Spectrum        Emission(const Vector3& p) const noexcept;
+
+        MR_PF_DECL
+        SegmentIterator GenSegmentIterator(const Ray& ray, const Vector2& tMM);
     };
 
     template <class SpectrumContext = SpectrumContextIdentity>
     class MediumHomogeneous
     {
         public:
-        using DataSoA = HomogeneousMediumData;
-        using SpectrumConverter = typename SpectrumContext::Converter;
         using enum HomogeneousMediumData::I;
+        using DataSoA           = HomogeneousMediumData;
+        using SpectrumConverter = typename SpectrumContext::Converter;
+        using SegmentIterator   = DefaultSegmentIterator;
 
         static constexpr RNRequestList SampleScatteringRNList = GenRNRequestList<2>();
 
@@ -73,16 +89,22 @@ namespace MediumDetail
                                           const DataSoA&, MediumKey);
 
         MR_HF_DECL
-        ScatterSample   SampleScattering(const Vector3& wO, RNGDispenser& rng) const;
+        ScatterSample   SampleScattering(const Vector3& wO,
+                                         const Vector3& p,
+                                         RNGDispenser& rng) const;
         MR_HF_DECL
-        Float           PdfScattering(const Vector3& wI, const Vector3& wO) const;
+        Float           PdfScattering(const Vector3& wI,
+                                      const Vector3& wO,
+                                      const Vector3& p) const;
 
         MR_HF_DECL
-        Spectrum        SigmaA(const Vector3& uv) const;
+        Spectrum        SigmaA(const Vector3& p) const;
         MR_HF_DECL
-        Spectrum        SigmaS(const Vector3& uv) const;
+        Spectrum        SigmaS(const Vector3& p) const;
         MR_HF_DECL
-        Spectrum        Emission(const Vector3& uv) const;
+        Spectrum        Emission(const Vector3& p) const;
+        MR_PF_DECL
+        SegmentIterator GenSegmentIterator(const Ray& ray, const Vector2& tMM);
     };
 }
 

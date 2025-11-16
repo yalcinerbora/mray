@@ -628,6 +628,7 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
                 .alphaMap           = ppResult.surfData.alphaMaps[i][j],
                 .lightOrMatKey      = ppResult.surfData.lightOrMatKeys[i][j],
                 .acceleratorKey     = accKey,
+                .interfaceIndex     = ppResult.surfData.interfaces[i][j],
                 .cullBackFaceNonTri = ppResult.surfData.cullFaceFlags[i][j],
                 .primSoA            = dPrimGroupSoA.data(),
                 .transSoA           = dTransSoAPtr
@@ -745,6 +746,7 @@ AcceleratorGroupOptiX<PG>::GetShaderOffsets() const
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupOptiX<PG>::CastLocalRays(// Output
+                                              Span<InterfaceIndex>,
                                               Span<HitKeyPack>,
                                               Span<MetaHit>,
                                               // I-O
@@ -755,6 +757,7 @@ void AcceleratorGroupOptiX<PG>::CastLocalRays(// Output
                                               Span<const CommonKey>,
                                               // Constants
                                               CommonKey,
+                                              bool,
                                               const GPUQueue&)
 {
     throw MRayError("For OptiX, this function should not be called");

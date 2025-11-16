@@ -3,22 +3,26 @@
 #include "Ray.h"
 
 template<FloatC T>
-MR_PF_DEF_V RayT<T>::RayT(const Vector<3, T>& direction,
-                        const Vector<3, T>& position) noexcept
+MR_PF_DEF_V
+RayT<T>::RayT(const Vector<3, T>& direction,
+              const Vector<3, T>& position) noexcept
     : dir(direction)
     , pos(position)
 {}
 
 template<FloatC T>
-MR_PF_DEF_V RayT<T>::RayT(const Vector<3, T> vec[2]) noexcept
+MR_PF_DEF_V
+RayT<T>::RayT(const Vector<3, T> vec[2]) noexcept
     : dir(vec[0])
     , pos(vec[1])
 {}
 
 template<FloatC T>
-MR_PF_DEF bool RayT<T>::IntersectsSphere(Vector<3, T>& intersectPos, T& t,
-                                         const Vector<3, T>& sphereCenter,
-                                         T sphereRadius) const noexcept
+MR_PF_DEF
+RayIntersectResult
+RayT<T>::IntersectsSphere(Vector<3, T>& intersectPos, T& t,
+                          const Vector<3, T>& sphereCenter,
+                          T sphereRadius) const noexcept
 {
     // RayTracing Gems
     // Chapter 7: Precision Improvements for Ray/Sphere Intersection
@@ -71,10 +75,14 @@ MR_PF_DEF bool RayT<T>::IntersectsSphere(Vector<3, T>& intersectPos, T& t,
         {
             t *= dirLengthInv;
             intersectPos = pos + t * dir;
-            return true;
+            return RayIntersectResult
+            {
+                true,
+                Math::LengthSqr(centerDir) < sphereRadius * sphereRadius
+            };
         }
     }
-    return false;
+    return RayIntersectResult{false};
 
     // Geometric solution
     //Vector<3, T> centerDir = sphereCenter - pos;
@@ -97,9 +105,11 @@ MR_PF_DEF bool RayT<T>::IntersectsSphere(Vector<3, T>& intersectPos, T& t,
 }
 
 template<FloatC T>
-MR_PF_DEF bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
-                                           const Vector<3, T> triCorners[3],
-                                           bool cullFace) const noexcept
+MR_PF_DEF
+RayIntersectResult
+RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
+                            const Vector<3, T> triCorners[3],
+                            bool cullFace) const noexcept
 {
     return IntersectsTriangle(baryCoords, t,
                               triCorners[0],
@@ -109,11 +119,13 @@ MR_PF_DEF bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
 }
 
 template<FloatC T>
-MR_PF_DEF bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
-                                           const Vector<3, T>& t0,
-                                           const Vector<3, T>& t1,
-                                           const Vector<3, T>& t2,
-                                           bool cullFace) const noexcept
+MR_PF_DEF
+RayIntersectResult
+RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
+                            const Vector<3, T>& t0,
+                            const Vector<3, T>& t1,
+                            const Vector<3, T>& t2,
+                            bool cullFace) const noexcept
 {
     using namespace MathConstants;
     // Moller-Trumbore
@@ -123,10 +135,10 @@ MR_PF_DEF bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
     Vector<3, T> p = Math::Cross(dir, e1);
     T det = Math::Dot(e0, p);
 
-    if((cullFace && (det < SmallEpsilon<T>())) ||
-       // Ray-Tri nearly parallel skip
-       (Math::Abs(det) < SmallEpsilon<T>()))
-        return false;
+    bool backfaceHit = (det < SmallEpsilon<T>());
+    bool nearlyParallel = (Math::Abs(det) < SmallEpsilon<T>());
+    if((cullFace && backfaceHit) || nearlyParallel)
+        return RayIntersectResult{false};
 
     T invDet = 1 / det;
 
@@ -134,50 +146,56 @@ MR_PF_DEF bool RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
     baryCoords[0] = Math::Dot(tVec, p) * invDet;
     // Early Skip
     if(baryCoords[0] < 0 || baryCoords[0] > 1)
-        return false;
+        return RayIntersectResult{false};
 
     Vector<3, T> qVec = Math::Cross(tVec, e0);
     baryCoords[1] = Math::Dot(dir, qVec) * invDet;
     // Early Skip 2
     if((baryCoords[1] < 0) || (baryCoords[1] + baryCoords[0]) > 1)
-        return false;
+        return RayIntersectResult{false};
 
     t = Math::Dot(e1, qVec) * invDet;
     if(t <= SmallEpsilon<T>())
-        return false;
+        return RayIntersectResult{false};
 
     // Calculate C
     baryCoords[2] = 1 - baryCoords[0] - baryCoords[1];
     baryCoords = Vector<3, T>(baryCoords[2],
                               baryCoords[0],
                               baryCoords[1]);
-    return true;
+    return RayIntersectResult{true, backfaceHit};
 }
 
 template<FloatC T>
-MR_PF_DEF bool RayT<T>::IntersectsPlane(Vector<3, T>& intersectPos, T& t,
-                                        const Vector<3, T>& planePos,
-                                        const Vector<3, T>& normal) const noexcept
+MR_PF_DEF
+RayIntersectResult
+RayT<T>::IntersectsPlane(Vector<3, T>& intersectPos, T& t,
+                         const Vector<3, T>& planePos,
+                         const Vector<3, T>& normal) const noexcept
 {
     using namespace MathConstants;
 
     T nDotD = normal.Dot(dir);
+    bool backFace = (nDotD < T(0));
     // Nearly parallel
-    if(abs(nDotD) <= Epsilon<T>)
+    if(Math::Abs(nDotD) <= Epsilon<T>)
     {
         t = std::numeric_limits<T>::infinity();
-        return false;
+        return RayIntersectResult{false};
     }
     t = (planePos - pos).Dot(normal) / nDotD;
     intersectPos = pos + t * dir;
-    return true;
+
+    return RayIntersectResult{true, backFace};
 }
 
 template<FloatC T>
-MR_PF_DEF bool RayT<T>::IntersectsAABB(Vector<2, T>& tOut,
-                                       const Vector<3, T>& aabbMin,
-                                       const Vector<3, T>& aabbMax,
-                                       const Vector<2, T>& tMinMax) const noexcept
+MR_PF_DEF
+RayIntersectResult
+RayT<T>::IntersectsAABB(Vector<2, T>& tOut,
+                        const Vector<3, T>& aabbMin,
+                        const Vector<3, T>& aabbMax,
+                        const Vector<2, T>& tMinMax) const noexcept
 {
     Vector<3, T> invD = Vector<3, T>(1) / dir;
     Vector<3, T> t0 = (aabbMin - pos) * invD;
@@ -188,17 +206,24 @@ MR_PF_DEF bool RayT<T>::IntersectsAABB(Vector<2, T>& tOut,
     for(unsigned int i = 0; i < 3; i++)
     {
         if(invD[i] < 0) std::swap(t0[i], t1[i]);
-
         tOut[0] = Math::Max(tOut[0], Math::Min(t0[i], t1[i]));
         tOut[1] = Math::Min(tOut[1], Math::Max(t0[i], t1[i]));
     }
-    return tOut[1] >= tOut[0];
+
+    return RayIntersectResult
+    {
+        .intersected = tOut[1] >= tOut[0],
+        .backFace    = (tOut[0] >= tMinMax[0] &&
+                        tOut[1] <= tMinMax[0])
+    };
 }
 
 template<FloatC T>
-MR_PF_DEF bool RayT<T>::IntersectsAABB(const Vector<3, T>& aabbMin,
-                                       const Vector<3, T>& aabbMax,
-                                       const Vector<2, T>& tMinMax) const noexcept
+MR_PF_DEF
+RayIntersectResult
+RayT<T>::IntersectsAABB(const Vector<3, T>& aabbMin,
+                        const Vector<3, T>& aabbMax,
+                        const Vector<2, T>& tMinMax) const noexcept
 {
     Vector<2, T> tOut;
     return IntersectsAABB(tOut, aabbMin, aabbMax,
@@ -206,29 +231,33 @@ MR_PF_DEF bool RayT<T>::IntersectsAABB(const Vector<3, T>& aabbMin,
 }
 
 template<FloatC T>
-MR_PF_DEF bool RayT<T>::IntersectsAABB(Vector<3, T>& pos, T& tOut,
-                                       const Vector<3, T>& aabbMin,
-                                       const Vector<3, T>& aabbMax,
-                                       const Vector<2, T>& tMinMax) const noexcept
+MR_PF_DEF
+RayIntersectResult
+RayT<T>::IntersectsAABB(Vector<3, T>& pos, T& tOut,
+                        const Vector<3, T>& aabbMin,
+                        const Vector<3, T>& aabbMax,
+                        const Vector<2, T>& tMinMax) const noexcept
 {
     Vector<2, T> t;
-    bool intersects = IntersectsAABB(t, aabbMin, aabbMax, tMinMax);
-    if(intersects)
+    auto result = IntersectsAABB(t, aabbMin, aabbMax, tMinMax);
+    if(result.intersected)
     {
         tOut = t[0];
         pos = AdvancedPos(t[0]);
     }
-    return intersects;
+    return result;
 }
 
 template<FloatC T>
-MR_PF_DEF Vector<3, T> RayT<T>::AdvancedPos(T t) const noexcept
+MR_PF_DEF
+Vector<3, T> RayT<T>::AdvancedPos(T t) const noexcept
 {
     return pos + t * dir;
 }
 
 template<FloatC T>
-MR_PF_DEF RayT<T> RayT<T>::Nudge(const Vector<3, T>& nudgeDir) const noexcept
+MR_PF_DEF
+RayT<T> RayT<T>::Nudge(const Vector<3, T>& nudgeDir) const noexcept
 {
     using Int = IntegralSister<T>;
     using Vec3Int = Vector<3, Int>;

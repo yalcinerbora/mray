@@ -247,6 +247,7 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
                                                              std::string_view typeName)
 {
     LinearizedSurfaceData result = {};
+    result.interfaces.reserve(partitions.totalInstanceCount);
     result.primRanges.reserve(partitions.totalInstanceCount);
     result.lightOrMatKeys.reserve(partitions.totalInstanceCount);
     result.alphaMaps.reserve(partitions.totalInstanceCount);
@@ -259,6 +260,7 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
         using namespace TracerConstants;
         for(uint32_t i = restStart; i < static_cast<uint32_t>(MaxPrimBatchPerSurface); i++)
         {
+            result.interfaces.back()[i] = InterfaceIndex::InvalidKey();
             result.alphaMaps.back()[i] = std::nullopt;
             result.cullFaceFlags.back()[i] = false;
             result.lightOrMatKeys.back()[i] = LightOrMatKey::InvalidKey();
@@ -268,6 +270,7 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
 
     const auto LoadSurf = [&](const SurfaceParams& surf)
     {
+        result.interfaces.emplace_back();
         result.instancePrimBatches.push_back(surf.primBatches);
         result.alphaMaps.emplace_back();
         result.cullFaceFlags.emplace_back();
@@ -305,12 +308,40 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
             result.lightOrMatKeys.back()[i] = LightOrMatKey::CombinedKey(IS_MAT_KEY_FLAG,
                                                                          mKey.FetchBatchPortion(),
                                                                          mKey.FetchIndexPortion());
+
+            // TODO: Linear search may be slow later
+            InterfaceKeyPack iKeyPack =
+            {
+                .front =
+                {
+                    .medKey   = Bit::BitCast<MediumKey>(surf.interfaces[i].frontVolume.mediumId),
+                    .transKey = Bit::BitCast<TransformKey>(surf.interfaces[i].frontVolume.transformId)
+                },
+                .back =
+                {
+                    .medKey   = Bit::BitCast<MediumKey>(surf.interfaces[i].backVolume.mediumId),
+                    .transKey = Bit::BitCast<TransformKey>(surf.interfaces[i].backVolume.transformId)
+                }
+            };
+            auto iLoc = std::find(p.globalInterfaceList->cbegin(), p.globalInterfaceList->cend(), iKeyPack);
+            if(iLoc == p.globalInterfaceList->cend())
+                throw MRayError("{:s}: Interface composed of (as \"[Front M T | Back M T]\") "
+                                "[{}, {} | {} {}] is not found ",
+                                typeName,
+                                CommonKey(surf.interfaces[i].frontVolume.mediumId),
+                                CommonKey(surf.interfaces[i].frontVolume.transformId),
+                                CommonKey(surf.interfaces[i].backVolume.mediumId),
+                                CommonKey(surf.interfaces[i].backVolume.transformId));
+
+            auto iIndex = CommonKey(std::distance(p.globalInterfaceList->cbegin(), iLoc));
+            result.interfaces.back()[i] = InterfaceIndex::CombinedKey(0, iIndex);
         }
         InitRest(static_cast<uint32_t>(surf.alphaMaps.size()));
     };
 
     const auto LoadLightSurf = [&](const LightSurfaceParams& lSurf)
     {
+        result.interfaces.emplace_back();
         result.alphaMaps.emplace_back();
         result.cullFaceFlags.emplace_back();
         result.lightOrMatKeys.emplace_back();
@@ -329,6 +360,28 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
         PrimBatchId primBatchId = std::bit_cast<PrimBatchId>(primBatchKey);
         result.transformKeys.back() = std::bit_cast<TransformKey>(lSurf.transformId);
         result.instancePrimBatches.back().push_back(primBatchId);
+
+        auto iLoc = std::find_if(p.globalInterfaceList->cbegin(), p.globalInterfaceList->cend(),
+                                 [interface = lSurf.volume](const InterfaceKeyPack& iParams)
+        {
+            VolumeKeyPack kp =
+            {
+                .medKey   = Bit::BitCast<MediumKey>(interface.mediumId),
+                .transKey = Bit::BitCast<TransformKey>(interface.transformId)
+            };
+            return (iParams.back  == kp && iParams.front == kp);
+        });
+        if(iLoc == p.globalInterfaceList->cend())
+            throw MRayError("{:s}: Interface composed of (as \"[Front M T | Back M T | isEnclosed]\") "
+                            "[{}, {} | {} {} | false] is not found ",
+                            typeName,
+                            CommonKey(lSurf.volume.mediumId),
+                            CommonKey(lSurf.volume.transformId),
+                            CommonKey(lSurf.volume.mediumId),
+                            CommonKey(lSurf.volume.transformId));
+
+        auto iIndex = CommonKey(std::distance(p.globalInterfaceList->cbegin(), iLoc));
+        result.interfaces.back().front() = InterfaceIndex::CombinedKey(0, iIndex);
     };
 
     for(const auto& pIndices : partitions.packedIndices)
@@ -350,6 +403,7 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
         }
     }
 
+    assert(result.interfaces.size() == partitions.totalInstanceCount);
     assert(result.alphaMaps.size() == partitions.totalInstanceCount);
     assert(result.cullFaceFlags.size() == partitions.totalInstanceCount);
     assert(result.lightOrMatKeys.size() == partitions.totalInstanceCount);
@@ -533,23 +587,21 @@ void AcceleratorGroup::WriteInstanceKeysAndAABBsInternal(Span<AABB3> aabbWriteRe
 
 
 void BaseAccelerator::PartitionSurfaces(std::vector<AccelGroupConstructParams>& partitions,
-                                        Span<const typename BaseAccelConstructParams::SurfPair> surfList,
-                                        const Map<PrimGroupId, PrimGroupPtr>& primGroups,
-                                        const Map<TransGroupId, TransformGroupPtr>& transGroups,
-                                        const TextureViewMap& textureViews)
+                                        const BaseAccelConstructParams& cParams)
 {
     using SurfParam = typename BaseAccelConstructParams::SurfPair;
-    assert(std::is_sorted(surfList.begin(), surfList.end(), SurfaceLessThan));
+    assert(std::is_sorted(cParams.mSurfList.begin(),
+                          cParams.mSurfList.end(), SurfaceLessThan));
 
     // TODO: One linear access to vector should be enough
     // to generate this after sort, but this is simpler to write
     // change this if this is a perf bottleneck.
-    auto start = surfList.begin();
-    while(start != surfList.end())
+    auto start = cParams.mSurfList.begin();
+    while(start != cParams.mSurfList.end())
     {
         auto pBatchId = start->second.primBatches.front();
         CommonKey pGroupId = PrimGroupIdFetcher()(pBatchId);
-        auto end = std::upper_bound(start, surfList.end(), pGroupId,
+        auto end = std::upper_bound(start, cParams.mSurfList.end(), pGroupId,
         [](CommonKey value, const SurfParam& surf)
         {
             CommonKey batchPortion = PrimGroupIdFetcher()(surf.second.primBatches.front());
@@ -557,15 +609,16 @@ void BaseAccelerator::PartitionSurfaces(std::vector<AccelGroupConstructParams>& 
         });
 
         partitions.emplace_back(AccelGroupConstructParams{});
-        auto pGroupOpt = primGroups.at(PrimGroupId(pGroupId));
+        auto pGroupOpt = cParams.primGroups.at(PrimGroupId(pGroupId));
         if(!pGroupOpt)
         {
             throw MRayError("{:s}: Unable to find primitive group()",
                             Name(), pGroupId);
-        }
+        };
         partitions.back().primGroup = pGroupOpt.value().get().get();
-        partitions.back().textureViews = &textureViews;
-        partitions.back().transformGroups = &transGroups;
+        partitions.back().textureViews = &cParams.texViewMap;
+        partitions.back().globalInterfaceList = &cParams.globalInterfaceList;
+        partitions.back().transformGroups = &cParams.transformGroups;
         auto innerStart = start;
         while(innerStart != end)
         {
@@ -588,19 +641,18 @@ void BaseAccelerator::PartitionSurfaces(std::vector<AccelGroupConstructParams>& 
 }
 
 void BaseAccelerator::AddLightSurfacesToPartitions(std::vector<AccelGroupConstructParams>& partitions,
-                                                   Span<const typename BaseAccelConstructParams::LightSurfPair> lSurfList,
-                                                   const Map<LightGroupId, LightGroupPtr>& lightGroups,
-                                                   const Map<TransGroupId, TransformGroupPtr>& transformGroups)
+                                                   const BaseAccelConstructParams& cParams)
 {
     using LightSurfP = typename BaseAccelConstructParams::LightSurfPair;
-    assert(std::is_sorted(lSurfList.begin(), lSurfList.end(), LightSurfaceLessThan));
+    assert(std::is_sorted(cParams.lSurfList.begin(), cParams.lSurfList.end(),
+                          LightSurfaceLessThan));
 
     // Now partition
-    auto start = lSurfList.begin();
-    while(start != lSurfList.end())
+    auto start = cParams.lSurfList.begin();
+    while(start != cParams.lSurfList.end())
     {
         CommonKey lGroupId = LightGroupIdFetcher()(start->second.lightId);
-        auto end = std::upper_bound(start, lSurfList.end(), lGroupId,
+        auto end = std::upper_bound(start, cParams.lSurfList.end(), lGroupId,
         [](CommonKey value, const LightSurfP& surf)
         {
             CommonKey batchPortion = LightGroupIdFetcher()(surf.second.lightId);
@@ -609,7 +661,7 @@ void BaseAccelerator::AddLightSurfacesToPartitions(std::vector<AccelGroupConstru
 
         //
         auto groupId = LightGroupId(lGroupId);
-        auto lGroupOpt = lightGroups.at(groupId);
+        auto lGroupOpt = cParams.lightGroups.at(groupId);
         if(!lGroupOpt)
         {
             throw MRayError("{:s}: Unable to find light group()",
@@ -634,8 +686,9 @@ void BaseAccelerator::AddLightSurfacesToPartitions(std::vector<AccelGroupConstru
         {
             partitions.emplace_back(AccelGroupConstructParams
             {
-                .transformGroups = &transformGroups,
-                .textureViews = nullptr,
+                .transformGroups = &cParams.transformGroups,
+                .textureViews = &cParams.texViewMap,
+                .globalInterfaceList = &cParams.globalInterfaceList,
                 .primGroup = pGroup,
                 .lightGroup = lGroup,
                 .tGroupSurfs = {},
@@ -658,9 +711,9 @@ void BaseAccelerator::AddLightSurfacesToPartitions(std::vector<AccelGroupConstru
                 return (value < TransGroupIdFetcher()(tId));
             });
             size_t elemCount = static_cast<size_t>(std::distance(innerStart, innerEnd));
-            size_t startDistance = static_cast<size_t>(std::distance(lSurfList.begin(), innerStart));
+            size_t startDistance = static_cast<size_t>(std::distance(cParams.lSurfList.begin(), innerStart));
             slot->tGroupLightSurfs.emplace_back(TransGroupId(tGroupId),
-                                                lSurfList.subspan(startDistance, elemCount));
+                                                cParams.lSurfList.subspan(startDistance, elemCount));
             innerStart = innerEnd;
         }
         start = end;
@@ -673,11 +726,9 @@ void BaseAccelerator::Construct(BaseAccelConstructParams p)
     const auto _ = annotation.AnnotateScope();
 
     std::vector<AccelGroupConstructParams> partitions;
-    PartitionSurfaces(partitions, p.mSurfList, p.primGroups,
-                      p.transformGroups, p.texViewMap);
+    PartitionSurfaces(partitions, p);
     // Add primitive-backed lights surfaces as well
-    AddLightSurfacesToPartitions(partitions, p.lSurfList, p.lightGroups,
-                                 p.transformGroups);
+    AddLightSurfacesToPartitions(partitions, p);
 
     // Generate the accelerators
     GPUQueueIteratorRoundRobin qIt(gpuSystem);

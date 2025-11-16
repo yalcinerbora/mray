@@ -15,6 +15,31 @@ inline void from_json(const nlohmann::json& n, SceneTexId& ts)
     ts = SceneTexId(n.at(TEXTURE_NAME).get<std::underlying_type_t<SceneTexId>>());
 }
 
+inline void from_json(const nlohmann::json& n, VolumeStruct& s)
+{
+    auto itT = n.find(NodeNames::TRANSFORM);
+    s.transformId = (itT == n.end())
+                        ? EMPTY_TRANSFORM
+                        : itT->get<uint32_t>();
+    auto itM = n.find(NodeNames::MEDIUM);
+    s.mediumId = (itM == n.end())
+                        ? EMPTY_MEDIUM
+                        : itM->get<uint32_t>();
+}
+
+inline void from_json(const nlohmann::json& n, InterfaceStruct& s)
+{
+    auto itF = n.find(NodeNames::MEDIUM_FRONT);
+    s.front = (itF == n.end())
+        ? VolumeStruct{EMPTY_MEDIUM, EMPTY_TRANSFORM}
+        : itF->get<VolumeStruct>();
+
+    auto itB = n.find(NodeNames::MEDIUM_BACK);
+    s.back = (itB == n.end())
+        ? VolumeStruct{EMPTY_MEDIUM, EMPTY_TRANSFORM}
+        : itB->get<VolumeStruct>();
+}
+
 inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
 {
     auto it = n.find(NodeNames::TRANSFORM);
@@ -27,6 +52,11 @@ inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
     if(matArray.size() != primArray.size())
         throw MRayError("Material/Primitive pair lists does not match on a surface!");
 
+    s.interfaces.fill(InterfaceStruct
+                      {
+                          .front = VolumeStruct{EMPTY_MEDIUM, EMPTY_TRANSFORM},
+                          .back = VolumeStruct{EMPTY_MEDIUM, EMPTY_TRANSFORM}
+                      });
     // As a default we do back face culling (it is helpful for self occlusions)
     s.doCullBackFace.fill(true);
     // and no alpha maps (all prims are opaque)
@@ -48,6 +78,10 @@ inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
         auto cullIt = n.find(NodeNames::CULL_FACE);
         if(cullIt != n.cend())
             s.doCullBackFace[0] = (*cullIt).get<bool>();
+
+        auto interfaceIt = n.find(NodeNames::INTERFACE);
+        if(interfaceIt != n.cend())
+            s.interfaces[0] = (*interfaceIt).get<InterfaceStruct>();
     }
     else
     {
@@ -68,6 +102,9 @@ inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
             if(cullIt != n.cend() && !(*cullIt)[i].is_string())
                 s.doCullBackFace[i] = (*cullIt)[i].get<bool>();
 
+            auto interfaceIt = n.find(NodeNames::INTERFACE);
+            if(interfaceIt != n.cend() && !(*interfaceIt)[i].is_string())
+                s.interfaces[i] = (*interfaceIt)[i].get<InterfaceStruct>();
         }
         s.pairCount = static_cast<int8_t>(matArray.size());
     }
@@ -79,12 +116,12 @@ inline void from_json(const nlohmann::json& n, LightSurfaceStruct& s)
     s.transformId = (itT == n.end())
                         ? EMPTY_TRANSFORM
                         : itT->get<uint32_t>();
-    auto itM = n.find(NodeNames::MEDIUM);
-    s.mediumId = (itM == n.end())
-                    ? EMPTY_MEDIUM
-                    : itM->get<uint32_t>();
-
     s.lightId = n.at(NodeNames::LIGHT);
+
+    auto itV = n.find(NodeNames::VOLUME);
+    s.vol = (itV == n.end())
+                ? VolumeStruct{EMPTY_MEDIUM, EMPTY_TRANSFORM}
+                : itV->get<VolumeStruct>();
 }
 
 inline void from_json(const nlohmann::json& n, CameraSurfaceStruct& s)
@@ -93,12 +130,12 @@ inline void from_json(const nlohmann::json& n, CameraSurfaceStruct& s)
     s.transformId = (itT == n.end())
                         ? EMPTY_TRANSFORM
                         : itT->get<uint32_t>();
-    auto itM = n.find(NodeNames::MEDIUM);
-    s.mediumId = (itM == n.end())
-                    ? EMPTY_MEDIUM
-                    : itM->get<uint32_t>();
-
     s.cameraId = n.at(NodeNames::CAMERA);
+
+    auto itV = n.find(NodeNames::VOLUME);
+    s.vol = (itV == n.end())
+        ? VolumeStruct{EMPTY_MEDIUM, EMPTY_TRANSFORM}
+        : itV->get<VolumeStruct>();
 }
 
 inline void from_json(const nlohmann::json& node, MRayTextureEdgeResolveEnum& t)

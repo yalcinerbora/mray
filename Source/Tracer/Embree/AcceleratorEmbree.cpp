@@ -207,6 +207,7 @@ void BaseAcceleratorEmbree::AllocateForTraversal(size_t)
 {}
 
 void BaseAcceleratorEmbree::CastRays(// Output
+                                     Span<InterfaceIndex> dInterfaceIndices,
                                      Span<HitKeyPack> dHitIds,
                                      Span<MetaHit> dHitParams,
                                      // I-O
@@ -214,6 +215,8 @@ void BaseAcceleratorEmbree::CastRays(// Output
                                      Span<RayGMem> dRays,
                                      // Input
                                      Span<const RayIndex> dRayIndices,
+                                     //
+                                     bool writeInterfaceIndex,
                                      const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -287,11 +290,11 @@ void BaseAcceleratorEmbree::CastRays(// Output
                                       &rh, &intersectArgs);
 
             // No matter what, relaod the rng state back.
-            // Even if there is not hit ray may used it
-            // during traversal.
+            // "Hit ray" may have used it during traversal.
             //
             // Flush the array, RNG class automatically
-            // writes back to the given global buffer
+            // writes back to the given global buffer during
+            // destruction
             rqContext.rng.clear();
             //
             for(uint32_t i = 0; i < localRayCount; i++)
@@ -324,6 +327,9 @@ void BaseAcceleratorEmbree::CastRays(// Output
 
                 dHitParams[rIndex] = MetaHit(ab);
                 UpdateTMax(dRays, rIndex, rh.ray.tfar[i]);
+
+                if(writeInterfaceIndex)
+                    dInterfaceIndices[rIndex] = rqContext.interfaceIndices[i];
             }
         }
     );
@@ -422,6 +428,7 @@ void BaseAcceleratorEmbree::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffe
 }
 
 void BaseAcceleratorEmbree::CastLocalRays(// Output
+                                          Span<InterfaceIndex> dInterfaceIndices,
                                           Span<HitKeyPack> dHitIds,
                                           Span<MetaHit> dHitParams,
                                           // I-O
@@ -430,7 +437,9 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
                                           // Input
                                           Span<const RayIndex> dRayIndices,
                                           Span<const AcceleratorKey> dAccelKeys,
+                                          //
                                           CommonKey dAccelKeyBatchPortion,
+                                          bool writeInterfaceIndex,
                                           const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -525,6 +534,9 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
             };
             dHitParams[rIndex] = MetaHit(Vector2(rh.hit.u, rh.hit.v));
             UpdateTMax(dRays, rIndex, rh.ray.tfar);
+
+            if(writeInterfaceIndex)
+                dInterfaceIndices[rIndex] = rqContext.interfaceIndices[i];
         }
     );
 }

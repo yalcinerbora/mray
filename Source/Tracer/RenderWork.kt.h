@@ -164,3 +164,40 @@ void KCRenderCameraWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params)
     // TODO: This will be needed for light tracers
     // (Light -> Camera)
 }
+
+template<class MediumWorkFunction,
+         auto GenSpectrumConverter, auto GenerateTransformContext>
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCMediumWork(MRAY_GRID_CONSTANT const typename MediumWorkFunction::Params params)
+{
+    //using TransContext = typename MediumWorkFunction::TContext;
+    //using Medium       = typename MediumWorkFunction::Medium;
+    //using SpectrumConv = typename MediumWorkFunction::SpectrumConv;
+
+    //// Work dedication
+    //KernelCallParams kp;
+    //static constexpr auto THREAD_PER_WARP = MediumWorkFunction::THREAD_PER_WORK;
+    //uint32_t laneId          = kp.threadId % THREAD_PER_WARP;
+    //uint32_t globalWarpId    = kp.GlobalId() / THREAD_PER_WARP;
+    //uint32_t globalWarpCount = kp.TotalSize() / THREAD_PER_WARP;
+
+    //uint32_t rayCount = uint32_t(params.renderState.dRayIndices.size());
+    //for(uint32_t globalId = globalWarpId;
+    //    globalId < rayCount; globalId += globalWarpCount)
+    //{
+    //    RNGDispenser rng(params.common.dRandomNumbers, globalId, rayCount);
+    //    RayIndex rIndex = params.common.dRayIndices[globalId];
+    //    InterfaceKeyPack keys = params.common.dKeys[rIndex];
+
+    //    // Create transform context
+    //    TransContext tContext = GenerateTransformContext(params.transSoA,
+    //                                                     EmptyType{},
+    //                                                     keys.transKey,
+    //                                                     PrimitiveKey(0));
+    //    SpectrumConv specConverter = GenSpectrumConverter(params, rIndex);
+    //    Medium medium = Medium(specConverter, params.medSoA, keys.medKey);
+
+    //    MediumWorkFunction::Call(medium, tContext, specConverter, rng,
+    //                             params, rIndex, laneId);
+    //}
+}

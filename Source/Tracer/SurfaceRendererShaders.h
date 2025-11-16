@@ -30,6 +30,7 @@ namespace SurfRDetail
             ACCEL_ID,
             TRANSFORM_ID,
             UV,
+            VOL_INTERFACE,
             //
             END
         };
@@ -47,7 +48,8 @@ namespace SurfRDetail
             "PrimitiveId",
             "AcceleratorId",
             "TransformId",
-            "UV"
+            "UV",
+            "VolumeInterface"
         };
         static_assert(Names.size() == static_cast<size_t>(END),
                       "Not enough data on enum lookup table");
@@ -87,6 +89,9 @@ namespace SurfRDetail
         Mode mode;
         // For AO Renderer, secondary ray's tMax
         Float tMaxAO;
+        // For Volume Interface Renderer
+        Span<InterfaceKeyPack> dGlobalInterfaceList;
+        VolumeKeyPack          cameraVolume;
     };
 
     struct RayStateCommon
@@ -96,6 +101,8 @@ namespace SurfRDetail
         Span<Spectrum>          dOutputData;
         Span<ImageCoordinate>   dImageCoordinates;
         Span<Float>             dFilmFilterWeights;
+        // Volume interface visualisation related
+        Span<InterfaceIndex>    dHitInterfaceIndices;
     };
 
     struct RayStateAO
@@ -165,6 +172,7 @@ void WorkFunctionCommon<P, M, T>::Call(const Primitive&, const Material&, const 
                                        const Params& params,
                                        RayIndex rayIndex, uint32_t)
 {
+    using RNGFunctions::HashPCG64::Hash;
     Vector3 color = Vector3::Zero();
     Mode::E mode = params.globalState.mode.e;
     switch(mode)
@@ -225,28 +233,28 @@ void WorkFunctionCommon<P, M, T>::Call(const Primitive&, const Material&, const 
             LightOrMatKey lmKey = params.common.dKeys[rayIndex].lightOrMatKey;
             MaterialKey mKey = MaterialKey::CombinedKey(lmKey.FetchBatchPortion(),
                                                         lmKey.FetchIndexPortion());
-            CommonKey k = mKey.FetchBatchPortion() ^ mKey.FetchIndexPortion();
+            CommonKey k = CommonKey(Hash(mKey.FetchBatchPortion(), mKey.FetchIndexPortion()));
             color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
         case PRIM_ID:
         {
             PrimitiveKey pKey = params.common.dKeys[rayIndex].primKey;
-            CommonKey k = pKey.FetchBatchPortion() ^ pKey.FetchIndexPortion();
+            CommonKey k = CommonKey(Hash(pKey.FetchBatchPortion(), pKey.FetchIndexPortion()));
             color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
         case ACCEL_ID:
         {
             AcceleratorKey aKey = params.common.dKeys[rayIndex].accelKey;
-            CommonKey k = aKey.FetchBatchPortion() ^ aKey.FetchIndexPortion();
+            CommonKey k = CommonKey(Hash(aKey.FetchBatchPortion(), aKey.FetchIndexPortion()));
             color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
         case TRANSFORM_ID:
         {
             TransformKey tKey = params.common.dKeys[rayIndex].transKey;
-            CommonKey k = tKey.FetchBatchPortion() ^ tKey.FetchIndexPortion();
+            CommonKey k = CommonKey(Hash(tKey.FetchBatchPortion(), tKey.FetchIndexPortion()));
             color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
@@ -256,6 +264,19 @@ void WorkFunctionCommon<P, M, T>::Call(const Primitive&, const Material&, const 
             {
                 color = Vector3(surf.uv, Float(0));
             }
+            break;
+        }
+        case VOL_INTERFACE:
+        {
+            //InterfaceIndex iIndex = params.rayState.dHitInterfaceIndices[rayIndex];
+            //color = Color::RandomColorRGB(static_cast<uint32_t>(iIndex.FetchIndexPortion()));
+
+            InterfaceIndex iIndex = params.rayState.dHitInterfaceIndices[rayIndex];
+            auto vK = DetermineCurrentVolume(params.globalState.dGlobalInterfaceList,
+                                             params.globalState.cameraVolume,
+                                             iIndex);
+            CommonKey k = CommonKey(Hash(CommonKey(vK.medKey), CommonKey(vK.transKey)));
+            color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
         default: color = BIG_MAGENTA(); break;

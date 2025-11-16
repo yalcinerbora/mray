@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RendererC.h"
+#include "MediumC.h"
 #include "RendererCommon.h"
 
 #include "Device/GPUSystem.hpp"
@@ -380,6 +381,65 @@ uint32_t RendererBase::GenerateCameraWorkMappings(uint32_t workStart)
                 .workPtr = std::move(ptr)
             }
         );
+    }
+    return workStart;
+}
+
+uint32_t RendererBase::GenerateMediumWorkMappings(uint32_t workStart)
+{
+    auto GenMediumWork = [&](const VolumeKeyPack& kp)
+    {
+        // Skip identity interfaces
+        if(kp.medKey == MediumKey::InvalidKey()) return;
+
+        using Bit::BitCast;
+        MediumGroupId mgId = BitCast<MediumGroupId>(kp.medKey.FetchBatchPortion());
+        TransGroupId tgId = BitCast<TransGroupId>(kp.transKey.FetchBatchPortion());
+
+        // Unlike other works we linear search here since it should not scale
+        // (Like if you render 500 volumes on a scene, this should not be a bottleneck)
+        auto loc = std::find_if(currentMediumWorks.cbegin(), currentMediumWorks.cend(),
+                                [mgId, tgId](const RenderMediumWorkStruct& mw)
+        {
+            return (mw.mgId == mgId && mw.tgId == tgId);
+        });
+        if(loc != currentMediumWorks.cend()) return;
+
+        // These should be checked beforehand, while actually creating
+        // the surface
+        const MediumGroupPtr& mg = tracerView.mediumGroups.at(mgId).value();
+        const TransformGroupPtr& tg = tracerView.transGroups.at(tgId).value();
+        std::string_view mgName = mg->Name();
+        std::string_view tgName = tg->Name();
+
+        using TypeNameGen::Runtime::CreateRenderMediumWorkType;
+        std::string workName = CreateRenderMediumWorkType(mgName, tgName);
+        auto workGenLoc = workPack.mediumWorkMap.at(workName);
+        if(!workGenLoc.has_value())
+        {
+            throw MRayError("[{}]: Could not find a renderer \"work\" for Medium/Transform "
+                            "pair of \"{}/{}\"",
+                            rendererName, mgName, tgName);
+        }
+        RenderMediumWorkGenerator generator = workGenLoc->get();
+        RenderMediumWorkPtr ptr = generator(*mg.get(), *tg.get(), gpuSystem);
+        // Put this ptr somewhere... safe
+        currentMediumWorks.emplace_back
+        (
+            RenderMediumWorkStruct
+            {
+                .mgId = mgId,
+                .tgId = tgId,
+                .workGroupId = workStart++,
+                .workPtr = std::move(ptr)
+            }
+        );
+    };
+    //
+    for(const InterfaceKeyPack& p : tracerView.globalInterfaceList)
+    {
+        GenMediumWork(p.front);
+        GenMediumWork(p.back);
     }
     return workStart;
 }

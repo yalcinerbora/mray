@@ -87,6 +87,13 @@ namespace PathTraceRDetail
         RayState,
         LG, TG
     >;
+    template<class LightSampler, class SpectrumConverter, MediumGroupC MG, TransformGroupC TG>
+    using MediumWorkParams = RenderMediumWorkParams
+    <
+        GlobalState<LightSampler, SpectrumConverter>,
+        RayState,
+        MG, TG
+    >;
 
     template<PrimitiveGroupC PGType, MaterialGroupC MGType, TransformGroupC TGType,
              class SpectrumCtxType>
@@ -140,6 +147,30 @@ namespace PathTraceRDetail
         MR_HF_DECL
         static void Call(const Light&, RNGDispenser&, const SpectrumConv&,
                          const Params& params, RayIndex rayIndex, uint32_t laneId);
+    };
+
+    template<MediumGroupC MGType, TransformGroupC TGType,
+             class SpectrumCtxType>
+    struct MediumFunction
+    {
+        MRAY_MEDIUM_WORK_FUNCTOR_DEFINE_TYPES(MGType, TGType, SpectrumCtxType, 1u);
+        using Params = MediumWorkParams<EmptyType, SpectrumConv, MG, TG>;
+
+        //MR_HF_DECL
+        //static void Call(const Light&, RNGDispenser&, const SpectrumConv&,
+        //                 const Params& params, RayIndex rayIndex, uint32_t laneId);
+    };
+
+    template<MediumGroupC MGType, TransformGroupC TGType,
+             class SpectrumCtxType, class LightSampler>
+    struct MediumFunctionWithNEE
+    {
+        MRAY_LIGHT_WORK_FUNCTOR_DEFINE_TYPES(MGType, TGType, SpectrumCtxType, 1u);
+        using Params = LightWorkParams<LightSampler, SpectrumConv, LG, TG>;
+
+        //MR_HF_DECL
+        //static void Call(const Light&, RNGDispenser&, const SpectrumConv&,
+        //                 const Params& params, RayIndex rayIndex, uint32_t laneId);
     };
 }
 
@@ -466,5 +497,13 @@ void LightWorkFunctionWithNEE<L, T, SC, LS>::Call(const Light& l, RNGDispenser&,
     pathDataPack.status.Set(uint32_t(PathStatusEnum::DEAD));
     params.rayState.dPathDataPack[rayIndex] = pathDataPack;
 }
+
+// ========================= //
+//   PURE PATH TRACE MEDIUM  //
+// ========================= //
+
+// ========================= //
+// NEE/MIS PATH TRACE MEDIUM //
+// ========================= //
 
 }

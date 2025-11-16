@@ -66,8 +66,16 @@ requires std::is_floating_point_v<typename Hit::InnerType>
 MR_GF_DECL
 void ReportIntersection(const IntersectionT<Hit>& intersection, unsigned int hitKind)
 {
+    static_assert(Hit::Dims <= 4,
+                  "This code needs to be updated if a "
+                  "primitive's hit parameter is more than 4");
+
     Float t = intersection.t;
     const Hit& h = intersection.hit;
+    bool backFace = intersection.backFace;
+    // 8th bit is reserved for embeded primitives by optix
+    // we only need 1-bit currently.
+    hitKind = (hitKind & 0x7Eu) | (backFace ? 0b1u : 0b0u);
 
     if constexpr(1 == Hit::Dims)
         optixReportIntersection(t, hitKind,
@@ -152,6 +160,8 @@ void KCClosestHit()
     MetaHit hit = ReadHitFromAttributes<Hit, TrianglePrimGroupC<PGroup>>();
 
     // Write to the global memory
+    bool doWriteInterfaceIndex = false;
+    Span<InterfaceIndex> dInterfaceIndices;
     Span<HitKeyPack> dHitKeys;
     Span<MetaHit> dHits;
     Span<RayGMem> dRays;
@@ -170,13 +180,35 @@ void KCClosestHit()
         };
         dHits[rIndex] = hit;
         dRays[rIndex].tMax = optixGetRayTmax();
-
+        doWriteInterfaceIndex = params.nParams.writeInterfaceIndex;
+        dInterfaceIndices = params.nParams.dInterfaceIndices;
     }
     else
     {
         dHitKeys = params.lParams.dHitKeys;
         dHits = params.lParams.dHits;
         dRays = params.lParams.dRays;
+        doWriteInterfaceIndex = params.lParams.writeInterfaceIndex;
+        dInterfaceIndices = params.lParams.dInterfaceIndices;
+    }
+
+    // Interface Index
+    if(doWriteInterfaceIndex)
+    {
+        bool isBackFace = false;
+        unsigned int hk = optixGetHitKind();
+        OptixPrimitiveType t = optixGetPrimitiveType(hk);
+        isBackFace = (t == OPTIX_PRIMITIVE_TYPE_CUSTOM)
+            ? (hk & 0x1 == 0x1)
+            : optixIsBackFaceHit();
+
+        auto orientation = (isBackFace)
+                ? IS_BACKFACE_KEY_FLAG
+                : IS_FRONTFACE_KEY_FLAG;
+
+        auto index = record.interfaceIndex.FetchIndexPortion();
+        auto ii = InterfaceIndex::CombinedKey(orientation, index);
+        dInterfaceIndices[rIndex] = ii;
     }
 }
 
@@ -261,7 +293,6 @@ void KCIntersect()
     // identity transform context
     Primitive prim(TransformContextIdentity{}, *record.primSoA, pKey);
     Intersection result = prim.Intersects(ray, record.cullBackFaceNonTri);
-
     if(result) ReportIntersection(*result, 0);
 }
 

@@ -181,6 +181,11 @@ namespace Distribution::Common
     Float           PDFTent(Float x, Float a, Float b);
 
     MR_PF_DECL
+    SampleT<Float>  SampleExp(Float xi, Float sigma = Float(1));
+    MR_PF_DECL
+    Float           PDFExp(Float x, Float sigma = Float(1));
+
+    MR_PF_DECL
     SampleT<Float>  SampleUniformRange(Float xi, Float a, Float b);
     MR_PF_DECL
     Float           PDFUniformRange(Float x, Float a, Float b);
@@ -817,6 +822,25 @@ Float Common::PDFUniformRange(Float x, Float a, Float b)
 {
     if(x < a && x > b) return 0;
     return Float(1) / (b - a);
+}
+
+MR_PF_DEF
+SampleT<Float> Common::SampleExp(Float xi, Float sigma)
+{
+    Float result = -Math::Log(Float(1) - xi) / sigma;
+    result *= sigma;
+
+    return SampleT<Float>
+    {
+        .value = result,
+        .pdf = PDFExp(xi)
+    };
+}
+
+MR_PF_DEF
+Float Common::PDFExp(Float x, Float sigma)
+{
+    return Math::Exp(-x * sigma) * sigma;
 }
 
 MR_PF_DEF

@@ -51,11 +51,13 @@ struct RendererLine
     uint32_t            workCount;
     uint32_t            lightWorkCount;
     uint32_t            camWorkCount;
+    uint32_t            mediaWorkCount;
     std::string_view    typeName;
     std::string_view    headerFile;
     std::string_view    workOverload;
     std::string_view    lightWorkOverload;
     std::string_view    cameraWorkOverload;
+    std::string_view    mediaWorkOverload;
 };
 
 using PrimLine  = BasicLine;
@@ -245,6 +247,8 @@ void ParseRendererLines(pmr::vector<RendererLine>& lines,
         else if(i == 5)
             result.cameraWorkOverload = line;
         else if(i == 6)
+            result.mediaWorkOverload = line;
+        else if(i == 7)
         {
             uint32_t val = 0;
             if(std::from_chars(line.data(), line.data() + line.size(), val).ec != std::errc{})
@@ -254,7 +258,7 @@ void ParseRendererLines(pmr::vector<RendererLine>& lines,
             }
             result.workCount = val;
         }
-        else if(i == 7)
+        else if(i == 8)
         {
             uint32_t val = 0;
             if(std::from_chars(line.data(), line.data() + line.size(), val).ec != std::errc{})
@@ -264,7 +268,7 @@ void ParseRendererLines(pmr::vector<RendererLine>& lines,
             }
             result.lightWorkCount = val;
         }
-        else if(i == 8)
+        else if(i == 9)
         {
             uint32_t val = 0;
             if(std::from_chars(line.data(), line.data() + line.size(), val).ec != std::errc{})
@@ -274,8 +278,18 @@ void ParseRendererLines(pmr::vector<RendererLine>& lines,
             }
             result.camWorkCount = val;
         }
+        else if(i == 10)
+        {
+            uint32_t val = 0;
+            if(std::from_chars(line.data(), line.data() + line.size(), val).ec != std::errc{})
+            {
+                fmt::println(stderr, "Unkown number for renderer media work count ({})", line);
+                std::exit(1);
+            }
+            result.mediaWorkCount = val;
+        }
     }
-    if(i != 9)
+    if(i != 11)
     {
         fmt::println(stderr, "Unable to parse renderer line \"{}\" properly", section);
         std::exit(1);
@@ -491,11 +505,13 @@ void FindAccelNames(std::array<std::string_view, 2>& linAccelNamePair,
 void GenRenderWorkTemplates(pmr::string& works,
                             pmr::string& lightWorks,
                             pmr::string& camWorks,
+                            pmr::string& medWorks,
                             const LinePack& lp)
 {
     static constexpr auto WORK_TEMPLATE_FMT = "RenderWorkT<Renderer, {}, {}, {}>"sv;
     static constexpr auto LIGHT_WORK_TEMPLATE_FMT = "RenderLightWorkT<Renderer, {}, {}>"sv;
     static constexpr auto CAM_WORK_TEMPLATE_FMT = "RenderCameraWorkT<Renderer, {}, {}>"sv;
+    static constexpr auto MED_WORK_TEMPLATE_FMT = "RenderMediumWorkT<Renderer, {}, {}>"sv;
     works.reserve(4096);
     lightWorks.reserve(4096);
     camWorks.reserve(4096);
@@ -547,11 +563,23 @@ void GenRenderWorkTemplates(pmr::string& works,
                                          CAM_WORK_TEMPLATE_FMT,
                                          c.typeName, t.typeName);
     }
+    // CAMERA WORKS
+    for(const auto& m : lp.meds)
+    for(const auto& t : lp.trans)
+    {
+        if(LookFilterAndSkip(m.transFilters, t)) continue;
+
+        if(!medWorks.empty()) medWorks += ",\n        "sv;
+        else medWorks += "    "sv;
+        medWorks += FormatToGlobalBuffer(MED_WORK_TEMPLATE_FMT.size(),
+                                         MED_WORK_TEMPLATE_FMT,
+                                         m.typeName, t.typeName);
+    }
 }
 
 void GenRenderWorkList(pmr::string& workList, const LinePack& lp)
 {
-    static constexpr auto WORK_LIST_FMT = "RendererWorkTypes<{}, {}, {}, {}>"sv;
+    static constexpr auto WORK_LIST_FMT = "RendererWorkTypes<{}, {}, {}, {}, {}>"sv;
     std::string buffer;
     for(const auto& r : lp.renders)
     {
@@ -562,7 +590,8 @@ void GenRenderWorkList(pmr::string& workList, const LinePack& lp)
                                          r.typeName,
                                          r.workOverload,
                                          r.lightWorkOverload,
-                                         r.cameraWorkOverload);
+                                         r.cameraWorkOverload,
+                                         r.mediaWorkOverload);
     }
 }
 
@@ -591,6 +620,7 @@ void WriteRequestedTypesFiles(const LinePack& lp,
     auto renderWorkTypePack = pmr::string(&globalAllocator);
     auto renderLightWorkTypePack = pmr::string(&globalAllocator);
     auto renderCamWorkTypePack = pmr::string(&globalAllocator);
+    auto renderMediaWorkTypePack = pmr::string(&globalAllocator);
     auto renderWorkList = pmr::string(&globalAllocator);
 
     auto AppendWithComma = [](pmr::string& s, std::string_view name)
@@ -622,7 +652,8 @@ void WriteRequestedTypesFiles(const LinePack& lp,
                    hwAccelNamePair, guardedInclude,
                    hwAccelTag, lp);
     GenRenderWorkTemplates(renderWorkTypePack, renderLightWorkTypePack,
-                           renderCamWorkTypePack, lp);
+                           renderCamWorkTypePack, renderMediaWorkTypePack,
+                           lp);
     GenRenderWorkList(renderWorkList, lp);
 
     auto fileStr = FormatToGlobalBuffer(TYPEGEN_HEADER_FILE_TEMPLATE_FMT.size(),
@@ -644,7 +675,8 @@ void WriteRequestedTypesFiles(const LinePack& lp,
                                    TYPEGEN_RENDER_HEADER_FILE_TEMPLATE_FMT,
                                    renderIncludes,          renderWorkTypePack,
                                    renderLightWorkTypePack, renderCamWorkTypePack,
-                                   rendererNames,           renderWorkList);
+                                   renderMediaWorkTypePack, rendererNames,
+                                   renderWorkList);
     auto rendReqFilePath = outDir / std::filesystem::path(TYPEGEN_RENDER_HEADER_FILE);
     ConditionallyWriteToFile(rendReqFilePath, fileStr);
 }
@@ -656,6 +688,7 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
     static constexpr auto WORK_FMT = "MRAY_RENDERER_KERNEL_INSTANTIATE({}, {}, {}, {}, {});\n"sv;
     static constexpr auto LIGHT_WORK_FMT = "MRAY_RENDERER_LIGHT_KERNEL_INSTANTIATE({}, {}, {}, {});\n"sv;
     static constexpr auto CAM_WORK_FMT = "MRAY_RENDERER_CAM_KERNEL_INSTANTIATE({}, {}, {}, {});\n"sv;
+    static constexpr auto MED_WORK_FMT = "MRAY_RENDERER_MEDIUM_KERNEL_INSTANTIATE({}, {}, {}, {});\n"sv;
     //
     static constexpr auto ACCEL_PRIM_CENTER_FMT = "MRAY_ACCEL_PRIM_CENTER_KERNEL_INSTANTIATE({}, {}, {});\n"sv;
     static constexpr auto ACCEL_PRIM_AABB_FMT = "MRAY_ACCEL_PRIM_AABB_KERNEL_INSTANTIATE({}, {}, {});\n"sv;
@@ -675,6 +708,7 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
     auto workInstantiations = StringViewVec(&globalAllocator);      workInstantiations.reserve(1024);
     auto lightWorkInstantiations = StringViewVec(&globalAllocator); lightWorkInstantiations.reserve(1024);
     auto camWorkInstantiations = StringViewVec(&globalAllocator);   camWorkInstantiations.reserve(1024);
+    auto medWorkInstantiations = StringViewVec(&globalAllocator);   medWorkInstantiations.reserve(1024);
     //
     auto accelInstantiations = StringViewVec(&globalAllocator);     accelInstantiations.reserve(1024);
     //
@@ -719,7 +753,6 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
             lightWorkInstantiations.emplace_back(wlLine);
         }
         // CAMERA WORKS
-
         for(const auto& c : lp.cams)
         for(const auto& t : lp.trans)
         for(uint32_t i = 0; i < r.camWorkCount; i++)
@@ -731,6 +764,19 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
                                                r.typeName, c.typeName,
                                                t.typeName, i);
             camWorkInstantiations.emplace_back(wcLine);
+        }
+        // MEDIA WORKS
+        for(const auto& m : lp.meds)
+        for(const auto& t : lp.trans)
+        for(uint32_t i = 0; i < r.mediaWorkCount; i++)
+        {
+            if(LookFilterAndSkip(m.transFilters, t)) continue;
+
+            auto wcLine = FormatToGlobalBuffer(MED_WORK_FMT.size(),
+                                               MED_WORK_FMT,
+                                               r.typeName, m.typeName,
+                                               t.typeName, i);
+            medWorkInstantiations.emplace_back(wcLine);
         }
     }
 
@@ -823,7 +869,7 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
         };
     }
     //
-    using PerFileVector = pmr::vector<std::array<pmr::string, 5>>;
+    using PerFileVector = pmr::vector<std::array<pmr::string, 6>>;
     PerFileVector perFileLists(fileCount, &globalAllocator);
     // Propagation of our allocator stops due to "std::array"
     // Manually allocate and reserve
@@ -852,19 +898,22 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
     AppendInstantiations(perFileLists, 0, workInstantiations);
     AppendInstantiations(perFileLists, 1, lightWorkInstantiations);
     AppendInstantiations(perFileLists, 2, camWorkInstantiations);
-    AppendInstantiations(perFileLists, 3, accelInstantiations);
-    AppendInstantiations(perFileLists, 4, rayGenInstantiations);
+    AppendInstantiations(perFileLists, 3, medWorkInstantiations);
+    AppendInstantiations(perFileLists, 4, accelInstantiations);
+    AppendInstantiations(perFileLists, 5, rayGenInstantiations);
     // for(size_t i = 0; i < workInstantiations.size(); i++)
     //     perFileLists[i % fileCount][0] += workInstantiations[i];
     // for(size_t i = 0; i < lightWorkInstantiations.size(); i++)
     //     perFileLists[i % fileCount][1] += lightWorkInstantiations[i];
     // for(size_t i = 0; i < camWorkInstantiations.size(); i++)
     //     perFileLists[i % fileCount][2] += camWorkInstantiations[i];
+    // for(size_t i = 0; i < medWorkInstantiations.size(); i++)
+    //     perFileLists[i % fileCount][3] += medWorkInstantiations[i];
 
     // for(size_t i = 0; i < accelInstantiations.size(); i++)
-    //     perFileLists[i % fileCount][3] += accelInstantiations[i];
+    //     perFileLists[i % fileCount][4] += accelInstantiations[i];
     // for(size_t i = 0; i < rayGenInstantiations.size(); i++)
-    //     perFileLists[i % fileCount][4] += rayGenInstantiations[i];
+    //     perFileLists[i % fileCount][5] += rayGenInstantiations[i];
 
     for(size_t i = 0; i < size_t(fileCount); i++)
     {
@@ -875,7 +924,8 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
            perFileLists[i][1].empty() &&
            perFileLists[i][2].empty() &&
            perFileLists[i][3].empty() &&
-           perFileLists[i][4].empty())
+           perFileLists[i][4].empty() &&
+           perFileLists[i][5].empty())
         {
             ConditionallyWriteToFile(outDir / fName, {});
             continue;
@@ -887,7 +937,8 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
                                               perFileLists[i][1],
                                               perFileLists[i][2],
                                               perFileLists[i][3],
-                                              perFileLists[i][4]);
+                                              perFileLists[i][4],
+                                              perFileLists[i][5]);
         ConditionallyWriteToFile(outDir / fName, fContents);
     }
 }
