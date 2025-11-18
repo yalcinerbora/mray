@@ -389,17 +389,19 @@ void DoBoundaryWork_##tag                   \
                                 g, h, i);   \
 }
 
-#define MRAY_RENDER_MEDIUM_DO_WORK_DECL(tag)      \
-void DoWork_##tag                                 \
-(                                                 \
-    const RenderRayState<R, tag>& dRayStates,     \
-    Span<RayGMem> dRaysIO,                        \
-    Span<RayCone> dRayDiffsIO,                    \
-    Span<const RayIndex> dRayIndicesIn,           \
-    Span<const RandomNumber> dRandomNumbers,      \
-    Span<const InterfaceKeyPack> dKeysIn,         \
-    const RenderGlobalState<R, tag>& globalState, \
-    const GPUQueue& queue                         \
+#define MRAY_RENDER_MEDIUM_DO_WORK_DECL(tag)            \
+void DoWork_##tag                                       \
+(                                                       \
+    const RenderRayState<R, tag>& dRayStates,           \
+    Span<RayGMem> dRaysIO,                              \
+    Span<RayCone> dRayDiffsIO,                          \
+    Span<const RayIndex> dRayIndices,                   \
+    Span<const InterfaceIndex> dInterfaceIndices,       \
+    Span<const VolumeKeyPack> dCurrentVolumes,          \
+    Span<const RandomNumber> dRandomNumbers,            \
+    Span<const InterfaceKeyPack> dGlobalInterfaceList,  \
+    const RenderGlobalState<R, tag>& globalState,       \
+    const GPUQueue& queue                               \
 ) const
 
 #define MRAY_RENDER_MEDIUM_DO_WORK_DEF(tag) \
@@ -409,14 +411,17 @@ void DoWork_##tag                           \
     Span<RayGMem> b,                        \
     Span<RayCone> c,                        \
     Span<const RayIndex> d,                 \
-    Span<const RandomNumber> e,             \
-    Span<const InterfaceKeyPack> f,         \
-    const RenderGlobalState<R, tag>& g,     \
-    const GPUQueue& h                       \
+    Span<const InterfaceIndex> e,           \
+    Span<const VolumeKeyPack> f,            \
+    Span<const RandomNumber> g,             \
+    Span<const InterfaceKeyPack> h,         \
+    const RenderGlobalState<R, tag>& i,     \
+    const GPUQueue& j                       \
 ) const override                            \
 {                                           \
     DoWorkInternal<tag>(a, b, c, d,         \
-                        e, f, g, h);        \
+                        e, f, g, h,         \
+                        i, j);              \
 }
 
 template<class R>

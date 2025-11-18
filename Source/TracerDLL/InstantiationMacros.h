@@ -50,14 +50,14 @@ struct GetCWFT
 template <class R, class CG, class TG, uint32_t I>
 using GetCWF = GetCWFT<R, CG, TG, I>::Type;
 
-// ==========================//
-//  Get Cam Work Metaprogram //
-// ========================= //
+// =============================//
+//  Get Medium Work Metaprogram //
+// ============================ //
 template <class R, class MG, class TG, uint32_t I>
 struct GetMWFT
 {
     private:
-    using WFList = R::template MediaWorkFunctions<MG, TG>;
+    using WFList = R::template MediumWorkFunctions<MG, TG>;
     public:
     using Type = std::conditional_t<I < WFList::TypeCount, TypePackElement<I, WFList>, void>;
 };
@@ -99,11 +99,11 @@ using GetMWF = GetMWFT<R, MG, TG, I>::Type;
     template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT          \
     void KCRenderMediumWork                                         \
     <                                                               \
-        GetMWF<R, C, T, I>,                                         \
-        AcquireSpectrumConverterGenerator<R, GetMWF<R, L, T, I>>(), \
-        AcquireTransformContextGenerator<PrimGroupEmpty, TG>()      \
+        GetMWF<R, M, T, I>,                                         \
+        AcquireSpectrumConverterGenerator<R, GetMWF<R, M, T, I>>(), \
+        AcquireTransformContextGenerator<PrimGroupEmpty, T>()       \
     >                                                               \
-    (MRAY_GRID_CONSTANT const typename GetMWF<R, C, T, I>::Params)
+    (MRAY_GRID_CONSTANT const typename GetMWF<R, M, T, I>::Params)
 
 // Accelerator Related
 #define MRAY_ACCEL_PRIM_CENTER_KERNEL_INSTANTIATE(A, P, T)                                                              \

@@ -7,22 +7,55 @@ namespace MediumDetail
 {
 
 MR_PF_DEF
-bool DefaultSegmentIterator::Advance()
+bool SingleSegmentIterator::Advance()
 {
     return false;
+}
+
+template<class S>
+MR_HF_DEF
+MediumTraverser<S>::MediumTraverser(const Ray& ray, const Vector2& tMM,
+                                    const SegmentIterator& it)
+    : it(it)
+    , dt(0)
+{
+    assert(Math::Length(ray.dir) == Float(0));
+}
+
+template<class S>
+MR_HF_DEF
+bool MediumTraverser<S>::SampleTMajor(Spectrum& tMaj, Spectrum& sMaj,
+                                      Float& t, Float xi)
+{
+    using Distribution::Common::SampleExp;
+    const auto& segment = it.curSegment;
+    bool isTerminated = false;
+
+    if(segment.tMM[0] + dt > segment.tMM[1])
+        isTerminated = it.Advance();
+
+    // Set iteration state
+    dt = SampleExp(xi, segment.sMajor[0]).value;
+    sMaj = segment.sMajor;
+    t = segment.tMM[0] + dt;
+    tMaj = Math::Exp(-dt * segment.sMajor);
+
+    return !isTerminated;
 }
 
 //===========================//
 //           Vacuum          //
 //===========================//
+template <class SC>
 MR_PF_DEF_V
-MediumVacuum::MediumVacuum(const SpectrumConverter&,
-                           const DataSoA&, MediumKey) noexcept
+MediumVacuum<SC>::MediumVacuum(const SpectrumConverter&,
+                               const DataSoA&, MediumKey) noexcept
 {}
 
+template <class SC>
 MR_PF_DEF
-ScatterSample MediumVacuum::SampleScattering(const Vector3&, const Vector3&,
-                                             RNGDispenser&) const noexcept
+ScatterSample MediumVacuum<SC>::SampleScattering(const Vector3&, const Vector3&,
+                                                 RNGDispenser&) const noexcept
 {
     return ScatterSample
     {
@@ -35,61 +68,73 @@ ScatterSample MediumVacuum::SampleScattering(const Vector3&, const Vector3&,
     };
 }
 
+template <class SC>
 MR_PF_DEF
-Float MediumVacuum::PdfScattering(const Vector3&, const Vector3&,
-                                  const Vector3&) const noexcept
+Float MediumVacuum<SC>::PdfScattering(const Vector3&, const Vector3&,
+                                      const Vector3&) const noexcept
 {
     return Float(0.0);
 }
 
+template <class SC>
 MR_PF_DEF
-Spectrum MediumVacuum::SigmaA(const Vector3&) const noexcept
+Spectrum MediumVacuum<SC>::SigmaA(const Vector3&) const noexcept
 {
     return Spectrum::Zero();
 }
 
+template <class SC>
 MR_PF_DEF
-Spectrum MediumVacuum::SigmaS(const Vector3&) const noexcept
+Spectrum MediumVacuum<SC>::SigmaS(const Vector3&) const noexcept
 {
     return Spectrum::Zero();
 }
 
+template <class SC>
 MR_PF_DEF
-Spectrum MediumVacuum::Emission(const Vector3&) const noexcept
+Spectrum MediumVacuum<SC>::Emission(const Vector3&) const noexcept
 {
     return Spectrum::Zero();
 }
 
+template <class SC>
 MR_PF_DEF
-typename MediumVacuum::SegmentIterator
-MediumVacuum::GenSegmentIterator(const Ray&, const Vector2& tMM)
+bool MediumVacuum<SC>::HasEmission() const
 {
-    return SegmentIterator
+    return false;
+}
+
+template <class SC>
+MR_HF_DEF
+typename MediumVacuum<SC>::Traverser
+MediumVacuum<SC>::GenTraverser(const Ray& r, const Vector2& tMM) const
+{
+    return MediumTraverser(r, tMM, SingleSegmentIterator
     {
         .curSegment =
         {
             .tMM = tMM,
             .sMajor = Spectrum(0)
         }
-    };
+    });
 }
 
 //===========================//
 //        Homogeneous        //
 //===========================//
-template <class ST>
+template <class SC>
 MR_HF_DEF
-MediumHomogeneous<ST>::MediumHomogeneous(const SpectrumConverter& sc,
+MediumHomogeneous<SC>::MediumHomogeneous(const SpectrumConverter& sc,
                                          const DataSoA& soa, MediumKey k)
-    : sigmaA(sc.Convert(soa.Get<SIGMA_A>()[k.FetchIndexPortion()]))
-    , sigmaS(sc.Convert(soa.Get<SIGMA_S>()[k.FetchIndexPortion()]))
-    , emission(sc.Convert(soa.Get<EMISSION>()[k.FetchIndexPortion()]))
+    : sigmaA(sc.ConvertAlbedo(soa.Get<SIGMA_A>()[k.FetchIndexPortion()]))
+    , sigmaS(sc.ConvertAlbedo(soa.Get<SIGMA_S>()[k.FetchIndexPortion()]))
+    , emission(sc.ConvertRadiance(soa.Get<EMISSION>()[k.FetchIndexPortion()]))
     , g(soa.Get<HG_PHASE>()[k.FetchIndexPortion()])
 {}
 
-template <class ST>
+template <class SC>
 MR_HF_DEF
-ScatterSample MediumHomogeneous<ST>::SampleScattering(const Vector3& wO,
+ScatterSample MediumHomogeneous<SC>::SampleScattering(const Vector3& wO,
                                                       const Vector3&,
                                                       RNGDispenser& rng) const
 {
@@ -110,9 +155,9 @@ ScatterSample MediumHomogeneous<ST>::SampleScattering(const Vector3& wO,
     };
 }
 
-template <class ST>
+template <class SC>
 MR_HF_DEF
-Float MediumHomogeneous<ST>::PdfScattering(const Vector3& wI,
+Float MediumHomogeneous<SC>::PdfScattering(const Vector3& wI,
                                            const Vector3& wO,
                                            const Vector3&) const
 {
@@ -121,40 +166,47 @@ Float MediumHomogeneous<ST>::PdfScattering(const Vector3& wI,
     return HenyeyGreensteinPhase(cosTheta, g);
 }
 
-template <class ST>
+template <class SC>
 MR_HF_DEF
-Spectrum MediumHomogeneous<ST>::SigmaA(const Vector3&) const
+Spectrum MediumHomogeneous<SC>::SigmaA(const Vector3&) const
 {
     return sigmaA;
 }
 
-template <class ST>
+template <class SC>
 MR_HF_DEF
-Spectrum MediumHomogeneous<ST>::SigmaS(const Vector3&) const
+Spectrum MediumHomogeneous<SC>::SigmaS(const Vector3&) const
 {
     return sigmaS;
 }
 
-template <class ST>
+template <class SC>
 MR_HF_DEF
-Spectrum MediumHomogeneous<ST>::Emission(const Vector3&) const
+Spectrum MediumHomogeneous<SC>::Emission(const Vector3&) const
 {
     return emission;
 }
 
-template <class ST>
+template <class SC>
 MR_PF_DEF
-typename MediumHomogeneous<ST>::SegmentIterator
-MediumHomogeneous<ST>::GenSegmentIterator(const Ray&, const Vector2& tMM)
+bool MediumHomogeneous<SC>::HasEmission() const
 {
-    return SegmentIterator
+    return emission != Spectrum::Zero();
+}
+
+template <class SC>
+MR_HF_DEF
+typename MediumHomogeneous<SC>::Traverser
+MediumHomogeneous<SC>::GenTraverser(const Ray& r, const Vector2& tMM) const
+{
+    return MediumTraverser(r, tMM, SingleSegmentIterator
     {
         .curSegment =
         {
             .tMM = tMM,
             .sMajor = sigmaA + sigmaS
         }
-    };
+    });
 }
 
 }

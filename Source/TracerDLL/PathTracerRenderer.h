@@ -44,7 +44,11 @@ class PathTracerRendererT final : public PathTracerRendererBase
     using CamWorkFunctions = TypePack<>;
 
     template<MediumGroupC MG, TransformGroupC TG>
-    using MediumWorkFunctions = TypePack<>;
+    using MediumWorkFunctions = TypePack
+    <
+        PathTraceRDetail::MediumWorkFunction<MG, TG, SpectrumContext>,
+        PathTraceRDetail::MediumWorkFunctionWithNEE<MG, TG, SpectrumContext, UniformLightSampler>
+    >;
 
     static std::string_view TypeName();
     static AttribInfoList   StaticAttributeInfo();

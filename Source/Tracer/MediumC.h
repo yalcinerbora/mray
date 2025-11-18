@@ -40,6 +40,7 @@ concept MediumC = requires(MediumType md,
 {
     typename MediumType::DataSoA;
     typename MediumType::SpectrumConverter;
+    typename MediumType::Traverser;
 
     // API
     MediumType(sc, typename MediumType::DataSoA{}, MediumKey{});
@@ -65,10 +66,11 @@ concept MediumC = requires(MediumType md,
     // that creates a ray.
     {md.SampleScattering(Vector3{}, Vector3{}, rng)} -> std::same_as<ScatterSample>;
     {md.PdfScattering(Vector3{}, Vector3{}, Vector3{})} -> std::same_as<Float>;
-
     {md.SigmaA(Vector3{})} -> std::same_as<Spectrum>;
     {md.SigmaS(Vector3{})} -> std::same_as<Spectrum>;
     {md.Emission(Vector3{})} -> std::same_as<Spectrum>;
+    {md.HasEmission()} -> std::same_as<bool>;
+    {md.GenTraverser(Ray{}, Vector2{})} -> std::same_as<typename MediumType::Traverser>;
     // Sample RN count
     MediumType::SampleScatteringRNList;
     requires std::is_same_v<decltype(MediumType::SampleScatteringRNList), const RNRequestList>;

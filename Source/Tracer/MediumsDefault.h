@@ -7,11 +7,28 @@
 
 namespace MediumDetail
 {
-    struct DefaultSegmentIterator
+    struct SingleSegmentIterator
     {
         RaySegment curSegment;
 
         MR_PF_DECL bool Advance();
+    };
+
+    template<class SegmentIteratorT>
+    struct MediumTraverser
+    {
+        using SegmentIterator = SegmentIteratorT;
+        SegmentIterator it;
+        Float           dt;
+
+        //
+        MR_HF_DECL
+        MediumTraverser(const Ray& ray, const Vector2& tMM,
+                        const SegmentIterator& it);
+
+        MR_HF_DECL
+        bool SampleTMajor(Spectrum& tMaj, Spectrum& sMaj,
+                          Float& rayT, Float xi);
     };
 
     // Lets try the new SoA span on homogeneous medium
@@ -33,13 +50,14 @@ namespace MediumDetail
         using Base::Base;
     };
 
+    template <class SpectrumContext = SpectrumContextIdentity>
     class MediumVacuum
     {
         public:
         using enum HomogeneousMediumData::I;
         using DataSoA           = EmptyType;
-        using SpectrumConverter = typename SpectrumContextIdentity::Converter;
-        using SegmentIterator   = DefaultSegmentIterator;
+        using SpectrumConverter = typename SpectrumContext::Converter;
+        using Traverser         = MediumTraverser<SingleSegmentIterator>;
 
         static constexpr RNRequestList SampleScatteringRNList = RNRequestList();
 
@@ -62,9 +80,11 @@ namespace MediumDetail
         Spectrum        SigmaS(const Vector3& p) const noexcept;
         MR_PF_DECL
         Spectrum        Emission(const Vector3& p) const noexcept;
-
         MR_PF_DECL
-        SegmentIterator GenSegmentIterator(const Ray& ray, const Vector2& tMM);
+        bool            HasEmission() const;
+
+        MR_HF_DECL
+        Traverser       GenTraverser(const Ray& ray, const Vector2& tMM) const;
     };
 
     template <class SpectrumContext = SpectrumContextIdentity>
@@ -74,7 +94,7 @@ namespace MediumDetail
         using enum HomogeneousMediumData::I;
         using DataSoA           = HomogeneousMediumData;
         using SpectrumConverter = typename SpectrumContext::Converter;
-        using SegmentIterator   = DefaultSegmentIterator;
+        using Traverser         = MediumTraverser<SingleSegmentIterator>;
 
         static constexpr RNRequestList SampleScatteringRNList = GenRNRequestList<2>();
 
@@ -104,7 +124,9 @@ namespace MediumDetail
         MR_HF_DECL
         Spectrum        Emission(const Vector3& p) const;
         MR_PF_DECL
-        SegmentIterator GenSegmentIterator(const Ray& ray, const Vector2& tMM);
+        bool            HasEmission() const;
+        MR_HF_DECL
+        Traverser       GenTraverser(const Ray& ray, const Vector2& tMM) const;
     };
 }
 
@@ -114,7 +136,7 @@ class MediumGroupVacuum : public GenericGroupMedium<MediumGroupVacuum>
     using DataSoA   = EmptyType;
 
     template<class STContext = SpectrumContextIdentity>
-    using Medium  = MediumDetail::MediumVacuum;
+    using Medium  = MediumDetail::MediumVacuum<STContext>;
 
     public:
     static std::string_view TypeName();
@@ -220,7 +242,7 @@ class MediumGroupHomogeneous : public GenericGroupMedium<MediumGroupHomogeneous>
 
 #include "MediumsDefault.hpp"
 
-static_assert(MediumC<MediumDetail::MediumVacuum>);
+static_assert(MediumC<MediumDetail::MediumVacuum<>>);
 static_assert(MediumGroupC<MediumGroupVacuum>);
 static_assert(MediumC<MediumDetail::MediumHomogeneous<>>);
 static_assert(MediumGroupC<MediumGroupHomogeneous>);

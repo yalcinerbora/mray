@@ -90,11 +90,15 @@ struct RenderMediumWorkParams
     using TransSoA = typename TransGroup::DataSoA;
     struct Common
     {
-        Span<RayGMem>                dRaysIO;
-        Span<RayCone>                dRayDiffsIO;
-        Span<const RayIndex>         dRayIndicesIn;
+        Span<RayGMem>                dRays;
+        Span<RayCone>                dRayCones;
+        //
+        Span<const RayIndex>         dRayIndices;
+        Span<const InterfaceIndex>   dInterfaceIndices;
+        Span<const VolumeKeyPack>    dCurrentVolumes;
         Span<const RandomNumber>     dRandomNumbers;
-        Span<const InterfaceKeyPack> dKeysIn;
+        // Global, Accessed by "dInterfaceIndicesIn"
+        Span<const InterfaceKeyPack> dGlobalInterfaceList;
     };
     //
     RayState    rayState;
@@ -213,7 +217,8 @@ concept CamWorkFuncC = requires()
 template<class T>
 concept MediumWorkFuncC = requires()
 {
-    true;
+    typename T::MG;
+    typename T::Params;
 };
 
 template<RendererC R, class WorkFunc>
@@ -403,12 +408,15 @@ class RenderMediumWork : public RenderMediumWorkT<R>
     const GPUSystem& gpuSystem;
 
     template<uint32_t I>
-    void DoWorkInternal(const RenderRayState<R, I>& dRayStates,
+    void DoWorkInternal(// I-O
+                        const RenderRayState<R, I>& dRayStates,
                         Span<RayGMem> dRaysIO,
                         Span<RayCone> dRayDiffsIO,
-                        Span<const RayIndex> dRayIndicesIn,
+                        Span<const RayIndex> dRayIndices,
+                        Span<const InterfaceIndex> dInterfaceIndices,
+                        Span<const VolumeKeyPack> dCurrentVolumes,
                         Span<const RandomNumber> dRandomNumbers,
-                        Span<const InterfaceKeyPack> dKeysIn,
+                        Span<const InterfaceKeyPack> dGlobalInterfaceList,
                         const RenderGlobalState<R, I>& globalState,
                         const GPUQueue& queue) const;
 
@@ -442,7 +450,7 @@ void KCRenderCameraWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params p
 template<class MediumWorkFunction,
          auto GenSpectrumConverter, auto GenerateTransformContext>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCMediumWork(MRAY_GRID_CONSTANT const typename MediumWorkFunction::Params params);
+void KCRenderMediumWork(MRAY_GRID_CONSTANT const typename MediumWorkFunction::Params params);
 
 template<RendererC R, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG>
@@ -930,9 +938,11 @@ void RenderMediumWork<R, MG, TG>::DoWorkInternal(// I-O
                                                  const RenderRayState<R, I>& dRayStates,
                                                  Span<RayGMem> dRaysIO,
                                                  Span<RayCone> dRayDiffsIO,
-                                                 Span<const RayIndex> dRayIndicesIn,
+                                                 Span<const RayIndex> dRayIndices,
+                                                 Span<const InterfaceIndex> dInterfaceIndices,
+                                                 Span<const VolumeKeyPack> dCurrentVolumes,
                                                  Span<const RandomNumber> dRandomNumbers,
-                                                 Span<const InterfaceKeyPack> dKeysIn,
+                                                 Span<const InterfaceKeyPack> dGlobalInterfaceList,
                                                  const RenderGlobalState<R, I>& globalState,
                                                  const GPUQueue& queue) const
 {
@@ -951,15 +961,18 @@ void RenderMediumWork<R, MG, TG>::DoWorkInternal(// I-O
         const RWParams params =
         {
             .rayState    = dRayStates,
+            .globalState = globalState,
             .common      =
             {
                 dRaysIO,
                 dRayDiffsIO,
-                dRayIndicesIn,
+                //
+                dRayIndices,
+                dInterfaceIndices,
+                dCurrentVolumes,
                 dRandomNumbers,
-                dKeysIn,
+                dGlobalInterfaceList
             },
-            .globalState = globalState,
             .mediumSoA   = mg.SoA(),
             .transSoA    = tg.SoA()
         };
@@ -970,7 +983,7 @@ void RenderMediumWork<R, MG, TG>::DoWorkInternal(// I-O
         using WF = TypePackElement<I, WFList>;
         static_assert(std::is_same_v<RWParams, typename WF::Params>,
                       "WorkFunction's ParamType does not match the renderer's param type!");
-        static constexpr auto Kernel = KCMediumWork
+        static constexpr auto Kernel = KCRenderMediumWork
         <
             WF,
             AcquireSpectrumConverterGenerator<R, WF>(),

@@ -71,6 +71,11 @@ namespace PathTraceRDetail
         Span<Spectrum>          dShadowRayRadiance;
         // May be empty if not spectral
         Span<SpectrumWaves>     dPathWavelengths;
+
+        // Volume rendering related
+        Span<BackupRNGState>    dBackupRNGStates;
+        Span<Spectrum>          dRPath;
+        Span<Spectrum>          dRLight;
     };
 
     template<class LightSampler, class SpectrumConverter, PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
@@ -151,26 +156,26 @@ namespace PathTraceRDetail
 
     template<MediumGroupC MGType, TransformGroupC TGType,
              class SpectrumCtxType>
-    struct MediumFunction
+    struct MediumWorkFunction
     {
         MRAY_MEDIUM_WORK_FUNCTOR_DEFINE_TYPES(MGType, TGType, SpectrumCtxType, 1u);
         using Params = MediumWorkParams<EmptyType, SpectrumConv, MG, TG>;
 
-        //MR_HF_DECL
-        //static void Call(const Light&, RNGDispenser&, const SpectrumConv&,
-        //                 const Params& params, RayIndex rayIndex, uint32_t laneId);
+        MR_HF_DECL
+        static void Call(const Medium&, const TContext&, SpectrumConv&,
+                         RNGDispenser&, const Params&, RayIndex, uint32_t);
     };
 
     template<MediumGroupC MGType, TransformGroupC TGType,
              class SpectrumCtxType, class LightSampler>
-    struct MediumFunctionWithNEE
+    struct MediumWorkFunctionWithNEE
     {
-        MRAY_LIGHT_WORK_FUNCTOR_DEFINE_TYPES(MGType, TGType, SpectrumCtxType, 1u);
-        using Params = LightWorkParams<LightSampler, SpectrumConv, LG, TG>;
+        MRAY_MEDIUM_WORK_FUNCTOR_DEFINE_TYPES(MGType, TGType, SpectrumCtxType, 1u);
+        using Params = MediumWorkParams<LightSampler, SpectrumConv, MG, TG>;
 
-        //MR_HF_DECL
-        //static void Call(const Light&, RNGDispenser&, const SpectrumConv&,
-        //                 const Params& params, RayIndex rayIndex, uint32_t laneId);
+        MR_HF_DECL
+        static void Call(const Medium&, const TContext&, SpectrumConv&,
+                         RNGDispenser&, const Params&, RayIndex, uint32_t);
     };
 }
 
@@ -501,9 +506,136 @@ void LightWorkFunctionWithNEE<L, T, SC, LS>::Call(const Light& l, RNGDispenser&,
 // ========================= //
 //   PURE PATH TRACE MEDIUM  //
 // ========================= //
+template<MediumGroupC M, TransformGroupC T, class SC>
+MR_HF_DEF
+void MediumWorkFunction <M, T, SC>::Call(const Medium&, const TContext&, SpectrumConv&,
+                                         RNGDispenser&, const Params&, RayIndex, uint32_t)
+{
+
+}
 
 // ========================= //
 // NEE/MIS PATH TRACE MEDIUM //
 // ========================= //
+template<MediumGroupC M, TransformGroupC T, class SC, class LS>
+MR_HF_DEF
+void MediumWorkFunctionWithNEE<M, T, SC, LS>::Call(const Medium& medium, const TContext& tContext,
+                                                   SpectrumConv&, RNGDispenser& rng, const Params& params,
+                                                   RayIndex rIndex, uint32_t)
+{
+    using namespace Distribution::Common;
+    using enum MediumEvent;
+    using MediumTraverser = typename Medium::Traverser;
+
+    const auto& rS          = params.rayState;
+    const auto& gS          = params.globalState;
+    auto [ray, tMM]         = RayFromGMem(params.common.dRays, rIndex);
+    auto rngBackup          = BackupRNG(rS.dBackupRNGStates[rIndex]);
+    Spectrum rLight         = rS.dRLight[rIndex];
+    Spectrum rPath          = rS.dRPath[rIndex];
+    PathDataPack pathState  = rS.dPathDataPack[rIndex];
+    Spectrum throughput     = rS.dThroughput[rIndex];
+    Spectrum pathRadiance   = rS.dPathRadiance[rIndex];
+
+    // To medium-local ray
+    Ray lRay = tContext.InvApply(ray);
+    Float lLen = Math::Length(lRay.dir);
+    Vector2 lTMM = tMM * lLen;
+    lRay.dir *= (Float(1) / lLen);
+
+    // Try to punchthrough the medium
+    MediumEvent status = TRANSMITTED;
+    MediumTraverser mt = medium.GenTraverser(lRay, lTMM);
+    Spectrum sMaj, tMaj; Float tRay;
+    while(!mt.SampleTMajor(tMaj, sMaj, tRay, rngBackup.NextFloat()))
+    {
+        Vector3 point = lRay.AdvancedPos(tRay);
+        Spectrum sigmaA = medium.SigmaA(point);
+        Spectrum sigmaS = medium.SigmaS(point);
+
+        // ============ //
+        //   Emission   //
+        // ============ //
+        if(medium.HasEmission() &&
+           (pathState.depth + 1) < gS.russianRouletteRange[1])
+        {
+            Spectrum emission = medium.Emission(point);
+
+            Float pdf = tMaj[0] * sMaj[0];
+            Spectrum factor = DivideByPDF(tMaj, pdf);
+            Spectrum tpEmit = throughput * factor;
+            Spectrum rEmit = rPath * sMaj * factor;
+
+            // TODO: This is wrong for RGB renderers
+            //static constexpr auto N = SpectraPerSpectrum;
+            Float rEMIS = rEmit.Sum();
+            //
+            pathRadiance += DivideByPDF(tpEmit * sigmaA * emission, rEMIS);
+        }
+        // Next Event
+        Float wFactor = Float(1) / sMaj[0];
+        Float probA = sigmaA[0] * wFactor;
+        Float probS = sigmaS[0] * wFactor;
+        Float probN = Float(1) - probA - probS;
+        std::array<Float, 3> dist = {probA, probS, probN};
+        auto [statusInt, localXi] = BisectSample<3>(rngBackup.NextFloat(), dist, true);
+        status = MediumEvent(statusInt);
+        if(status == ABSORBED)
+        {
+            throughput = Spectrum::Zero();
+            pathState.status.Set(uint32_t(PathStatusEnum::DEAD));
+            break;
+        }
+        else if(status == SCATTERED)
+        {
+            pathState.status.Set(uint32_t(PathStatusEnum::MEDIUM_SCATTERED));
+            pathState.depth++;
+            auto sample = medium.SampleScattering(lRay.dir, point, rng);
+
+            Float pdf = tMaj[0] * sigmaS[0];
+            Spectrum factor = DivideByPDF(tMaj * sigmaS, pdf);
+            throughput *= factor;
+            throughput *= Spectrum(sample.value.phaseVal);
+            throughput = DivideByPDF(throughput, sample.pdf);
+            rPath *= factor;
+
+            // TODO: Russian roulette
+            ray = tContext.Apply(Ray(sample.value.wI, point));
+            tMM = Vector2(0, std::numeric_limits<Float>::max());
+            break;
+        }
+        // Null scattering
+        Spectrum sigmaN = sMaj - sigmaA - sigmaS;
+        Float pdf = tMaj[0] * sigmaN[0];
+        Spectrum factor = DivideByPDF(tMaj * sigmaN, pdf);
+        throughput *= factor;
+
+        rPath *= factor;
+        rLight *= DivideByPDF(tMaj * sMaj, pdf);
+
+        if(throughput < Spectrum(MathConstants::SmallEpsilon<Float>()))
+            break;
+    }
+    assert(status == TRANSMITTED || status == ABSORBED ||
+           status == SCATTERED);
+
+    if(status == TRANSMITTED)
+    {
+        Spectrum factor = DivideByPDF(tMaj, tMaj[0]);
+        throughput *= factor;
+        rPath *= factor;
+        rLight *= factor;
+        RayCone rCone = params.common.dRayCones[rIndex].Advance(tRay);
+        params.common.dRayCones[rIndex] = rCone;
+    }
+    if(medium.HasEmission())
+        rS.dPathRadiance[rIndex] = pathRadiance;
+
+    RayToGMem(params.common.dRays, rIndex, ray, tMM);
+    rS.dThroughput[rIndex] = throughput;
+    rS.dRPath[rIndex] = rPath;
+    rS.dRLight[rIndex] = rLight;
+    rS.dPathDataPack[rIndex] = pathState;
+}
 
 }
