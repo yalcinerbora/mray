@@ -66,9 +66,12 @@ class PathTracerRendererT final : public PathTracerRendererBase
     // Memory
     DeviceMemory        rendererGlobalMem;
     // Work Hash related
-    RenderWorkHasher    workHasher;
-    Span<CommonKey>     dWorkHashes;
-    Span<CommonKey>     dWorkBatchIds;
+    RenderSurfaceWorkHasher surfaceWorkHasher;
+    Span<CommonKey>         dSurfaceWorkHashes;
+    Span<CommonKey>         dSurfaceWorkBatchIds;
+    RenderMediumWorkHasher  mediumWorkHasher;
+    Span<CommonKey>         dMediumWorkHashes;
+    Span<CommonKey>         dMediumWorkBatchIds;
     // Ray-cast Related
     Span<MetaHit>       dHits;
     Span<HitKeyPack>    dHitKeys;

@@ -703,9 +703,9 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     // Generate work keys from hit packs
     // for partitioning
     using namespace std::string_literals;
-    processQueue.IssueWorkKernel<KCGenerateWorkKeysIndirect>
+    processQueue.IssueWorkKernel<KCGenerateSurfaceWorkKeysIndirect>
     (
-        "KCGenerateWorkKeysIndirect",
+        "KCGenerateSurfaceWorkKeysIndirect",
         DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
         dKeys,
         ToConstSpan(dIndices),
@@ -773,7 +773,7 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     processQueue.MemsetAsync(dShadowRays, 0x00);
     processQueue.MemsetAsync(dShadowPrevPathOutRadiance, 0x00);
     //
-    IssueWorkKernelsToPartitions<This>
+    IssueSurfaceWorkKernelsToPartitions<This>
     (
         workHasher, partitionOutput,
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
@@ -1245,8 +1245,8 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
     // ===================== //
     // After Allocation Init //
     // ===================== //
-    workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds,
-                                  maxRayCount, queue);
+    workHasher = InitializeSurfaceHashes(dWorkHashes, dWorkBatchIds,
+                                         maxRayCount, queue);
 
     // Reset hits and paths
     queue.MemsetAsync(dHits, 0x00);

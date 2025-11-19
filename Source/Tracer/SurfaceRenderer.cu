@@ -289,14 +289,14 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
         dRayStateAO.dImageCoordinates = dRayStateCommon.dImageCoordinates;
         dRayStateAO.dOutputData = dRayStateCommon.dOutputData;
         dRayStateAO.dFilmFilterWeights = dRayStateCommon.dFilmFilterWeights;
-    }
-    // Dont forget to copy the interface list :)
-    queue.MemcpyAsync(dGlobalInterfaceList,
-                      Span<const InterfaceKeyPack>(tracerView.globalInterfaceList));
 
+        // Dont forget to copy the interface list :)
+        queue.MemcpyAsync(dGlobalInterfaceList,
+                          Span<const InterfaceKeyPack>(tracerView.globalInterfaceList));
+    }
     // And initialize the hashes
-    workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds,
-                                  maxRayCount, queue);
+    workHasher = InitializeSurfaceHashes(dWorkHashes, dWorkBatchIds,
+                                         maxRayCount, queue);
 
     // Initialize ray partitioner with worst case scenario,
     // All work types are used. (We do not use camera work
@@ -457,11 +457,9 @@ RendererOutput SurfaceRenderer::DoRender()
     );
 
     // Generate work keys from hit packs
-    using namespace std::string_literals;
-    static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeys"s;
-    processQueue.IssueWorkKernel<KCGenerateWorkKeys>
+    processQueue.IssueWorkKernel<KCGenerateSurfaceWorkKeys>
     (
-        GenWorkKernelName,
+        "KCGenerateSurfaceWorkKeys",
         DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dHitKeysLocal.size())},
         dKeys,
         ToConstSpan(dHitKeysLocal),

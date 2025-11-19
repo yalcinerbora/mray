@@ -72,10 +72,9 @@ class HashGridRenderer final : public RendererBase
     CameraKey                   curCamKey;
     const RenderCameraWorkI*    curCamWork;
     // Renderer Systems and Memory
-    HashGrid            hashGrid;
+    HashGrid                hashGrid;
     RayPartitioner      rayPartitioner;
     RNGeneratorPtr      rnGenerator;
-    RenderWorkHasher    workHasher;
     //
     DeviceMemory        rendererGlobalMem;
     Span<MetaHit>       dHits;
@@ -87,10 +86,11 @@ class HashGridRenderer final : public RendererBase
     Span<uint16_t>      dPathRNGDimensions;
     RayState            dRayState;
     // Work Hash related
-    Span<CommonKey>     dWorkHashes;
-    Span<CommonKey>     dWorkBatchIds;
+    RenderSurfaceWorkHasher workHasher;
+    Span<CommonKey>         dWorkHashes;
+    Span<CommonKey>         dWorkBatchIds;
     // For hash grid, cam position buffer
-    Span<Vector3>       dCamPosBuffer;
+    Span<Vector3>           dCamPosBuffer;
 
     uint32_t    FindMaxSamplePerIteration(uint32_t maxRayCount);
     void        PathTraceAndQuery();

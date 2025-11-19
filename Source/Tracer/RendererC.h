@@ -575,7 +575,7 @@ UpcastRenderMediumWork(const std::unique_ptr<RenderMediumWorkI>& ptr)
 // (Material/Light/Camera)/Transform/Primitive will be hashed and used
 // to lookup this array (either linear search or binary search).
 //
-class RenderWorkHasher
+class RenderSurfaceWorkHasher
 {
     private:
     Span<CommonKey> dWorkBatchHashes;
@@ -591,9 +591,9 @@ class RenderWorkHasher
 
     protected:
     public:
-                RenderWorkHasher() = default;
-    MRAY_HOST   RenderWorkHasher(Span<CommonKey> dWorkBatchHashes,
-                                 Span<CommonKey> dBatchIds);
+                RenderSurfaceWorkHasher() = default;
+    MRAY_HOST   RenderSurfaceWorkHasher(Span<CommonKey> dWorkBatchHashes,
+                                        Span<CommonKey> dBatchIds);
 
     MRAY_HOST
     void PopulateHashesAndKeys(const TracerView& tracerView,
@@ -615,6 +615,46 @@ class RenderWorkHasher
     CommonKey HashWorkDataPortion(HitKeyPack p, RayIndex i) const;
     MR_HF_DECL
     CommonKey GenerateWorkKeyGPU(HitKeyPack p, RayIndex i) const;
+};
+
+// Same as above but for media
+class RenderMediumWorkHasher
+{
+    private:
+    Span<CommonKey> dWorkBatchHashes;
+    Span<CommonKey> dWorkBatchIds;
+    uint32_t batchBits  = 0;
+    uint32_t dataBits   = 0;
+    // Maximum identifier count that is used by a single
+    // group.
+    uint32_t maxMediumIdBits = 0;
+    uint32_t maxTransIdBits  = 0;
+    uint32_t maxIndexBits    = 0;
+
+    protected:
+    public:
+                RenderMediumWorkHasher() = default;
+    MRAY_HOST   RenderMediumWorkHasher(Span<CommonKey> dWorkBatchHashes,
+                                       Span<CommonKey> dBatchIds);
+
+    MRAY_HOST
+    void PopulateHashesAndKeys(const TracerView& tracerView,
+                               const RenderMediumWorkList& curWorks,
+                               uint32_t maxRayCount,
+                               const GPUQueue& queue);
+
+    MR_HF_DECL
+    Vector2ui WorkBatchDataRange() const;
+    MR_HF_DECL
+    Vector2ui WorkBatchBitRange() const;
+    MR_HF_DECL
+    CommonKey BisectBatchPortion(CommonKey key) const;
+    MR_HF_DECL
+    CommonKey HashWorkBatchPortion(VolumeKeyPack p) const;
+    MR_HF_DECL
+    CommonKey HashWorkDataPortion(VolumeKeyPack p, RayIndex i) const;
+    MR_HF_DECL
+    CommonKey GenerateWorkKeyGPU(VolumeKeyPack p, RayIndex i) const;
 };
 
 class RendererBase : public RendererI
@@ -658,18 +698,27 @@ class RendererBase : public RendererI
 
     uint32_t                GenerateWorks();
     void                    ClearAllWorkMappings();
-    RenderWorkHasher        InitializeHashes(Span<CommonKey> dHashes,
-                                             Span<CommonKey> dWorkIds,
-                                             uint32_t maxRayCount,
-                                             const GPUQueue& queue);
+    RenderSurfaceWorkHasher InitializeSurfaceHashes(Span<CommonKey> dHashes,
+                                                    Span<CommonKey> dWorkIds,
+                                                    uint32_t maxRayCount,
+                                                    const GPUQueue& queue);
+    RenderMediumWorkHasher  InitializeMediumHashes(Span<CommonKey> dHashes,
+                                                   Span<CommonKey> dWorkIds,
+                                                   uint32_t maxRayCount,
+                                                   const GPUQueue& queue);
 
     // Some common functions between renderer
     template<class Renderer, class WorkF, class LightWorkF = EmptyFunctor, class CamWorkF = EmptyFunctor>
-    void    IssueWorkKernelsToPartitions(const RenderWorkHasher&,
-                                         const MultiPartitionOutput&,
-                                         WorkF&&,
-                                         LightWorkF&& = LightWorkF(),
-                                         CamWorkF&&   = CamWorkF()) const;
+    void IssueSurfaceWorkKernelsToPartitions(const RenderSurfaceWorkHasher&,
+                                             const MultiPartitionOutput&,
+                                             WorkF&&,
+                                             LightWorkF&& = LightWorkF(),
+                                             CamWorkF&&   = CamWorkF()) const;
+
+    template<class Renderer, class WorkF>
+    void IssueMediumWorkKernelsToPartitions(const RenderMediumWorkHasher&,
+                                            const MultiPartitionOutput&,
+                                            WorkF&&) const;
 
     public:
                         RendererBase(const RenderImagePtr&,
@@ -726,8 +775,8 @@ auto RenderMediumWorkStruct::operator<=>(const RenderMediumWorkStruct& right) co
 }
 
 MRAY_HOST inline
-RenderWorkHasher::RenderWorkHasher(Span<CommonKey> dWBHashes,
-                                   Span<CommonKey> dWBIds)
+RenderSurfaceWorkHasher::RenderSurfaceWorkHasher(Span<CommonKey> dWBHashes,
+                                                 Span<CommonKey> dWBIds)
     : dWorkBatchHashes(dWBHashes)
     , dWorkBatchIds(dWBIds)
     , batchBits(Bit::RequiredBitsToRepresent(static_cast<uint32_t>(dWBHashes.size())))
@@ -740,25 +789,25 @@ RenderWorkHasher::RenderWorkHasher(Span<CommonKey> dWBHashes,
 }
 
 MR_HF_DEF
-Vector2ui RenderWorkHasher::WorkBatchDataRange() const
+Vector2ui RenderSurfaceWorkHasher::WorkBatchDataRange() const
 {
     return Vector2ui(0, dataBits);
 }
 
 MR_HF_DEF
-Vector2ui RenderWorkHasher::WorkBatchBitRange() const
+Vector2ui RenderSurfaceWorkHasher::WorkBatchBitRange() const
 {
     return Vector2ui(dataBits, dataBits + batchBits);
 }
 
 MR_HF_DEF
-CommonKey RenderWorkHasher::BisectBatchPortion(CommonKey key) const
+CommonKey RenderSurfaceWorkHasher::BisectBatchPortion(CommonKey key) const
 {
     return Bit::FetchSubPortion(key, {dataBits, dataBits + batchBits});
 }
 
 MR_HF_DEF
-CommonKey RenderWorkHasher::HashWorkBatchPortion(HitKeyPack p) const
+CommonKey RenderSurfaceWorkHasher::HashWorkBatchPortion(HitKeyPack p) const
 {
     static_assert(PrimitiveKey::BatchBits + LightOrMatKey::BatchBits +
                   LightOrMatKey::FlagBits +
@@ -779,7 +828,7 @@ CommonKey RenderWorkHasher::HashWorkBatchPortion(HitKeyPack p) const
 }
 
 MR_HF_DEF
-CommonKey RenderWorkHasher::HashWorkDataPortion(HitKeyPack p, RayIndex i) const
+CommonKey RenderSurfaceWorkHasher::HashWorkDataPortion(HitKeyPack p, RayIndex i) const
 {
     // Get the Id portions
     CommonKey mlIndex = p.lightOrMatKey.FetchIndexPortion();
@@ -835,7 +884,130 @@ CommonKey RenderWorkHasher::HashWorkDataPortion(HitKeyPack p, RayIndex i) const
 }
 
 MR_HF_DEF
-CommonKey RenderWorkHasher::GenerateWorkKeyGPU(HitKeyPack p, RayIndex rayIndex) const
+CommonKey RenderSurfaceWorkHasher::GenerateWorkKeyGPU(HitKeyPack p, RayIndex rayIndex) const
+{
+    CommonKey batchHash = HashWorkBatchPortion(p);
+    // Find the batch portion (Linear search)
+    uint32_t i = 0;
+    CommonKey batchId = std::numeric_limits<CommonKey>::max();
+    for(CommonKey checkHash : dWorkBatchHashes)
+    {
+        if(checkHash == batchHash)
+        {
+            batchId = dWorkBatchIds[i];
+            break;
+        }
+        i++;
+    }
+    // Compose the sort key
+    CommonKey hashLower = HashWorkDataPortion(p, rayIndex);
+    CommonKey result = Bit::SetSubPortion(hashLower, batchId,
+                                          {dataBits, dataBits + batchBits});
+    return result;
+}
+
+
+MRAY_HOST inline
+RenderMediumWorkHasher::RenderMediumWorkHasher(Span<CommonKey> dWBHashes,
+                                               Span<CommonKey> dWBIds)
+    : dWorkBatchHashes(dWBHashes)
+    , dWorkBatchIds(dWBIds)
+    , batchBits(Bit::RequiredBitsToRepresent(static_cast<uint32_t>(dWBHashes.size())))
+    , dataBits(sizeof(CommonKey) * CHAR_BIT - batchBits)
+    , maxMediumIdBits(0)
+    , maxTransIdBits(0)
+{
+    assert(dWBHashes.size() == dWBIds.size());
+}
+
+MR_HF_DEF
+Vector2ui RenderMediumWorkHasher::WorkBatchDataRange() const
+{
+    return Vector2ui(0, dataBits);
+}
+
+MR_HF_DEF
+Vector2ui RenderMediumWorkHasher::WorkBatchBitRange() const
+{
+    return Vector2ui(dataBits, dataBits + batchBits);
+}
+
+MR_HF_DEF
+CommonKey RenderMediumWorkHasher::BisectBatchPortion(CommonKey key) const
+{
+    return Bit::FetchSubPortion(key, {dataBits, dataBits + batchBits});
+}
+
+MR_HF_DEF
+CommonKey RenderMediumWorkHasher::HashWorkBatchPortion(VolumeKeyPack p) const
+{
+    static_assert(MediumKey::BatchBits + TransformKey::BatchBits
+                  <= sizeof(CommonKey) * CHAR_BIT,
+                  "Unable to pack batch bits for hasing!");
+    // In common case, compose the batch identifiers
+    CommonKey r = Bit::Compose<MediumKey::BatchBits, TransformKey::BatchBits>
+    (
+        p.medKey.FetchBatchPortion(),
+        p.transKey.FetchBatchPortion()
+    );
+    return r;
+}
+
+MR_HF_DEF
+CommonKey
+RenderMediumWorkHasher::HashWorkDataPortion(VolumeKeyPack p, RayIndex i) const
+{
+    // Get the Id portions
+    CommonKey mIndex = p.medKey.FetchIndexPortion();
+    CommonKey tIndex = p.transKey.FetchIndexPortion();
+
+    // Heuristic: Most important bits are the rayIndex,
+    // then medium, then transform.
+    //
+    // This heruistic comes due to fact that writes dominate
+    // the performance of surface sampling (see "RenderSurfaceWorkHasher")
+    //
+    // Since media sampling requires many/many read accesses
+    // to the underlying data structure, we may implement
+    // a bouqette sorting of the rays (spatio directional sorting)
+    //
+    // Since these keys are going to be used in radix sort, and this
+    // part (data part) is just used for performance, we can
+    // dynamically adjust this for highly heterogeneous media
+    // etc. (We just need to transfer that heterogeneousity
+    // here)
+    //
+    // We will see. (TODO: ...)
+    uint32_t remainingBits = dataBits;
+    uint32_t currentBit = 0;
+    CommonKey result = 0;
+    auto WriteKey = [&](uint32_t maxItemBitCount, CommonKey item) -> bool
+    {
+        uint32_t bitsForItem = Math::Min(maxItemBitCount, remainingBits);
+        if(bitsForItem == 0) return false;
+
+        uint32_t start = currentBit;
+        uint32_t end = currentBit + bitsForItem;
+        assert(end <= sizeof(CommonKey) * CHAR_BIT);
+        std::array range = {CommonKey(start), CommonKey(end)};
+        result = Bit::SetSubPortion(result, item, range);
+        remainingBits -= bitsForItem;
+        currentBit += bitsForItem;
+        return true;
+    };
+    // Actual Payload index
+    if(!WriteKey(maxIndexBits, i)) return result;
+    // Materials
+    if(!WriteKey(maxMediumIdBits, mIndex)) return result;
+    // Transforms
+    if(!WriteKey(maxTransIdBits, tIndex)) return result;
+
+    return result;
+}
+
+MR_HF_DEF
+CommonKey
+RenderMediumWorkHasher::GenerateWorkKeyGPU(VolumeKeyPack p, RayIndex rayIndex) const
 {
     CommonKey batchHash = HashWorkBatchPortion(p);
     // Find the batch portion (Linear search)
@@ -885,16 +1057,32 @@ uint32_t RendererBase::GenerateWorks()
 }
 
 inline
-RenderWorkHasher RendererBase::InitializeHashes(Span<CommonKey> dHashes,
-                                                Span<CommonKey> dWorkIds,
-                                                uint32_t maxRayCount,
-                                                const GPUQueue& queue)
+RenderSurfaceWorkHasher
+RendererBase::InitializeSurfaceHashes(Span<CommonKey> dHashes,
+                                      Span<CommonKey> dWorkIds,
+                                      uint32_t maxRayCount,
+                                      const GPUQueue& queue)
 {
-    RenderWorkHasher result(dHashes, dWorkIds);
+    RenderSurfaceWorkHasher result(dHashes, dWorkIds);
     result.PopulateHashesAndKeys(tracerView,
                                  currentWorks,
                                  currentLightWorks,
                                  currentCameraWorks,
+                                 maxRayCount,
+                                 queue);
+    return result;
+}
+
+inline
+RenderMediumWorkHasher
+RendererBase::InitializeMediumHashes(Span<CommonKey> dHashes,
+                                     Span<CommonKey> dWorkIds,
+                                     uint32_t maxRayCount,
+                                     const GPUQueue& queue)
+{
+    RenderMediumWorkHasher result(dHashes, dWorkIds);
+    result.PopulateHashesAndKeys(tracerView,
+                                 currentMediumWorks,
                                  maxRayCount,
                                  queue);
     return result;

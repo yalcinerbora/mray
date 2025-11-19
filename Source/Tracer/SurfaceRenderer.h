@@ -52,7 +52,7 @@ class SurfaceRenderer final : public RendererBase
     //
     SurfRDetail::Mode::E        anchorMode;
     FilmFilterPtr               filmFilter;
-    RenderWorkHasher            workHasher;
+    RenderSurfaceWorkHasher     workHasher;
     //
     Optional<CameraTransform>   curCamTransformOverride;
     CameraSurfaceParams         curCamSurfaceParams;

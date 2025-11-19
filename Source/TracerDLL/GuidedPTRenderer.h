@@ -62,9 +62,9 @@ class GuidedPTRenderer final : public PathTracerRendererBase
     // Memory
     DeviceMemory        rendererGlobalMem;
     // Work Hash related
-    RenderWorkHasher    workHasher;
-    Span<CommonKey>     dWorkHashes;
-    Span<CommonKey>     dWorkBatchIds;
+    RenderSurfaceWorkHasher workHasher;
+    Span<CommonKey>         dWorkHashes;
+    Span<CommonKey>         dWorkBatchIds;
     // Ray-cast Related
     Span<MetaHit>       dHits;
     Span<HitKeyPack>    dHitKeys;

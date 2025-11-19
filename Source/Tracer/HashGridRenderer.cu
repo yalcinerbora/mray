@@ -214,8 +214,8 @@ RenderBufferInfo HashGridRenderer::StartRender(const RenderImageParams& rIP,
                                  RendererBase::SUB_CAMERA_BUFFER_SIZE, 1});
     //
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds,
-                                  maxRayCount, queue);
+    workHasher = InitializeSurfaceHashes(dWorkHashes, dWorkBatchIds,
+                                         maxRayCount, queue);
 
     // Also allocate for the partitioner inside the
     // base accelerator (This should not allocate for HW accelerators)
@@ -411,10 +411,9 @@ void HashGridRenderer::PathTraceAndQuery()
 
         // Generate work keys from hit packs
         using namespace std::string_literals;
-        static const std::string GenWorkKernelName = std::string(TypeName()) + "-KCGenerateWorkKeysIndirect"s;
-        processQueue.IssueWorkKernel<KCGenerateWorkKeysIndirect>
+        processQueue.IssueWorkKernel<KCGenerateSurfaceWorkKeysIndirect>
         (
-            GenWorkKernelName,
+            "KCGenerateSurfaceWorkKeysIndirect",
             DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
             dKeys,
             ToConstSpan(dIndices),
@@ -443,7 +442,7 @@ void HashGridRenderer::PathTraceAndQuery()
         };
 
         // Issue the work kernels
-        IssueWorkKernelsToPartitions<This>(workHasher, partitionOutput,
+        IssueSurfaceWorkKernelsToPartitions<This>(workHasher, partitionOutput,
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                  uint32_t, uint32_t partitionSize)
         {

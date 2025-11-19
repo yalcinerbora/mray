@@ -228,7 +228,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         dRays, dIndices, false, processQueue
     );
 
-    if(false) // currentOptions.sampleMedium
+    if(currentOptions.sampleMedia)
     {
         // Generate work keys for media
 
@@ -252,22 +252,22 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
 
     // Generate work keys from hit packs
     using namespace std::string_literals;
-    processQueue.IssueWorkKernel<KCGenerateWorkKeysIndirect>
+    processQueue.IssueWorkKernel<KCGenerateSurfaceWorkKeysIndirect>
     (
-        "KCGenerateWorkKeysIndirect"sv,
+        "KCGenerateSurfaceWorkKeysIndirect"sv,
         DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         dKeys,
         ToConstSpan(dIndices),
         ToConstSpan(dHitKeys),
-        workHasher
+        surfaceWorkHasher
     );
 
     // Finally, partition using the generated keys.
     // Fully partitioning here by using a single sort
     auto& rp = rayPartitioner;
     auto partitionOutput = rp.MultiPartition(dKeys, dIndices,
-                                             workHasher.WorkBatchDataRange(),
-                                             workHasher.WorkBatchBitRange(),
+                                             surfaceWorkHasher.WorkBatchDataRange(),
+                                             surfaceWorkHasher.WorkBatchBitRange(),
                                              processQueue, false);
     // Wait for results to be available in host buffers
     // since we need partition ranges on the CPU to Issue kernels.
@@ -292,7 +292,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
             .specContextData = typedSpectrumContext.GetData()
         };
 
-        IssueWorkKernelsToPartitions<This>(workHasher, partitionOutput,
+        IssueSurfaceWorkKernelsToPartitions<This>(surfaceWorkHasher, partitionOutput,
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t partitionSize)
         {
@@ -363,7 +363,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         // CUDA Init check error, we access the rays even if it is not written
         processQueue.MemsetAsync(dOutRays, 0x00);
         // Do the NEE kernel + boundary work
-        IssueWorkKernelsToPartitions<This>(workHasher, partitionOutput,
+        IssueSurfaceWorkKernelsToPartitions<This>(surfaceWorkHasher, partitionOutput,
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
                   uint32_t, uint32_t partitionSize)
         {
@@ -420,7 +420,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         );
 
         // Do the actual kernel
-        IssueWorkKernelsToPartitions<This>(workHasher, partitionOutput,
+        IssueSurfaceWorkKernelsToPartitions<This>(surfaceWorkHasher, partitionOutput,
         [&](const auto& workI, Span<uint32_t> dLocalIndices,
             uint32_t, uint32_t partitionSize)
         {
@@ -709,7 +709,8 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                 // Per path bounce, max used random number of that bounce
                 dRandomNumBuffer,
                 // Per render work
-                dWorkHashes, dWorkBatchIds,
+                dSurfaceWorkHashes, dSurfaceWorkBatchIds,
+                dMediumWorkHashes, dMediumWorkBatchIds,
                 //
                 dSubCameraBuffer
             ),
@@ -724,6 +725,9 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                 // Per path bounce, max used random number of that bounce
                 maxSampleCount,
                 // Per render work
+                totalWorkCount, totalWorkCount,
+                // TODO: This is a waste we should split the
+                // total work count
                 totalWorkCount, totalWorkCount,
                 //
                 RendererBase::SUB_CAMERA_BUFFER_SIZE});
@@ -750,7 +754,8 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                 // Per path bounce, max used random number of that bounce
                 dRandomNumBuffer,
                 // Per render work
-                dWorkHashes, dWorkBatchIds,
+                dSurfaceWorkHashes, dSurfaceWorkBatchIds,
+                dMediumWorkHashes, dMediumWorkBatchIds,
                 //
                 dSubCameraBuffer
             ),
@@ -769,6 +774,9 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                 maxSampleCount,
                 // Per render work
                 totalWorkCount, totalWorkCount,
+                // TODO: This is a waste but medium/transform
+                // pairs should be small
+                totalWorkCount, totalWorkCount,
                 //
                 RendererBase::SUB_CAMERA_BUFFER_SIZE
             }
@@ -786,8 +794,12 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
     // ===================== //
     // After Allocation Init //
     // ===================== //
-    workHasher = InitializeHashes(dWorkHashes, dWorkBatchIds,
-                                  maxRayCount, queue);
+    surfaceWorkHasher = InitializeSurfaceHashes(dSurfaceWorkHashes,
+                                                dSurfaceWorkBatchIds,
+                                                maxRayCount, queue);
+    mediumWorkHasher = InitializeMediumHashes(dMediumWorkHashes,
+                                              dMediumWorkBatchIds,
+                                              maxRayCount, queue);
 
     // Reset hits and paths
     queue.MemsetAsync(dHits, 0x00);

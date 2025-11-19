@@ -41,6 +41,7 @@ namespace PathTraceRDetail
         LightSamplerType    lightSampler = LightSamplerType::E::UNIFORM;
         SampleMode          sampleMode = SampleMode::E::PURE;
         RenderMode          renderMode = RenderMode::E::THROUGHPUT;
+        bool                sampleMedia = false;
     };
 
     template<class LightSampler, class SpectrumConverter>

@@ -7,9 +7,9 @@
 #include "Device/GPUSystem.hpp"
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
-                        MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
-                        MRAY_GRID_CONSTANT const RenderWorkHasher workHasher)
+void KCGenerateSurfaceWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
+                               MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
+                               MRAY_GRID_CONSTANT const RenderSurfaceWorkHasher workHasher)
 {
     assert(dWorkKey.size() == dInputKeys.size());
 
@@ -22,10 +22,26 @@ void KCGenerateWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCGenerateWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
-                                MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
-                                MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
-                                MRAY_GRID_CONSTANT const RenderWorkHasher workHasher)
+void KCGenerateSurfaceWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
+                                       MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
+                                       MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
+                                       MRAY_GRID_CONSTANT const RenderSurfaceWorkHasher workHasher)
+{
+    KernelCallParams kp;
+    uint32_t keyCount = static_cast<uint32_t>(dIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
+    {
+        RayIndex keyIndex = dIndices[i];
+        auto keyPack = dInputKeys[keyIndex];
+        dWorkKey[i] = workHasher.GenerateWorkKeyGPU(keyPack, keyIndex);
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCGenerateMediumWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
+                                      MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
+                                      MRAY_GRID_CONSTANT const Span<const VolumeKeyPack> dInputKeys,
+                                      MRAY_GRID_CONSTANT const RenderMediumWorkHasher workHasher)
 {
     KernelCallParams kp;
     uint32_t keyCount = static_cast<uint32_t>(dIndices.size());
@@ -83,14 +99,16 @@ void KCCopyRaysIndirect(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
 
 
 MRAY_HOST
-void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
-                                             const RenderWorkList& curWorks,
-                                             const RenderLightWorkList& curLightWorks,
-                                             const RenderCameraWorkList& curCamWorks,
-                                             uint32_t maxRayCount,
-                                             const GPUQueue& queue)
+void
+RenderSurfaceWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
+                                               const RenderWorkList& curWorks,
+                                               const RenderLightWorkList& curLightWorks,
+                                               const RenderCameraWorkList& curCamWorks,
+                                               uint32_t maxRayCount,
+                                               const GPUQueue& queue)
 {
-    size_t totalWorkBatchCount = (curWorks.size() + curLightWorks.size() +
+    size_t totalWorkBatchCount = (curWorks.size() +
+                                  curLightWorks.size() +
                                   curCamWorks.size());
     std::vector<CommonKey> hHashes;
     std::vector<CommonKey> hBatchIds;
@@ -111,10 +129,10 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
         auto tK = TransformKey::CombinedKey(std::bit_cast<CommonKey>(transGroupId), 0u);
         HitKeyPack kp =
         {
-            .primKey = pK,
-            .lightOrMatKey = mK,
-            .transKey = tK,
-            .accelKey = AcceleratorKey::InvalidKey()
+            .primKey        = pK,
+            .lightOrMatKey  = mK,
+            .transKey       = tK,
+            .accelKey       = AcceleratorKey::InvalidKey()
         };
         hHashes.emplace_back(HashWorkBatchPortion(kp));
         hBatchIds.push_back(work.workGroupId);
@@ -141,10 +159,10 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
         auto pK = PrimitiveKey::CombinedKey(primGroupId, 0u);
         HitKeyPack kp =
         {
-            .primKey = pK,
-            .lightOrMatKey = lK,
-            .transKey = tK,
-            .accelKey = AcceleratorKey::InvalidKey()
+            .primKey        = pK,
+            .lightOrMatKey  = lK,
+            .transKey       = tK,
+            .accelKey       = AcceleratorKey::InvalidKey()
         };
         hHashes.emplace_back(HashWorkBatchPortion(kp));
         hBatchIds.push_back(work.workGroupId);
@@ -167,6 +185,53 @@ void RenderWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
     maxPrimIdBits       = Bit::RequiredBitsToRepresent(primMaxCount);
     maxTransIdBits      = Bit::RequiredBitsToRepresent(transMaxCount);
     maxIndexBits        = Bit::RequiredBitsToRepresent(maxRayCount);
+
+    queue.MemcpyAsync(dWorkBatchHashes, Span<const CommonKey>(hHashes));
+    queue.MemcpyAsync(dWorkBatchIds, Span<const CommonKey>(hBatchIds));
+    queue.Barrier().Wait();
+}
+
+MRAY_HOST
+void
+RenderMediumWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
+                                              const RenderMediumWorkList& curWorks,
+                                              uint32_t maxRayCount,
+                                              const GPUQueue& queue)
+{
+    size_t totalWorkBatchCount = (curWorks.size());
+    std::vector<CommonKey> hHashes;
+    std::vector<CommonKey> hBatchIds;
+    hHashes.reserve(totalWorkBatchCount);
+    hBatchIds.reserve(totalWorkBatchCount);
+
+    uint32_t medMaxCount = 0;
+    uint32_t transMaxCount = 0;
+    for(const auto& work : curWorks)
+    {
+        MediumGroupId mediumGroupId = work.mgId;
+        TransGroupId transGroupId = work.tgId;
+
+        auto mK = MediumKey::CombinedKey(Bit::BitCast<CommonKey>(mediumGroupId), 0u);
+        auto tK = TransformKey::CombinedKey(Bit::BitCast<CommonKey>(transGroupId), 0u);
+        VolumeKeyPack kp =
+        {
+            .medKey   = mK,
+            .transKey = tK
+        };
+        hHashes.emplace_back(HashWorkBatchPortion(kp));
+        hBatchIds.push_back(work.workGroupId);
+
+        // Might as well check the data amount here
+        uint32_t mediaCount = uint32_t(tracerView.mediumGroups.at(mediumGroupId)->get()->TotalItemCount());
+        uint32_t transformCount = uint32_t(tracerView.transGroups.at(transGroupId)->get()->TotalItemCount());
+        medMaxCount = Math::Max(medMaxCount, mediaCount);
+        transMaxCount = Math::Max(transMaxCount, transformCount);
+    }
+
+    // Find bit count
+    maxMediumIdBits = Bit::RequiredBitsToRepresent(medMaxCount);
+    maxTransIdBits  = Bit::RequiredBitsToRepresent(transMaxCount);
+    maxIndexBits    = Bit::RequiredBitsToRepresent(maxRayCount);
 
     queue.MemcpyAsync(dWorkBatchHashes, Span<const CommonKey>(hHashes));
     queue.MemcpyAsync(dWorkBatchIds, Span<const CommonKey>(hBatchIds));

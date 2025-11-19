@@ -640,8 +640,12 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     std::array<Float, 2> misWeights = {};
     bool isLobeSampled = false;
     if(!isSpecular)
-        misWeights[0] = Math::Lerp(Float(0), gs.lobeProbability,
-                                   Float(1) - specularity);
+    {
+        Float t = Math::Clamp(Float(1) - specularity, Float(0), Float(1));
+        misWeights[0] = Math::Lerp(Float(0), gs.lobeProbability, t);
+    }
+
+
     misWeights[1] = Float(1) - misWeights[0];
     // MIS
     BxDFSample pathSample;
@@ -665,6 +669,13 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
         misPDFs[1] = pathSample.pdf;
     }
     Float pdfPath = BalanceCancelled<2>(misPDFs, misWeights);
+    if(pdfPath < Float(0))
+    {
+        printf("wut? %.10f | %.10f %.10f | %.10f %.10f \n",
+               pdfPath, misPDFs[0], misPDFs[1],
+               misWeights[0], misWeights[1]);
+    }
+
 
     // ================ //
     // Russian Roulette //
