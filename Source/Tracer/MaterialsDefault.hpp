@@ -782,3 +782,100 @@ bool UnrealMaterial<SC>::IsAllTexturesAreResident(const Surface& surface,
 }
 
 }
+
+namespace PassthroughMatDetail
+{
+
+template <class SC>
+MR_PF_DEF
+NormalMap PassthroughMaterial<SC>::GetNormalMap(const DataSoA&, MaterialKey)
+{
+    return std::nullopt;
+}
+
+template <class SC>
+MR_PF_DEF_V
+PassthroughMaterial<SC>::PassthroughMaterial(const SpectrumConverter&,
+                                             const Surface& surface,
+                                             const DataSoA&, MaterialKey)
+    : surface(surface)
+{}
+
+template <class SC>
+MR_PF_DEF
+BxDFSample
+PassthroughMaterial<SC>::SampleBxDF(const Vector3& wO,
+                                    RNGDispenser&) const
+{
+    return BxDFSample
+    {
+        .wI     = Ray(-wO, surface.position),
+        .pdf    = Float(1.0),
+        .eval   = BxDFEval
+        {
+            .reflectance     = Spectrum(1.0),
+            .isPassedThrough = true,
+            .isDispersed     = false
+        }
+    };
+}
+
+template <class SC>
+MR_PF_DEF
+Float
+PassthroughMaterial<SC>::Pdf(const Ray&, const Vector3&) const
+{
+    // We can not sample this
+    return Float(0);
+}
+
+template <class SC>
+MR_PF_DEF
+BxDFEval PassthroughMaterial<SC>::Evaluate(const Ray&, const Vector3&) const
+{
+    return BxDFEval
+    {
+        .reflectance     = Spectrum(1),
+        .isPassedThrough = true,
+        .isDispersed     = false
+    };
+}
+
+template <class SC>
+MR_PF_DEF
+bool PassthroughMaterial<SC>::IsEmissive() const
+{
+    return false;
+}
+
+template <class SC>
+MR_PF_DEF
+Spectrum PassthroughMaterial<SC>::Emit(const Vector3&) const
+{
+    return Spectrum::Zero();
+}
+
+template <class SC>
+MR_PF_DEF
+Float PassthroughMaterial<SC>::Specularity() const
+{
+    return Float(1);
+}
+
+template <class SC>
+MR_PF_DEF
+RayConeSurface PassthroughMaterial<SC>::RefractRayCone(const RayConeSurface& r,
+                                                       const Vector3&) const
+{
+    return r;
+}
+
+template <class SC>
+MR_PF_DEF
+bool PassthroughMaterial<SC>::IsAllTexturesAreResident(const Surface&, const DataSoA&,
+                                                       MaterialKey)
+{
+    return true;
+}
+
+}

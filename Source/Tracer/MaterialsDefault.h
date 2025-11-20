@@ -210,6 +210,47 @@ namespace UnrealMatDetail
     };
 }
 
+namespace PassthroughMatDetail
+{
+    template <class SpectrumContext = SpectrumContextIdentity>
+    struct PassthroughMaterial
+    {
+        using Surface           = BasicSurface;
+        using DataSoA           = EmptyType;
+        using SpectrumConverter = typename SpectrumContext::Converter;
+        //
+        static constexpr RNRequestList SampleRNList = RNRequestList();
+
+        private:
+        const Surface& surface;
+
+        public:
+        MR_PF_DECL
+        static NormalMap GetNormalMap(const DataSoA& soa, MaterialKey k);
+
+        MR_PF_DECL_V
+        PassthroughMaterial(const SpectrumConverter& sTransContext,
+                            const Surface& surface,
+                            const DataSoA& soa, MaterialKey mk);
+
+        MR_PF_DECL
+        BxDFSample          SampleBxDF(const Vector3& wO,
+                                       RNGDispenser& dispenser) const;
+        MR_PF_DECL Float    Pdf(const Ray& wI, const Vector3& wO) const;
+
+        MR_PF_DECL BxDFEval Evaluate(const Ray& wI, const Vector3& wO) const;
+        MR_PF_DECL bool     IsEmissive() const;
+        MR_PF_DECL Spectrum Emit(const Vector3& wO) const;
+        MR_PF_DECL Float    Specularity() const;
+        MR_PF_DECL
+        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO) const;
+
+        MR_PF_DECL
+        static bool         IsAllTexturesAreResident(const Surface&, const DataSoA&,
+                                                     MaterialKey);
+    };
+}
+
 class MatGroupLambert final : public GenericGroupMaterial<MatGroupLambert>
 {
     public:
@@ -410,6 +451,59 @@ class MatGroupUnreal final : public GenericGroupMaterial<MatGroupUnreal>
                                    const GPUSystem&,
                                    const TextureViewMap&,
                                    const TextureMap&);
+    void            CommitReservations() override;
+    AttribInfoList  AttributeInfo() const override;
+    void            PushAttribute(MaterialKey id,
+                                  uint32_t attributeIndex,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushAttribute(MaterialKey id,
+                                  uint32_t attributeIndex,
+                                  const Vector2ui& subRange,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                  uint32_t attributeIndex,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+
+    // Extra
+    void            PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                     uint32_t attributeIndex,
+                                     TransientData,
+                                     std::vector<Optional<TextureId>>,
+                                     const GPUQueue& queue) override;
+    void            PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                     uint32_t attributeIndex,
+                                     std::vector<Optional<TextureId>>,
+                                     const GPUQueue& queue) override;
+    void            PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                     uint32_t attributeIndex,
+                                     std::vector<TextureId>,
+                                     const GPUQueue& queue) override;
+
+    DataSoA         SoA() const;
+    void            Finalize(const GPUQueue&) override;
+};
+
+class MatGroupPassthrough final : public GenericGroupMaterial<MatGroupPassthrough>
+{
+    public:
+    using DataSoA = EmptyType;
+    template<class STContext = SpectrumContextIdentity>
+    using Material = PassthroughMatDetail::PassthroughMaterial<STContext>;
+    using Surface = typename Material<>::Surface;
+
+    private:
+    protected:
+
+    public:
+    static std::string_view TypeName();
+
+    MatGroupPassthrough(uint32_t groupId,
+                        const GPUSystem&,
+                        const TextureViewMap&,
+                        const TextureMap&);
     void            CommitReservations() override;
     AttribInfoList  AttributeInfo() const override;
     void            PushAttribute(MaterialKey id,

@@ -486,3 +486,89 @@ typename MatGroupUnreal::DataSoA MatGroupUnreal::SoA() const
 
 void MatGroupUnreal::Finalize(const GPUQueue&)
 {}
+
+//===============================//
+//       Passthrough Material    //
+//===============================//
+std::string_view MatGroupPassthrough::TypeName()
+{
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "Passthrough"sv;
+    return MaterialTypeName<Name>;
+}
+
+MatGroupPassthrough::MatGroupPassthrough(uint32_t groupId,
+                                         const GPUSystem& s,
+                                         const TextureViewMap& texViewMap,
+                                         const TextureMap& texMap)
+    : GenericGroupMaterial<MatGroupPassthrough>(groupId, s, texViewMap, texMap)
+{}
+
+void MatGroupPassthrough::CommitReservations()
+{
+    isCommitted = true;
+}
+
+MatAttributeInfoList MatGroupPassthrough::AttributeInfo() const
+{
+    static const MatAttributeInfoList LogicList = {};
+    return LogicList;
+}
+
+void MatGroupPassthrough::PushAttribute(MaterialKey,
+                                        uint32_t attributeIndex,
+                                        TransientData,
+                                        const GPUQueue&)
+{
+    throw MRayError("{:s} do not have any attributes!", TypeName());
+}
+
+void MatGroupPassthrough::PushAttribute(MaterialKey,
+                                        uint32_t,
+                                        const Vector2ui&,
+                                        TransientData, const GPUQueue&)
+{
+    throw MRayError("{:s} do not have any attributes!", TypeName());
+}
+
+void MatGroupPassthrough::PushAttribute(MaterialKey, MaterialKey,
+                                        uint32_t,
+                                        TransientData,
+                                        const GPUQueue&)
+{
+    throw MRayError("{:s} do not have any attributes!", TypeName());
+}
+
+
+void MatGroupPassthrough::PushTexAttribute(MaterialKey, MaterialKey,
+                                           uint32_t, TransientData,
+                                           std::vector<Optional<TextureId>>,
+                                           const GPUQueue&)
+{
+    throw MRayError("{:s} do not have any attributes!", TypeName());
+}
+
+void MatGroupPassthrough::PushTexAttribute(MaterialKey, MaterialKey,
+                                           uint32_t,
+                                           std::vector<Optional<TextureId>>,
+                                           const GPUQueue&)
+{
+    throw MRayError("{:s} do not have any attributes!", TypeName());
+}
+
+void MatGroupPassthrough::PushTexAttribute(MaterialKey, MaterialKey,
+                                           uint32_t,
+                                           std::vector<TextureId>,
+                                           const GPUQueue&)
+{
+    throw MRayError("{:s} do not have any attributes!", TypeName());
+}
+
+EmptyType MatGroupPassthrough::SoA() const
+{
+    return EmptyType{};
+}
+
+void MatGroupPassthrough::Finalize(const GPUQueue&)
+{}

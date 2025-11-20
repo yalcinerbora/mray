@@ -812,7 +812,10 @@ void BaseAccelerator::Construct(BaseAccelConstructParams p)
     // Internal construction routine,
     // we can not fetch the leaf data here because some accelerators are
     // constructed on CPU (due to laziness)
-    sceneAABB = InternalConstruct(instanceOffsets);
+    if(partitions.size() != 0)
+        sceneAABB = InternalConstruct(instanceOffsets);
+    else
+        sceneAABB = AABB3::Zero();
 }
 
 

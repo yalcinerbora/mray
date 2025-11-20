@@ -687,6 +687,10 @@ void BaseAcceleratorOptiX::CastRays(// Output
     static const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
     const auto _ = annotation.AnnotateScope();
 
+    // Scene may be empty, skip ray casting
+    if(maxBitsUsedOnKey == Vector2ui::Zero())
+        return;
+
     // TODO: Currently only works for single GPU
     assert(gpuSystem.AllGPUs().size() == 1);
     assert(dRayIndices.size() != 0);
@@ -733,6 +737,10 @@ void BaseAcceleratorOptiX::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffer
     using namespace std::string_view_literals;
     static const auto annotation = gpuSystem.CreateAnnotation("Visibilty Casting"sv);
     const auto _ = annotation.AnnotateScope();
+
+    // Scene may be empty, skip ray casting
+    if(maxBitsUsedOnKey == Vector2ui::Zero())
+        return;
 
     // TODO: Currently only works for single GPU
     assert(gpuSystem.AllGPUs().size() == 1);
@@ -783,6 +791,10 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
     using namespace std::string_view_literals;
     static const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
     const auto _ = annotation.AnnotateScope();
+
+    // Scene may be empty, skip ray casting
+    if(maxBitsUsedOnKey == Vector2ui::Zero())
+        return;
 
     // TODO: Currently only works for single GPU
     assert(gpuSystem.AllGPUs().size() == 1);
