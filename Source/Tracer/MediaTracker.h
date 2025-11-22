@@ -157,9 +157,13 @@ class RayMediaListPack
 
 class MediaTrackerView
 {
+    // TODO: This could be 16-bit but my 1080 does not support
+    // it. Need to check 2000 series (which should be the bare minimum).
+    using LockInt = uint32_t;
+
     static constexpr auto EMPTY_VAL    = uint32_t(UINT32_MAX);
-    static constexpr auto LOCK_VAL     = uint16_t(1);
-    static constexpr auto UNLOCKED_VAL = uint16_t(0);
+    static constexpr auto LOCK_VAL     = LockInt(1);
+    static constexpr auto UNLOCKED_VAL = LockInt(0);
     struct InsertResult
     {
         uint32_t index;
@@ -169,7 +173,7 @@ class MediaTrackerView
     private:
     Span<const VolumeKeyPack> dGlobalVolumeList;
     Span<MediaList>           dValues;
-    Span<uint16_t>            dLocks;
+    Span<LockInt>            dLocks;
 
     MR_GF_DECL
     InsertResult TryInsertAtomic(const MediaList& list) const;
@@ -327,8 +331,8 @@ MediaTrackerView::TryInsertAtomic(const MediaList& list) const
 {
     // CUDA stuff, it does not like gobal space constexpr
     // assumes it is on host
-    static constexpr auto EMPTY = EMPTY_VAL;
-    static constexpr auto LOCKED = LOCK_VAL;
+    static constexpr auto EMPTY    = EMPTY_VAL;
+    static constexpr auto LOCKED   = LOCK_VAL;
     static constexpr auto UNLOCKED = UNLOCKED_VAL;
 
     using RNGFunctions::HashPCG64::Hash;
@@ -367,6 +371,7 @@ MediaTrackerView::TryInsertAtomic(const MediaList& list) const
             old = AtomicCompSwap(dLocks[i], UNLOCKED, LOCKED);
         }
         while(old == LOCK_VAL);
+        ThreadFenceGrid();
 
         // Now we are fine (hopefully)
         if(dValues[i].listRaw[0] == EMPTY)
@@ -376,6 +381,7 @@ MediaTrackerView::TryInsertAtomic(const MediaList& list) const
             // ============ //
             //  REL. LOCK   //
             // ============ //
+            ThreadFenceGrid();
             AtomicStore(dLocks[i], UNLOCKED);
             return InsertResult{i, true};
         }

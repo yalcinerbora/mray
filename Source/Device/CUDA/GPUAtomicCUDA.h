@@ -1,3 +1,4 @@
+#pragma once
 
 #include "Core/Vector.h"
 #include "Core/BitFunctions.h"
@@ -266,10 +267,16 @@ template<class T>
 MR_GF_DECL void AtomicStore(T& t, T val)
 {
     #ifdef __CUDA_ARCH__
-        __nv_atomic_store_n(&t, val,
-                            // TODO: This is defensive change later
-                            __NV_ATOMIC_SEQ_CST,
-                            __NV_THREAD_SCOPE_DEVICE);
+    {
+        #if CUDA_VERSION >= 12080
+            __nv_atomic_store_n(&t, val,
+                                // TODO: This is defensive, change later
+                                __NV_ATOMIC_SEQ_CST,
+                                __NV_THREAD_SCOPE_DEVICE);
+        #else
+            atomicExch(&t, val);
+        #endif
+    }
     #else
         t += val;
     #endif
