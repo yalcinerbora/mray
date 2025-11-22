@@ -404,7 +404,7 @@ void HashGridRenderer::PathTraceAndQuery()
         // Actual Ray Casting
         tracerView.baseAccelerator.CastRays
         (
-            Span<InterfaceIndex>(),
+            Span<VolumeIndex>(),
             dHitKeys, dHits, dBackupRNGStates,
             dRays, dIndices, false, processQueue
         );

@@ -151,7 +151,9 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/Filters.h
         ${CURRENT_SOURCE_DIR}/SurfaceComparators.h
         ${CURRENT_SOURCE_DIR}/HashGrid.h
-        ${CURRENT_SOURCE_DIR}/HashGrid.cu)
+        ${CURRENT_SOURCE_DIR}/HashGrid.cu
+        ${CURRENT_SOURCE_DIR}/MediaTracker.h
+        ${CURRENT_SOURCE_DIR}/MediaTracker.cu)
 
     set(SRC_COMMON
         ${CMAKE_CURRENT_FUNCTION_LIST_FILE}
@@ -221,6 +223,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/HashGrid.cu
         ${CURRENT_SOURCE_DIR}/RendererCommon.cu
         ${CURRENT_SOURCE_DIR}/PathTracerRendererBase.cu
+        ${CURRENT_SOURCE_DIR}/MediaTracker.cu
     )
 
     # Add sources for OptiX (Backend: CUDA, Enable HW Acceleration ON)

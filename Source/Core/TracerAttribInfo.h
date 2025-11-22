@@ -89,23 +89,16 @@ struct VolumeParams
 {
     MediumId    mediumId;
     TransformId transformId;
+    uint32_t    priority;
 
     auto operator<=>(const VolumeParams&) const = default;
-};
-
-struct InterfaceParams
-{
-    VolumeParams frontVolume;
-    VolumeParams backVolume;
-
-    auto operator<=>(const InterfaceParams&) const = default;
 };
 
 using SurfaceMatList        = StaticVector<MaterialId, TracerConstants::MaxPrimBatchPerSurface>;
 using SurfacePrimList       = StaticVector<PrimBatchId, TracerConstants::MaxPrimBatchPerSurface>;
 using OptionalAlphaMapList  = StaticVector<Optional<TextureId>, TracerConstants::MaxPrimBatchPerSurface>;
 using CullBackfaceFlagList  = StaticVector<bool, TracerConstants::MaxPrimBatchPerSurface>;
-using InterfaceList         = StaticVector<InterfaceParams, TracerConstants::MaxPrimBatchPerSurface>;
+using VolumeList            = StaticVector<VolumeParams, TracerConstants::MaxPrimBatchPerSurface>;
 // Renderer Related
 MRAY_GENERIC_ID(RendererId, CommonId);
 using RendererAttributeInfo = GenericAttributeInfo;

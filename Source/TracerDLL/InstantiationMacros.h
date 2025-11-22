@@ -145,7 +145,7 @@ using GetMWF = GetMWFT<R, MG, TG, I>::Type;
 
 #define MRAY_ACCEL_LOCAL_RAY_CAST_KERNEL_INSTANTIATE(A, P, T)                                                               \
     template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT                                                                  \
-    void KCLocalRayCast<A<P>, T, MRAY_ACCEL_TGEN_FUNCTION(A<P>, T)>(MRAY_GRID_CONSTANT const Span<InterfaceIndex>,          \
+    void KCLocalRayCast<A<P>, T, MRAY_ACCEL_TGEN_FUNCTION(A<P>, T)>(MRAY_GRID_CONSTANT const Span<VolumeIndex>,          \
                                                                     MRAY_GRID_CONSTANT const Span<HitKeyPack>,              \
                                                                     MRAY_GRID_CONSTANT const Span<MetaHit>,                 \
                                                                     MRAY_GRID_CONSTANT const Span<BackupRNGState>,          \

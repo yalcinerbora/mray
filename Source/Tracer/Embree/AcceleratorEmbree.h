@@ -78,11 +78,11 @@ struct EmbreeHitRecord
     AcceleratorKey      acceleratorKey;
     // Actual keys of the primitives in the geometry
     // This can be accessed via primID field (hopefully)
-    Span<const PrimitiveKey>    dPrimKeys;
+    Span<const PrimitiveKey> dPrimKeys;
     // Optional alpha map
-    Optional<AlphaMap>          alphaMap;
+    Optional<AlphaMap>       alphaMap;
     //
-    InterfaceIndex              interfaceIndex;
+    VolumeIndex              volumeIndex;
     //
     // Also embree do not support cull back face
     // natively AFAIK. But we want to use cool AVX/SSE
@@ -144,7 +144,7 @@ struct EmbreeRayQueryContext
     ArrayT<BackupRNGState>  rngStates;
     ArrayT<BackupRNG>       rng;
     ArrayT<AcceleratorKey>  localAccelKeys;
-    ArrayT<InterfaceIndex>  interfaceIndices;
+    ArrayT<VolumeIndex>     volumeIndices;
 };
 
 struct EmbreGlobalUserData
@@ -240,7 +240,7 @@ class AcceleratorGroupEmbree final
                                    const GPUQueue&) const override;
     // Functionality
     void CastLocalRays(// Output
-                       Span<InterfaceIndex> dInterfaceIndices,
+                       Span<VolumeIndex> dVolumeIndices,
                        Span<HitKeyPack> dHitIds,
                        Span<MetaHit> dHitParams,
                        // I-O
@@ -251,7 +251,7 @@ class AcceleratorGroupEmbree final
                        Span<const CommonKey> dAccelKeys,
                        // Constants
                        CommonKey workId,
-                       bool writeInterfaceIndex,
+                       bool resolveMedia,
                        const GPUQueue& queue) override;
 
     void CastVisibilityRays(// Output
@@ -307,7 +307,7 @@ class BaseAcceleratorEmbree final : public BaseAcceleratorT<BaseAcceleratorEmbre
 
     //
     void    CastRays(// Output
-                     Span<InterfaceIndex> dInterfaceIndices,
+                     Span<VolumeIndex> dVolumeIndices,
                      Span<HitKeyPack> dHitIds,
                      Span<MetaHit> dHitParams,
                      // I-O
@@ -316,7 +316,7 @@ class BaseAcceleratorEmbree final : public BaseAcceleratorT<BaseAcceleratorEmbre
                      // Input
                      Span<const RayIndex> dRayIndices,
                      //
-                     bool writeInterfaceIndex,
+                     bool resolveMedia,
                      const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -329,7 +329,7 @@ class BaseAcceleratorEmbree final : public BaseAcceleratorT<BaseAcceleratorEmbre
                                const GPUQueue& queue) override;
 
     void    CastLocalRays(// Output
-                          Span<InterfaceIndex> dInterfaceIndices,
+                          Span<VolumeIndex> dVolumeIndices,
                           Span<HitKeyPack> dHitIds,
                           Span<MetaHit> dHitParams,
                           // I-O
@@ -340,7 +340,7 @@ class BaseAcceleratorEmbree final : public BaseAcceleratorT<BaseAcceleratorEmbre
                           Span<const AcceleratorKey> dAccelKeys,
                           //
                           CommonKey dAccelKeyBatchPortion,
-                          bool writeInterfaceIndex,
+                          bool resolveMedia,
                           const GPUQueue& queue) override;
 
     void    AllocateForTraversal(size_t maxRayCount) override;

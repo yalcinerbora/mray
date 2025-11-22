@@ -76,7 +76,6 @@ class SurfaceRenderer final : public RendererBase
     Span<uint32_t>          dIsVisibleBuffer;
     Span<RandomNumber>      dRandomNumBuffer;
     Span<Byte>              dSubCameraBuffer;
-    Span<InterfaceKeyPack>  dGlobalInterfaceList;
     // Work Hash related
     Span<CommonKey>         dWorkHashes;
     Span<CommonKey>         dWorkBatchIds;

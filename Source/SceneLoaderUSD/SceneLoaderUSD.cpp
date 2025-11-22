@@ -904,20 +904,14 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                 surface.primBatches.push_back(primBatchId);
                 surface.cullFaceFlags.push_back(prim.cullFace);
                 surface.alphaMaps.push_back(mat.alphaMap);
-                surface.interfaces.push_back
+                // TODO: USD volume stuff currently not loaded
+                surface.volumes.push_back
                 (
-                    InterfaceParams
+                    VolumeParams
                     {
-                        .frontVolume =
-                        {
-                            .mediumId = TracerConstants::VacuumMediumId,
-                            .transformId = TracerConstants::IdentityTransformId
-                        },
-                        .backVolume =
-                        {
-                            .mediumId = TracerConstants::VacuumMediumId,
-                            .transformId = TracerConstants::IdentityTransformId
-                        }
+                        .mediumId = TracerConstants::VacuumMediumId,
+                        .transformId = TracerConstants::IdentityTransformId,
+                        .priority = 0
                     }
                 );
             }
@@ -950,20 +944,13 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                 surface.primBatches.push_back(primBatchId);
                 surface.cullFaceFlags.push_back(!mat.alphaMap.has_value());
                 surface.alphaMaps.push_back(mat.alphaMap);
-                surface.interfaces.push_back
+                surface.volumes.push_back
                 (
-                    InterfaceParams
+                    VolumeParams
                     {
-                        .frontVolume =
-                        {
-                            .mediumId = TracerConstants::VacuumMediumId,
-                            .transformId = TracerConstants::IdentityTransformId
-                        },
-                        .backVolume =
-                        {
-                            .mediumId = TracerConstants::VacuumMediumId,
-                            .transformId = TracerConstants::IdentityTransformId
-                        }
+                        .mediumId    = TracerConstants::VacuumMediumId,
+                        .transformId = TracerConstants::IdentityTransformId,
+                        .priority    = 0
                     }
                 );
             }

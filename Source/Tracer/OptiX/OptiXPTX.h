@@ -19,7 +19,7 @@ struct NormalRayCastArgPackOptiX
 {
     OptixTraversableHandle  baseAccelerator;
     // Outputs
-    Span<InterfaceIndex>    dInterfaceIndices;
+    Span<VolumeIndex>       dVolumeIndices;
     Span<HitKeyPack>        dHitKeys;
     Span<MetaHit>           dHits;
     // I-O
@@ -27,7 +27,7 @@ struct NormalRayCastArgPackOptiX
     Span<RayGMem>           dRays;
     // Inputs
     Span<const RayIndex>    dRayIndices;
-    bool                    writeInterfaceIndex;
+    bool                    resolveMedia;
 };
 
 struct VisibilityCastArgPackOptiX
@@ -45,7 +45,7 @@ struct VisibilityCastArgPackOptiX
 struct LocalRayCastArgPackOptiX
 {
     // Outputs
-    Span<InterfaceIndex>    dInterfaceIndices;
+    Span<VolumeIndex>       dVolumeIndices;
     Span<HitKeyPack>        dHitKeys;
     Span<MetaHit>           dHits;
     // I-O
@@ -58,7 +58,7 @@ struct LocalRayCastArgPackOptiX
     Span<const OptixTraversableHandle>  dGlobalInstanceTraversables;
     Span<const Matrix4x4>               dGlobalInstanceInvTransforms;
     uint32_t                            batchStartOffset;
-    bool                                writeInterfaceIndex;
+    bool                                resolveMedia;
 };
 
 struct ArgumentPackOptiX
@@ -93,7 +93,7 @@ struct GenericHitRecordData
     // trace the GAS for SSS)
     AcceleratorKey      acceleratorKey;
     // Index to the global interface list
-    InterfaceIndex      interfaceIndex;
+    VolumeIndex         volumeIndex;
     // Cull face is instance level operation and is a software flag
     // for triangles, for other primitives this will be valid
     bool                cullBackFaceNonTri;

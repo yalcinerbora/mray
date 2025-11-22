@@ -1865,24 +1865,14 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
             PushToTypeMapping(transformNodes, transformHT,
                               s.transformId, TRANSFORM_LIST);
 
-            if(s.interfaces[i].front.mediumId != EMPTY_MEDIUM)
+            if(s.volumes[i].mediumId != EMPTY_MEDIUM)
                 PushToTypeMapping(mediumNodes, mediumHT,
-                                  s.interfaces[i].front.mediumId,
+                                  s.volumes[i].mediumId,
                                   MEDIUM_LIST);
 
-            if(s.interfaces[i].front.transformId != EMPTY_TRANSFORM)
+            if(s.volumes[i].transformId != EMPTY_TRANSFORM)
                 PushToTypeMapping(transformNodes, transformHT,
-                                  s.interfaces[i].front.transformId,
-                                  TRANSFORM_LIST);
-
-            if(s.interfaces[i].back.mediumId != EMPTY_MEDIUM)
-                PushToTypeMapping(mediumNodes, mediumHT,
-                                  s.interfaces[i].back.mediumId,
-                                  MEDIUM_LIST);
-
-            if(s.interfaces[i].back.transformId != EMPTY_TRANSFORM)
-                PushToTypeMapping(transformNodes, transformHT,
-                                  s.interfaces[i].back.transformId,
+                                  s.volumes[i].transformId,
                                   TRANSFORM_LIST);
 
             if(s.alphaMaps[i].has_value())
@@ -2065,7 +2055,7 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
         SurfaceMatList matList;
         OptionalAlphaMapList alphaMaps;
         CullBackfaceFlagList cullFace;
-        InterfaceList interfaces;
+        VolumeList volumes;
 
         transformId = transformMappings.map.at(surf.transformId).second;
         for(uint8_t i = 0; i < surf.pairCount; i++)
@@ -2084,26 +2074,17 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
             alphaMaps.push_back(texId);
             cullFace.push_back(surf.doCullBackFace[i]);
 
-            InterfaceParams iParams = TracerConstants::IdentityIterface;
-            if(surf.interfaces[i].front.mediumId != EMPTY_MEDIUM)
+            VolumeParams vParams = TracerConstants::IdentityVolume;
+            if(surf.volumes[i].mediumId != EMPTY_MEDIUM)
             {
-                MediumId mId = mediumMappings.map.at(surf.interfaces[i].front.mediumId).second;
-                TransformId tId = (surf.interfaces[i].front.transformId == EMPTY_TRANSFORM)
+                MediumId mId = mediumMappings.map.at(surf.volumes[i].mediumId).second;
+                TransformId tId = (surf.volumes[i].transformId == EMPTY_TRANSFORM)
                     ? TracerConstants::IdentityTransformId
-                    : transformMappings.map.at(surf.interfaces[i].front.transformId).second;
-                iParams.frontVolume.mediumId = mId;
-                iParams.frontVolume.transformId = tId;
+                    : transformMappings.map.at(surf.volumes[i].transformId).second;
+                vParams.mediumId = mId;
+                vParams.transformId = tId;
             }
-            if(surf.interfaces[i].back.mediumId != EMPTY_MEDIUM)
-            {
-                MediumId mId = mediumMappings.map.at(surf.interfaces[i].back.mediumId).second;
-                TransformId tId = (surf.interfaces[i].back.transformId == EMPTY_TRANSFORM)
-                    ? TracerConstants::IdentityTransformId
-                    : transformMappings.map.at(surf.interfaces[i].back.transformId).second;
-                iParams.backVolume.mediumId = mId;
-                iParams.backVolume.transformId = tId;
-            }
-            interfaces.push_back(iParams);
+            volumes.push_back(vParams);
         }
 
         SurfaceParams surfParams
@@ -2113,7 +2094,7 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
             .transformId    = transformId,
             .alphaMaps      = alphaMaps,
             .cullFaceFlags  = cullFace,
-            .interfaces     = interfaces
+            .volumes        = volumes
         };
         SurfaceId mRaySurf = tracer.CreateSurface(surfParams);
         mRaySurfaces.push_back(Pair(surfaceId++, mRaySurf));

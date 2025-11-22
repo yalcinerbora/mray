@@ -67,7 +67,7 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
     CommonKey isBackFace = (intersection.value().backFace)
             ? IS_BACKFACE_KEY_FLAG
             : IS_FRONTFACE_KEY_FLAG;
-    CommonKey ii = interfaces[index].FetchIndexPortion();
+    CommonKey vI = volumeIndices[index].FetchIndexPortion();
     // It is a hit! Update
     return HitResult
     {
@@ -75,7 +75,7 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
         .t              = intersection.value().t,
         .primitiveKey   = primKey,
         .lmKey          = lmKeys[index],
-        .interface      = InterfaceIndex::CombinedKey(isBackFace, ii)
+        .volumeIndex    = VolumeIndex::CombinedKey(isBackFace, vI)
     };
 }
 
@@ -88,7 +88,7 @@ AcceleratorLinear<PG, TG>::AcceleratorLinear(const TransDataSoA& tSoA,
     : primRanges(dataSoA.dPrimitiveRanges[aId.FetchIndexPortion()])
     , cullFaceFlags(dataSoA.dCullFace[aId.FetchIndexPortion()])
     , alphaMaps(dataSoA.dAlphaMaps[aId.FetchIndexPortion()])
-    , interfaces(dataSoA.dInterfaces[aId.FetchIndexPortion()])
+    , volumeIndices(dataSoA.dVolumeIndices[aId.FetchIndexPortion()])
     , lmKeys(dataSoA.dLightOrMatKeys[aId.FetchIndexPortion()])
     , leafs(ToConstSpan(dataSoA.dLeafs[aId.FetchIndexPortion()]))
     , transformKey(dataSoA.dInstanceTransforms[aId.FetchIndexPortion()])
@@ -183,7 +183,7 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
     // Copy these host vectors to GPU
     // For linear accelerator we only need these at GPU memory
     // additionally we will create instance's globalAABB
-    MemAlloc::AllocateMultiData(Tie(dInstanceInterfaceIndices,
+    MemAlloc::AllocateMultiData(Tie(dInstanceVolumeIndices,
                                     dCullFaceFlags,
                                     dAlphaMaps,
                                     dLightOrMatKeys,
@@ -203,20 +203,20 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
                                                                   this->instanceLeafRanges);
 
     // Actual memcpy
-    Span<InterfaceIndexArray>       hSpanInstanceInterfaceIndices(ppResult.surfData.interfaces);
+    Span<VolumeIndexArray>          hSpanInstanceVolumeIndices(ppResult.surfData.volumeIndices);
     Span<CullFaceFlagArray>         hSpanCullFaceFlags(ppResult.surfData.cullFaceFlags);
     Span<AlphaMapArray>             hSpanAlphaMaps(ppResult.surfData.alphaMaps);
     Span<LightOrMatKeyArray>        hSpanLMKeys(ppResult.surfData.lightOrMatKeys);
     Span<PrimRangeArray>            hSpanPrimitiveRanges(ppResult.surfData.primRanges);
     Span<TransformKey>              hSpanTransformKeys(ppResult.surfData.transformKeys);
     Span<Span<const PrimitiveKey>>  hSpanLeafs(hInstanceLeafs);
-    queue.MemcpyAsync(dInstanceInterfaceIndices, ToConstSpan(hSpanInstanceInterfaceIndices));
-    queue.MemcpyAsync(dCullFaceFlags,            ToConstSpan(hSpanCullFaceFlags));
-    queue.MemcpyAsync(dAlphaMaps,                ToConstSpan(hSpanAlphaMaps));
-    queue.MemcpyAsync(dLightOrMatKeys,           ToConstSpan(hSpanLMKeys));
-    queue.MemcpyAsync(dPrimitiveRanges,          ToConstSpan(hSpanPrimitiveRanges));
-    queue.MemcpyAsync(dTransformKeys,            ToConstSpan(hSpanTransformKeys));
-    queue.MemcpyAsync(dLeafs,                    ToConstSpan(hSpanLeafs));
+    queue.MemcpyAsync(dInstanceVolumeIndices, ToConstSpan(hSpanInstanceVolumeIndices));
+    queue.MemcpyAsync(dCullFaceFlags,         ToConstSpan(hSpanCullFaceFlags));
+    queue.MemcpyAsync(dAlphaMaps,             ToConstSpan(hSpanAlphaMaps));
+    queue.MemcpyAsync(dLightOrMatKeys,        ToConstSpan(hSpanLMKeys));
+    queue.MemcpyAsync(dPrimitiveRanges,       ToConstSpan(hSpanPrimitiveRanges));
+    queue.MemcpyAsync(dTransformKeys,         ToConstSpan(hSpanTransformKeys));
+    queue.MemcpyAsync(dLeafs,                 ToConstSpan(hSpanLeafs));
 
     // Copy Ids to the leaf buffer
     auto hConcreteLeafRanges = Span<const Vector2ui>(this->concreteLeafRanges);
@@ -248,7 +248,7 @@ void AcceleratorGroupLinear<PG>::Construct(AccelGroupConstructParams p,
 
     data = DataSoA
     {
-        .dInterfaces            = ToConstSpan(dInstanceInterfaceIndices),
+        .dVolumeIndices         = ToConstSpan(dInstanceVolumeIndices),
         .dCullFace              = ToConstSpan(dCullFaceFlags),
         .dAlphaMaps             = ToConstSpan(dAlphaMaps),
         .dLightOrMatKeys        = ToConstSpan(dLightOrMatKeys),
@@ -290,7 +290,7 @@ void AcceleratorGroupLinear<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWrit
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
-                                               Span<InterfaceIndex> dInterfaceIndices,
+                                               Span<VolumeIndex> dVolumeIndices,
                                                Span<HitKeyPack> dHitIds,
                                                Span<MetaHit> dHitParams,
                                                // I-O
@@ -301,7 +301,7 @@ void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
                                                Span<const CommonKey> dAccelKeys,
                                                // Constants
                                                CommonKey workId,
-                                               bool writeInterfaceIndex,
+                                               bool resolveMedia,
                                                const GPUQueue& queue)
 {
     CommonKey localWorkId = workId - this->globalWorkIdToLocalOffset;
@@ -313,7 +313,7 @@ void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
 
     const auto& work = workOpt.value().get();
     work->CastLocalRays(// Output
-                        dInterfaceIndices,
+                        dVolumeIndices,
                         dHitIds,
                         dHitParams,
                         // I-O
@@ -323,7 +323,7 @@ void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
                         dRayIndices,
                         dAccelKeys,
                         // Constants
-                        writeInterfaceIndex,
+                        resolveMedia,
                         queue);
 }
 

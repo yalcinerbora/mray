@@ -42,9 +42,7 @@ namespace NodeNames
     static constexpr auto ALPHA_MAP     = "alphaMap"sv;
     static constexpr auto CULL_FACE     = "cullBackFace"sv;
     // Medium Related
-    static constexpr auto INTERFACE     = "interface"sv;
-    static constexpr auto MEDIUM_FRONT  = "front"sv;
-    static constexpr auto MEDIUM_BACK   = "back"sv;
+    static constexpr auto PRIORITY      = "priority"sv;
     // Material & Light Common Names
     static constexpr auto MEDIUM        = "medium"sv;
     static constexpr auto LIGHT         = "light"sv;

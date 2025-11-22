@@ -80,7 +80,7 @@ namespace LBVHAccelDetail
     struct LBVHAcceleratorSoA
     {
         // Per accelerator instance stuff
-        Span<const InterfaceIndexArray>         dInterfaces;
+        Span<const VolumeIndexArray>            dVolumeIndices;
         Span<const CullFaceFlagArray>           dCullFace;
         Span<const AlphaMapArray>               dAlphaMaps;
         Span<const LightOrMatKeyArray>          dLightOrMatKeys;
@@ -113,7 +113,7 @@ namespace LBVHAccelDetail
         // Rest is by reference (except the tKey & cullFace, these are a single word)
         CullFaceFlagArray           cullFaceFlags;
         const AlphaMapArray&        alphaMaps;
-        const InterfaceIndexArray&  interfaces;
+        const VolumeIndexArray&     volumeIndices;
         const LightOrMatKeyArray&   lmKeys;
         Span<const PrimitiveKey>    leafs;
         Span<const LBVHNode>        nodes;
@@ -167,7 +167,7 @@ class AcceleratorGroupLBVH final
     DeviceMemory                mem;
     DataSoA                     data;
     // Per-instance (All accelerators will have these)
-    Span<InterfaceIndexArray>   dInstanceInterfaceIndices;
+    Span<VolumeIndexArray>      dInstanceVolumeIndices;
     Span<CullFaceFlagArray>     dCullFaceFlags;
     Span<AlphaMapArray>         dAlphaMaps;
     Span<LightOrMatKeyArray>    dLightOrMatKeys;
@@ -204,7 +204,7 @@ class AcceleratorGroupLBVH final
 
     // Functionality
     void    CastLocalRays(// Output
-                          Span<InterfaceIndex> dInterfaceIndices,
+                          Span<VolumeIndex> dVolumeIndices,
                           Span<HitKeyPack> dHitIds,
                           Span<MetaHit> dHitParams,
                           // I-O
@@ -215,7 +215,7 @@ class AcceleratorGroupLBVH final
                           Span<const CommonKey> dAccelKeys,
                           // Constants
                           CommonKey workId,
-                          bool writeInterfaceIndex,
+                          bool resolveMedia,
                           const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -269,7 +269,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
 
     //
     void    CastRays(// Output
-                     Span<InterfaceIndex> dInterfaceIndices,
+                     Span<VolumeIndex> dVolumeIndices,
                      Span<HitKeyPack> dHitIds,
                      Span<MetaHit> dHitParams,
                      // I-O
@@ -278,7 +278,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                      // Input
                      Span<const RayIndex> dRayIndices,
                      //
-                     bool writeInterfaceIndex,
+                     bool resolveMedia,
                      const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -291,7 +291,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                                const GPUQueue& queue) override;
 
     void    CastLocalRays(// Output
-                          Span<InterfaceIndex> dInterfaceIndices,
+                          Span<VolumeIndex> dVolumeIndices,
                           Span<HitKeyPack> dHitIds,
                           Span<MetaHit> dHitParams,
                           // I-O
@@ -302,7 +302,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                           Span<const AcceleratorKey> dAccelKeys,
                           //
                           CommonKey dAccelKeyBatchPortion,
-                          bool writeInterfaceIndex,
+                          bool resolveMedia,
                           const GPUQueue& queue) override;
 
     void    AllocateForTraversal(size_t maxRayCount) override;

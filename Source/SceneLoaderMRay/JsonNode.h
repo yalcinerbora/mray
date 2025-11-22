@@ -50,12 +50,7 @@ struct VolumeStruct
 {
     uint32_t mediumId;
     uint32_t transformId;
-};
-
-struct InterfaceStruct
-{
-    VolumeStruct front;
-    VolumeStruct back;
+    uint32_t priority;
 };
 
 struct SurfaceStruct
@@ -69,15 +64,15 @@ struct SurfaceStruct
     using IdPairList    = std::array<IdPair, PPS>;
     using TextureList   = std::array<Optional<SceneTexId>, PPS>;
     using CullList      = std::array<bool, PPS>;
-    using InterfaceList = std::array<InterfaceStruct, PPS>;
+    using VolumeList    = std::array<VolumeStruct, PPS>;
 
     //
-    uint32_t        transformId;
-    IdPairList      matPrimBatchPairs;
-    TextureList     alphaMaps;
-    CullList        doCullBackFace;
-    int8_t          pairCount;
-    InterfaceList   interfaces;
+    uint32_t    transformId;
+    IdPairList  matPrimBatchPairs;
+    TextureList alphaMaps;
+    CullList    doCullBackFace;
+    int8_t      pairCount;
+    VolumeList  volumes;
 };
 using SceneSurfList = std::vector<SurfaceStruct>;
 
@@ -100,7 +95,6 @@ using SceneCamSurfList = std::vector<CameraSurfaceStruct>;
 // Json converters
 void from_json(const nlohmann::json&, SceneTexId&);
 void from_json(const nlohmann::json&, VolumeStruct&);
-void from_json(const nlohmann::json&, InterfaceStruct&);
 void from_json(const nlohmann::json&, SurfaceStruct&);
 void from_json(const nlohmann::json&, LightSurfaceStruct&);
 void from_json(const nlohmann::json&, CameraSurfaceStruct&);

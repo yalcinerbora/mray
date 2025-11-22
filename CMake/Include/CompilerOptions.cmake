@@ -193,6 +193,9 @@ set(MRAY_CUDA_OPTIONS
 # Platform Specific CUDA Options
 if(MSVC)
     set(MRAY_CUDA_OPTIONS ${MRAY_CUDA_OPTIONS}
+        # Large section tables (too many templates on CPU Device)
+        -Xcompiler=/bigobj
+
         # Ignore inline functions are not defined warning
         -Xcompiler=/wd4984
         -Xcompiler=/wd4324

@@ -151,8 +151,8 @@ class TracerBase : public TracerI
     // Render Framebuffer
     RenderImagePtr      renderImage;
 
-    // Deduplicated Interface List
-    std::vector<InterfaceKeyPack> globalInterfaceList;
+    // Deduplicated Volume List
+    std::vector<VolumeKeyPack> globalVolumeList;
 
     // Current Types
     Map<std::string_view, PrimAttributeInfoList>       primAttributeInfoMap;
@@ -166,7 +166,7 @@ class TracerBase : public TracerI
     void            PopulateAttribInfoAndTypeLists();
     TracerView      GenerateTracerView();
     void            GenerateDefaultGroups();
-    void            GenerateGlobalInterfaceList();
+    void            GenerateGlobalVolumeList();
 
     public:
     // Constructors & Destructor

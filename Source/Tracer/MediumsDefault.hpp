@@ -14,7 +14,7 @@ bool SingleSegmentIterator::Advance()
 
 template<class S>
 MR_HF_DEF
-MediumTraverser<S>::MediumTraverser(const Ray& ray, const Vector2& tMM,
+MediumTraverser<S>::MediumTraverser(const Ray&, const Vector2&,
                                     const SegmentIterator& it)
     : it(it)
     , dt(0)

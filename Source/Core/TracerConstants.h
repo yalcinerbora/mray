@@ -34,10 +34,11 @@ namespace TracerConstants
     // This will be compile time checked.
     static constexpr size_t MaxCameraInstanceByteSize = 512;
 
-    static constexpr std::string_view IdentityTransName = "(T)Identity";
-    static constexpr std::string_view NullLightName     = "(L)Null";
-    static constexpr std::string_view EmptyPrimName     = "(P)Empty";
-    static constexpr std::string_view VacuumMediumName  = "(Md)Vacuum";
+    static constexpr std::string_view IdentityTransName  = "(T)Identity";
+    static constexpr std::string_view NullLightName      = "(L)Null";
+    static constexpr std::string_view EmptyPrimName      = "(P)Empty";
+    static constexpr std::string_view VacuumMediumName   = "(Md)Vacuum";
+    static constexpr std::string_view PassthroughMatName = "(Mt)Passthrough";
 
     static constexpr std::string_view LIGHT_PREFIX      = "(L)";
     static constexpr std::string_view TRANSFORM_PREFIX  = "(T)";

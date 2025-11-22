@@ -12,6 +12,7 @@
 #include "AcceleratorC.h"
 #include "Texture.h"
 #include "TextureFilter.h"
+#include "MediaTracker.h"
 
 #include "Core/Algorithm.h"
 #include "Core/TypePack.h"
@@ -37,6 +38,8 @@ template<class, class> class GenericTexturedGroupT;
 using GenericGroupTransformT = GenericGroupT<TransformKey, TransAttributeInfo>;
 using GenericGroupMediumT    = GenericTexturedGroupT<MediumKey, MediumAttributeInfo>;
 using GenericGroupMaterialT  = GenericTexturedGroupT<MaterialKey, MatAttributeInfo>;
+
+class MediaTrackerView;
 
 struct FlatSurfParams
 {
@@ -74,7 +77,7 @@ struct TracerView
     const std::vector<Pair<LightSurfaceId, LightSurfaceParams>>&    lightSurfs;
     const std::vector<Pair<CamSurfaceId, CameraSurfaceParams>>&     camSurfs;
     const std::vector<FlatSurfParams>&                              flattenedSurfaces;
-    const std::vector<InterfaceKeyPack>&                             globalInterfaceList;
+    const std::vector<VolumeKeyPack>&                               globalVolumeList;
 };
 
 class RenderWorkI
@@ -396,10 +399,9 @@ void DoWork_##tag                                       \
     Span<RayGMem> dRaysIO,                              \
     Span<RayCone> dRayDiffsIO,                          \
     Span<const RayIndex> dRayIndices,                   \
-    Span<const InterfaceIndex> dInterfaceIndices,       \
-    Span<const VolumeKeyPack> dCurrentVolumes,          \
+    Span<const RayMediaListPack> dRayMediaPacks,        \
     Span<const RandomNumber> dRandomNumbers,            \
-    Span<const InterfaceKeyPack> dGlobalInterfaceList,  \
+    const MediaTrackerView& mediaTracker,               \
     const RenderGlobalState<R, tag>& globalState,       \
     const GPUQueue& queue                               \
 ) const
@@ -411,17 +413,15 @@ void DoWork_##tag                           \
     Span<RayGMem> b,                        \
     Span<RayCone> c,                        \
     Span<const RayIndex> d,                 \
-    Span<const InterfaceIndex> e,           \
-    Span<const VolumeKeyPack> f,            \
-    Span<const RandomNumber> g,             \
-    Span<const InterfaceKeyPack> h,         \
-    const RenderGlobalState<R, tag>& i,     \
-    const GPUQueue& j                       \
+    Span<const RayMediaListPack> e,         \
+    Span<const RandomNumber> f,             \
+    const MediaTrackerView& g,              \
+    const RenderGlobalState<R, tag>& h,     \
+    const GPUQueue& i                       \
 ) const override                            \
 {                                           \
     DoWorkInternal<tag>(a, b, c, d,         \
-                        e, f, g, h,         \
-                        i, j);              \
+                        e, f, g, h, i);     \
 }
 
 template<class R>

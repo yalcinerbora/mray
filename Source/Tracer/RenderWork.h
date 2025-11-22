@@ -8,6 +8,7 @@
 #include "TracerTypes.h"
 #include "Random.h"
 #include "RayGenKernels.h"
+#include "MediaTracker.h"
 
 // Render work kernel parameters
 // There are too many parameters so these are
@@ -94,11 +95,10 @@ struct RenderMediumWorkParams
         Span<RayCone>                dRayCones;
         //
         Span<const RayIndex>         dRayIndices;
-        Span<const InterfaceIndex>   dInterfaceIndices;
-        Span<const VolumeKeyPack>    dCurrentVolumes;
+        Span<const RayMediaListPack> dRayMediaPacks;
         Span<const RandomNumber>     dRandomNumbers;
-        // Global, Accessed by "dInterfaceIndicesIn"
-        Span<const InterfaceKeyPack> dGlobalInterfaceList;
+        // Global
+        MediaTrackerView             mediaTracker;
     };
     //
     RayState    rayState;
@@ -413,10 +413,9 @@ class RenderMediumWork : public RenderMediumWorkT<R>
                         Span<RayGMem> dRaysIO,
                         Span<RayCone> dRayDiffsIO,
                         Span<const RayIndex> dRayIndices,
-                        Span<const InterfaceIndex> dInterfaceIndices,
-                        Span<const VolumeKeyPack> dCurrentVolumes,
+                        Span<const RayMediaListPack> dRayInterfacePacks,
                         Span<const RandomNumber> dRandomNumbers,
-                        Span<const InterfaceKeyPack> dGlobalInterfaceList,
+                        const MediaTrackerView& mediaTracker,
                         const RenderGlobalState<R, I>& globalState,
                         const GPUQueue& queue) const;
 
@@ -939,10 +938,9 @@ void RenderMediumWork<R, MG, TG>::DoWorkInternal(// I-O
                                                  Span<RayGMem> dRaysIO,
                                                  Span<RayCone> dRayDiffsIO,
                                                  Span<const RayIndex> dRayIndices,
-                                                 Span<const InterfaceIndex> dInterfaceIndices,
-                                                 Span<const VolumeKeyPack> dCurrentVolumes,
+                                                 Span<const RayMediaListPack> dRayMediaPacks,
                                                  Span<const RandomNumber> dRandomNumbers,
-                                                 Span<const InterfaceKeyPack> dGlobalInterfaceList,
+                                                 const MediaTrackerView& mediaTracker,
                                                  const RenderGlobalState<R, I>& globalState,
                                                  const GPUQueue& queue) const
 {
@@ -968,10 +966,9 @@ void RenderMediumWork<R, MG, TG>::DoWorkInternal(// I-O
                 dRayDiffsIO,
                 //
                 dRayIndices,
-                dInterfaceIndices,
-                dCurrentVolumes,
+                dRayMediaPacks,
                 dRandomNumbers,
-                dGlobalInterfaceList
+                mediaTracker
             },
             .mediumSoA   = mg.SoA(),
             .transSoA    = tg.SoA()

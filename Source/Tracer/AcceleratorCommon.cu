@@ -247,7 +247,7 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
                                                              std::string_view typeName)
 {
     LinearizedSurfaceData result = {};
-    result.interfaces.reserve(partitions.totalInstanceCount);
+    result.volumeIndices.reserve(partitions.totalInstanceCount);
     result.primRanges.reserve(partitions.totalInstanceCount);
     result.lightOrMatKeys.reserve(partitions.totalInstanceCount);
     result.alphaMaps.reserve(partitions.totalInstanceCount);
@@ -260,7 +260,7 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
         using namespace TracerConstants;
         for(uint32_t i = restStart; i < static_cast<uint32_t>(MaxPrimBatchPerSurface); i++)
         {
-            result.interfaces.back()[i] = InterfaceIndex::InvalidKey();
+            result.volumeIndices.back()[i] = VolumeIndex::InvalidKey();
             result.alphaMaps.back()[i] = std::nullopt;
             result.cullFaceFlags.back()[i] = false;
             result.lightOrMatKeys.back()[i] = LightOrMatKey::InvalidKey();
@@ -270,7 +270,7 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
 
     const auto LoadSurf = [&](const SurfaceParams& surf)
     {
-        result.interfaces.emplace_back();
+        result.volumeIndices.emplace_back();
         result.instancePrimBatches.push_back(surf.primBatches);
         result.alphaMaps.emplace_back();
         result.cullFaceFlags.emplace_back();
@@ -310,38 +310,30 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
                                                                          mKey.FetchIndexPortion());
 
             // TODO: Linear search may be slow later
-            InterfaceKeyPack iKeyPack =
+            VolumeKeyPack vKeyPack =
             {
-                .front =
-                {
-                    .medKey   = Bit::BitCast<MediumKey>(surf.interfaces[i].frontVolume.mediumId),
-                    .transKey = Bit::BitCast<TransformKey>(surf.interfaces[i].frontVolume.transformId)
-                },
-                .back =
-                {
-                    .medKey   = Bit::BitCast<MediumKey>(surf.interfaces[i].backVolume.mediumId),
-                    .transKey = Bit::BitCast<TransformKey>(surf.interfaces[i].backVolume.transformId)
-                }
+                .medKey   = Bit::BitCast<MediumKey>(surf.volumes[i].mediumId),
+                .transKey = Bit::BitCast<TransformKey>(surf.volumes[i].transformId),
+                .priority = surf.volumes[i].priority
             };
-            auto iLoc = std::find(p.globalInterfaceList->cbegin(), p.globalInterfaceList->cend(), iKeyPack);
-            if(iLoc == p.globalInterfaceList->cend())
-                throw MRayError("{:s}: Interface composed of (as \"[Front M T | Back M T]\") "
-                                "[{}, {} | {} {}] is not found ",
+            auto vLoc = std::find(p.globalVolumeList->cbegin(), p.globalVolumeList->cend(), vKeyPack);
+            if(vLoc == p.globalVolumeList->cend())
+                throw MRayError("{:s}: Volume [Medium: {}, Transform: {}, Priority: {}] "
+                                "is not found ",
                                 typeName,
-                                CommonKey(surf.interfaces[i].frontVolume.mediumId),
-                                CommonKey(surf.interfaces[i].frontVolume.transformId),
-                                CommonKey(surf.interfaces[i].backVolume.mediumId),
-                                CommonKey(surf.interfaces[i].backVolume.transformId));
+                                CommonKey(surf.volumes[i].mediumId),
+                                CommonKey(surf.volumes[i].transformId),
+                                surf.volumes[i].priority);
 
-            auto iIndex = CommonKey(std::distance(p.globalInterfaceList->cbegin(), iLoc));
-            result.interfaces.back()[i] = InterfaceIndex::CombinedKey(0, iIndex);
+            auto iIndex = CommonKey(std::distance(p.globalVolumeList->cbegin(), vLoc));
+            result.volumeIndices.back()[i] = VolumeIndex::CombinedKey(0, iIndex);
         }
         InitRest(static_cast<uint32_t>(surf.alphaMaps.size()));
     };
 
     const auto LoadLightSurf = [&](const LightSurfaceParams& lSurf)
     {
-        result.interfaces.emplace_back();
+        result.volumeIndices.emplace_back();
         result.alphaMaps.emplace_back();
         result.cullFaceFlags.emplace_back();
         result.lightOrMatKeys.emplace_back();
@@ -361,27 +353,24 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
         result.transformKeys.back() = std::bit_cast<TransformKey>(lSurf.transformId);
         result.instancePrimBatches.back().push_back(primBatchId);
 
-        auto iLoc = std::find_if(p.globalInterfaceList->cbegin(), p.globalInterfaceList->cend(),
-                                 [interface = lSurf.volume](const InterfaceKeyPack& iParams)
+        VolumeKeyPack vKeyPack =
         {
-            VolumeKeyPack kp =
-            {
-                .medKey   = Bit::BitCast<MediumKey>(interface.mediumId),
-                .transKey = Bit::BitCast<TransformKey>(interface.transformId)
-            };
-            return (iParams.back  == kp && iParams.front == kp);
-        });
-        if(iLoc == p.globalInterfaceList->cend())
-            throw MRayError("{:s}: Interface composed of (as \"[Front M T | Back M T | isEnclosed]\") "
-                            "[{}, {} | {} {} | false] is not found ",
+            .medKey   = Bit::BitCast<MediumKey>(lSurf.volume.mediumId),
+            .transKey = Bit::BitCast<TransformKey>(lSurf.volume.transformId),
+            .priority = lSurf.volume.priority
+
+        };
+        auto vLoc = std::find(p.globalVolumeList->cbegin(), p.globalVolumeList->cend(), vKeyPack);
+        if(vLoc == p.globalVolumeList->cend())
+            throw MRayError("{:s}: Volume [Medium: {}, Transform: {}, Priority: {}] "
+                            "is not found ",
                             typeName,
                             CommonKey(lSurf.volume.mediumId),
                             CommonKey(lSurf.volume.transformId),
-                            CommonKey(lSurf.volume.mediumId),
-                            CommonKey(lSurf.volume.transformId));
+                            lSurf.volume.priority);
 
-        auto iIndex = CommonKey(std::distance(p.globalInterfaceList->cbegin(), iLoc));
-        result.interfaces.back().front() = InterfaceIndex::CombinedKey(0, iIndex);
+        auto vIndex = CommonKey(std::distance(p.globalVolumeList->cbegin(), vLoc));
+        result.volumeIndices.back().front() = VolumeIndex::CombinedKey(0, vIndex);
     };
 
     for(const auto& pIndices : partitions.packedIndices)
@@ -403,7 +392,7 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
         }
     }
 
-    assert(result.interfaces.size() == partitions.totalInstanceCount);
+    assert(result.volumeIndices.size() == partitions.totalInstanceCount);
     assert(result.alphaMaps.size() == partitions.totalInstanceCount);
     assert(result.cullFaceFlags.size() == partitions.totalInstanceCount);
     assert(result.lightOrMatKeys.size() == partitions.totalInstanceCount);
@@ -617,7 +606,7 @@ void BaseAccelerator::PartitionSurfaces(std::vector<AccelGroupConstructParams>& 
         };
         partitions.back().primGroup = pGroupOpt.value().get().get();
         partitions.back().textureViews = &cParams.texViewMap;
-        partitions.back().globalInterfaceList = &cParams.globalInterfaceList;
+        partitions.back().globalVolumeList = &cParams.globalVolumeList;
         partitions.back().transformGroups = &cParams.transformGroups;
         auto innerStart = start;
         while(innerStart != end)
@@ -688,7 +677,7 @@ void BaseAccelerator::AddLightSurfacesToPartitions(std::vector<AccelGroupConstru
             {
                 .transformGroups = &cParams.transformGroups,
                 .textureViews = &cParams.texViewMap,
-                .globalInterfaceList = &cParams.globalInterfaceList,
+                .globalVolumeList = &cParams.globalVolumeList,
                 .primGroup = pGroup,
                 .lightGroup = lGroup,
                 .tGroupSurfs = {},

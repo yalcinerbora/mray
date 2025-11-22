@@ -160,8 +160,8 @@ void KCClosestHit()
     MetaHit hit = ReadHitFromAttributes<Hit, TrianglePrimGroupC<PGroup>>();
 
     // Write to the global memory
-    bool doWriteInterfaceIndex = false;
-    Span<InterfaceIndex> dInterfaceIndices;
+    bool resolveMedia = false;
+    Span<VolumeIndex> dVolumeIndices;
     Span<HitKeyPack> dHitKeys;
     Span<MetaHit> dHits;
     Span<RayGMem> dRays;
@@ -180,20 +180,20 @@ void KCClosestHit()
         };
         dHits[rIndex] = hit;
         dRays[rIndex].tMax = optixGetRayTmax();
-        doWriteInterfaceIndex = params.nParams.writeInterfaceIndex;
-        dInterfaceIndices = params.nParams.dInterfaceIndices;
+        resolveMedia = params.nParams.resolveMedia;
+        dVolumeIndices = params.nParams.dVolumeIndices;
     }
     else
     {
         dHitKeys = params.lParams.dHitKeys;
         dHits = params.lParams.dHits;
         dRays = params.lParams.dRays;
-        doWriteInterfaceIndex = params.lParams.writeInterfaceIndex;
-        dInterfaceIndices = params.lParams.dInterfaceIndices;
+        resolveMedia = params.lParams.resolveMedia;
+        dVolumeIndices = params.lParams.dVolumeIndices;
     }
 
     // Interface Index
-    if(doWriteInterfaceIndex)
+    if(resolveMedia)
     {
         bool isBackFace = false;
         unsigned int hk = optixGetHitKind();
@@ -206,9 +206,9 @@ void KCClosestHit()
                 ? IS_BACKFACE_KEY_FLAG
                 : IS_FRONTFACE_KEY_FLAG;
 
-        auto index = record.interfaceIndex.FetchIndexPortion();
-        auto ii = InterfaceIndex::CombinedKey(orientation, index);
-        dInterfaceIndices[rIndex] = ii;
+        auto vIndex = record.volumeIndex.FetchIndexPortion();
+        auto vI = VolumeIndex::CombinedKey(orientation, vIndex);
+        dVolumeIndices[rIndex] = vI;
     }
 }
 

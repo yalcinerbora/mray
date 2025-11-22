@@ -197,7 +197,7 @@ void BaseAcceleratorLinear::AllocateForTraversal(size_t maxRayCount)
 }
 
 void BaseAcceleratorLinear::CastRays(// Output
-                                     Span<InterfaceIndex> dInterfaceIndices,
+                                     Span<VolumeIndex> dVolumeIndices,
                                      Span<HitKeyPack> dHitIds,
                                      Span<MetaHit> dHitParams,
                                      // I-O
@@ -206,7 +206,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                                      // Input
                                      Span<const RayIndex> dRayIndices,
                                      //
-                                     bool writeInterfaceIndex,
+                                     bool resolveMedia,
                                      const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -306,7 +306,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                 }
                 AcceleratorGroupI* accelGroup = accelGroupOpt.value().get();
                 accelGroup->CastLocalRays(// Output
-                                          dInterfaceIndices,
+                                          dVolumeIndices,
                                           dHitIds,
                                           dHitParams,
                                           // I-O
@@ -317,7 +317,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                                           dLocalKeys,
                                           //
                                           key.FetchBatchPortion(),
-                                          writeInterfaceIndex,
+                                          resolveMedia,
                                           queue);
             }
         }
@@ -454,7 +454,7 @@ void BaseAcceleratorLinear::CastVisibilityRays(// Output
 }
 
 void BaseAcceleratorLinear::CastLocalRays(// Output
-                                          Span<InterfaceIndex> dInterfaceIndices,
+                                          Span<VolumeIndex> dVolumeIndices,
                                           Span<HitKeyPack> dHitIds,
                                           Span<MetaHit> dHitParams,
                                           // I-O
@@ -465,7 +465,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                                           Span<const AcceleratorKey> dAccelKeys,
                                           //
                                           CommonKey dAccelKeyBatchPortion,
-                                          bool writeInterfaceIndex,
+                                          bool resolveMedia,
                                           const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -486,7 +486,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
     auto dAccelKeysCommon = MemAlloc::RepurposeAlloc<const CommonKey>(dAccelKeys);
 
     accelGroup->CastLocalRays(// Output
-                              dInterfaceIndices,
+                              dVolumeIndices,
                               dHitIds,
                               dHitParams,
                               // I-O
@@ -497,7 +497,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                               dAccelKeysCommon,
                               //
                               dAccelKeyBatchPortion,
-                              writeInterfaceIndex,
+                              resolveMedia,
                               queue);
 }
 

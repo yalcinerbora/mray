@@ -175,7 +175,7 @@ using LightKey          = MaterialKey;
 using LightOrMatKey     = TriKeyT<CommonKey, 1,
                                   LightKey::BatchBits - 1,
                                   LightKey::IdBits>;
-using InterfaceIndex    = KeyT<CommonKey, 1, CommonKeyBits - 1>;
+using VolumeIndex       = KeyT<CommonKey, 1, CommonKeyBits - 1>;
 
 static constexpr CommonKey IS_MAT_KEY_FLAG = 0u;
 static constexpr CommonKey IS_LIGHT_KEY_FLAG = 1u;
@@ -205,21 +205,13 @@ struct alignas(HitKeyPackAlignment) HitKeyPack
     AcceleratorKey  accelKey;
 };
 
-static constexpr size_t InterfaceKeyPackAlignment = (sizeof(MediumKey) + sizeof(TransformKey));
-struct alignas(InterfaceKeyPackAlignment) VolumeKeyPack
+struct VolumeKeyPack
 {
-    MediumKey       medKey;
-    TransformKey    transKey;
+    MediumKey    medKey;
+    TransformKey transKey;
+    uint32_t     priority;
 
     auto operator<=>(const VolumeKeyPack&) const = default;
-};
-
-struct InterfaceKeyPack
-{
-    VolumeKeyPack front;
-    VolumeKeyPack back;
-
-    auto operator<=>(const InterfaceKeyPack&) const = default;
 };
 
 template <class HitType>
@@ -405,21 +397,4 @@ bool SpectrumWavesT<SPS, T>::IsDispersed() const
     // Don't bother checking the rest if the second one is gone,
     // all gone
     else return this->operator[](1) == DISPERSED_WAVE;
-}
-
-MR_PF_DEF
-VolumeKeyPack
-DetermineCurrentVolume(const Span<const InterfaceKeyPack>& globalInterfaceList,
-                       const VolumeKeyPack& currentVolume,
-                       InterfaceIndex index)
-{
-    bool isBackFace = index.FetchBatchPortion() == IS_BACKFACE_KEY_FLAG;
-    CommonKey interfaceIndex = index.FetchIndexPortion();
-    InterfaceKeyPack kp = globalInterfaceList[interfaceIndex];
-    VolumeKeyPack vol = (isBackFace) ? kp.back : kp.front;
-    // If given volume is "don't care" just return the current
-    // volume
-    return (vol.medKey == MediumKey::InvalidKey())
-                ? currentVolume
-                : vol;
 }

@@ -558,7 +558,7 @@ void MediumWorkFunctionWithNEE<M, T, SC, LS>::Call(const Medium& medium, const T
         //   Emission   //
         // ============ //
         if(medium.HasEmission() &&
-           (pathState.depth + 1) < gS.russianRouletteRange[1])
+           (pathState.depth + 1u) < gS.russianRouletteRange[1])
         {
             Spectrum emission = medium.Emission(point);
 

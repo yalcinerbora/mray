@@ -122,12 +122,12 @@ void IntersectFuncEmbree(const RTCIntersectFunctionNArguments* args)
                 potentialHits.instPrimID[0][i] = args->context->instPrimID[0];
                 newTs[i] = hitResult->t;
                 //
-                auto ifFlagPart = (hitResult->backFace)
+                auto vFlagPart = (hitResult->backFace)
                                     ? IS_BACKFACE_KEY_FLAG
                                     : IS_FRONTFACE_KEY_FLAG;
-                auto ifIndexPart = record.interfaceIndex.FetchIndexPortion();
-                embreeContext.interfaceIndices[rh.ray.id[i]] = InterfaceIndex::CombinedKey(ifFlagPart,
-                                                                                           ifIndexPart);
+                auto vIndexPart = record.volumeIndex.FetchIndexPortion();
+                embreeContext.volumeIndices[rh.ray.id[i]] = VolumeIndex::CombinedKey(vFlagPart,
+                                                                                        vIndexPart);
                 //
                 someHasAlphaMaps |= record.alphaMap.has_value();
             }
@@ -318,12 +318,12 @@ void FilterFuncEmbree(const RTCFilterFunctionNArguments* args)
                 Vector3 n = Vector3(h.Ng_x[i], h.Ng_y[i], h.Ng_z[i]);
                 // TODO: Isn't this should be greater ?
                 bool isBackFace = (Math::Dot(n, d) < Float{0});
-                auto ifFlagPart = (isBackFace)
+                auto vFlagPart = (isBackFace)
                                     ? IS_FRONTFACE_KEY_FLAG
                                     : IS_BACKFACE_KEY_FLAG;
-                auto ifIndexPart = record.interfaceIndex.FetchIndexPortion();
-                embreeContext.interfaceIndices[r.id[i]] = InterfaceIndex::CombinedKey(ifFlagPart,
-                                                                                      ifIndexPart);
+                auto vIndexPart = record.volumeIndex.FetchIndexPortion();
+                embreeContext.volumeIndices[r.id[i]] = VolumeIndex::CombinedKey(vFlagPart,
+                                                                                   vIndexPart);
 
                 if(record.cullFace)
                 {
@@ -727,7 +727,7 @@ void AcceleratorGroupEmbree<PG>::Construct(AccelGroupConstructParams p,
                 .dPrimKeys      = hAllLeafs.subspan(leafRange[0] + localPrimKeyOffset,
                                                     localSize),
                 .alphaMap       = ppResult.surfData.alphaMaps[i][j],
-                .interfaceIndex = ppResult.surfData.interfaces[i][j],
+                .volumeIndex    = ppResult.surfData.volumeIndices[i][j],
                 .cullFace       = ppResult.surfData.cullFaceFlags[i][j],
                 .isTriangle     = IsTriangle
             };
@@ -777,7 +777,7 @@ void AcceleratorGroupEmbree<PG>::WriteInstanceKeysAndAABBs(Span<AABB3>,
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupEmbree<PG>::CastLocalRays(// Output
-                                               Span<InterfaceIndex>,
+                                               Span<VolumeIndex>,
                                                Span<HitKeyPack>,
                                                Span<MetaHit>,
                                                // I-O

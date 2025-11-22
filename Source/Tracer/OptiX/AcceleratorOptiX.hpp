@@ -628,7 +628,7 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
                 .alphaMap           = ppResult.surfData.alphaMaps[i][j],
                 .lightOrMatKey      = ppResult.surfData.lightOrMatKeys[i][j],
                 .acceleratorKey     = accKey,
-                .interfaceIndex     = ppResult.surfData.interfaces[i][j],
+                .volumeIndex        = ppResult.surfData.volumeIndices[i][j],
                 .cullBackFaceNonTri = ppResult.surfData.cullFaceFlags[i][j],
                 .primSoA            = dPrimGroupSoA.data(),
                 .transSoA           = dTransSoAPtr
@@ -746,7 +746,7 @@ AcceleratorGroupOptiX<PG>::GetShaderOffsets() const
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupOptiX<PG>::CastLocalRays(// Output
-                                              Span<InterfaceIndex>,
+                                              Span<VolumeIndex>,
                                               Span<HitKeyPack>,
                                               Span<MetaHit>,
                                               // I-O

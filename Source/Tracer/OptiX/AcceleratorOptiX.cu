@@ -671,7 +671,7 @@ void BaseAcceleratorOptiX::AllocateForTraversal(size_t)
 {}
 
 void BaseAcceleratorOptiX::CastRays(// Output
-                                    Span<InterfaceIndex> dInterfaceIndices,
+                                    Span<VolumeIndex> dVolumeIndices,
                                     Span<HitKeyPack> dHitIds,
                                     Span<MetaHit> dHitParams,
                                     // I-O
@@ -680,7 +680,7 @@ void BaseAcceleratorOptiX::CastRays(// Output
                                     // Input
                                     Span<const RayIndex> dRayIndices,
                                     //
-                                    bool writeInterfaceIndex,
+                                    bool resolveMedia,
                                     const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -707,13 +707,13 @@ void BaseAcceleratorOptiX::CastRays(// Output
         .nParams = NormalRayCastArgPackOptiX
         {
             .baseAccelerator     = baseAccelerator,
-            .dInterfaceIndices   = dInterfaceIndices,
+            .dVolumeIndices      = dVolumeIndices,
             .dHitKeys            = dHitIds,
             .dHits               = dHitParams,
             .dRNGStates          = dRNGStates,
             .dRays               = dRays,
             .dRayIndices         = dRayIndices,
-            .writeInterfaceIndex = writeInterfaceIndex
+            .resolveMedia        = resolveMedia
         }
     };
     queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOptiX>(&argPack, 1));
@@ -774,7 +774,7 @@ void BaseAcceleratorOptiX::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffer
 }
 
 void BaseAcceleratorOptiX::CastLocalRays(// Output
-                                         Span<InterfaceIndex> dInterfaceIndices,
+                                         Span<VolumeIndex> dVolumeIndices,
                                          Span<HitKeyPack> dHitIds,
                                          Span<MetaHit> dHitParams,
                                          // I-O
@@ -785,7 +785,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
                                          Span<const AcceleratorKey> dAccelKeys,
                                          //
                                          CommonKey dAccelKeyBatchPortion,
-                                         bool writeInterfaceIndex,
+                                         bool resolveMedia,
                                          const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -813,7 +813,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
         .mode = RenderModeOptiX::LOCAL,
         .lParams = LocalRayCastArgPackOptiX
         {
-            .dInterfaceIndices   = dInterfaceIndices,
+            .dVolumeIndices      = dVolumeIndices,
             .dHitKeys            = dHitIds,
             .dHits               = dHitParams,
             .dRNGStates          = dRNGStates,
@@ -823,7 +823,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
             .dGlobalInstanceTraversables  = dGlobalTraversableHandles,
             .dGlobalInstanceInvTransforms = dGlobalInstanceInvTransforms,
             .batchStartOffset    = batchStartOffset,
-            .writeInterfaceIndex = writeInterfaceIndex
+            .resolveMedia        = resolveMedia
         }
     };
     queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOptiX>(&argPack, 1));

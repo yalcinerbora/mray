@@ -14,7 +14,7 @@ class AcceleratorWorkI
     virtual         ~AcceleratorWorkI() = default;
 
     virtual void    CastLocalRays(// Output
-                                  Span<InterfaceIndex> dInterfaceIndices,
+                                  Span<VolumeIndex> dVolumeIndices,
                                   Span<HitKeyPack> dHitKeys,
                                   Span<MetaHit> dHitParams,
                                   // I-O
@@ -24,7 +24,7 @@ class AcceleratorWorkI
                                   Span<const RayIndex> dRayIndices,
                                   Span<const CommonKey> dAccelIdPacks,
                                   // Constants
-                                  bool writeInterfaceIndex,
+                                  bool resolveMedia,
                                   const GPUQueue& queue) const = 0;
 
     virtual void    CastVisibilityRays(// Output

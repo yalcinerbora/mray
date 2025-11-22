@@ -215,7 +215,7 @@ namespace PassthroughMatDetail
     template <class SpectrumContext = SpectrumContextIdentity>
     struct PassthroughMaterial
     {
-        using Surface           = BasicSurface;
+        using Surface           = DefaultSurface;
         using DataSoA           = EmptyType;
         using SpectrumConverter = typename SpectrumContext::Converter;
         //

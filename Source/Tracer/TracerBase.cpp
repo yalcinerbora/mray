@@ -146,14 +146,12 @@ TracerView TracerBase::GenerateTracerView()
         .lightSurfs = lightSurfaces.Vec(),
         .camSurfs = cameraSurfaces.Vec(),
         .flattenedSurfaces = flattenedSurfaces,
-        .globalInterfaceList = globalInterfaceList
+        .globalVolumeList = globalVolumeList
     };
 }
 
 void TracerBase::GenerateDefaultGroups()
 {
-
-    //PrimGroupId emptyPGId = CreatePrimitiveGroup(std::string(TracerConstants::EmptyPrimName));
     auto genFuncP = typeGenerators.primGenerator.at(TracerConstants::EmptyPrimName);
     uint32_t idInt = primGroupCounter.fetch_add(1);
     PrimGroupId emptyPGId = static_cast<PrimGroupId>(idInt);
@@ -184,31 +182,32 @@ void TracerBase::GenerateDefaultGroups()
                                                             texMem.TextureViews(),
                                                             texMem.Textures()));
     assert(vacuumMedId == TracerConstants::VacuumMediumGroupId);
+    //
+    auto genFuncMt = typeGenerators.matGenerator.at(TracerConstants::PassthroughMatName);
+    idInt = matGroupCounter.fetch_add(1);
+    MatGroupId passMatId = static_cast<MatGroupId>(idInt);
+    matGroups.try_emplace(passMatId, genFuncMt.value()(std::move(idInt), gpuSystem,
+                                                       texMem.TextureViews(),
+                                                       texMem.Textures()));
+    assert(passMatId == TracerConstants::PassthroughMatGroupId);
 }
 
-void TracerBase::GenerateGlobalInterfaceList()
+void TracerBase::GenerateGlobalVolumeList()
 {
-    globalInterfaceList.reserve(512);
-    auto AddUnique = [this](const InterfaceParams& p)
+    globalVolumeList.reserve(512);
+    auto AddUnique = [this](const VolumeParams& p)
     {
-        InterfaceKeyPack pack =
+        VolumeKeyPack pack =
         {
-            .front =
-            {
-                .medKey   = Bit::BitCast<MediumKey>(p.frontVolume.mediumId),
-                .transKey = Bit::BitCast<TransformKey>(p.frontVolume.transformId),
-            },
-            .back =
-            {
-                .medKey   = Bit::BitCast<MediumKey>(p.backVolume.mediumId),
-                .transKey = Bit::BitCast<TransformKey>(p.backVolume.transformId),
-            }
+            .medKey   = Bit::BitCast<MediumKey>(p.mediumId),
+            .transKey = Bit::BitCast<TransformKey>(p.transformId),
+            .priority = p.priority
         };
 
-        auto loc = std::find(globalInterfaceList.cbegin(),
-                             globalInterfaceList.cend(), pack);
-        if(loc == globalInterfaceList.cend())
-            globalInterfaceList.emplace_back(std::move(pack));
+        auto loc = std::find(globalVolumeList.cbegin(),
+                             globalVolumeList.cend(), pack);
+        if(loc == globalVolumeList.cend())
+            globalVolumeList.emplace_back(std::move(pack));
     };
 
     // TODO: Make this more optimal later
@@ -216,16 +215,16 @@ void TracerBase::GenerateGlobalInterfaceList()
     // total unique interface count should be small
     const auto& surfList = surfaces.Vec();
     for(const auto& surf : surfList)
-    for(const auto& iface : surf.second.interfaces)
+    for(const auto& iface : surf.second.volumes)
         AddUnique(iface);
 
     const auto& lSurfList = lightSurfaces.Vec();
     for(const auto& lSurf : lSurfList)
-        AddUnique(InterfaceParams{lSurf.second.volume, lSurf.second.volume});
+        AddUnique(lSurf.second.volume);
 
     const auto& camSurfList = cameraSurfaces.Vec();
     for(const auto& cSurf : camSurfList)
-        AddUnique(InterfaceParams{cSurf.second.volume, cSurf.second.volume});
+        AddUnique(cSurf.second.volume);
 }
 
 TracerBase::TracerBase(const TypeGeneratorPack& tGen,
@@ -660,6 +659,9 @@ void TracerBase::PushPrimAttribute(PrimGroupId gId,
 
 MatGroupId TracerBase::CreateMaterialGroup(std::string name)
 {
+    if(name == TracerConstants::PassthroughMatName)
+        return TracerConstants::PassthroughMatGroupId;
+
     auto genFunc = typeGenerators.matGenerator.at(name);
     if(!genFunc)
     {
@@ -679,6 +681,9 @@ MatGroupId TracerBase::CreateMaterialGroup(std::string name)
 
 MaterialId TracerBase::ReserveMaterial(MatGroupId id, AttributeCountList count)
 {
+    if(id == TracerConstants::PassthroughMatGroupId)
+        return TracerConstants::PassthroughMatId;
+
     auto matGroup = matGroups.at(id);
     if(!matGroup)
     {
@@ -1498,8 +1503,8 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     }
     std::sort(flattenedSurfaces.begin(), flattenedSurfaces.end());
 
-    // Generate Interface Indices
-    GenerateGlobalInterfaceList();
+    // Generate Volume Indices
+    GenerateGlobalVolumeList();
 
     // Currently none of the groups have a finalize that affect the
     // construction of accelerator(s). However; in future it may be.
@@ -1511,7 +1516,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     MRAY_LOG("[Tracer]:     Constructing Accelerators ...");
     accelerator->Construct(BaseAccelConstructParams
     {
-        .globalInterfaceList = globalInterfaceList,
+        .globalVolumeList = globalVolumeList,
         .texViewMap = texMem.TextureViews(),
         .primGroups = primGroups.GetMap(),
         .lightGroups = lightGroups.GetMap(),
@@ -1724,7 +1729,7 @@ void TracerBase::ClearAll()
     camSurfaceCounter = 0;
 
     texMem.Clear();
-    globalInterfaceList.clear();
+    globalVolumeList.clear();
 
     currentRenderer = nullptr;
     currentRendererId = TracerIdInvalid<RendererId>;

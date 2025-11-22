@@ -187,10 +187,11 @@ void KCRenderMediumWork(MRAY_GRID_CONSTANT const typename MediumWorkFunction::Pa
     {
         RNGDispenser rng(params.common.dRandomNumbers, globalId, rayCount);
         RayIndex rIndex = params.common.dRayIndices[globalId];
-        InterfaceIndex interfaceIndex = params.common.dInterfaceIndices[rIndex];
-        VolumeKeyPack vK = DetermineCurrentVolume(params.common.dGlobalInterfaceList,
-                                                  params.common.dCurrentVolumes[rIndex],
-                                                  interfaceIndex);
+
+        // Generate Medium Key Pair
+        RayMediaListPack rMediaPack = params.common.dRayMediaPacks[rIndex];
+        VolumeKeyPack vK = params.common.mediaTracker.GetVolumeKeyPack(rMediaPack);
+
         // Create transform context
         TransContext tContext = GenerateTransformContext(params.transSoA,
                                                          EmptyType{},

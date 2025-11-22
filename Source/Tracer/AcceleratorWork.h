@@ -72,7 +72,7 @@ template<AccelGroupC AG, TransformGroupC TG,
          auto GenerateTransformContext = MRAY_ACCEL_TGEN_FUNCTION(AG, TG)>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCLocalRayCast(// Output
-                    MRAY_GRID_CONSTANT const Span<InterfaceIndex> dInterfaceIndices,
+                    MRAY_GRID_CONSTANT const Span<VolumeIndex> dVolumeIndices,
                     MRAY_GRID_CONSTANT const Span<HitKeyPack> dHitIds,
                     MRAY_GRID_CONSTANT const Span<MetaHit> dHitParams,
                     // I-O
@@ -85,7 +85,7 @@ void KCLocalRayCast(// Output
                     MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA,
                     MRAY_GRID_CONSTANT const typename AG::DataSoA aSoA,
                     MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA,
-                    MRAY_GRID_CONSTANT const bool writeInterfaceIndex);
+                    MRAY_GRID_CONSTANT const bool resolveMedia);
 
 template<AccelGroupC AG, TransformGroupC TG,
          auto GenerateTransformContext = MRAY_ACCEL_TGEN_FUNCTION(AG, TG)>
@@ -128,7 +128,7 @@ class AcceleratorWork : public BaseType
 
     // Cast Local rays
     void CastLocalRays(// Output
-                       Span<InterfaceIndex> dInterfaceIndices,
+                       Span<VolumeIndex> dVolumeIndices,
                        Span<HitKeyPack> dHitKeys,
                        Span<MetaHit> dHitParams,
                        // I-O
@@ -138,7 +138,7 @@ class AcceleratorWork : public BaseType
                        Span<const RayIndex> dRayIndices,
                        Span<const CommonKey> dAcceleratorKeys,
                        // Constants
-                       bool writeInterfaceIndex,
+                       bool resolveMedia,
                        const GPUQueue& queue) const override;
 
     void CastVisibilityRays(// Output
@@ -192,7 +192,7 @@ AcceleratorWork<AG, TG, BT>::AcceleratorWork(const AcceleratorGroupI& ag,
 
 template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
 void AcceleratorWork<AG, TG, BT>::CastLocalRays(// Output
-                                                Span<InterfaceIndex> dInterfaceIndices,
+                                                Span<VolumeIndex> dVolumeIndices,
                                                 Span<HitKeyPack> dHitIds,
                                                 Span<MetaHit> dHitParams,
                                                 // I-O
@@ -202,7 +202,7 @@ void AcceleratorWork<AG, TG, BT>::CastLocalRays(// Output
                                                 Span<const RayIndex> dRayIndices,
                                                 Span<const CommonKey> dAcceleratorKeys,
                                                 // Constants
-                                                bool writeInterfaceIndex,
+                                                bool resolveMedia,
                                                 const GPUQueue& queue) const
 {
     assert(dHitIds.size() == dHitParams.size());
@@ -217,7 +217,7 @@ void AcceleratorWork<AG, TG, BT>::CastLocalRays(// Output
         "KCCastLocalRays-"s + std::string(TypeName()),
         DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dRayIndices.size())},
         //
-        dInterfaceIndices,
+        dVolumeIndices,
         dHitIds,
         dHitParams,
         dRNGStates,
@@ -227,7 +227,7 @@ void AcceleratorWork<AG, TG, BT>::CastLocalRays(// Output
         transGroup.SoA(),
         accelGroup.SoA(),
         primGroup.SoA(),
-        writeInterfaceIndex
+        resolveMedia
     );
 }
 

@@ -578,7 +578,7 @@ GuidedPTRenderer::DisplayHashGrid(Span<const RayIndex> dDeadRayIndices,
     // ray hit position).
     tracerView.baseAccelerator.CastRays
     (
-        Span<InterfaceIndex>(),
+        Span<VolumeIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
         dShadowRays, dDeadRayIndices, false, processQueue
     );
@@ -696,7 +696,7 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     // Actual Ray Casting
     tracerView.baseAccelerator.CastRays
     (
-        Span<InterfaceIndex>(),
+        Span<VolumeIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
         dRays, dIndices, false, processQueue
     );

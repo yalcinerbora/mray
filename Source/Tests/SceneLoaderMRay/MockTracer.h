@@ -1672,11 +1672,10 @@ inline SurfaceId TracerMock::CreateSurface(SurfaceParams p)
                             ? MRAY_FORMAT("{}, ", static_cast<CommonId>(p.alphaMaps[i].value()))
                             : "None, ";
 
-        interfaceString += MRAY_FORMAT("[Front: {}|{}, Back: {}|{}]",
-                                       static_cast<CommonId>(p.interfaces[i].frontVolume.mediumId),
-                                       static_cast<CommonId>(p.interfaces[i].frontVolume.transformId),
-                                       static_cast<CommonId>(p.interfaces[i].backVolume.mediumId),
-                                       static_cast<CommonId>(p.interfaces[i].backVolume.transformId));
+        interfaceString += MRAY_FORMAT("[Medium: {}, Transform: {}, Priority: {}]",
+                                       static_cast<CommonId>(p.volumes[i].mediumId),
+                                       static_cast<CommonId>(p.volumes[i].transformId),
+                                       static_cast<CommonId>(p.volumes[i].priority));
     }
 
     MRAY_LOG("Creating Surface({}): Trans:{}, "

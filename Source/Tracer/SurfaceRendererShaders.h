@@ -89,9 +89,8 @@ namespace SurfRDetail
         Mode mode;
         // For AO Renderer, secondary ray's tMax
         Float tMaxAO;
-        // For Volume Interface Renderer
-        Span<InterfaceKeyPack> dGlobalInterfaceList;
-        VolumeKeyPack          cameraVolume;
+
+        MediaTracker mediaTracker;
     };
 
     struct RayStateCommon
@@ -102,7 +101,7 @@ namespace SurfRDetail
         Span<ImageCoordinate>   dImageCoordinates;
         Span<Float>             dFilmFilterWeights;
         // Volume interface visualisation related
-        Span<InterfaceIndex>    dHitInterfaceIndices;
+        Span<RayMediaListPack>  dRayMediaPacks;
     };
 
     struct RayStateAO
@@ -268,15 +267,14 @@ void WorkFunctionCommon<P, M, T>::Call(const Primitive&, const Material&, const 
         }
         case VOL_INTERFACE:
         {
-            //InterfaceIndex iIndex = params.rayState.dHitInterfaceIndices[rayIndex];
-            //color = Color::RandomColorRGB(static_cast<uint32_t>(iIndex.FetchIndexPortion()));
+            //VolumeIndex iIndex = params.rayState.dHitVolumeIndices[rayIndex];
+            //params.globalState.mediaTracker
 
-            InterfaceIndex iIndex = params.rayState.dHitInterfaceIndices[rayIndex];
-            auto vK = DetermineCurrentVolume(params.globalState.dGlobalInterfaceList,
-                                             params.globalState.cameraVolume,
-                                             iIndex);
-            CommonKey k = CommonKey(Hash(CommonKey(vK.medKey), CommonKey(vK.transKey)));
-            color = Color::RandomColorRGB(static_cast<uint32_t>(k));
+            //auto vK = DetermineCurrentVolume(params.globalState.dGlobalInterfaceList,
+            //                                 params.globalState.cameraVolume,
+            //                                 iIndex);
+            //CommonKey k = CommonKey(Hash(CommonKey(vK.medKey), CommonKey(vK.transKey)));
+            //color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
         default: color = BIG_MAGENTA(); break;

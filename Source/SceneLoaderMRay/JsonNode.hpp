@@ -23,21 +23,12 @@ inline void from_json(const nlohmann::json& n, VolumeStruct& s)
                         : itT->get<uint32_t>();
     auto itM = n.find(NodeNames::MEDIUM);
     s.mediumId = (itM == n.end())
-                        ? EMPTY_MEDIUM
-                        : itM->get<uint32_t>();
-}
-
-inline void from_json(const nlohmann::json& n, InterfaceStruct& s)
-{
-    auto itF = n.find(NodeNames::MEDIUM_FRONT);
-    s.front = (itF == n.end())
-        ? VolumeStruct{EMPTY_MEDIUM, EMPTY_TRANSFORM}
-        : itF->get<VolumeStruct>();
-
-    auto itB = n.find(NodeNames::MEDIUM_BACK);
-    s.back = (itB == n.end())
-        ? VolumeStruct{EMPTY_MEDIUM, EMPTY_TRANSFORM}
-        : itB->get<VolumeStruct>();
+                    ? EMPTY_MEDIUM
+                    : itM->get<uint32_t>();
+    auto itP = n.find(NodeNames::PRIORITY);
+    s.priority = (itP == n.end())
+                    ? 0
+                    : itM->get<uint32_t>();
 }
 
 inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
@@ -52,11 +43,7 @@ inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
     if(matArray.size() != primArray.size())
         throw MRayError("Material/Primitive pair lists does not match on a surface!");
 
-    s.interfaces.fill(InterfaceStruct
-                      {
-                          .front = VolumeStruct{EMPTY_MEDIUM, EMPTY_TRANSFORM},
-                          .back = VolumeStruct{EMPTY_MEDIUM, EMPTY_TRANSFORM}
-                      });
+    s.volumes.fill(VolumeStruct{EMPTY_MEDIUM, EMPTY_TRANSFORM, 0u});
     // As a default we do back face culling (it is helpful for self occlusions)
     s.doCullBackFace.fill(true);
     // and no alpha maps (all prims are opaque)
@@ -79,9 +66,9 @@ inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
         if(cullIt != n.cend())
             s.doCullBackFace[0] = (*cullIt).get<bool>();
 
-        auto interfaceIt = n.find(NodeNames::INTERFACE);
-        if(interfaceIt != n.cend())
-            s.interfaces[0] = (*interfaceIt).get<InterfaceStruct>();
+        auto volumeIt = n.find(NodeNames::VOLUME);
+        if(volumeIt != n.cend())
+            s.volumes[0] = (*volumeIt).get<VolumeStruct>();
     }
     else
     {
@@ -102,9 +89,9 @@ inline void from_json(const nlohmann::json& n, SurfaceStruct& s)
             if(cullIt != n.cend() && !(*cullIt)[i].is_string())
                 s.doCullBackFace[i] = (*cullIt)[i].get<bool>();
 
-            auto interfaceIt = n.find(NodeNames::INTERFACE);
-            if(interfaceIt != n.cend() && !(*interfaceIt)[i].is_string())
-                s.interfaces[i] = (*interfaceIt)[i].get<InterfaceStruct>();
+            auto volumeIt = n.find(NodeNames::VOLUME);
+            if(volumeIt != n.cend() && !(*volumeIt)[i].is_string())
+                s.volumes[i] = (*volumeIt)[i].get<VolumeStruct>();
         }
         s.pairCount = static_cast<int8_t>(matArray.size());
     }

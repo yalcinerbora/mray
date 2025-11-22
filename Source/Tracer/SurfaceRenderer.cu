@@ -268,31 +268,25 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     {
         bool isVolumeMode = (currentOptions.mode == SurfRDetail::Mode::VOL_INTERFACE);
         size_t rayVolCount = isVolumeMode ? maxRayCount : size_t(0);
-        size_t volListCount = isVolumeMode ? tracerView.globalInterfaceList.size() : size_t(0);
 
         MemAlloc::AllocateMultiData(Tie(dHits, dHitKeys, dRays, dRayCones,
                                         dRayStateCommon.dImageCoordinates,
                                         dRayStateCommon.dOutputData,
                                         dRayStateCommon.dFilmFilterWeights,
-                                        dRayStateCommon.dHitInterfaceIndices,
+                                        dRayStateCommon.dRayMediaPacks,
                                         dRandomNumBuffer,
                                         dWorkHashes, dWorkBatchIds,
-                                        dGlobalInterfaceList,
                                         dSubCameraBuffer),
                                     rendererGlobalMem,
                                     {maxRayCount, maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount, maxRayCount,
                                      maxRayCount, rayVolCount, maxSampleCount,
-                                     totalWorkCount, totalWorkCount, volListCount,
+                                     totalWorkCount, totalWorkCount,
                                      SUB_CAMERA_BUFFER_SIZE});
 
         dRayStateAO.dImageCoordinates = dRayStateCommon.dImageCoordinates;
         dRayStateAO.dOutputData = dRayStateCommon.dOutputData;
         dRayStateAO.dFilmFilterWeights = dRayStateCommon.dFilmFilterWeights;
-
-        // Dont forget to copy the interface list :)
-        queue.MemcpyAsync(dGlobalInterfaceList,
-                          Span<const InterfaceKeyPack>(tracerView.globalInterfaceList));
     }
     // And initialize the hashes
     workHasher = InitializeSurfaceHashes(dWorkHashes, dWorkBatchIds,
@@ -446,15 +440,27 @@ RendererOutput SurfaceRenderer::DoRender()
     );
 
     // Ray Casting
+    // Repurpose allocation for ray casting we are not using it
+    Span<VolumeIndex> dVolumeIndices = MemAlloc::RepurposeAlloc<VolumeIndex>(dRandomNumBuffer);
+
     SurfRDetail::Mode::E curMode = currentOptions.mode;
+    bool showVolumeMode = curMode == SurfRDetail::Mode::VOL_INTERFACE;
     tracerView.baseAccelerator.CastRays
     (
-        dRayStateCommon.dHitInterfaceIndices,
+        dVolumeIndices,
         dHitKeysLocal, dHits, dBackupRNGStates,
         dRays, dIndices,
-        (curMode == SurfRDetail::Mode::VOL_INTERFACE),
+        showVolumeMode,
         processQueue
     );
+
+    if(showVolumeMode)
+    {
+        // Resolve the VolumeIndices to
+        // Ray keys
+        // TODO:
+        assert(false);
+    }
 
     // Generate work keys from hit packs
     processQueue.IssueWorkKernel<KCGenerateSurfaceWorkKeys>
@@ -497,14 +503,8 @@ RendererOutput SurfaceRenderer::DoRender()
 
     SurfRDetail::GlobalState globalState =
     {
-        .mode                 = SurfRDetail::Mode(curMode),
-        .tMaxAO               = curTMaxAO,
-        .dGlobalInterfaceList = dGlobalInterfaceList,
-        .cameraVolume = VolumeKeyPack
-        {
-            .medKey   = Bit::BitCast<MediumKey>(curCamSurfaceParams.volume.mediumId),
-            .transKey = Bit::BitCast<TransformKey>(curCamSurfaceParams.volume.transformId)
-        }
+        .mode         = SurfRDetail::Mode(curMode),
+        .tMaxAO       = curTMaxAO
     };
 
     for(uint32_t i = 0; i < hPartitionCount[0]; i++)

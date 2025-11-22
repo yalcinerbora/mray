@@ -21,6 +21,7 @@ P PrimGroupTriangle           "Tracer/PrimitiveDefaultTriangle.h"
 P PrimGroupSphere             "Tracer/PrimitivesDefault.h"
 
 # Materials (Name / Header File / Optional Filter)
+Mt MatGroupPassthrough         "Tracer/MaterialsDefault.h"
 Mt MatGroupLambert             "Tracer/MaterialsDefault.h"
 Mt MatGroupReflect             "Tracer/MaterialsDefault.h"
 Mt MatGroupRefract             "Tracer/MaterialsDefault.h"

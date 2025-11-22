@@ -108,6 +108,9 @@ namespace TracerConstants
     static constexpr PrimGroupId EmptyPrimGroupId       = PrimGroupId{0};
     static constexpr PrimBatchId EmptyPrimBatchId       = PrimBatchId{0};
 
+    static constexpr MatGroupId PassthroughMatGroupId   = MatGroupId(0);
+    static constexpr MaterialId PassthroughMatId        = MaterialId(0);
+
     static constexpr TextureId InvalidTexture           = TextureId{0};
 
     static const auto NoAlphaMapList = OptionalAlphaMapList(StaticVecSize(MaxPrimBatchPerSurface),
@@ -115,18 +118,11 @@ namespace TracerConstants
     static const auto CullFaceTrueList = CullBackfaceFlagList(StaticVecSize(MaxPrimBatchPerSurface),
                                                               true);
 
-    static const auto IdentityIterface = InterfaceParams
+    static const auto IdentityVolume = VolumeParams
     {
-        .frontVolume =
-        {
-            MediumId(std::numeric_limits<CommonId>::max()),
-            TransformId(std::numeric_limits<CommonId>::max())
-        },
-        .backVolume =
-        {
-            MediumId(std::numeric_limits<CommonId>::max()),
-            TransformId(std::numeric_limits<CommonId>::max())
-        }
+        .mediumId    = MediumId(std::numeric_limits<CommonId>::max()),
+        .transformId = TransformId(std::numeric_limits<CommonId>::max()),
+        .priority    = std::numeric_limits<uint32_t>::max()
     };
 };
 
@@ -137,7 +133,7 @@ struct SurfaceParams
     TransformId          transformId;
     OptionalAlphaMapList alphaMaps;
     CullBackfaceFlagList cullFaceFlags;
-    InterfaceList        interfaces;
+    VolumeList           volumes;
 };
 
 struct LightSurfaceParams

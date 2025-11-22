@@ -517,7 +517,7 @@ MatAttributeInfoList MatGroupPassthrough::AttributeInfo() const
 }
 
 void MatGroupPassthrough::PushAttribute(MaterialKey,
-                                        uint32_t attributeIndex,
+                                        uint32_t,
                                         TransientData,
                                         const GPUQueue&)
 {
