@@ -5,6 +5,28 @@
 #include "Core/TracerConstants.h"
 #include "Core/TracerI.h"
 
+MR_HF_DECL
+void SortByPrio(std::array<uint32_t, MAX_NESTED_MEDIA>& ml,
+                std::array<uint32_t, MAX_NESTED_MEDIA>& priorities,
+                uint32_t indexCount)
+{
+    for(uint32_t i = 1; i < indexCount; i++)
+    {
+        uint32_t p = priorities[i];
+        uint32_t k = ml[i];
+        for(int32_t j = i - 1; j >= 0; j--)
+        {
+            if(priorities[j] > p || (priorities[j] == p && ml[j] > k))
+            {
+                std::swap(priorities[j + 1], priorities[j]);
+                std::swap(ml[j + 1], ml[j]);
+            }
+        }
+        ml[i] = k;
+        priorities[i] = p;
+    }
+}
+
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCPrimeHashTable(MRAY_GRID_CONSTANT const MediaTrackerView tracker,
                       // Input
@@ -13,6 +35,57 @@ void KCPrimeHashTable(MRAY_GRID_CONSTANT const MediaTrackerView tracker,
     KernelCallParams kp;
     for(uint32_t i = kp.GlobalId(); i < dLists.size(); i += kp.TotalSize())
         tracker.TryInsertAtomic(dLists[i]);
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCSetStartingVolumeIndirect(// Output
+                                 MRAY_GRID_CONSTANT const Span<RayMediaListPack> dPacks,
+                                 // Input
+                                 MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices,
+                                 // Constants
+                                 MRAY_GRID_CONSTANT const MediaList startVolumeList,
+                                 MRAY_GRID_CONSTANT const MediaTrackerView tracker)
+{
+    KernelCallParams kp;
+    uint32_t rayCount = uint32_t(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        RayIndex rIndex = dRayIndices[i];
+        // TODO: Maybe implement a search?
+        // Also we are searching for all threads
+        // kinda wasteful (all will reach on to the same mem address so
+        // it may not have large perf saving probably)
+        auto [index, isInserted] = tracker.TryInsertAtomic(startVolumeList);
+        assert(isInserted == false);
+
+        RayMediaListPack p;
+        p.SetCurMediaIndex(0);
+        p.SetNextMediaIndex(0);
+        p.SetOuterIndex(index);
+        p.SetEntering(false);
+        p.SetRayPassedThrough(false);
+        dPacks[rIndex] = p;
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCUpdateMediaListPacksIndirect(// I-O
+                                    MRAY_GRID_CONSTANT const Span<RayMediaListPack> dPacks,
+                                    MRAY_GRID_CONSTANT const MediaTrackerView tracker,
+                                    //
+                                    MRAY_GRID_CONSTANT const Span<const VolumeIndex> dNewVolumeIndices,
+                                    MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
+{
+    KernelCallParams kp;
+    uint32_t rayCount = uint32_t(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        RayIndex rIndex = dRayIndices[i];
+        RayMediaListPack p = dPacks[rIndex];
+        VolumeIndex vI = dNewVolumeIndices[rIndex];
+        tracker.UpdateRayMediaList(p, vI);
+        dPacks[rIndex] = p;
+    }
 }
 
 uint32_t MediaTracker::FindVolumeIndex(VolumeId vId) const
@@ -74,7 +147,7 @@ MediaTracker::MediaTracker(const VolumeList& globalVolumeList,
 }
 
 void MediaTracker::SetStartingVolumeIndirect(// Output
-                                             Span<RayMediaListPack> packs,
+                                             Span<RayMediaListPack> dPacks,
                                              // Input
                                              Span<const RayIndex> dRayIndices,
                                              // Constants
@@ -82,6 +155,30 @@ void MediaTracker::SetStartingVolumeIndirect(// Output
                                              const GPUQueue& queue)
 {
     //
+    std::array<uint32_t, MAX_NESTED_MEDIA> unpackedList;
+    std::array<uint32_t, MAX_NESTED_MEDIA> priorities;
+    unpackedList.fill(MediaTrackerView::EMPTY_VAL);
+
+    uint32_t i = 0;
+    for(VolumeId v : startVolumeList)
+    {
+        unpackedList[i] = FindVolumeIndex(v);
+        priorities[i] = globalVolumeList[unpackedList[i]].second.priority;
+        i++;
+    }
+    SortByPrio(unpackedList, priorities, i);
+    MediaList l; l.Pack(unpackedList);
+
+    queue.IssueWorkKernel<KCSetStartingVolumeIndirect>
+    (
+        "KCSetStartingVolumeIndirect",
+        DeviceWorkIssueParams{.workCount = uint32_t(dRayIndices.size())},
+        //
+        dPacks,
+        ToConstSpan(dRayIndices),
+        l,
+        View()
+    );
 }
 
 void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& hSurfaceVolumeList,
@@ -107,6 +204,11 @@ void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& h
         unpackedList.fill(MediaTrackerView::EMPTY_VAL);
         unpackedList[0] = FindVolumeIndex(boundaryVolume);
         unpackedList[1] = FindVolumeIndex(vId);
+
+        std::array<uint32_t, MAX_NESTED_MEDIA> priorities;
+        priorities[0] = globalVolumeList[unpackedList[0]].second.priority;
+        priorities[1] = globalVolumeList[unpackedList[1]].second.priority;
+        SortByPrio(unpackedList, priorities, 2);
 
         MediaList l; l.Pack(unpackedList);
         mediaLists.push_back(l);
@@ -142,6 +244,13 @@ void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& h
                 if(Bit::FetchSubPortion(i, {j, j + 1}) == 0) continue;
                 unpackedList[counter++] = volIndices[j];
             }
+
+            std::array<uint32_t, MAX_NESTED_MEDIA> priorities;
+            for(uint32_t j = 0; j < counter; j++)
+                priorities[j] = globalVolumeList[unpackedList[0]].second.priority;
+            priorities[1] = globalVolumeList[unpackedList[1]].second.priority;
+            SortByPrio(unpackedList, priorities, counter);
+
             MediaList l; l.Pack(unpackedList);
             mediaLists.push_back(l);
         }
@@ -163,4 +272,24 @@ void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& h
         dLists
     );
     queue.Barrier().Wait();
+}
+
+void MediaTracker::UpdateMediaListPacksIndirect(// I-O
+                                                Span<RayMediaListPack> dPacks,
+                                                //
+                                                Span<const VolumeIndex> dNewVolumeIndices,
+                                                Span<const RayIndex> dRayIndices,
+                                                const GPUQueue& queue)
+
+{
+    queue.IssueWorkKernel<KCUpdateMediaListPacksIndirect>
+    (
+        "KCUpdateMediaListPacksIndirect",
+        DeviceWorkIssueParams{.workCount = uint32_t(dRayIndices.size())},
+        //
+        dPacks,
+        View(),
+        dNewVolumeIndices,
+        dRayIndices
+    );
 }

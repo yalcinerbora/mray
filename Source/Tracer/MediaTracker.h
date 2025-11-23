@@ -141,6 +141,7 @@ class RayMediaListPack
     uint32_t pack;
 
     public:
+                        RayMediaListPack() = default;
     MR_PF_DECL_V        RayMediaListPack(uint32_t curMed, uint32_t nextMed, uint32_t outer);
 
     MR_PF_DECL uint32_t CurMediaIndex() const;
@@ -221,17 +222,23 @@ class MediaTracker
 
 
     void SetStartingVolumeIndirect(// Output
-                                   Span<RayMediaListPack> packs,
+                                   Span<RayMediaListPack> dPacks,
                                    // Input
                                    Span<const RayIndex> dRayIndices,
                                    // Constants
                                    const BoundaryVolumeList& nestedVolumeList,
                                    const GPUQueue&);
-
     void PrimeHashTable(const std::vector<const SurfaceVolumeList*>& hSurfaceVolumeList,
                         const std::vector<const BoundaryVolumeList*>& hBoundaryVolumeList,
                         VolumeId boundaryVolume,
                         const GPUQueue&);
+
+    void UpdateMediaListPacksIndirect(// I-O
+                                      Span<RayMediaListPack> dPacks,
+                                      //
+                                      Span<const VolumeIndex> dNewVolumeIndices,
+                                      Span<const RayIndex> dRayIndices,
+                                      const GPUQueue&);
 
     // Misc
     size_t           GPUMemoryUsage() const;
@@ -261,6 +268,7 @@ uint32_t RayMediaListPack::OuterIndex() const
 {
     return Bit::FetchSubPortion(pack, {OUTER_INDEX_RANGE[0], OUTER_INDEX_RANGE[1]});
 }
+
 MR_PF_DEF
 bool RayMediaListPack::IsEntering() const
 {
@@ -527,9 +535,10 @@ void MediaTrackerView::UpdateRayMediaList(RayMediaListPack& rayMediaListIndex,
 
 MR_HF_DEF
 VolumeKeyPack
-MediaTrackerView::GetVolumeKeyPack(RayMediaListPack) const
+MediaTrackerView::GetVolumeKeyPack(RayMediaListPack p) const
 {
-    return VolumeKeyPack{};
+    uint32_t i = dValues[p.OuterIndex()].Unpack()[p.CurMediaIndex()];
+    return dGlobalVolumeList[i];
 }
 
 inline
