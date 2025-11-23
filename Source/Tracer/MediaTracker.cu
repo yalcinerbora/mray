@@ -5,6 +5,16 @@
 #include "Core/TracerConstants.h"
 #include "Core/TracerI.h"
 
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCPrimeHashTable(MRAY_GRID_CONSTANT const MediaTrackerView tracker,
+                      // Input
+                      MRAY_GRID_CONSTANT const Span<const MediaList> dLists)
+{
+    KernelCallParams kp;
+    for(uint32_t i = kp.GlobalId(); i < dLists.size(); i += kp.TotalSize())
+        tracker.TryInsertAtomic(dLists[i]);
+}
+
 uint32_t MediaTracker::FindVolumeIndex(VolumeId vId) const
 {
     auto loc = std::lower_bound(globalVolumeList.cbegin(),
@@ -55,7 +65,9 @@ MediaTracker::MediaTracker(const VolumeList& globalVolumeList,
     queue.MemcpyAsync(dGlobalVolumeList, Span<const VolumeKeyPack>(kp));
     queue.MemsetAsync(dLocksHT, 0x00);
     queue.MemsetAsync(dMediaListHT, 0xFF);
-    assert(MediaTrackerView::EMPTY_VAL == UINT32_MAX);
+    static_assert(MediaTrackerView::EMPTY_VAL == UINT32_MAX,
+                  "MediaTrackerViev::EMPTY_VAL is changed, change the memset "
+                  "according to the new value");
 
     // TODO: This may be redundant
     queue.Barrier().Wait();
@@ -111,13 +123,16 @@ void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& h
     {
         const BoundaryVolumeList& bList = *ptr;
         // Add all of the combinations of this list
-        uint32_t totalCombinations = 1u << MAX_NESTED_MEDIA;
+        uint32_t totalCombinations = 1u << bList.size();
         std::array<uint32_t, MAX_NESTED_MEDIA> unpackedList;
         StaticVector<uint32_t, MAX_NESTED_MEDIA> volIndices;
 
         for(VolumeId v : bList)
             volIndices.push_back(FindVolumeIndex(v));
 
+        // TODO: We are adding singular values
+        // here but only singular value should be the boundary
+        // one.
         for(uint32_t i = 1; i < totalCombinations; i++)
         {
             unpackedList.fill(MediaTrackerView::EMPTY_VAL);
@@ -138,9 +153,14 @@ void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& h
     Span<MediaList> dLists;
     MemAlloc::AllocateMultiData(Tie(dLists), localMem,
                                 {mediaLists.size()});
-
     queue.MemcpyAsync(dLists, Span<const MediaList>(mediaLists));
-
-
-
+    queue.IssueWorkKernel<KCPrimeHashTable>
+    (
+        "KCPrimeHashTable",
+        DeviceWorkIssueParams{.workCount = uint32_t(dLists.size())},
+        //
+        View(),
+        dLists
+    );
+    queue.Barrier().Wait();
 }

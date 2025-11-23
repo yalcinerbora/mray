@@ -177,19 +177,19 @@ class MediaTrackerView
     Span<MediaList>           dValues;
     Span<LockInt>             dLocks;
 
-    MR_GF_DECL
-    InsertResult TryInsertAtomic(const MediaList& list) const;
+
 
     public:
     // Constructors & Destructor
-    MediaTrackerView() = default;
-    MRAY_HOST
-    MediaTrackerView(Span<const VolumeKeyPack> dGlobalVolumeList,
-                     Span<MediaList> dValues,
-                     Span<LockInt> dLocks);
-
+              MediaTrackerView() = default;
+    MRAY_HOST MediaTrackerView(Span<const VolumeKeyPack> dGlobalVolumeList,
+                               Span<MediaList> dValues,
+                               Span<LockInt> dLocks);
 
     //
+    MR_GF_DECL
+    InsertResult TryInsertAtomic(const MediaList& list) const;
+
     MR_GF_DECL
     void UpdateRayMediaList(RayMediaListPack& rayMediaListIndex,
                             VolumeIndex nextVolumeIndex) const;
