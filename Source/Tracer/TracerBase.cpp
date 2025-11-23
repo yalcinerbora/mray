@@ -146,7 +146,8 @@ TracerView TracerBase::GenerateTracerView()
         .lightSurfs = lightSurfaces.Vec(),
         .camSurfs = cameraSurfaces.Vec(),
         .flattenedSurfaces = flattenedSurfaces,
-        .globalVolumeList = volumes.Vec()
+        .globalVolumeList = volumes.Vec(),
+        .boundaryVolume = boundaryVolume
     };
 }
 

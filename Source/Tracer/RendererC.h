@@ -78,6 +78,7 @@ struct TracerView
     const std::vector<Pair<CamSurfaceId, CameraSurfaceParams>>&     camSurfs;
     const std::vector<FlatSurfParams>&                              flattenedSurfaces;
     const std::vector<Pair<VolumeId, VolumeKeyPack>>&               globalVolumeList;
+    VolumeId                                                        boundaryVolume;
 };
 
 class RenderWorkI

@@ -7,6 +7,7 @@
 
 class SurfaceRenderer final : public RendererBase
 {
+    using MediaTrackerPtr = std::unique_ptr<MediaTracker>;
     using FilmFilterPtr = std::unique_ptr<TextureFilterI>;
     using Options = SurfRDetail::Options;
 
@@ -81,6 +82,8 @@ class SurfaceRenderer final : public RendererBase
     Span<CommonKey>         dWorkBatchIds;
     //
     bool                    saveImage;
+    //
+    MediaTrackerPtr         mediaTracker;
 
     uint32_t    FindMaxSamplePerIteration(uint32_t rayCount,
                                           SurfRDetail::Mode::E,

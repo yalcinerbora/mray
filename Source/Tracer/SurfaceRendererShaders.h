@@ -89,8 +89,8 @@ namespace SurfRDetail
         Mode mode;
         // For AO Renderer, secondary ray's tMax
         Float tMaxAO;
-
-        MediaTracker mediaTracker;
+        // For interface view
+        MediaTrackerView mediaTracker;
     };
 
     struct RayStateCommon

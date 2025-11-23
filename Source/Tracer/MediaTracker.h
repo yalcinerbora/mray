@@ -81,6 +81,7 @@
 // instanced. This is somehwat of a limitation though.
 
 #include "Core/Types.h"
+#include "Core/TracerAttribInfo.h"
 
 #include "Device/GPUAtomic.h"
 
@@ -161,6 +162,7 @@ class MediaTrackerView
     // it. Need to check 2000 series (which should be the bare minimum).
     using LockInt = uint32_t;
 
+    public:
     static constexpr auto EMPTY_VAL    = uint32_t(UINT32_MAX);
     static constexpr auto LOCK_VAL     = LockInt(1);
     static constexpr auto UNLOCKED_VAL = LockInt(0);
@@ -181,6 +183,10 @@ class MediaTrackerView
     public:
     // Constructors & Destructor
     MediaTrackerView() = default;
+    MRAY_HOST
+    MediaTrackerView(Span<const VolumeKeyPack> dGlobalVolumeList,
+                     Span<MediaList> dValues,
+                     Span<LockInt> dLocks);
 
 
     //
@@ -190,6 +196,52 @@ class MediaTrackerView
 
     MR_HF_DECL
     VolumeKeyPack GetVolumeKeyPack(RayMediaListPack rayMediaListIndex) const;
+};
+
+class MediaTracker
+{
+    using VolumeList = std::vector<Pair<VolumeId, VolumeKeyPack>>;
+
+    private:
+    const GPUSystem& gpuSystem;
+    const VolumeList& globalVolumeList;
+    // Memory
+    DeviceMemory        mem;
+    Span<VolumeKeyPack> dGlobalVolumeList;
+    Span<uint32_t>      dLocksHT;
+    Span<MediaList>     dMediaListHT;
+
+    uint32_t FindVolumeIndex(VolumeId) const;
+
+    public:
+    // Constructors & Destructor
+    MediaTracker(const VolumeList& globalVolumeList,
+                 uint32_t maximumEntryCount,
+                 const GPUSystem& gpuSystem);
+
+
+    void SetStartingVolumeIndirect(// Output
+                                   Span<RayMediaListPack> packs,
+                                   // Input
+                                   Span<const RayIndex> dRayIndices,
+                                   // Constants
+                                   const BoundaryVolumeList& nestedVolumeList,
+                                   const GPUQueue&);
+
+    void PrimeHashTable(const std::vector<const SurfaceVolumeList*>& hSurfaceVolumeList,
+                        const std::vector<const BoundaryVolumeList*>& hBoundaryVolumeList,
+                        VolumeId boundaryVolume,
+                        const GPUQueue&);
+
+    // Misc
+    size_t           GPUMemoryUsage() const;
+    MediaTrackerView View() const;
+
+    //void ResolveInterface(// I-O
+    //                      Span<RayMediaListPack> packs,
+    //                      const GPUQueue&);
+
+    //void HashForPartition(Span<const RayMediaListPack> packs);
 };
 
 MR_PF_DEF
@@ -324,6 +376,16 @@ void MediaList::Pack(const IndexList& list)
     // 7
     listRaw[7] = Bit::SetSubPortion(listRaw[4], list[7]      , {12, 32});
 }
+
+MRAY_HOST
+inline
+MediaTrackerView::MediaTrackerView(Span<const VolumeKeyPack> dGlobalVolumeList,
+                                   Span<MediaList> dValues,
+                                   Span<LockInt> dLocks)
+    : dGlobalVolumeList(dGlobalVolumeList)
+    , dValues(dValues)
+    , dLocks(dLocks)
+{}
 
 MR_GF_DEF
 typename MediaTrackerView::InsertResult
@@ -470,15 +532,16 @@ MediaTrackerView::GetVolumeKeyPack(RayMediaListPack) const
     return VolumeKeyPack{};
 }
 
-
-struct MediaTracker
+inline
+MediaTrackerView MediaTracker::View() const
 {
+    return MediaTrackerView(dGlobalVolumeList,
+                            dMediaListHT,
+                            dLocksHT);
+}
 
-
-
-    void ResolveInterface(// I-O
-                          Span<RayMediaListPack> packs,
-                          const GPUQueue&);
-
-    void HashForPartition(Span<const RayMediaListPack> packs);
-};
+inline
+size_t MediaTracker::GPUMemoryUsage() const
+{
+    return mem.Size();
+}

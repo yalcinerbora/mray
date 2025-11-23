@@ -46,23 +46,25 @@ struct TracerParameters
 {
     // Random Seed value, many samplers etc.
     // will start via this seed if applicable
-    uint64_t            seed = 0;
+    uint64_t             seed = 0;
     // Accelerator mode, software/hardware etc.
-    AcceleratorType     accelMode = AcceleratorType::HARDWARE;
+    AcceleratorType      accelMode = AcceleratorType::HARDWARE;
     // Item pool size, amount of "items" (paths/rays/etc) processed
     // in parallel
-    uint32_t            parallelizationHint = 1 << 21; // 2^21 ~= 2M
+    uint32_t             parallelizationHint = 1 << 21; // 2^21 ~= 2M
     // Current sampler logic,
-    SamplerType         samplerType = SamplerType::INDEPENDENT;
+    SamplerType          samplerType = SamplerType::INDEPENDENT;
     // Texture Related
-    uint32_t            clampedTexRes = std::numeric_limits<uint32_t>::max();
-    bool                genMips = false;
-    FilterType          mipGenFilter = FilterType{ FilterType::GAUSSIAN, 2.0f };
-    MRayColorSpaceEnum  globalTextureColorSpace = MRayColorSpaceEnum::MR_ACES_CG;
+    uint32_t             clampedTexRes = std::numeric_limits<uint32_t>::max();
+    bool                 genMips = false;
+    FilterType           mipGenFilter = FilterType{ FilterType::GAUSSIAN, 2.0f };
+    MRayColorSpaceEnum   globalTextureColorSpace = MRayColorSpaceEnum::MR_ACES_CG;
     // Film Related
-    FilterType          filmFilter = FilterType{FilterType::GAUSSIAN, 1.0f};
+    FilterType           filmFilter = FilterType{FilterType::GAUSSIAN, 1.0f};
     // Spectral Rendering Related
     WavelengthSampleMode wavelengthSampleMode = WavelengthSampleMode::HYPERBOLIC_PBRT;
+    // Volume Tracker related
+    uint32_t             volumeTrackerEntryCount = 10'000;
 };
 
 // Generic Texture Input Parameters

@@ -152,8 +152,6 @@ struct AccelGroupConstructParams
     const GenericGroupLightT*       lightGroup;
     TGroupedSurfaces                tGroupSurfs;
     TGroupedLightSurfaces           tGroupLightSurfs;
-
-
 };
 
 class AcceleratorGroupI

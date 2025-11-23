@@ -93,7 +93,7 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
     static constexpr auto MIP_GEN_FILTER_NAME   = "mipGenFilter"sv;
     static constexpr auto FILM_FILTER_NAME      = "filmFilter"sv;
     static constexpr auto WLSAMPLE_MODE_NAME    = "wavelengthSampleMode"sv;
-    //static constexpr auto PARTITION_LOGIC_NAME  = "partitionLogic"sv;
+    static constexpr auto VTRACKER_COUNT_NAME   = "volumeTrackerEntryCount"sv;
 
     nlohmann::json configJson;
     auto OptionalFetch = []<class T>(T& outEntry, std::string_view NAME,
@@ -134,6 +134,7 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
         OptionalFetch(config.params.mipGenFilter, MIP_GEN_FILTER_NAME, paramsJson);
         OptionalFetch(config.params.filmFilter, FILM_FILTER_NAME, paramsJson);
         OptionalFetch(config.params.wavelengthSampleMode.e, WLSAMPLE_MODE_NAME, paramsJson);
+        OptionalFetch(config.params.volumeTrackerEntryCount, VTRACKER_COUNT_NAME, paramsJson);
 
         // TODO: Add this later
         //OptionalFetch(config.params.partitionLogic, PARTITION_LOGIC_NAME, paramsJson);

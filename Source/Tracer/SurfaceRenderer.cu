@@ -308,6 +308,32 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     curTMaxAO = Math::Length(tracerView.baseAccelerator.SceneAABB().GeomSpan());
     curTMaxAO *= currentOptions.tMaxAORatio;
 
+    if(currentOptions.mode == SurfRDetail::Mode::VOL_INTERFACE)
+    {
+        mediaTracker = std::make_unique<MediaTracker>(tracerView.globalVolumeList,
+                                                      tracerView.tracerParams.volumeTrackerEntryCount,
+                                                      gpuSystem);
+
+
+        std::vector<const SurfaceVolumeList*> sVolumes;
+        sVolumes.reserve(tracerView.surfs.size());
+        for(const auto& [_, p] : tracerView.surfs)
+            sVolumes.push_back(&p.volumes);
+
+        std::vector<const BoundaryVolumeList*> bVolumes;
+        bVolumes.reserve(tracerView.lightSurfs.size() +
+                         tracerView.camSurfs.size());
+        for(const auto& [_, p] : tracerView.lightSurfs)
+            bVolumes.push_back(&p.nestedVolumes);
+        for(const auto& [_, p] : tracerView.camSurfs)
+            bVolumes.push_back(&p.nestedVolumes);
+
+        mediaTracker->PrimeHashTable(sVolumes, bVolumes,
+                                     tracerView.boundaryVolume,
+                                     queue);
+        queue.Barrier().Wait();
+    }
+
     // Finally generate RNG
     auto RngGen = tracerView.rngGenerators.at(tracerView.tracerParams.samplerType.e);
     if(!RngGen)
@@ -504,7 +530,9 @@ RendererOutput SurfaceRenderer::DoRender()
     SurfRDetail::GlobalState globalState =
     {
         .mode         = SurfRDetail::Mode(curMode),
-        .tMaxAO       = curTMaxAO
+        .tMaxAO       = curTMaxAO,
+        .mediaTracker = (mediaTracker) ? mediaTracker->View()
+                                       : MediaTrackerView(),
     };
 
     for(uint32_t i = 0; i < hPartitionCount[0]; i++)
@@ -726,6 +754,7 @@ void SurfaceRenderer::StopRender()
     ClearAllWorkMappings();
     filmFilter = {};
     rnGenerator = {};
+    mediaTracker = {};
     std::fill(tilePathCounts.begin(),
               tilePathCounts.end(), 0u);
 }
@@ -755,7 +784,9 @@ SurfaceRenderer::StaticAttributeInfo()
 
 size_t SurfaceRenderer::GPUMemoryUsage() const
 {
-    return (rayPartitioner.GPUMemoryUsage() +
-            rnGenerator->GPUMemoryUsage() +
-            rendererGlobalMem.Size());
+    size_t result = mediaTracker ? mediaTracker->GPUMemoryUsage() : 0;
+    result += (rayPartitioner.GPUMemoryUsage() +
+               rnGenerator->GPUMemoryUsage() +
+               rendererGlobalMem.Size());
+    return result;
 }
