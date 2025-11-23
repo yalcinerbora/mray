@@ -92,6 +92,7 @@ using TransformIdList   = std::vector<TransformId>;
 using MediumIdList      = std::vector<MediumId>;
 using LightIdList       = std::vector<LightId>;
 using CameraIdList      = std::vector<CameraId>;
+using VolumeIdList      = std::vector<VolumeId>;
 
 namespace TracerConstants
 {
@@ -112,18 +113,12 @@ namespace TracerConstants
     static constexpr MaterialId PassthroughMatId        = MaterialId(0);
 
     static constexpr TextureId InvalidTexture           = TextureId{0};
+    static constexpr VolumeId InvalidVolume             = TracerIdInvalid<VolumeId>;
 
     static const auto NoAlphaMapList = OptionalAlphaMapList(StaticVecSize(MaxPrimBatchPerSurface),
                                                             std::nullopt);
     static const auto CullFaceTrueList = CullBackfaceFlagList(StaticVecSize(MaxPrimBatchPerSurface),
                                                               true);
-
-    static const auto IdentityVolume = VolumeParams
-    {
-        .mediumId    = MediumId(std::numeric_limits<CommonId>::max()),
-        .transformId = TransformId(std::numeric_limits<CommonId>::max()),
-        .priority    = std::numeric_limits<uint32_t>::max()
-    };
 };
 
 struct SurfaceParams
@@ -133,21 +128,21 @@ struct SurfaceParams
     TransformId          transformId;
     OptionalAlphaMapList alphaMaps;
     CullBackfaceFlagList cullFaceFlags;
-    VolumeList           volumes;
+    SurfaceVolumeList    volumes;
 };
 
 struct LightSurfaceParams
 {
-    LightId      lightId;
-    TransformId  transformId;
-    VolumeParams volume;
+    LightId             lightId;
+    TransformId         transformId;
+    BoundaryVolumeList  nestedVolumes;
 };
 
 struct CameraSurfaceParams
 {
-    CameraId     cameraId;
-    TransformId  transformId;
-    VolumeParams volume;
+    CameraId            cameraId;
+    TransformId         transformId;
+    BoundaryVolumeList  nestedVolumes;
 };
 
 class [[nodiscard]] TracerI
@@ -322,16 +317,25 @@ class [[nodiscard]] TracerI
     //            Surfaces            //
     //================================//
     // Basic surface
-    virtual SurfaceId       CreateSurface(SurfaceParams) = 0;
+    virtual SurfaceId           CreateSurface(SurfaceParams) = 0;
     // These may not be "surfaces" by nature but user must register them.
     // Renderer will only use the cameras/lights registered here
     // Same goes for other surfaces as well
     // Primitive-backed lights imply accelerator generation
-    virtual LightSurfaceId      SetBoundarySurface(LightSurfaceParams) = 0;
+    virtual LightSurfaceId      SetBoundarySurface(LightId, TransformId) = 0;
     virtual LightSurfaceId      CreateLightSurface(LightSurfaceParams) = 0;
     virtual CamSurfaceId        CreateCameraSurface(CameraSurfaceParams) = 0;
     virtual SurfaceCommitResult CommitSurfaces() = 0;
     virtual CameraTransform     GetCamTransform(CamSurfaceId) const = 0;
+    // Volumes are somewhat specific that these are not rendered unless
+    // these are backed by surfaces. We just use this syntax to
+    // simplify the internals of the system.
+    // (Similar to the all other Ids, user could've send the same
+    // data twice, we could deduplicate it etc. but it would be costly,
+    // i.e. a primitive would require per component match etc)
+    virtual VolumeId            RegisterVolume(VolumeParams) = 0;
+    virtual VolumeIdList        RegisterVolumes(std::vector<VolumeParams>) = 0;
+    virtual void                SetBoundaryVolume(VolumeId) = 0;
 
     //================================//
     //           Renderers            //

@@ -9,6 +9,7 @@
 class ThreadPool;
 
 enum class SceneTexId : uint32_t {};
+enum class SceneVolId : uint32_t {};
 
 // TODO: Some formats (well probably all formats)
 // Have a string as "name" parameter. MRay scene format
@@ -23,6 +24,7 @@ struct TracerIdPack
     using MaterialIdMappings    = std::map<uint32_t, Pair<MatGroupId, MaterialId>>;
     using MediumIdMappings      = std::map<uint32_t, Pair<MediumGroupId, MediumId>>;
     using TextureIdMappings     = std::map<SceneTexId, TextureId>;
+    using VolumeIdMappings      = std::map<SceneVolId, VolumeId>;
 
     std::vector<char>           concatStrings;
     std::vector<Vector2ul>      stringRanges;
@@ -34,10 +36,12 @@ struct TracerIdPack
     MaterialIdMappings  mats;
     MediumIdMappings    mediums;
     TextureIdMappings   textures;
+    VolumeIdMappings    volumes;
     std::vector<Pair<uint32_t, SurfaceId>>      surfaces;
     std::vector<Pair<uint32_t, CamSurfaceId>>   camSurfaces;
     std::vector<Pair<uint32_t, LightSurfaceId>> lightSurfaces;
     Pair<uint32_t, LightSurfaceId>              boundarySurface;
+    VolumeId                                    boundaryVolume;
 
     double  loadTimeMS = 0.0;
 };

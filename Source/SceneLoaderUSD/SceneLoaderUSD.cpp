@@ -905,15 +905,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                 surface.cullFaceFlags.push_back(prim.cullFace);
                 surface.alphaMaps.push_back(mat.alphaMap);
                 // TODO: USD volume stuff currently not loaded
-                surface.volumes.push_back
-                (
-                    VolumeParams
-                    {
-                        .mediumId = TracerConstants::VacuumMediumId,
-                        .transformId = TracerConstants::IdentityTransformId,
-                        .priority = 0
-                    }
-                );
+                surface.volumes.push_back(TracerConstants::InvalidVolume);
             }
             SurfaceId sId = tracer.CreateSurface(surface);
             surfaceList.emplace_back(prim.surfacePrim, sId);
@@ -944,15 +936,6 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                 surface.primBatches.push_back(primBatchId);
                 surface.cullFaceFlags.push_back(!mat.alphaMap.has_value());
                 surface.alphaMaps.push_back(mat.alphaMap);
-                surface.volumes.push_back
-                (
-                    VolumeParams
-                    {
-                        .mediumId    = TracerConstants::VacuumMediumId,
-                        .transformId = TracerConstants::IdentityTransformId,
-                        .priority    = 0
-                    }
-                );
             }
             SurfaceId sId = tracer.CreateSurface(surface);
             surfaceList.emplace_back(prim.surfacePrim, sId);
@@ -970,12 +953,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             .cameraId = outCam.second,
             .transformId = cameraSurfTIds.empty()
                                 ? TracerConstants::IdentityTransformId
-                                : cameraSurfTIds[0],
-            .volume = VolumeParams
-            {
-                .mediumId = TracerConstants::VacuumMediumId,
-                .transformId = TracerConstants::IdentityTransformId
-            }
+                                : cameraSurfTIds[0]
         };
         CamSurfaceId csId = tracer.CreateCameraSurface(surface);
         camSurfaceList.emplace_back(outCam.first, csId);
@@ -984,19 +962,25 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     // Set the boundary surface
     tracer.SetBoundarySurface
     (
-        LightSurfaceParams
+        boundaryLight,
+        domeLightSurfTIds.empty()
+            ? TracerConstants::IdentityTransformId
+            : domeLightSurfTIds[0]
+    );
+    // Set boundary volume
+    // TODO: We are creating empty volume here to skip
+    // wiring
+    VolumeId boundaryVolume = tracer.RegisterVolume
+    (
+        VolumeParams
         {
-            .lightId = boundaryLight,
-            .transformId = domeLightSurfTIds.empty()
-                            ? TracerConstants::IdentityTransformId
-                            : domeLightSurfTIds[0],
-            .volume = VolumeParams
-            {
-                .mediumId = TracerConstants::VacuumMediumId,
-                .transformId = TracerConstants::IdentityTransformId
-            }
+            .mediumId    = TracerConstants::VacuumMediumId,
+            .transformId = TracerConstants::IdentityTransformId,
+            .priority    = 0,
         }
     );
+    tracer.SetBoundaryVolume(boundaryVolume);
+
     //
     TracerIdPack result;
     std::vector<char> stringConcat;

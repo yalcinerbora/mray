@@ -18,9 +18,7 @@ MediumTraverser<S>::MediumTraverser(const Ray&, const Vector2&,
                                     const SegmentIterator& it)
     : it(it)
     , dt(0)
-{
-    assert(Math::Length(ray.dir) == Float(0));
-}
+{}
 
 template<class S>
 MR_HF_DEF

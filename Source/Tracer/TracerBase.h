@@ -103,10 +103,12 @@ class TracerBase : public TracerI
     ThreadSafeMap<RendererId, RendererPtr>           renderers;
 
     // Surface
+    VolumeId                                                    boundaryVolume = TracerConstants::InvalidVolume;
     Pair<LightSurfaceId, LightSurfaceParams>                    boundarySurface = InvalidBoundarySurface;
     ThreadSafeVector<Pair<SurfaceId, SurfaceParams>>            surfaces;
     ThreadSafeVector<Pair<LightSurfaceId, LightSurfaceParams>>  lightSurfaces;
     ThreadSafeVector<Pair<CamSurfaceId, CameraSurfaceParams>>   cameraSurfaces;
+    ThreadSafeVector<Pair<VolumeId, VolumeKeyPack>>             volumes;
     // Flattened Surface
     std::vector<FlatSurfParams>                                 flattenedSurfaces;
     //
@@ -120,11 +122,12 @@ class TracerBase : public TracerI
     std::atomic_uint32_t    matGroupCounter     = 0;
     std::atomic_uint32_t    transGroupCounter   = 0;
     std::atomic_uint32_t    lightGroupCounter   = 0;
-    std::atomic_uint32_t    rendererCounter      = 0;
+    std::atomic_uint32_t    rendererCounter     = 0;
     // Surface Related
     std::atomic_uint32_t    surfaceCounter      = 0;
     std::atomic_uint32_t    lightSurfaceCounter = 0;
     std::atomic_uint32_t    camSurfaceCounter   = 0;
+    std::atomic_uint32_t    volumeCounter       = 0;
 
     protected:
     ThreadPool*         globalThreadPool;
@@ -151,9 +154,6 @@ class TracerBase : public TracerI
     // Render Framebuffer
     RenderImagePtr      renderImage;
 
-    // Deduplicated Volume List
-    std::vector<VolumeKeyPack> globalVolumeList;
-
     // Current Types
     Map<std::string_view, PrimAttributeInfoList>       primAttributeInfoMap;
     Map<std::string_view, CamAttributeInfoList>        camAttributeInfoMap;
@@ -161,12 +161,11 @@ class TracerBase : public TracerI
     Map<std::string_view, MatAttributeInfoList>        matAttributeInfoMap;
     Map<std::string_view, TransAttributeInfoList>      transAttributeInfoMap;
     Map<std::string_view, LightAttributeInfoList>      lightAttributeInfoMap;
-    //Map<std::string_view, RendererAttributeInfoList>   rendererAttributeInfoMap;
 
     void            PopulateAttribInfoAndTypeLists();
     TracerView      GenerateTracerView();
     void            GenerateDefaultGroups();
-    void            GenerateGlobalVolumeList();
+    void            AdjustSurfaceVolumes();
 
     public:
     // Constructors & Destructor
@@ -307,11 +306,15 @@ class TracerBase : public TracerI
                                         std::vector<TextureId> textures) override;
 
     SurfaceId           CreateSurface(SurfaceParams) override;
-    LightSurfaceId      SetBoundarySurface(LightSurfaceParams) override;
+    LightSurfaceId      SetBoundarySurface(LightId, TransformId) override;
     LightSurfaceId      CreateLightSurface(LightSurfaceParams) override;
     CamSurfaceId        CreateCameraSurface(CameraSurfaceParams) override;
     SurfaceCommitResult CommitSurfaces() override;
     CameraTransform     GetCamTransform(CamSurfaceId) const override;
+
+    VolumeId            RegisterVolume(VolumeParams) override;
+    VolumeIdList        RegisterVolumes(std::vector<VolumeParams>) override;
+    void                SetBoundaryVolume(VolumeId) override;
 
     RendererId  CreateRenderer(std::string typeName) override;
     void        DestroyRenderer(RendererId) override;

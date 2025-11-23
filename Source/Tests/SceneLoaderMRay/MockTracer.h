@@ -140,6 +140,7 @@ class TracerMock : public TracerI
     std::atomic_size_t  surfaceCounter      = 0;
     std::atomic_size_t  lightSurfaceCounter = 0;
     std::atomic_size_t  camSurfaceCounter   = 0;
+    std::atomic_size_t  volumeCounter       = 0;
 
     // Texture Related
     std::atomic_size_t  textureCounter  = 0;
@@ -293,11 +294,15 @@ class TracerMock : public TracerI
 
 
     SurfaceId           CreateSurface(SurfaceParams) override;
-    LightSurfaceId      SetBoundarySurface(LightSurfaceParams) override;
+    LightSurfaceId      SetBoundarySurface(LightId, TransformId) override;
     LightSurfaceId      CreateLightSurface(LightSurfaceParams) override;
     CamSurfaceId        CreateCameraSurface(CameraSurfaceParams) override;
     SurfaceCommitResult CommitSurfaces() override;
     CameraTransform     GetCamTransform(CamSurfaceId) const override;
+
+    VolumeId            RegisterVolume(VolumeParams) override;
+    VolumeIdList        RegisterVolumes(std::vector<VolumeParams>) override;
+    void                SetBoundaryVolume(VolumeId) override;
 
     RendererId  CreateRenderer(std::string typeName) override;
     void        DestroyRenderer(RendererId) override;
@@ -1672,10 +1677,9 @@ inline SurfaceId TracerMock::CreateSurface(SurfaceParams p)
                             ? MRAY_FORMAT("{}, ", static_cast<CommonId>(p.alphaMaps[i].value()))
                             : "None, ";
 
-        interfaceString += MRAY_FORMAT("[Medium: {}, Transform: {}, Priority: {}]",
-                                       static_cast<CommonId>(p.volumes[i].mediumId),
-                                       static_cast<CommonId>(p.volumes[i].transformId),
-                                       static_cast<CommonId>(p.volumes[i].priority));
+        interfaceString += (p.volumes[i] == TracerConstants::InvalidVolume)
+                            ? MRAY_FORMAT("{}, ", CommonId(p.volumes[i]))
+                            : "None, ";
     }
 
     MRAY_LOG("Creating Surface({}): Trans:{}, "
@@ -1687,17 +1691,16 @@ inline SurfaceId TracerMock::CreateSurface(SurfaceParams p)
     return SurfaceId(surfId);
 }
 
-inline LightSurfaceId TracerMock::SetBoundarySurface(LightSurfaceParams p)
+inline LightSurfaceId TracerMock::SetBoundarySurface(LightId lightId,
+                                                     TransformId transformId)
 {
     size_t lightSurfId = lightSurfaceCounter.fetch_add(1);
     if(!print) return LightSurfaceId(lightSurfId);
 
-    MRAY_LOG("Setting BoundarySurface({}): Light: {}, Trans: {}, "
-             "Volume: [Medium: {}, Trans: {}]",
-             lightSurfId, static_cast<CommonId>(p.lightId),
-             static_cast<CommonId>(p.transformId),
-             static_cast<CommonId>(p.volume.mediumId),
-             static_cast<CommonId>(p.volume.transformId));
+    MRAY_LOG("Setting BoundarySurface({}): Light: {}, Trans: {}",
+             lightSurfId,
+             static_cast<CommonId>(lightId),
+             static_cast<CommonId>(transformId));
     return LightSurfaceId(lightSurfId);
 }
 
@@ -1706,12 +1709,15 @@ inline LightSurfaceId TracerMock::CreateLightSurface(LightSurfaceParams p)
     size_t lightSurfId = lightSurfaceCounter.fetch_add(1);
     if(!print) return LightSurfaceId(lightSurfId);
 
+    std::string volumeList;
+    for(VolumeId v : p.nestedVolumes)
+        volumeList += MRAY_FORMAT("{} ", CommonId(v));
+
     MRAY_LOG("Creating LightSurface({}): Light: {}, Trans: {}, "
-             "Volume: [Medium: {}, Trans: {}]",
+             "Nested in these Volumes: [{}]",
              lightSurfId, static_cast<CommonId>(p.lightId),
              static_cast<CommonId>(p.transformId),
-             static_cast<CommonId>(p.volume.mediumId),
-             static_cast<CommonId>(p.volume.transformId));
+             volumeList);
     return LightSurfaceId(lightSurfId);
 }
 
@@ -1720,13 +1726,57 @@ inline CamSurfaceId TracerMock::CreateCameraSurface(CameraSurfaceParams p)
     size_t camSurfId = camSurfaceCounter.fetch_add(1);
     if(!print) return CamSurfaceId(camSurfId);
 
+    std::string volumeList;
+    for(VolumeId v : p.nestedVolumes)
+        volumeList += MRAY_FORMAT("{} ", CommonId(v));
+
     MRAY_LOG("Creating CameraSurface({}): Camera: {}, Trans: {}, "
-             "Volume [Medium: {}, Transform: {}]",
+             "Nested in these Volumes: [{}]",
              camSurfId, static_cast<CommonId>(p.cameraId),
              static_cast<CommonId>(p.transformId),
-             static_cast<CommonId>(p.volume.mediumId),
-             static_cast<CommonId>(p.volume.transformId));
+             volumeList);
     return CamSurfaceId(camSurfId);
+}
+
+inline VolumeId TracerMock::RegisterVolume(VolumeParams v)
+{
+    size_t volId = volumeCounter.fetch_add(1);
+    if(!print) return VolumeId(volId);
+
+    MRAY_LOG("Creating Volume({}): [Medium: {}, Trans: {}, "
+             "Priority: {}]", volId,
+             static_cast<CommonId>(v.mediumId),
+             static_cast<CommonId>(v.transformId),
+             static_cast<CommonId>(v.priority));
+    return VolumeId(volId);
+}
+
+inline VolumeIdList TracerMock::RegisterVolumes(std::vector<VolumeParams> vols)
+{
+    size_t volStart = volumeCounter.fetch_add(vols.size());
+    VolumeIdList result(vols.size());
+    for(size_t i = 0; i < vols.size(); i++)
+        result[i] = VolumeId(volStart + i);
+
+    if(!print) return result;
+
+    std::string list = "Bulk Creating Volumes";
+    for(size_t i = 0; i < vols.size(); i++)
+    {
+        list += MRAY_FORMAT("    Volume({}): [Medium: {}, Trans: {}, "
+                            "Priority: {}]", size_t(result[i]),
+                            static_cast<CommonId>(vols[i].mediumId),
+                            static_cast<CommonId>(vols[i].transformId),
+                            static_cast<CommonId>(vols[i].priority));
+    }
+    MRAY_LOG("{}", list);
+    return result;
+}
+
+inline void TracerMock::SetBoundaryVolume(VolumeId id)
+{
+    if(!print) return;
+    MRAY_LOG("Setting boundary volume ({})", CommonId(id));
 }
 
 inline SurfaceCommitResult TracerMock::CommitSurfaces()

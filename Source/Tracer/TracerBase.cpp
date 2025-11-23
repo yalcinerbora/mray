@@ -146,7 +146,7 @@ TracerView TracerBase::GenerateTracerView()
         .lightSurfs = lightSurfaces.Vec(),
         .camSurfs = cameraSurfaces.Vec(),
         .flattenedSurfaces = flattenedSurfaces,
-        .globalVolumeList = globalVolumeList
+        .globalVolumeList = volumes.Vec()
     };
 }
 
@@ -192,39 +192,115 @@ void TracerBase::GenerateDefaultGroups()
     assert(passMatId == TracerConstants::PassthroughMatGroupId);
 }
 
-void TracerBase::GenerateGlobalVolumeList()
+void TracerBase::AdjustSurfaceVolumes()
 {
-    globalVolumeList.reserve(512);
-    auto AddUnique = [this](const VolumeParams& p)
+    auto& volumesVec = volumes.Vec();
+    using namespace TracerConstants;
+    if(boundaryVolume == InvalidVolume)
     {
-        VolumeKeyPack pack =
-        {
-            .medKey   = Bit::BitCast<MediumKey>(p.mediumId),
-            .transKey = Bit::BitCast<TransformKey>(p.transformId),
-            .priority = p.priority
-        };
+        MRAY_WARNING_LOG("No boundary volume is set! Setting a default one "
+                         "(VacuumMedium, IdentityTransform, Priority 0).");
 
-        auto loc = std::find(globalVolumeList.cbegin(),
-                             globalVolumeList.cend(), pack);
-        if(loc == globalVolumeList.cend())
-            globalVolumeList.emplace_back(std::move(pack));
+        //
+        auto loc = std::find_if(volumesVec.cbegin(), volumesVec.cend(),
+        [](const auto& vol)
+        {
+            return (vol.second.medKey == Bit::BitCast<MediumKey>(VacuumMediumId) &&
+                    vol.second.transKey == Bit::BitCast<TransformKey>(IdentityTransformId) &&
+                    vol.second.priority == 0);
+
+        });
+        if(loc == volumesVec.cend())
+        {
+            VolumeId vId = VolumeId(volumeCounter.fetch_add(1));
+            VolumeKeyPack kp =
+            {
+                .medKey = Bit::BitCast<MediumKey>(VacuumMediumId),
+                .transKey = Bit::BitCast<TransformKey>(IdentityTransformId),
+                .priority = 0
+            };
+            volumesVec.emplace_back(vId, kp);
+            boundaryVolume = vId;
+        }
+        else boundaryVolume = loc->first;
+    }
+
+    VolumeId bv = this->boundaryVolume;
+    auto AdjustBoundaryVolumes = [&volumesVec, bv](BoundaryVolumeList& l)
+    {
+        if(l.empty())
+        {
+            l.push_back(bv);
+            return;
+        }
+        else
+        {
+            // Every nested volume id must have at least
+            // boundary volume.
+            //
+            // If light/camera surface is nested inside more than one
+            // volume (excluding boundary) it is an error than we can not
+            // track. So we only add the boundary surface to the list.
+            auto loc = std::find_if(l.cbegin(), l.cend(),
+            [bv](const auto& vId)
+            {
+                return vId == bv;
+            });
+            if(loc == l.cend())
+            {
+                l.push_back(bv);
+            }
+        }
+
+        // N^2 Complexity may not perform well
+        auto firstLoc = std::find_if(volumesVec.cbegin(), volumesVec.cend(),
+        [checkId = l[0]](const auto& a)
+        {
+            return a.first == checkId;
+        });
+        if(firstLoc == volumesVec.cend())
+            throw MRayError("Unable to find volume with id ({})",
+                            CommonKey(l[0]));
+
+        size_t maxIndex = 0;
+        uint32_t curPrioMax = firstLoc->second.priority;
+        for(size_t i = 1; i < l.size(); i++)
+        {
+            auto loc = std::find_if(volumesVec.cbegin(), volumesVec.cend(),
+            [checkId = l[0]](const auto& a)
+            {
+                return a.first == checkId;
+            });
+            if(loc == volumesVec.cend())
+                throw MRayError("Unable to find volume with id ({})",
+                                CommonKey(l[i]));
+            uint32_t prio = loc->second.priority;
+            if(prio > curPrioMax)
+            {
+                maxIndex = i;
+                curPrioMax = prio;
+            }
+        }
+        if(maxIndex != 0) std::swap(l[0], l[maxIndex]);
     };
 
-    // TODO: Make this more optimal later
-    // Worst case it is N^2 (but it is quite unlikely)
-    // total unique interface count should be small
-    const auto& surfList = surfaces.Vec();
-    for(const auto& surf : surfList)
-    for(const auto& iface : surf.second.volumes)
-        AddUnique(iface);
+    // Setup camera/lights surface nested medium ids with
+    // highest prio first.
+    for(auto& [_, camSurf] : cameraSurfaces.Vec())
+        AdjustBoundaryVolumes(camSurf.nestedVolumes);
+    for(auto& [_, lightSurf] : lightSurfaces.Vec())
+        AdjustBoundaryVolumes(lightSurf.nestedVolumes);
 
-    const auto& lSurfList = lightSurfaces.Vec();
-    for(const auto& lSurf : lSurfList)
-        AddUnique(lSurf.second.volume);
-
-    const auto& camSurfList = cameraSurfaces.Vec();
-    for(const auto& cSurf : camSurfList)
-        AddUnique(cSurf.second.volume);
+    // Sort the volumes by their id
+    // every surface will try to find the offset
+    // from this list to save as an index
+    // Linear search for each surface may not be performant
+    using VolPair = Pair<VolumeId, VolumeKeyPack>;
+    std::sort(volumesVec.begin(), volumesVec.end(),
+              [](const VolPair& a, const VolPair& b)
+    {
+        return a.first < b.first;
+    });
 }
 
 TracerBase::TracerBase(const TypeGeneratorPack& tGen,
@@ -1381,7 +1457,8 @@ SurfaceId TracerBase::CreateSurface(SurfaceParams p)
     return SurfaceId(sId);
 }
 
-LightSurfaceId TracerBase::SetBoundarySurface(LightSurfaceParams p)
+LightSurfaceId TracerBase::SetBoundarySurface(LightId lightId,
+                                              TransformId transformId)
 {
     LightSurfaceId lightSId;
     if(boundarySurface.first == TracerIdInvalid<LightSurfaceId>)
@@ -1389,7 +1466,7 @@ LightSurfaceId TracerBase::SetBoundarySurface(LightSurfaceParams p)
     else
         lightSId = boundarySurface.first;
 
-    boundarySurface = {lightSId, p};
+    boundarySurface = {lightSId, {lightId, transformId}};
     return lightSId;
 }
 
@@ -1407,6 +1484,47 @@ CamSurfaceId TracerBase::CreateCameraSurface(CameraSurfaceParams p)
     return CamSurfaceId(camSId);
 }
 
+VolumeId TracerBase::RegisterVolume(VolumeParams vParams)
+{
+    uint32_t volumeId = volumeCounter.fetch_add(1);
+    VolumeKeyPack kp =
+    {
+        .medKey = Bit::BitCast<MediumKey>(vParams.mediumId),
+        .transKey = Bit::BitCast<TransformKey>(vParams.transformId),
+        .priority = vParams.priority
+    };
+    volumes.emplace_back(VolumeId(volumeId), kp);
+    return VolumeId(volumeId);
+}
+
+VolumeIdList TracerBase::RegisterVolumes(std::vector<VolumeParams> volumeParams)
+{
+    uint32_t volumeStart = volumeCounter.fetch_add(uint32_t(volumeParams.size()));
+    VolumeIdList result; result.reserve(volumeParams.size());
+
+    // TODO: too many locks / unlocks here
+    uint32_t i = 0;
+    for(const auto& vParams : volumeParams)
+    {
+        VolumeId vId = VolumeId(volumeStart + i);
+        VolumeKeyPack kp =
+        {
+            .medKey = Bit::BitCast<MediumKey>(vParams.mediumId),
+            .transKey = Bit::BitCast<TransformKey>(vParams.transformId),
+            .priority = vParams.priority
+        };
+        volumes.emplace_back(vId, kp);
+        result.push_back(vId);
+        i++;
+    }
+    return result;
+}
+
+void TracerBase::SetBoundaryVolume(VolumeId v)
+{
+    boundaryVolume = v;
+}
+
 SurfaceCommitResult TracerBase::CommitSurfaces()
 {
     // Synchronize all here, probably scene load is issued
@@ -1422,6 +1540,10 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
                          "(NullLight, IdentityTransform, VacuumMedium).");
         boundarySurface.second = LightSurfaceParams{};
     }
+
+    // Generate Volume Indices
+    AdjustSurfaceVolumes();
+
 
     // Finalize the group operations
     // Some groups require post-processing
@@ -1503,9 +1625,6 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     }
     std::sort(flattenedSurfaces.begin(), flattenedSurfaces.end());
 
-    // Generate Volume Indices
-    GenerateGlobalVolumeList();
-
     // Currently none of the groups have a finalize that affect the
     // construction of accelerator(s). However; in future it may be.
     // So again wait the "Finalize" calls of the groups and the texture.
@@ -1516,7 +1635,7 @@ SurfaceCommitResult TracerBase::CommitSurfaces()
     MRAY_LOG("[Tracer]:     Constructing Accelerators ...");
     accelerator->Construct(BaseAccelConstructParams
     {
-        .globalVolumeList = globalVolumeList,
+        .globalVolumeList = volumes.Vec(),
         .texViewMap = texMem.TextureViews(),
         .primGroups = primGroups.GetMap(),
         .lightGroups = lightGroups.GetMap(),
@@ -1729,7 +1848,7 @@ void TracerBase::ClearAll()
     camSurfaceCounter = 0;
 
     texMem.Clear();
-    globalVolumeList.clear();
+    volumes.clear();
 
     currentRenderer = nullptr;
     currentRendererId = TracerIdInvalid<RendererId>;

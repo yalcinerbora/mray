@@ -33,6 +33,11 @@ namespace TracerConstants
     // much memory, and camera should fit into this.
     // This will be compile time checked.
     static constexpr size_t MaxCameraInstanceByteSize = 512;
+    // Maximum nested volumes allowed by the renderer
+    // This is used for light/camera surfaces
+    // when these are nested inside a volume
+    // These are unfortunately authored.
+    static constexpr size_t MaxNestedVolumes = 8;
 
     static constexpr std::string_view IdentityTransName  = "(T)Identity";
     static constexpr std::string_view NullLightName      = "(L)Null";

@@ -14,6 +14,7 @@ class SceneLoaderMRay : public SceneLoaderI
     public:
     using TypeMappedNodes   = std::map<std::string, std::vector<JsonNode>>;
     using TexMappedNodes    = std::vector<Pair<SceneTexId, JsonNode>>;
+    using VolMappedNodes    = std::vector<Pair<SceneVolId, JsonNode>>;
 
     template <class Map>
     struct MutexedMap
@@ -30,6 +31,7 @@ class SceneLoaderMRay : public SceneLoaderI
     using MaterialIdMappings    = typename TracerIdPack::MaterialIdMappings;
     using MediumIdMappings      = typename TracerIdPack::MediumIdMappings;
     using TextureIdMappings     = typename TracerIdPack::TextureIdMappings;
+    using VolumeIdMappings      = typename TracerIdPack::VolumeIdMappings;
 
     private:
     std::string         scenePath;
@@ -44,6 +46,7 @@ class SceneLoaderMRay : public SceneLoaderI
     TypeMappedNodes     materialNodes;
     TypeMappedNodes     mediumNodes;
     TexMappedNodes      textureNodes;
+    VolMappedNodes      volumeNodes;
 
     // Scene id to -> Tracer id mappings
     MutexedMap<TransformIdMappings> transformMappings;
@@ -53,16 +56,18 @@ class SceneLoaderMRay : public SceneLoaderI
     MutexedMap<CamIdMappings>       camMappings;
     MutexedMap<LightIdMappings>     lightMappings;
     TextureIdMappings               texMappings;
+    VolumeIdMappings                volMappings;
 
     LightSurfaceId  mRayBoundaryLightSurface;
+    VolumeId        mRayBoundaryVolume;
     std::vector<Pair<uint32_t, SurfaceId>>         mRaySurfaces;
     std::vector<Pair<uint32_t, LightSurfaceId>>    mRayLightSurfaces;
     std::vector<Pair<uint32_t, CamSurfaceId>>      mRayCamSurfaces;
 
     static LightSurfaceStruct               LoadBoundary(const nlohmann::json&);
     static std::vector<SurfaceStruct>       LoadSurfaces(const nlohmann::json&);
-    static std::vector<CameraSurfaceStruct> LoadCamSurfaces(const nlohmann::json&, uint32_t boundaryMediumId);
-    static std::vector<LightSurfaceStruct>  LoadLightSurfaces(const nlohmann::json&, uint32_t boundaryMediumId);
+    static std::vector<CameraSurfaceStruct> LoadCamSurfaces(const nlohmann::json&);
+    static std::vector<LightSurfaceStruct>  LoadLightSurfaces(const nlohmann::json&);
 
     static void DryRunLightsForPrim(std::vector<uint32_t>&,
                                     const TypeMappedNodes&,
@@ -81,6 +86,7 @@ class SceneLoaderMRay : public SceneLoaderI
     void        LoadPrimitives(TracerI&, ErrorList&);
     void        LoadCameras(TracerI&, ErrorList&);
     void        LoadLights(TracerI&, ErrorList&);
+    void        LoadVolumes(TracerI&, ErrorList&);
 
     void        CreateTypeMapping(const TracerI&,
                                   const SceneSurfList&,

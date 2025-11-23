@@ -173,7 +173,7 @@ class MediaTrackerView
     private:
     Span<const VolumeKeyPack> dGlobalVolumeList;
     Span<MediaList>           dValues;
-    Span<LockInt>            dLocks;
+    Span<LockInt>             dLocks;
 
     MR_GF_DECL
     InsertResult TryInsertAtomic(const MediaList& list) const;

@@ -13,7 +13,7 @@
 #include "NodeNames.h" // IWYU pragma: keep
 
 static constexpr uint32_t EMPTY_TRANSFORM = std::numeric_limits<uint32_t>::max();
-static constexpr uint32_t EMPTY_MEDIUM = std::numeric_limits<uint32_t>::max();
+static constexpr uint32_t EMPTY_VOLUME = std::numeric_limits<uint32_t>::max();
 
 struct TracerSceneView
 {
@@ -64,7 +64,7 @@ struct SurfaceStruct
     using IdPairList    = std::array<IdPair, PPS>;
     using TextureList   = std::array<Optional<SceneTexId>, PPS>;
     using CullList      = std::array<bool, PPS>;
-    using VolumeList    = std::array<VolumeStruct, PPS>;
+    using VolumeList    = std::array<uint32_t, PPS>;
 
     //
     uint32_t    transformId;
@@ -72,23 +72,29 @@ struct SurfaceStruct
     TextureList alphaMaps;
     CullList    doCullBackFace;
     int8_t      pairCount;
-    VolumeList  volumes;
+    VolumeList  volumeIds;
 };
 using SceneSurfList = std::vector<SurfaceStruct>;
 
 struct LightSurfaceStruct
 {
+    static constexpr auto MNV = TracerConstants::MaxNestedVolumes;
+    using VolumeList = std::array<uint32_t, MNV>;
+
     uint32_t     lightId;
     uint32_t     transformId;
-    VolumeStruct vol;
+    VolumeList   volumeIds;
 };
 using SceneLightSurfList = std::vector<LightSurfaceStruct>;
 
 struct CameraSurfaceStruct
 {
+    static constexpr auto MNV = TracerConstants::MaxNestedVolumes;
+    using VolumeList = std::array<uint32_t, MNV>;
+
     uint32_t     cameraId;
     uint32_t     transformId;
-    VolumeStruct vol;
+    VolumeList   volumeIds;
 };
 using SceneCamSurfList = std::vector<CameraSurfaceStruct>;
 

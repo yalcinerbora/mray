@@ -126,7 +126,7 @@ struct BaseAccelConstructParams
 {
     using SurfPair      = Pair<SurfaceId, SurfaceParams>;
     using LightSurfPair = Pair<LightSurfaceId, LightSurfaceParams>;
-    using VolumeList    = std::vector<VolumeKeyPack>;
+    using VolumeList    = std::vector<Pair<VolumeId, VolumeKeyPack>>;
 
     const VolumeList&                           globalVolumeList;
     const TextureViewMap&                       texViewMap;
@@ -143,7 +143,7 @@ struct AccelGroupConstructParams
     using LightSurfPair         = typename BaseAccelConstructParams::LightSurfPair;
     using TGroupedSurfaces      = std::vector<Pair<TransGroupId, Span<const SurfPair>>>;
     using TGroupedLightSurfaces = std::vector<Pair<TransGroupId, Span<const LightSurfPair>>>;
-    using VolumeList = std::vector<VolumeKeyPack>;
+    using VolumeList            = std::vector<Pair<VolumeId, VolumeKeyPack>>;
 
     const Map<TransGroupId, TransformGroupPtr>* transformGroups;
     const TextureViewMap*                       textureViews;

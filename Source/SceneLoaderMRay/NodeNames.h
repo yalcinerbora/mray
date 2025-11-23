@@ -14,6 +14,7 @@ namespace NodeNames
     static constexpr auto TRANSFORM_LIST = "Transforms"sv;
     static constexpr auto PRIMITIVE_LIST = "Primitives"sv;
     static constexpr auto MATERIAL_LIST  = "Materials"sv;
+    static constexpr auto VOLUME_LIST    = "Volumes"sv;
     // Surfaces
     static constexpr auto BOUNDARY              = "Boundary"sv;
     static constexpr auto SURFACE_LIST          = "Surfaces"sv;

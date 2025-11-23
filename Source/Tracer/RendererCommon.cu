@@ -501,7 +501,7 @@ uint32_t RendererBase::GenerateMediumWorkMappings(uint32_t workStart)
         );
     };
     //
-    for(const VolumeKeyPack& p : tracerView.globalVolumeList)
+    for(const auto& [_, p] : tracerView.globalVolumeList)
         GenMediumWork(p);
     return workStart;
 }

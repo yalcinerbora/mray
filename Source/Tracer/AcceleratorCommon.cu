@@ -246,6 +246,13 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
                                                              const GenericGroupPrimitiveT& pg,
                                                              std::string_view typeName)
 {
+    assert(std::is_sorted(p.globalVolumeList->cbegin(),
+                          p.globalVolumeList->cend(),
+                          [](const auto& a, const auto& b)
+    {
+        return a.first < b.first;
+    }));
+
     LinearizedSurfaceData result = {};
     result.volumeIndices.reserve(partitions.totalInstanceCount);
     result.primRanges.reserve(partitions.totalInstanceCount);
@@ -308,25 +315,26 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
             result.lightOrMatKeys.back()[i] = LightOrMatKey::CombinedKey(IS_MAT_KEY_FLAG,
                                                                          mKey.FetchBatchPortion(),
                                                                          mKey.FetchIndexPortion());
-
-            // TODO: Linear search may be slow later
-            VolumeKeyPack vKeyPack =
+            //
+            result.volumeIndices.back()[i] = VolumeIndex::InvalidKey();
+            if(surf.volumes[i] != TracerConstants::InvalidVolume)
             {
-                .medKey   = Bit::BitCast<MediumKey>(surf.volumes[i].mediumId),
-                .transKey = Bit::BitCast<TransformKey>(surf.volumes[i].transformId),
-                .priority = surf.volumes[i].priority
-            };
-            auto vLoc = std::find(p.globalVolumeList->cbegin(), p.globalVolumeList->cend(), vKeyPack);
-            if(vLoc == p.globalVolumeList->cend())
-                throw MRayError("{:s}: Volume [Medium: {}, Transform: {}, Priority: {}] "
-                                "is not found ",
-                                typeName,
-                                CommonKey(surf.volumes[i].mediumId),
-                                CommonKey(surf.volumes[i].transformId),
-                                surf.volumes[i].priority);
-
-            auto iIndex = CommonKey(std::distance(p.globalVolumeList->cbegin(), vLoc));
-            result.volumeIndices.back()[i] = VolumeIndex::CombinedKey(0, iIndex);
+                Pair<VolumeId, VolumeKeyPack> checkVol = {surf.volumes[i], {}};
+                auto vLoc = std::lower_bound(p.globalVolumeList->cbegin(), p.globalVolumeList->cend(),
+                                             checkVol,
+                [](const auto& a, const auto& b) -> bool
+                {
+                    return a.first < b.first;
+                });
+                if(vLoc == p.globalVolumeList->cend() ||
+                   vLoc->first != checkVol.first)
+                {
+                    throw MRayError("{:s}: Volume {} is not found!",
+                                    typeName, CommonId(checkVol.first));
+                }
+                auto vIndex = CommonKey(std::distance(p.globalVolumeList->cbegin(), vLoc));
+                result.volumeIndices.back()[i] = VolumeIndex::CombinedKey(0, vIndex);
+            }
         }
         InitRest(static_cast<uint32_t>(surf.alphaMaps.size()));
     };
@@ -352,25 +360,8 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
         PrimBatchId primBatchId = std::bit_cast<PrimBatchId>(primBatchKey);
         result.transformKeys.back() = std::bit_cast<TransformKey>(lSurf.transformId);
         result.instancePrimBatches.back().push_back(primBatchId);
-
-        VolumeKeyPack vKeyPack =
-        {
-            .medKey   = Bit::BitCast<MediumKey>(lSurf.volume.mediumId),
-            .transKey = Bit::BitCast<TransformKey>(lSurf.volume.transformId),
-            .priority = lSurf.volume.priority
-
-        };
-        auto vLoc = std::find(p.globalVolumeList->cbegin(), p.globalVolumeList->cend(), vKeyPack);
-        if(vLoc == p.globalVolumeList->cend())
-            throw MRayError("{:s}: Volume [Medium: {}, Transform: {}, Priority: {}] "
-                            "is not found ",
-                            typeName,
-                            CommonKey(lSurf.volume.mediumId),
-                            CommonKey(lSurf.volume.transformId),
-                            lSurf.volume.priority);
-
-        auto vIndex = CommonKey(std::distance(p.globalVolumeList->cbegin(), vLoc));
-        result.volumeIndices.back().front() = VolumeIndex::CombinedKey(0, vIndex);
+        // Lights are ray sinks, so it does not matter to set volume
+        result.volumeIndices.back().front() = VolumeIndex::InvalidKey();
     };
 
     for(const auto& pIndices : partitions.packedIndices)

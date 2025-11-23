@@ -84,6 +84,7 @@ using MediumAttributeInfoList = TexturedAttributeInfoList;
 MRAY_GENERIC_ID(SurfaceId, CommonId);
 MRAY_GENERIC_ID(LightSurfaceId, CommonId);
 MRAY_GENERIC_ID(CamSurfaceId, CommonId);
+MRAY_GENERIC_ID(VolumeId, CommonId);
 
 struct VolumeParams
 {
@@ -98,7 +99,8 @@ using SurfaceMatList        = StaticVector<MaterialId, TracerConstants::MaxPrimB
 using SurfacePrimList       = StaticVector<PrimBatchId, TracerConstants::MaxPrimBatchPerSurface>;
 using OptionalAlphaMapList  = StaticVector<Optional<TextureId>, TracerConstants::MaxPrimBatchPerSurface>;
 using CullBackfaceFlagList  = StaticVector<bool, TracerConstants::MaxPrimBatchPerSurface>;
-using VolumeList            = StaticVector<VolumeParams, TracerConstants::MaxPrimBatchPerSurface>;
+using SurfaceVolumeList     = StaticVector<VolumeId, TracerConstants::MaxPrimBatchPerSurface>;
+using BoundaryVolumeList    = StaticVector<VolumeId, TracerConstants::MaxNestedVolumes>;
 // Renderer Related
 MRAY_GENERIC_ID(RendererId, CommonId);
 using RendererAttributeInfo = GenericAttributeInfo;
