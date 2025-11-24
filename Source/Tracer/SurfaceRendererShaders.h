@@ -232,29 +232,29 @@ void WorkFunctionCommon<P, M, T>::Call(const Primitive&, const Material&, const 
             LightOrMatKey lmKey = params.common.dKeys[rayIndex].lightOrMatKey;
             MaterialKey mKey = MaterialKey::CombinedKey(lmKey.FetchBatchPortion(),
                                                         lmKey.FetchIndexPortion());
-            CommonKey k = CommonKey(Hash(mKey.FetchBatchPortion(), mKey.FetchIndexPortion()));
-            color = Color::RandomColorRGB(static_cast<uint32_t>(k));
+            uint32_t k = uint32_t(Hash(mKey.FetchBatchPortion(), mKey.FetchIndexPortion()));
+            color = Color::RandomColorRGB(k);
             break;
         }
         case PRIM_ID:
         {
             PrimitiveKey pKey = params.common.dKeys[rayIndex].primKey;
-            CommonKey k = CommonKey(Hash(pKey.FetchBatchPortion(), pKey.FetchIndexPortion()));
-            color = Color::RandomColorRGB(static_cast<uint32_t>(k));
+            uint32_t k = uint32_t(Hash(pKey.FetchBatchPortion(), pKey.FetchIndexPortion()));
+            color = Color::RandomColorRGB(k);
             break;
         }
         case ACCEL_ID:
         {
             AcceleratorKey aKey = params.common.dKeys[rayIndex].accelKey;
-            CommonKey k = CommonKey(Hash(aKey.FetchBatchPortion(), aKey.FetchIndexPortion()));
-            color = Color::RandomColorRGB(static_cast<uint32_t>(k));
+            uint32_t k = uint32_t(Hash(aKey.FetchBatchPortion(), aKey.FetchIndexPortion()));
+            color = Color::RandomColorRGB(k);
             break;
         }
         case TRANSFORM_ID:
         {
             TransformKey tKey = params.common.dKeys[rayIndex].transKey;
-            CommonKey k = CommonKey(Hash(tKey.FetchBatchPortion(), tKey.FetchIndexPortion()));
-            color = Color::RandomColorRGB(static_cast<uint32_t>(k));
+            uint32_t k = uint32_t(Hash(tKey.FetchBatchPortion(), tKey.FetchIndexPortion()));
+            color = Color::RandomColorRGB(k);
             break;
         }
         case UV:
@@ -268,13 +268,21 @@ void WorkFunctionCommon<P, M, T>::Call(const Primitive&, const Material&, const 
         case VOL_INTERFACE:
         {
             RayMediaListPack mediaPack = params.rayState.dRayMediaPacks[rayIndex];
-            // Surface Renderer does not update mediaPack's
-            // IsPassthrough variable, since it does not resolve materials
-            // so we assume only passthrough happens
-            params.globalState.mediaTracker.ResolveCurVolume(mediaPack);
-            auto vK = params.globalState.mediaTracker.GetVolumeKeyPack(mediaPack);
-            CommonKey k = CommonKey(Hash(CommonKey(vK.medKey), CommonKey(vK.transKey)));
-            color = Color::RandomColorRGB(static_cast<uint32_t>(k));
+            //
+            uint32_t k = uint32_t(Hash(mediaPack.pack));
+            color = Color::RandomColorRGB(k);
+
+            // TODO:
+            // This is hard to reason about, so we are just showing
+            // media index pack, maybe later we can do something better
+            //
+            //// Surface Renderer does not update mediaPack's
+            //// IsPassthrough variable, since it does not resolve materials
+            //// so we assume only passthrough happens
+            //params.globalState.mediaTracker.ResolveCurVolume(mediaPack);
+            //auto vK = params.globalState.mediaTracker.GetVolumeKeyPack(mediaPack);
+            //uint32_t k = uint32_t(Hash(CommonKey(vK.medKey), CommonKey(vK.transKey)));
+            //color = Color::RandomColorRGB(k);
             break;
         }
         default: color = BIG_MAGENTA(); break;

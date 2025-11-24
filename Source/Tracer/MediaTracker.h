@@ -138,10 +138,9 @@ class RayMediaListPack
                                                                 IS_ENTERING_RANGE[1] + PASSTHROUGH_BIT);
     static_assert(PASSTHROUGH_RANGE[1] == (sizeof(uint32_t) * CHAR_BIT));
 
-    private:
-    uint32_t pack;
-
     public:
+    uint32_t            pack;
+    //
                         RayMediaListPack() = default;
     MR_PF_DECL_V        RayMediaListPack(uint32_t curMed, uint32_t nextMed, uint32_t outer);
 
@@ -435,55 +434,57 @@ MediaTrackerView::TryInsertAtomic(const MediaList& list) const
     uint32_t index = h & divMask;
     for(uint32_t i = index;; i = (i + 1) & divMask)
     {
+        using namespace DeviceAtomic;
         // We will try to do atomic CAS lock shortly but we can
         // pre-check the lock here, if it is unlocked
         // writer already done writing all the indices.
-        if(dLocks[i] == UNLOCKED && dValues[i] == list)
+        if(AtomicLoad(dLocks[i]) == UNLOCKED && dValues[i] == list)
             return InsertResult{i, false};
+
+        auto TryAcquire = [&]()
+        {
+            uint32_t old = AtomicCompSwap(dLocks[i], UNLOCKED, LOCKED);
+            ThreadFenceGrid();
+            return old != LOCK_VAL;
+        };
+        auto Release = [&]()
+        {
+            AtomicStore(dLocks[i], UNLOCKED);
+            ThreadFenceGrid();
+        };
 
         // Now the tricky part
         // Obviously device does not have 5x32-bit atomic operation,
         // (Although new NVIDIA devices has 128-bit atomics)
         // So we store hash list as both as a locking mechanism
         // and to fast check if we continue probing or not.
-        // ============ //
-        //   ACQ. LOCK  //
-        // ============ //
-        using namespace DeviceAtomic;
-        uint32_t old;
+        //
+        // Another thing is that warps work on lockstep,
+        // so we can't spin until we acquire value since lane0 and lane1
+        // competes for the same location and we need to exit to write.
+        // So all checks are inside the spin lock.
+        bool locked = false;
         do
         {
-            old = AtomicCompSwap(dLocks[i], UNLOCKED, LOCKED);
+            locked = TryAcquire();
+            // Now we are fine (hopefully)
+            if(locked && dValues[i].listRaw[0] == EMPTY)
+            {
+                // Successfull Insert
+                dValues[i] = list;
+                Release();
+                return InsertResult{i, true};
+            }
+            else if(locked && dValues[i] == list)
+            {
+                Release();
+                return InsertResult{i, false};
+            }
+            // Occupied
+            Release();
         }
-        while(old == LOCK_VAL);
-        ThreadFenceGrid();
+        while(!locked);
 
-        // Now we are fine (hopefully)
-        if(dValues[i].listRaw[0] == EMPTY)
-        {
-            // Successfull Insert
-            dValues[i] = list;
-            // ============ //
-            //  REL. LOCK   //
-            // ============ //
-            ThreadFenceGrid();
-            AtomicStore(dLocks[i], UNLOCKED);
-            return InsertResult{i, true};
-        }
-        else if(dValues[i] == list)
-        {
-            // Unsuccessfull insert but we find the data
-            // ============ //
-            //  REL. LOCK   //
-            // ============ //
-            AtomicStore(dLocks[i], UNLOCKED);
-            return InsertResult{i, false};
-        }
-        // Occupied
-        // ============ //
-        //  REL. LOCK   //
-        // ============ //
-        AtomicStore(dLocks[i], UNLOCKED);
         //
         if(i == index - 1) break;
     }

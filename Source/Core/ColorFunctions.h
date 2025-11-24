@@ -215,14 +215,25 @@ MR_PF_DEF Vector3 Color::RandomColorRGB(uint32_t index) noexcept
 {
     // https://martin.ankerl.com/2009/12/09/how-to-create-random-colors-programmatically/
     // Specifically using double here to get some precision
-    constexpr double SATURATION = 0.75;
-    constexpr double VALUE = 0.95;
     constexpr double GOLDEN_RATIO_CONJ = 0.618033988749895;
     // For large numbers use double arithmetic here
     double hue = 0.1 + static_cast<double>(index) * GOLDEN_RATIO_CONJ;
     hue -= Math::Floor(hue);
 
-    return HSVToRGB(Vector3(hue, SATURATION, VALUE));
+    // Embeding a PCG32 as a hash here to randomize value
+    uint32_t h = index * 747796405u + 2891336453u;
+    h = ((h >> ((h >> 28u) + 4u)) ^ h) * 277803737u;
+    h = (h >> 22u) ^ h;
+
+    constexpr Vector2 VALUE_RANGE = Vector2(0.30, 0.75);
+    Float xi = Float(0x1.p-32f) * Float(h);
+    Float value = (VALUE_RANGE[1] - VALUE_RANGE[0]) * xi;
+    value += VALUE_RANGE[1];
+
+    // Nothing fancy for saturation
+    constexpr Float SATURATION = Float(0.95);
+
+    return HSVToRGB(Vector3(hue, SATURATION, value));
 }
 
 MR_PF_DEF Vector3 Color::XYZToYxy(const Vector3& xyz) noexcept

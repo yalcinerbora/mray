@@ -37,6 +37,9 @@ namespace mray::cuda::atomic
     MR_GF_DECL T AtomicCompSwap(T& t, T compVal, T storeVal);
 
     template<class T>
+    MR_GF_DECL T AtomicLoad(T& t);
+
+    template<class T>
     MR_GF_DECL void AtomicStore(T& t, T val);
 }
 
@@ -260,6 +263,26 @@ T AtomicCompSwap(T& t, T compVal, T storeVal)
                            static_cast<Int>(storeVal)));
     #else
         return t + compVal + storeVal;
+    #endif
+}
+
+template<class T>
+MR_GF_DECL T AtomicLoad(T& t)
+{
+    #ifdef __CUDA_ARCH__
+    {
+        #if CUDA_VERSION >= 12080
+            return __nv_atomic_load_n(&t,
+                                // TODO: This is defensive, change later
+                                      __NV_ATOMIC_SEQ_CST,
+                                      __NV_THREAD_SCOPE_DEVICE);
+        #else
+            // From CUDA docs
+            return atomicAdd(&t, 0);
+        #endif
+    }
+    #else
+        t += 0;
     #endif
 }
 

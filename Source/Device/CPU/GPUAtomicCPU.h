@@ -38,6 +38,9 @@ namespace mray::host::atomic
     MR_GF_DECL T AtomicCompSwap(T& t, T compVal, T val);
 
     template<class T>
+    MR_GF_DECL T AtomicLoad(T& t);
+
+    template<class T>
     MR_GF_DECL void AtomicStore(T& t, T val);
 }
 
@@ -140,6 +143,15 @@ T AtomicCompSwap(T& t, T compVal, T val)
     ref.compare_exchange_strong(compVal, val);
     return compVal;
 }
+
+template<class T>
+MR_GF_DECL
+T AtomicLoad(T& t)
+{
+    std::atomic_ref<T> ref(t);
+    return ref.load();
+}
+
 
 template<class T>
 MR_GF_DEF
