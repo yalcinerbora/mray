@@ -100,13 +100,13 @@ inline void ThreadFenceGrid()
 }
 
 // A Good guess for TPB
-static constexpr uint32_t StaticThreadPerBlock1D()
+constexpr uint32_t StaticThreadPerBlock1D()
 {
     return 256u;
 }
 
 // TODO: This should not be compile time static
-static constexpr uint32_t TotalQueuePerDevice()
+constexpr uint32_t TotalQueuePerDevice()
 {
     return 4;
 }

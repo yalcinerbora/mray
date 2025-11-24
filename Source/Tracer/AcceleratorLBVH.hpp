@@ -285,6 +285,7 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::IntersectionCheck(const Ray& ray,
             ? IS_BACKFACE_KEY_FLAG
             : IS_FRONTFACE_KEY_FLAG;
     CommonKey vI = volumeIndices[index].FetchIndexPortion();
+    CommonKey vPassthrough = volumeIndices[index].FetchFlagPortion();
 
     // It is a hit! Update
     return HitResult
@@ -293,7 +294,7 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::IntersectionCheck(const Ray& ray,
         .t              = intersection.value().t,
         .primitiveKey   = primKey,
         .lmKey          = lmKeys[index],
-        .volumeIndex    = VolumeIndex::CombinedKey(isBackFace, vI)
+        .volumeIndex    = VolumeIndex::CombinedKey(vPassthrough, isBackFace, vI)
     };
 }
 

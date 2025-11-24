@@ -207,7 +207,8 @@ void KCClosestHit()
                 : IS_FRONTFACE_KEY_FLAG;
 
         auto vIndex = record.volumeIndex.FetchIndexPortion();
-        auto vI = VolumeIndex::CombinedKey(orientation, vIndex);
+        auto vPassthrough = record.volumeIndex.FetchFlagPortion();
+        auto vI = VolumeIndex::CombinedKey(vPassthrough, orientation, vIndex);
         dVolumeIndices[rIndex] = vI;
     }
 }

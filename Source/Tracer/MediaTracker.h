@@ -97,11 +97,14 @@ inline constexpr uint32_t MEDIA_LIST_BITS = MAX_MEDIA_BITS * MAX_NESTED_MEDIA;
 inline constexpr uint32_t MEDIA_LIST_WORDS = MEDIA_LIST_BITS / (sizeof(uint32_t) * CHAR_BIT);
 static_assert(MEDIA_LIST_BITS % (sizeof(uint32_t) * CHAR_BIT) == 0,
               "Wasted bits in MediaTracker!");
+inline constexpr CommonKey INVALID_VOLUME_INDEX = VolumeIndex::InvalidKey().FetchIndexPortion();
 
 struct MediaList
 {
     using IndexList = std::array<uint32_t, MAX_NESTED_MEDIA>;
     using PackedList = std::array<uint32_t, MEDIA_LIST_WORDS>;
+
+    static constexpr uint32_t INVALID_INDEX = (1 << MAX_MEDIA_BITS) - 1;
 
     PackedList listRaw;
     // Functionality to lift the data to register space
@@ -109,8 +112,7 @@ struct MediaList
     // usage yet
     MR_PF_DECL   IndexList Unpack() const;
     MR_PF_DECL_V void      Pack(const IndexList&);
-
-    auto operator<=>(const MediaList&) const = default;
+    MR_PF_DECL   bool       operator==(const MediaList&) const;
 };
 
 class RayMediaListPack
@@ -125,17 +127,16 @@ class RayMediaListPack
                                                   ENTER_EXIT_BIT -
                                                   PASSTHROUGH_BIT);
     //
-    static constexpr Vector2ui OUTER_INDEX_RANGE = Vector2ui(0, OUTER_INDEX_BITS);
-    static constexpr Vector2ui CUR_INDEX_RANGE   = Vector2ui(OUTER_INDEX_RANGE[1],
-                                                             OUTER_INDEX_RANGE[1] + INNER_INDEX_BITS);
-    static constexpr Vector2ui NEXT_INDEX_RANGE  = Vector2ui(CUR_INDEX_RANGE[1],
-                                                             CUR_INDEX_RANGE[1] + INNER_INDEX_BITS);
-    static constexpr Vector2ui IS_ENTERING_RANGE = Vector2ui(NEXT_INDEX_RANGE[1],
-                                                             NEXT_INDEX_RANGE[1] + ENTER_EXIT_BIT);
-    static constexpr Vector2ui PASSTHROUGH_RANGE = Vector2ui(IS_ENTERING_RANGE[1],
-                                                             IS_ENTERING_RANGE[1] + PASSTHROUGH_BIT);
+    static constexpr Vector2ui OUTER_INDEX_RANGE    = Vector2ui(0, OUTER_INDEX_BITS);
+    static constexpr Vector2ui CUR_INDEX_RANGE      = Vector2ui(OUTER_INDEX_RANGE[1],
+                                                                OUTER_INDEX_RANGE[1] + INNER_INDEX_BITS);
+    static constexpr Vector2ui NEXT_INDEX_RANGE     = Vector2ui(CUR_INDEX_RANGE[1],
+                                                                CUR_INDEX_RANGE[1] + INNER_INDEX_BITS);
+    static constexpr Vector2ui IS_ENTERING_RANGE    = Vector2ui(NEXT_INDEX_RANGE[1],
+                                                                NEXT_INDEX_RANGE[1] + ENTER_EXIT_BIT);
+    static constexpr Vector2ui PASSTHROUGH_RANGE    = Vector2ui(IS_ENTERING_RANGE[1],
+                                                                IS_ENTERING_RANGE[1] + PASSTHROUGH_BIT);
     static_assert(PASSTHROUGH_RANGE[1] == (sizeof(uint32_t) * CHAR_BIT));
-
 
     private:
     uint32_t pack;
@@ -148,13 +149,13 @@ class RayMediaListPack
     MR_PF_DECL uint32_t NextMediaIndex() const;
     MR_PF_DECL uint32_t OuterIndex() const;
     MR_PF_DECL bool     IsEntering() const;
-    MR_PF_DECL bool     IsRayPassedThrough() const;
+    MR_PF_DECL bool     IsPassthrough() const;
     //
     MR_PF_DECL_V void   SetCurMediaIndex(uint32_t);
     MR_PF_DECL_V void   SetNextMediaIndex(uint32_t);
     MR_PF_DECL_V void   SetOuterIndex(uint32_t);
     MR_PF_DECL_V void   SetEntering(bool);
-    MR_PF_DECL_V void   SetRayPassedThrough(bool);
+    MR_PF_DECL_V void   SetPassthrough(bool);
 };
 
 class MediaTrackerView
@@ -192,8 +193,11 @@ class MediaTrackerView
     InsertResult TryInsertAtomic(const MediaList& list) const;
 
     MR_GF_DECL
-    void UpdateRayMediaList(RayMediaListPack& rayMediaListIndex,
-                            VolumeIndex nextVolumeIndex) const;
+    void InsertNewVolume(RayMediaListPack& rayMediaListIndex,
+                         VolumeIndex nextVolumeIndex) const;
+
+    MR_GF_DECL
+    void ResolveCurVolume(RayMediaListPack& rayMediaListIndex) const;
 
     MR_HF_DECL
     VolumeKeyPack GetVolumeKeyPack(RayMediaListPack rayMediaListIndex) const;
@@ -227,28 +231,28 @@ class MediaTracker
                                    Span<const RayIndex> dRayIndices,
                                    // Constants
                                    const BoundaryVolumeList& nestedVolumeList,
-                                   const GPUQueue&);
+                                   const GPUQueue&) const;
     void PrimeHashTable(const std::vector<const SurfaceVolumeList*>& hSurfaceVolumeList,
                         const std::vector<const BoundaryVolumeList*>& hBoundaryVolumeList,
                         VolumeId boundaryVolume,
-                        const GPUQueue&);
+                        const GPUQueue&) const;
 
-    void UpdateMediaListPacksIndirect(// I-O
-                                      Span<RayMediaListPack> dPacks,
-                                      //
-                                      Span<const VolumeIndex> dNewVolumeIndices,
-                                      Span<const RayIndex> dRayIndices,
-                                      const GPUQueue&);
+    void AddNewVolumeToRaysIndirect(// I-O
+                                    Span<RayMediaListPack> dPacks,
+                                    //
+                                    Span<const VolumeIndex> dNewVolumeIndices,
+                                    Span<const RayIndex> dRayIndices,
+                                    const GPUQueue&) const;
+
+    void ResolveCurVolumesOfRaysIndirect(// I-O
+                                         Span<RayMediaListPack> dPacks,
+                                         //
+                                         Span<const RayIndex> dRayIndices,
+                                         const GPUQueue&) const;
 
     // Misc
     size_t           GPUMemoryUsage() const;
     MediaTrackerView View() const;
-
-    //void ResolveInterface(// I-O
-    //                      Span<RayMediaListPack> packs,
-    //                      const GPUQueue&);
-
-    //void HashForPartition(Span<const RayMediaListPack> packs);
 };
 
 MR_PF_DEF
@@ -276,7 +280,7 @@ bool RayMediaListPack::IsEntering() const
 }
 
 MR_PF_DEF
-bool RayMediaListPack::IsRayPassedThrough() const
+bool RayMediaListPack::IsPassthrough() const
 {
     return bool(Bit::FetchSubPortion(pack, {PASSTHROUGH_RANGE[0], PASSTHROUGH_RANGE[1]}));
 }
@@ -307,10 +311,9 @@ void RayMediaListPack::SetEntering(bool b)
 }
 
 MR_PF_DEF_V
-void RayMediaListPack::SetRayPassedThrough(bool b)
+void RayMediaListPack::SetPassthrough(bool b)
 {
-    pack = Bit::SetSubPortion(pack, b ? 1 : 0,
-                              {PASSTHROUGH_RANGE[0], PASSTHROUGH_RANGE[1]});
+    pack = Bit::SetSubPortion(pack, b ? 1 : 0, {PASSTHROUGH_RANGE[0], PASSTHROUGH_RANGE[1]});
 }
 
 MR_PF_DEF
@@ -382,7 +385,19 @@ void MediaList::Pack(const IndexList& list)
     listRaw[3] = Bit::SetSubPortion(listRaw[3], list[6]      , {24, 32});
     listRaw[4] = Bit::SetSubPortion(listRaw[4], list[6] >>  8, { 0, 12});
     // 7
-    listRaw[7] = Bit::SetSubPortion(listRaw[4], list[7]      , {12, 32});
+    listRaw[4] = Bit::SetSubPortion(listRaw[4], list[7]      , {12, 32});
+}
+
+MR_PF_DEF
+bool MediaList::operator==(const MediaList& other) const
+{
+    bool equal = true;
+    for(uint32_t i = 0; i < MEDIA_LIST_WORDS; i++)
+    {
+        equal &= (listRaw[i] == other.listRaw[i]);
+        if(!equal) break;
+    }
+    return equal;
 }
 
 MRAY_HOST
@@ -472,65 +487,146 @@ MediaTrackerView::TryInsertAtomic(const MediaList& list) const
         //
         if(i == index - 1) break;
     }
+    printf("Media HT Full!\n");
     return InsertResult{0, false};
 }
 
 MR_GF_DEF
-void MediaTrackerView::UpdateRayMediaList(RayMediaListPack& rayMediaListIndex,
-                                          VolumeIndex nextVolumeIndexPack) const
+void MediaTrackerView::InsertNewVolume(RayMediaListPack& rayMediaListIndex,
+                                       VolumeIndex nextVolumeIndexPack) const
 {
-    uint32_t htIndex = rayMediaListIndex.OuterIndex();
-    MediaList curList = dValues[htIndex];
+    assert(rayMediaListIndex.CurMediaIndex() == rayMediaListIndex.NextMediaIndex()
+           && "Ray's media should've been resolved before \"UpdateRayMediaList\"");
 
+    // Volume of the surface is don't care, so we ignore it
+    // These surfaces should be reflective
+    if(nextVolumeIndexPack.FetchIndexPortion() == INVALID_VOLUME_INDEX)
+        return;
+
+    uint32_t htIndex = rayMediaListIndex.OuterIndex();
     // Add new volume to the stack
     using UnpackedList = typename MediaList::IndexList;
-    UnpackedList volIndices = curList.Unpack();
-
-    // Acquire the index
-    uint32_t newNextVolInnerIndex;
-
-
-    // Sorted Add
-    uint32_t nextVolumeIndex = nextVolumeIndexPack.FetchIndexPortion();
-    uint32_t liftedVolIndex = nextVolumeIndex;
-    uint32_t liftPrio = dGlobalVolumeList[nextVolumeIndex].priority;
-    CommonKey liftKey = CommonKey(dGlobalVolumeList[nextVolumeIndex].medKey);
-    for(uint32_t i = 0; i < MAX_NESTED_MEDIA; i++)
+    using UnpackedPrioList = UnpackedList;
+    UnpackedPrioList priorities = {};
+    UnpackedList volIndices = dValues[htIndex].Unpack();
+    // Must be valid index
+    assert(volIndices[0] != MediaList::INVALID_INDEX);
+    // First lift the priorities from the global list
+    // TODO: This can be baked to the following loop for perf maybe?
+    // Measure.
+    uint32_t elemCount = 0;
+    for(; elemCount < MAX_NESTED_MEDIA; elemCount++)
     {
-        uint32_t curPrio = dGlobalVolumeList[volIndices[i]].priority;
-        CommonKey curKey = CommonKey(dGlobalVolumeList[volIndices[i]].medKey);
+        if(volIndices[elemCount] == MediaList::INVALID_INDEX) break;
 
-        if(volIndices[i] == EMPTY_VAL)
+        uint32_t globalIndex = volIndices[elemCount];
+        priorities[elemCount] = dGlobalVolumeList[globalIndex].priority;
+    }
+    assert(elemCount <= MAX_NESTED_MEDIA);
+    // New volume's index and priority
+    uint32_t newVolumeIndex = nextVolumeIndexPack.FetchIndexPortion();
+    uint32_t newVolumePrio = dGlobalVolumeList[newVolumeIndex].priority;
+
+    // Add or Find
+    uint32_t liftPrio = newVolumePrio;
+    uint32_t liftIndex = newVolumeIndex;
+    bool isFound = false;
+    uint32_t insertOrFoundLoc = UINT32_MAX;
+    for(uint32_t i = 0; i < elemCount; i++)
+    {
+        if(liftIndex == volIndices[i])
         {
-            volIndices[i] = liftedVolIndex;
-            i++;
+            isFound = true;
+            insertOrFoundLoc = i;
             break;
         }
-        else if((liftPrio > curPrio) || (liftPrio == curPrio && liftKey > curKey))
-        {
-            if(liftedVolIndex == nextVolumeIndex)
-                newNextVolInnerIndex = i;
 
-            std::swap(liftedVolIndex, volIndices[i]);
-            std::swap(liftPrio, curPrio);
-            std::swap(liftKey, curKey);
+        if(liftPrio > priorities[i] ||
+           liftPrio == priorities[i] && liftIndex > volIndices[i])
+        {
+            if(liftIndex == newVolumeIndex)
+                insertOrFoundLoc = i;
+
+            std::swap(liftPrio, priorities[i]);
+            std::swap(liftIndex, volIndices[i]);
         }
     }
+    if(!isFound && elemCount != MAX_NESTED_MEDIA)
+    {
+        priorities[elemCount] = liftPrio;
+        volIndices[elemCount] = liftIndex;
+        if(liftIndex == newVolumeIndex)
+            insertOrFoundLoc = elemCount;
+    }
+    assert(insertOrFoundLoc != UINT32_MAX);
+    //
+    uint32_t nextVolInnerIndex = insertOrFoundLoc;
+    uint32_t curVolInnerIndex = (insertOrFoundLoc == 0) ? 1 : 0;
 
-    uint32_t newCurVolInnerIndex = rayMediaListIndex.CurMediaIndex();
-    if(newNextVolInnerIndex <= newCurVolInnerIndex)
-        newCurVolInnerIndex++;
+    rayMediaListIndex.SetEntering(!isFound);
+    rayMediaListIndex.SetCurMediaIndex(curVolInnerIndex);
+    rayMediaListIndex.SetNextMediaIndex(nextVolInnerIndex);
 
+    // We can set the passthrough bit iff volume index (accelerator)
+    // set the material id as passthrough mat.
+    bool isPassthroughMat = (nextVolumeIndexPack.FetchFlagPortion() ==
+                             IS_PASSTHROUGH_MAT_FLAG);
+    // Also add the fake intersection state
+    bool isFakeIntersection = (priorities[nextVolInnerIndex] <
+                               priorities[curVolInnerIndex]);
+    rayMediaListIndex.SetPassthrough(isPassthroughMat ||
+                                     isFakeIntersection);
 
-    // Finally Pack and Insert
-    curList.Pack(volIndices);
-    auto [newIndex, _] = TryInsertAtomic(curList);
+    // Only add this interaction to the hash table
+    // if we actually added a new item to the stack
+    if(!isFound)
+    {
+        MediaList l; l.Pack(volIndices);
+        auto [newIndex, _] = TryInsertAtomic(l);
+        rayMediaListIndex.SetOuterIndex(newIndex);
+    }
+}
 
-    // Find the next volume and cur volume index
-    rayMediaListIndex.SetOuterIndex(newIndex);
-    rayMediaListIndex.SetCurMediaIndex(newCurVolInnerIndex);
-    rayMediaListIndex.SetNextMediaIndex(newNextVolInnerIndex);
-    rayMediaListIndex.SetEntering(nextVolumeIndexPack.FetchBatchPortion());
+MR_GF_DEF
+void MediaTrackerView::ResolveCurVolume(RayMediaListPack& rayMediaListIndex) const
+{
+    // Passthrough bit is seth by us (on "InsertNewVolume")
+    // or ray literally passed through by dielectric
+    // and another kernel set that value.
+    //
+    // We did passed through, and we are entering the new volume
+    // Since system already adds the entered value to the stack
+    // We do not need to do anything except set next = cur = 0
+    // (since stack is sorted).
+    bool reset = (rayMediaListIndex.IsPassthrough() && rayMediaListIndex.IsEntering());
+    // The opposite is also true, if we did not passthrough but we were exiting from a
+    // volume, we do not need to change the state
+    // we prematurely added the volume to the stack,
+    reset |= (!rayMediaListIndex.IsPassthrough() && !rayMediaListIndex.IsEntering());
+    if(reset)
+    {
+        rayMediaListIndex.SetNextMediaIndex(0);
+        rayMediaListIndex.SetCurMediaIndex(0);
+        return;
+    }
+    // Now we can remove "next"
+    using IndexList = typename MediaList::IndexList;
+    IndexList mediaIndices = dValues[rayMediaListIndex.OuterIndex()].Unpack();
+    uint32_t next = rayMediaListIndex.NextMediaIndex();
+    if(next == MAX_NESTED_MEDIA - 1)
+        mediaIndices[next] = MediaList::INVALID_INDEX;
+    else for(uint32_t i = next; i < MAX_NESTED_MEDIA - 1; i++)
+        mediaIndices[i] = mediaIndices[i + 1];
+    //
+    MediaList l; l.Pack(mediaIndices);
+    auto [newLoc, _] = TryInsertAtomic(l);
+    //
+    rayMediaListIndex.SetOuterIndex(newLoc);
+    rayMediaListIndex.SetNextMediaIndex(0);
+    rayMediaListIndex.SetCurMediaIndex(0);
+    // TODO: Should we clear these bits, or it is not this system's responsibility?
+    rayMediaListIndex.SetEntering(false);
+    rayMediaListIndex.SetPassthrough(false);
 }
 
 MR_HF_DEF

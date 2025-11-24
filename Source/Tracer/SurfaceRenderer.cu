@@ -267,7 +267,9 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     else
     {
         bool isVolumeMode = (currentOptions.mode == SurfRDetail::Mode::VOL_INTERFACE);
-        size_t rayVolCount = isVolumeMode ? maxRayCount : size_t(0);
+        size_t rayVolCount = (isVolumeMode) ? maxRayCount : size_t(0);
+        assert(maxSampleCount * sizeof(RandomNumber) >=
+               rayVolCount * sizeof(RayMediaListPack));
 
         MemAlloc::AllocateMultiData(Tie(dHits, dHitKeys, dRays, dRayCones,
                                         dRayStateCommon.dImageCoordinates,
@@ -453,6 +455,14 @@ RendererOutput SurfaceRenderer::DoRender()
     }
     tilePixIndex += rayCount;
 
+    if(currentOptions.mode == SurfRDetail::Mode::VOL_INTERFACE)
+    {
+        mediaTracker->SetStartingVolumeIndirect(dRayStateCommon.dRayMediaPacks,
+                                                dIndices,
+                                                curCamSurfaceParams.nestedVolumes,
+                                                processQueue);
+    }
+
     // Cast rays
     using namespace std::string_view_literals;
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
@@ -468,6 +478,7 @@ RendererOutput SurfaceRenderer::DoRender()
     // Ray Casting
     // Repurpose allocation for ray casting we are not using it
     Span<VolumeIndex> dVolumeIndices = MemAlloc::RepurposeAlloc<VolumeIndex>(dRandomNumBuffer);
+    processQueue.MemsetAsync(dVolumeIndices, 0xFF);
 
     SurfRDetail::Mode::E curMode = currentOptions.mode;
     bool showVolumeMode = curMode == SurfRDetail::Mode::VOL_INTERFACE;
@@ -480,12 +491,13 @@ RendererOutput SurfaceRenderer::DoRender()
         processQueue
     );
 
+    // Resolve the VolumeIndices to
     if(showVolumeMode)
     {
-        // Resolve the VolumeIndices to
-        // Ray keys
-        // TODO:
-        assert(false);
+        mediaTracker->AddNewVolumeToRaysIndirect(dRayStateCommon.dRayMediaPacks,
+                                                 dVolumeIndices,
+                                                 dIndices,
+                                                 processQueue);
     }
 
     // Generate work keys from hit packs

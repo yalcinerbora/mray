@@ -333,7 +333,11 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
                                     typeName, CommonId(checkVol.first));
                 }
                 auto vIndex = CommonKey(std::distance(p.globalVolumeList->cbegin(), vLoc));
-                result.volumeIndices.back()[i] = VolumeIndex::CombinedKey(0, vIndex);
+                using namespace TracerConstants;
+                auto isInterfaceMat = (mKey.FetchBatchPortion() == CommonKey(PassthroughMatGroupId))
+                                        ? IS_PASSTHROUGH_MAT_FLAG
+                                        : IS_NOT_PASSTHROUGH_MAT_FLAG;
+                result.volumeIndices.back()[i] = VolumeIndex::CombinedKey(isInterfaceMat, 0, vIndex);
             }
         }
         InitRest(static_cast<uint32_t>(surf.alphaMaps.size()));

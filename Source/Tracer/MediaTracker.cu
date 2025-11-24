@@ -10,20 +10,29 @@ void SortByPrio(std::array<uint32_t, MAX_NESTED_MEDIA>& ml,
                 std::array<uint32_t, MAX_NESTED_MEDIA>& priorities,
                 uint32_t indexCount)
 {
+    auto IsLess = [&](uint32_t j, uint32_t index, uint32_t prio) -> bool
+    {
+        bool less = priorities[j] < prio;
+        bool eqLess = (priorities[j] == prio);
+        eqLess &= (ml[j] < index);
+        return less || eqLess;
+    };
+
+    // Insertion Sort
     for(uint32_t i = 1; i < indexCount; i++)
     {
-        uint32_t p = priorities[i];
-        uint32_t k = ml[i];
-        for(int32_t j = i - 1; j >= 0; j--)
+        uint32_t prio = priorities[i];
+        uint32_t index = ml[i];
+
+        int32_t j = i - 1;
+        for(; j >= 0 && IsLess(j, index, prio); j--)
         {
-            if(priorities[j] > p || (priorities[j] == p && ml[j] > k))
-            {
-                std::swap(priorities[j + 1], priorities[j]);
-                std::swap(ml[j + 1], ml[j]);
-            }
+            std::swap(priorities[j + 1], priorities[j]);
+            std::swap(ml[j + 1], ml[j]);
         }
-        ml[i] = k;
-        priorities[i] = p;
+        // Insert to the slot
+        ml[j + 1] = index;
+        priorities[j + 1] = prio;
     }
 }
 
@@ -63,13 +72,13 @@ void KCSetStartingVolumeIndirect(// Output
         p.SetNextMediaIndex(0);
         p.SetOuterIndex(index);
         p.SetEntering(false);
-        p.SetRayPassedThrough(false);
+        p.SetPassthrough(false);
         dPacks[rIndex] = p;
     }
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCUpdateMediaListPacksIndirect(// I-O
+void KCAddNewVolumeToRayListIndirect(// I-O
                                     MRAY_GRID_CONSTANT const Span<RayMediaListPack> dPacks,
                                     MRAY_GRID_CONSTANT const MediaTrackerView tracker,
                                     //
@@ -83,7 +92,25 @@ void KCUpdateMediaListPacksIndirect(// I-O
         RayIndex rIndex = dRayIndices[i];
         RayMediaListPack p = dPacks[rIndex];
         VolumeIndex vI = dNewVolumeIndices[rIndex];
-        tracker.UpdateRayMediaList(p, vI);
+        tracker.InsertNewVolume(p, vI);
+        dPacks[rIndex] = p;
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCResolveCurVolumesOfRaysIndirect(// I-O
+                                       MRAY_GRID_CONSTANT const Span<RayMediaListPack> dPacks,
+                                       MRAY_GRID_CONSTANT const MediaTrackerView tracker,
+                                       //
+                                       MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
+{
+    KernelCallParams kp;
+    uint32_t rayCount = uint32_t(dRayIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        RayIndex rIndex = dRayIndices[i];
+        RayMediaListPack p = dPacks[rIndex];
+        tracker.ResolveCurVolume(p);
         dPacks[rIndex] = p;
     }
 }
@@ -122,6 +149,7 @@ MediaTracker::MediaTracker(const VolumeList& globalVolumeList,
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     // Assume %50 load factor
     maximumEntryCount *= 2;
+    maximumEntryCount = Math::NextPowerOfTwo(maximumEntryCount);
     MemAlloc::AllocateMultiData(Tie(dGlobalVolumeList,
                                     dLocksHT, dMediaListHT),
                                 mem,
@@ -152,7 +180,7 @@ void MediaTracker::SetStartingVolumeIndirect(// Output
                                              Span<const RayIndex> dRayIndices,
                                              // Constants
                                              const BoundaryVolumeList& startVolumeList,
-                                             const GPUQueue& queue)
+                                             const GPUQueue& queue) const
 {
     //
     std::array<uint32_t, MAX_NESTED_MEDIA> unpackedList;
@@ -184,7 +212,7 @@ void MediaTracker::SetStartingVolumeIndirect(// Output
 void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& hSurfaceVolumeList,
                                   const std::vector<const BoundaryVolumeList*>& hBoundaryVolumeList,
                                   VolumeId boundaryVolume,
-                                  const GPUQueue& queue)
+                                  const GPUQueue& queue) const
 {
     using namespace TracerConstants;
     size_t conservativeSize = hSurfaceVolumeList.size() * 2 * MaxPrimBatchPerSurface;
@@ -226,38 +254,41 @@ void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& h
         const BoundaryVolumeList& bList = *ptr;
         // Add all of the combinations of this list
         uint32_t totalCombinations = 1u << bList.size();
-        std::array<uint32_t, MAX_NESTED_MEDIA> unpackedList;
+
         StaticVector<uint32_t, MAX_NESTED_MEDIA> volIndices;
+        StaticVector<uint32_t, MAX_NESTED_MEDIA> priorities;
 
         for(VolumeId v : bList)
+        {
             volIndices.push_back(FindVolumeIndex(v));
+            uint32_t prio = globalVolumeList[volIndices.back()].second.priority;
+            priorities.push_back(prio);
+        }
 
-        // TODO: We are adding singular values
+        // TODO: We are adding all the singular values
         // here but only singular value should be the boundary
         // one.
         for(uint32_t i = 1; i < totalCombinations; i++)
         {
+            std::array<uint32_t, MAX_NESTED_MEDIA> unpackedList;
+            std::array<uint32_t, MAX_NESTED_MEDIA> curPriorities;
             unpackedList.fill(MediaTrackerView::EMPTY_VAL);
+
             uint32_t counter = 0;
-            for(uint32_t j = 0; j < MAX_NESTED_MEDIA; i++)
+            for(uint32_t j = 0; j < MAX_NESTED_MEDIA; j++)
             {
                 if(Bit::FetchSubPortion(i, {j, j + 1}) == 0) continue;
-                unpackedList[counter++] = volIndices[j];
+                unpackedList[counter] = volIndices[j];
+                curPriorities[counter] = priorities[j];
+                counter++;
             }
-
-            std::array<uint32_t, MAX_NESTED_MEDIA> priorities;
-            for(uint32_t j = 0; j < counter; j++)
-                priorities[j] = globalVolumeList[unpackedList[0]].second.priority;
-            priorities[1] = globalVolumeList[unpackedList[1]].second.priority;
-            SortByPrio(unpackedList, priorities, counter);
+            SortByPrio(unpackedList, curPriorities, counter);
 
             MediaList l; l.Pack(unpackedList);
             mediaLists.push_back(l);
         }
     }
-
     // Send to GPU and let GPU do the hash table stuff.
-    //.............
     DeviceLocalMemory localMem(*queue.Device());
     Span<MediaList> dLists;
     MemAlloc::AllocateMultiData(Tie(dLists), localMem,
@@ -274,22 +305,39 @@ void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& h
     queue.Barrier().Wait();
 }
 
-void MediaTracker::UpdateMediaListPacksIndirect(// I-O
-                                                Span<RayMediaListPack> dPacks,
-                                                //
-                                                Span<const VolumeIndex> dNewVolumeIndices,
-                                                Span<const RayIndex> dRayIndices,
-                                                const GPUQueue& queue)
+void MediaTracker::AddNewVolumeToRaysIndirect(// I-O
+                                              Span<RayMediaListPack> dPacks,
+                                              //
+                                              Span<const VolumeIndex> dNewVolumeIndices,
+                                              Span<const RayIndex> dRayIndices,
+                                              const GPUQueue& queue) const
 
 {
-    queue.IssueWorkKernel<KCUpdateMediaListPacksIndirect>
+    queue.IssueWorkKernel<KCAddNewVolumeToRayListIndirect>
     (
-        "KCUpdateMediaListPacksIndirect",
+        "KCAddNewVolumeToRayListIndirect",
         DeviceWorkIssueParams{.workCount = uint32_t(dRayIndices.size())},
         //
         dPacks,
         View(),
         dNewVolumeIndices,
+        dRayIndices
+    );
+}
+
+void MediaTracker::ResolveCurVolumesOfRaysIndirect(// I-O
+                                                   Span<RayMediaListPack> dPacks,
+                                                   //
+                                                   Span<const RayIndex> dRayIndices,
+                                                   const GPUQueue& queue) const
+{
+    queue.IssueWorkKernel<KCResolveCurVolumesOfRaysIndirect>
+    (
+        "KCResolveCurVolumesOfRaysIndirect",
+        DeviceWorkIssueParams{.workCount = uint32_t(dRayIndices.size())},
+        //
+        dPacks,
+        View(),
         dRayIndices
     );
 }

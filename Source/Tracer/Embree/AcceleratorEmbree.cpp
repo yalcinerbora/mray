@@ -282,6 +282,8 @@ void BaseAcceleratorEmbree::CastRays(// Output
                 rh.ray.tfar[i] = tMM[1];
                 // RNG
                 rqContext.rng.emplace_back(dRNGStates[rIndex]);
+                // Volume buffer
+                rqContext.volumeIndices.emplace_back();
             }
 
             // Launch!
@@ -504,6 +506,8 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
             rh.ray.tfar = tMM[1];
             // RNG
             rqContext.rng.emplace_back(dRNGStates[rIndex]);
+            // Volume Buffer
+            rqContext.volumeIndices.emplace_back();
             // Launch!
             rtcIntersect1(t, &rh, &intersectArgs);
             //

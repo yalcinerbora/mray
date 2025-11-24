@@ -175,13 +175,16 @@ using LightKey          = MaterialKey;
 using LightOrMatKey     = TriKeyT<CommonKey, 1,
                                   LightKey::BatchBits - 1,
                                   LightKey::IdBits>;
-using VolumeIndex       = KeyT<CommonKey, 1, CommonKeyBits - 1>;
+using VolumeIndex       = TriKeyT<CommonKey, 1, 1, CommonKeyBits - 2>;
 
 static constexpr CommonKey IS_MAT_KEY_FLAG = 0u;
 static constexpr CommonKey IS_LIGHT_KEY_FLAG = 1u;
 
 static constexpr CommonKey IS_FRONTFACE_KEY_FLAG = 0u;
 static constexpr CommonKey IS_BACKFACE_KEY_FLAG = 1u;
+
+static constexpr CommonKey IS_NOT_PASSTHROUGH_MAT_FLAG = 0u;
+static constexpr CommonKey IS_PASSTHROUGH_MAT_FLAG = 1u;
 
 static_assert(std::is_same_v<LightKey, MaterialKey>,
               "Material and Light keys must match due to variant like usage");

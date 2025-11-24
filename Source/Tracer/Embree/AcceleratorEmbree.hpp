@@ -122,12 +122,14 @@ void IntersectFuncEmbree(const RTCIntersectFunctionNArguments* args)
                 potentialHits.instPrimID[0][i] = args->context->instPrimID[0];
                 newTs[i] = hitResult->t;
                 //
-                auto vFlagPart = (hitResult->backFace)
-                                    ? IS_BACKFACE_KEY_FLAG
-                                    : IS_FRONTFACE_KEY_FLAG;
+                auto vBackfacePart = (hitResult->backFace)
+                                        ? IS_BACKFACE_KEY_FLAG
+                                        : IS_FRONTFACE_KEY_FLAG;
                 auto vIndexPart = record.volumeIndex.FetchIndexPortion();
-                embreeContext.volumeIndices[rh.ray.id[i]] = VolumeIndex::CombinedKey(vFlagPart,
-                                                                                        vIndexPart);
+                auto vPassthroughPart = record.volumeIndex.FetchFlagPortion();
+                embreeContext.volumeIndices[rh.ray.id[i]] = VolumeIndex::CombinedKey(vPassthroughPart,
+                                                                                     vBackfacePart,
+                                                                                     vIndexPart);
                 //
                 someHasAlphaMaps |= record.alphaMap.has_value();
             }
@@ -318,12 +320,14 @@ void FilterFuncEmbree(const RTCFilterFunctionNArguments* args)
                 Vector3 n = Vector3(h.Ng_x[i], h.Ng_y[i], h.Ng_z[i]);
                 // TODO: Isn't this should be greater ?
                 bool isBackFace = (Math::Dot(n, d) < Float{0});
-                auto vFlagPart = (isBackFace)
-                                    ? IS_FRONTFACE_KEY_FLAG
-                                    : IS_BACKFACE_KEY_FLAG;
+                auto vBackfacePart = (isBackFace)
+                                        ? IS_FRONTFACE_KEY_FLAG
+                                        : IS_BACKFACE_KEY_FLAG;
                 auto vIndexPart = record.volumeIndex.FetchIndexPortion();
-                embreeContext.volumeIndices[r.id[i]] = VolumeIndex::CombinedKey(vFlagPart,
-                                                                                   vIndexPart);
+                auto vPassthroughPart = record.volumeIndex.FetchFlagPortion();
+                embreeContext.volumeIndices[r.id[i]] = VolumeIndex::CombinedKey(vPassthroughPart,
+                                                                                vBackfacePart,
+                                                                                vIndexPart);
 
                 if(record.cullFace)
                 {

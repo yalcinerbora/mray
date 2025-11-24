@@ -267,14 +267,14 @@ void WorkFunctionCommon<P, M, T>::Call(const Primitive&, const Material&, const 
         }
         case VOL_INTERFACE:
         {
-            //VolumeIndex iIndex = params.rayState.dHitVolumeIndices[rayIndex];
-            //params.globalState.mediaTracker
-
-            //auto vK = DetermineCurrentVolume(params.globalState.dGlobalInterfaceList,
-            //                                 params.globalState.cameraVolume,
-            //                                 iIndex);
-            //CommonKey k = CommonKey(Hash(CommonKey(vK.medKey), CommonKey(vK.transKey)));
-            //color = Color::RandomColorRGB(static_cast<uint32_t>(k));
+            RayMediaListPack mediaPack = params.rayState.dRayMediaPacks[rayIndex];
+            // Surface Renderer does not update mediaPack's
+            // IsPassthrough variable, since it does not resolve materials
+            // so we assume only passthrough happens
+            params.globalState.mediaTracker.ResolveCurVolume(mediaPack);
+            auto vK = params.globalState.mediaTracker.GetVolumeKeyPack(mediaPack);
+            CommonKey k = CommonKey(Hash(CommonKey(vK.medKey), CommonKey(vK.transKey)));
+            color = Color::RandomColorRGB(static_cast<uint32_t>(k));
             break;
         }
         default: color = BIG_MAGENTA(); break;

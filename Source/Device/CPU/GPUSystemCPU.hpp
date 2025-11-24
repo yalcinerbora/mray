@@ -7,27 +7,6 @@
 #include "Core/ThreadPool.h"
 #include <cstdint>
 
-static constexpr uint32_t WarpSize()
-{
-    return 1u;
-}
-
-template<uint32_t LOGICAL_WARP_SIZE = WarpSize()>
-MR_GF_DEF static void WarpSynchronize()
-{
-    static_assert(LOGICAL_WARP_SIZE == std::numeric_limits<uint32_t>::max(),
-                  "CPU Device does not have notion of warps. "
-                  "Please write a CPU specific algorithm.");
-}
-
-MR_GF_DEF static void BlockSynchronize() {}
-
-MR_GF_DEF static void ThreadFenceGrid()
-{
-    // TODO: Reason about this
-    std::atomic_thread_fence(std::memory_order_acq_rel);
-}
-
 namespace mray::host
 {
 

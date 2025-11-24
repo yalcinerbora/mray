@@ -35,6 +35,30 @@ class ThreadPool;
 
 #define MRAY_KERNEL
 
+inline constexpr uint32_t WarpSize()
+{
+    return 1u;
+}
+
+template<uint32_t LOGICAL_WARP_SIZE = WarpSize()>
+MR_GF_DEF
+void WarpSynchronize()
+{
+    static_assert(LOGICAL_WARP_SIZE == std::numeric_limits<uint32_t>::max(),
+                  "CPU Device does not have notion of warps. "
+                  "Please write a CPU specific algorithm.");
+}
+
+MR_GF_DEF
+void BlockSynchronize() {}
+
+MR_GF_DEF
+void ThreadFenceGrid()
+{
+    // TODO: Reason about this, currently most safe option
+    std::atomic_thread_fence(std::memory_order_acq_rel);
+}
+
 static constexpr uint32_t StaticThreadPerBlock1D()
 {
     // After manually adjusting this in "Kitchen"
@@ -51,6 +75,7 @@ static constexpr uint32_t TotalQueuePerDevice()
 {
     return 4;
 }
+
 
 namespace mray::host
 {
