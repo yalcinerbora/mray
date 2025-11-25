@@ -183,7 +183,7 @@ if(MRAY_BUILD_VISOR)
     mray_build_ext_dependency_git(
         NAME vulkan_headers_ext
         URL "https://github.com/KhronosGroup/Vulkan-Headers.git"
-        TAG "577baa05033cf1d9236b3d078ca4b3269ed87a2b" # 1.3.280
+        TAG "39c50d7bf094853a1f9a2e8a7e3377d425ae0c6a" # 1.4.333
         LICENSE_NAME "LICENSE.md"
         FORCE_RELEASE
         BUILD_ARGS
@@ -195,7 +195,7 @@ if(MRAY_BUILD_VISOR)
     mray_build_ext_dependency_git(
         NAME vulkan_loader_ext
         URL "https://github.com/KhronosGroup/Vulkan-Loader.git"
-        TAG "61a9c50248e09f3a0e0be7ce6f8bb1663855f979" # 1.3.280
+        TAG "9a8d188e98319d5e9eaf3e3c0b6aa4d5f5756c7e" # 1.4.333
         LICENSE_NAME "LICENSE.txt"
         FORCE_RELEASE
         BUILD_ARGS
@@ -230,17 +230,17 @@ if(MRAY_BUILD_VISOR)
 
     # Slang version v.2024.14.4
     if(WIN32)
-        set(SLANGC_ZIP_NAME "slang-2025.8-windows-x86_64.zip")
-        set(SLANGC_SHA256_HASH "21D4F2786BBE7E23B79F8186C2BEA6782BB3FF0CFB3BA26FB487DE1019EC08D7")
+        set(SLANGC_ZIP_NAME "slang-2025.22.1-windows-x86_64.zip")
+        set(SLANGC_SHA256_HASH "1b0017958766ffe62e29a105d28c5de8d23cfd95a38db1869b558b354998111d")
     elseif(UNIX AND NOT APPLE)
-        set(SLANGC_ZIP_NAME "slang-2025.8-linux-x86_64.tar.gz")
-        set(SLANGC_SHA256_HASH "E94ED4CC6372B9B028844B6874049F8DBB0AE2B5E174323D9B52BEF327C8B4BB")
+        set(SLANGC_ZIP_NAME "slang-2025.22.1-linux-x86_64.tar.gz")
+        set(SLANGC_SHA256_HASH "1da353e3130a13050927245cfaba16cb8a6d9574e7b3b8a89ec30acba357f2b9")
     else()
         message(FATAL_ERROR "Unsupported platform for macos(?)")
     endif()
 
     FetchContent_Declare(slangc_ext
-        URL "https://github.com/shader-slang/slang/releases/download/v2025.8/${SLANGC_ZIP_NAME}"
+        URL "https://github.com/shader-slang/slang/releases/download/v2025.22.1/${SLANGC_ZIP_NAME}"
         URL_HASH "SHA256=${SLANGC_SHA256_HASH}")
     FetchContent_MakeAvailable(slangc_ext)
 

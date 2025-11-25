@@ -57,14 +57,12 @@ class Swapchain
     static const std::array<VkColorSpaceKHR, 4> FormatListHDR;
     static const std::array<VkColorSpaceKHR, 6> FormatListSDR;
     static const std::array<VkPresentModeKHR, 3> PresentModes;
-
-    private:
     // MESA intel iGPU returns minImage as 3 so increasing this to 4
     // TODO: Make it dynamic later maybe?
-    static constexpr size_t MAX_WINDOW_FBO_COUNT = 8;
     template<class T>
     using SwapchainVec = StaticVector<T, MAX_WINDOW_FBO_COUNT>;
 
+    private:
     VkSurfaceCapabilitiesKHR                capabilities;
     StaticVector<VkSurfaceFormatKHR, 32>    surfaceTypeList;
     StaticVector<VkPresentModeKHR, 8>       presentModeTypeList;
@@ -112,6 +110,7 @@ class Swapchain
     Pair<MRayColorSpaceEnum, Float> ColorSpace() const;
     VkColorSpaceKHR                 ColorSpaceVk() const;
     SwapchainInfo                   GetSwapchainInfo() const;
+    uint32_t                        IndexFBO() const;
 
 };
 

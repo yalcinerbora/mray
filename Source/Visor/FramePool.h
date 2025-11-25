@@ -7,6 +7,8 @@ struct MRayError;
 class Swapchain;
 struct VulkanSystemView;
 
+static constexpr size_t MAX_WINDOW_FBO_COUNT = 8;
+
 struct FramebufferPack
 {
     VkExtent2D      extent;
@@ -30,13 +32,18 @@ struct FramePack : public FramebufferPack
 
 class FramePool
 {
+    static constexpr uint32_t FRAMES_IN_FLIGHT = 1;
+    using CommandSubmitSems = std::array<VulkanBinarySemaphore, MAX_WINDOW_FBO_COUNT>;
+    using ImgAvailSems = std::array<VulkanBinarySemaphore, FRAMES_IN_FLIGHT>;
+
     private:
-    //VkCommandPool       commandPool = nullptr;
     VkDevice            deviceVk    = nullptr;
     VkQueue             mainQueueVk = nullptr;
     VulkanFence         fence;
     VulkanCommandBuffer cBuffer;
-    FrameSemaphorePair  semaphores;
+    CommandSubmitSems   commandsSubmittedSems;
+    ImgAvailSems        imageAvailableSems;
+    uint32_t            launchFrameIndex = 0;
 
     public:
                     FramePool() = default;
@@ -44,7 +51,7 @@ class FramePool
                     FramePool(FramePool&&) = default;
     FramePool&      operator=(const FramePool&) = delete;
     FramePool&      operator=(FramePool&&) = default;
-                    ~FramePool() = default;
+                    ~FramePool();// = default;
 
     MRayError       Initialize(const VulkanSystemView& handlesVk);
 

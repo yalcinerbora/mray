@@ -735,6 +735,11 @@ SwapchainInfo Swapchain::GetSwapchainInfo() const
     return swapchainInfo;
 }
 
+uint32_t Swapchain::IndexFBO() const
+{
+    return currentImgIndex;
+}
+
 VulkanSystemView VisorWindow::handlesVk = {};
 
 void VisorWindow::WndPosChanged(int, int)

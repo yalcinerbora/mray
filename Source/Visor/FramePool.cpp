@@ -9,13 +9,27 @@ MRayError FramePool::Initialize(const VulkanSystemView& handlesVk)
 {
     deviceVk = handlesVk.deviceVk;
     mainQueueVk = handlesVk.mainQueueVk;
-    //commandPool = handlesVk.mainCommandPool;
 
     cBuffer = VulkanCommandBuffer(handlesVk);
     fence = VulkanFence(handlesVk);
-    semaphores.commandsExecutedSignal = VulkanBinarySemaphore(handlesVk);
-    semaphores.imageAvailableSignal = VulkanBinarySemaphore(handlesVk);
+
+    for(uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
+        imageAvailableSems[i] = VulkanBinarySemaphore(handlesVk);
+
+    // TODO: We are allocating extra semaphores
+    // which may not be optimal
+    for(uint32_t i = 0; i < MAX_WINDOW_FBO_COUNT; i++)
+        commandsSubmittedSems[i] = VulkanBinarySemaphore(handlesVk);
+
     return MRayError::OK;
+}
+
+FramePool::~FramePool()
+{
+    for(uint32_t i = 0; i < FRAMES_IN_FLIGHT; i++)
+        imageAvailableSems[i] = VulkanBinarySemaphore();
+    for(uint32_t i = 0; i < MAX_WINDOW_FBO_COUNT; i++)
+        commandsSubmittedSems[i] = VulkanBinarySemaphore();
 }
 
 FramePack FramePool::AcquireNextFrame(Swapchain& swapchain)
@@ -24,7 +38,7 @@ FramePack FramePool::AcquireNextFrame(Swapchain& swapchain)
     vkWaitForFences(deviceVk, 1, &waitFence, VK_TRUE,
                     std::numeric_limits<uint64_t>::max());
 
-    const auto& imgAvailSem = semaphores.imageAvailableSignal;
+    const auto& imgAvailSem = imageAvailableSems[launchFrameIndex];
     FramebufferPack fbPack = swapchain.NextFrame(imgAvailSem);
 
     vkResetFences(deviceVk, 1, &waitFence);
@@ -42,8 +56,8 @@ FramePack FramePool::AcquireNextFrame(Swapchain& swapchain)
 void FramePool::PresentThisFrame(Swapchain& swapchain,
                                  const VulkanTimelineSemaphore* extraWaitSem)
 {
-    const auto& comExecSem = semaphores.commandsExecutedSignal;
-    const auto& imgReadySem = semaphores.imageAvailableSignal;
+    const auto& comExecSem = commandsSubmittedSems[swapchain.IndexFBO()];
+    const auto& imgReadySem = imageAvailableSems[launchFrameIndex];
 
     // ============== //
     //   SUBMISSION   //
@@ -83,4 +97,6 @@ void FramePool::PresentThisFrame(Swapchain& swapchain,
     // Finally submit!
     vkQueueSubmit2(mainQueueVk, 1, &submitInfo, fence);
     swapchain.PresentFrame(comExecSem);
+
+    launchFrameIndex = (launchFrameIndex + 1) % FRAMES_IN_FLIGHT;
 }
