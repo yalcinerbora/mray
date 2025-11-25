@@ -32,6 +32,17 @@ struct FramePack : public FramebufferPack
 
 class FramePool
 {
+    // !!!!
+    //
+    // Most of the uniform data is nauively memcopied to
+    // a device-visible host buffer every frame (for simplicity
+    // this is not a game afterall)
+    //
+    // So be careful changing this and sending multiple frames.
+    // Afaik all transient buffers should be duplicated for each
+    // launched frame.
+    //
+    // !!!!
     static constexpr uint32_t FRAMES_IN_FLIGHT = 1;
     using CommandSubmitSems = std::array<VulkanBinarySemaphore, MAX_WINDOW_FBO_COUNT>;
     using ImgAvailSems = std::array<VulkanBinarySemaphore, FRAMES_IN_FLIGHT>;
