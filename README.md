@@ -165,9 +165,9 @@ If you want to generate an image without the GUI run:
 
 ## Future Work
  - ~~Implement a "host" renderer (CPU).~~
- - Implement "device" abstraction layers for Intel and AMD gpus (via SYCL and HIP respectively). Functionality is abstracted away, so this should be relatively straightforward given these APIs have all the functionality of CUDA that we use.
+ - Implement "device" abstraction layers for Intel and AMD GPUs (via SYCL and HIP, respectively). Functionality is abstracted away, so this should be straightforward, given that these APIs have all the functionality of CUDA that we use.
  - Add support for volume rendering
- - Add support for spectral rendering (Again abstraction is there but not correct at the moment it requires quite a bit of work).
+ - ~~Add support for spectral rendering (Again, abstraction is there but not correct at the moment it requires quite a bit of work).~~
  - Out-of-core texturing support (texture streaming).
 
 ## Similar Projects
