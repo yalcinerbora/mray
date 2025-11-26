@@ -1686,13 +1686,13 @@ void SceneLoaderMRay::LoadVolumes(TracerI& tracer, ErrorList&)
         using namespace NodeNames;
         auto m = jsonNode.AccessData<uint32_t>(MEDIUM);
         auto t = jsonNode.AccessOptionalData<uint32_t>(TRANSFORM);
-        auto p = jsonNode.AccessOptionalData<uint32_t>(PRIORITY);
+        auto p = jsonNode.AccessOptionalData<int32_t>(PRIORITY);
 
         TransformId tId = TracerConstants::IdentityTransformId;
         if(t) tId = tIdMap.at(*t).second;
 
         MediumId mId = mIdMap.at(m).second;
-        uint32_t priority = p.value_or(0);
+        int32_t priority = p.value_or(std::numeric_limits<int32_t>::min() + 1);
         vols.push_back(VolumeParams
                        {
                            .mediumId = mId,

@@ -1,5 +1,6 @@
 
 #include "GPUSystemCUDA.h"
+#include "Core/BitFunctions.h"
 
 namespace mray::cuda::warp::detail
 {
@@ -55,6 +56,17 @@ namespace mray::cuda::warp
 
     static constexpr unsigned int ALL_WARP_MASK = std::numeric_limits<unsigned int>::max();
 
+    MR_GF_DECL uint32_t ActiveLaneMask();
+
+    template<uint32_t LogicalWarpSize = WarpSize()>
+    MR_GF_DECL uint32_t WarpBallot(bool predicate, unsigned int mask = ALL_WARP_MASK);
+
+    template<uint32_t LogicalWarpSize = WarpSize()>
+    MR_GF_DECL bool WarpAny(bool predicate, unsigned int mask = ALL_WARP_MASK);
+
+    template<uint32_t LogicalWarpSize = WarpSize()>
+    MR_GF_DECL bool WarpAll(bool predicate, unsigned int mask = ALL_WARP_MASK);
+
     template<uint32_t LogicalWarpSize = WarpSize(), WarpTransferrableC T>
     MR_GF_DECL T WarpBroadcast(T varName, int laneId,
                                unsigned int mask = ALL_WARP_MASK);
@@ -72,34 +84,76 @@ namespace mray::cuda::warp
     MR_GF_DECL T WarpReduce(T varName, BinaryFunc&&,
                             unsigned int mask = ALL_WARP_MASK);
 
-    template<uint32_t LogicalWarpSize = WarpSize(), WarpTransferrableC T>
+    template<WarpTransferrableC T>
     MR_GF_DECL T WarpReduceAdd(T varName, unsigned int mask = ALL_WARP_MASK);
 
-    template<uint32_t LogicalWarpSize = WarpSize(), WarpTransferrableC T>
+    template<WarpTransferrableC T>
     MR_GF_DECL T WarpReduceMin(T varName, unsigned int mask = ALL_WARP_MASK);
 
-    template<uint32_t LogicalWarpSize = WarpSize(), WarpTransferrableC T>
+    template<WarpTransferrableC T>
     MR_GF_DECL T WarpReduceMax(T varName, unsigned int mask = ALL_WARP_MASK);
 
-    template<uint32_t LogicalWarpSize = WarpSize(), WarpTransferrableC T>
+    template<WarpTransferrableC T>
     MR_GF_DECL T WarpReduceAnd(T varName, unsigned int mask = ALL_WARP_MASK);
 
-    template<uint32_t LogicalWarpSize = WarpSize(), WarpTransferrableC T>
+    template<WarpTransferrableC T>
     MR_GF_DECL T WarpReduceOr(T varName, unsigned int mask = ALL_WARP_MASK);
 
-    template<uint32_t LogicalWarpSize = WarpSize(), WarpTransferrableC T>
+    template<WarpTransferrableC T>
     MR_GF_DECL T WarpReduceXor(T varName, unsigned int mask = ALL_WARP_MASK);
 }
 
 namespace mray::cuda::warp
 {
 
+MR_GF_DEF uint32_t ActiveLaneMask()
+{
+    return __activemask();
+}
+
+template<uint32_t LogicalWarpSize>
+MR_GF_DEF uint32_t WarpBallot(bool predicate, unsigned int mask)
+{
+    // TODO: We do not have the lane id here
+    // so we create it from threadidx.x
+    uint32_t laneId = threadIdx.x % WarpSize();
+    uint32_t localLogicalWarpId = laneId / LogicalWarpSize;
+
+    uint32_t fullVotes = uint32_t(__ballot_sync(mask, predicate));
+    uint32_t o = localLogicalWarpId;
+    std::array bits = {(o + 0) * LogicalWarpSize,
+                       (o + 1) * LogicalWarpSize};
+    uint32_t result = Bit::FetchSubPortion(fullVotes, bits);
+    return result;
+}
+
+template<uint32_t LogicalWarpSize>
+MR_GF_DEF bool WarpAny(bool predicate, unsigned int mask)
+{
+    // We can't use  __all_sync
+    // since we need to support logical warp stuff.
+    // Masks needs to be global (not per logic)
+    // due to instruction afaik (each lane needs to give the same mask)
+    // so we ballot and compress via bit functions
+    uint32_t votes = WarpBallot<LogicalWarpSize>(predicate, mask);
+    return (Bit::PopC(votes) > 0);
+}
+
+template<uint32_t LogicalWarpSize>
+MR_GF_DEF bool WarpAll(bool predicate, unsigned int mask)
+{
+    // Same as above, use Ballot.
+    uint32_t votes = WarpBallot<LogicalWarpSize>(predicate, mask);
+    return (Bit::PopC(votes) == LogicalWarpSize);
+}
+
 template<uint32_t LogicalWarpSize , WarpTransferrableC T>
 MR_GF_DEF
 T WarpBroadcast(T varName, int laneId, unsigned int mask)
 {
     using namespace detail;
-    return CopyFromIntegral<T>(__shfl_sync(mask, laneId, CopyToIntegral(varName), LogicalWarpSize));
+    return CopyFromIntegral<T>(__shfl_sync(mask, CopyToIntegral(varName),
+                                           laneId, LogicalWarpSize));
 }
 
 template<uint32_t LogicalWarpSize, WarpTransferrableC T>
@@ -107,8 +161,8 @@ MR_GF_DEF
 T WarpFetchForward(T varName, int offset, unsigned int mask)
 {
     using namespace detail;
-    return CopyFromIntegral<T>(__shfl_down_sync(mask, offset, CopyToIntegral(varName),
-                                                LogicalWarpSize));
+    return CopyFromIntegral<T>(__shfl_down_sync(mask, CopyToIntegral(varName),
+                                                offset, LogicalWarpSize));
 }
 
 template<uint32_t LogicalWarpSize, WarpTransferrableC T>
@@ -116,13 +170,13 @@ MR_GF_DEF
 T WarpFetchBackward(T varName, int offset, unsigned int mask)
 {
     using namespace detail;
-    return CopyFromIntegral<T>(__shfl_up_sync(mask, offset, CopyToIntegral(varName),
-                                              LogicalWarpSize));
+    return CopyFromIntegral<T>(__shfl_up_sync(mask, CopyToIntegral(varName),
+                                              offset, LogicalWarpSize));
 }
 
 template<uint32_t LogicalWarpSize, WarpTransferrableC T, class BinaryFunc>
 MR_GF_DEF
-T WarpReduce(T varName, unsigned int mask, BinaryFunc&& ReduceOp)
+T WarpReduce(T varName, BinaryFunc&& ReduceOp, unsigned int mask)
 {
     T result = varName;
 
@@ -133,7 +187,7 @@ T WarpReduce(T varName, unsigned int mask, BinaryFunc&& ReduceOp)
     return result;
 }
 
-template<uint32_t LogicalWarpSize, WarpTransferrableC T>
+template<WarpTransferrableC T>
 MR_GF_DEF
 T WarpReduceAdd(T varName, unsigned int mask)
 {
@@ -152,7 +206,7 @@ T WarpReduceAdd(T varName, unsigned int mask)
     #endif
 }
 
-template<uint32_t LogicalWarpSize, WarpTransferrableC T>
+template<WarpTransferrableC T>
 MR_GF_DEF
 T WarpReduceMin(T varName, unsigned int mask)
 {
@@ -171,7 +225,7 @@ T WarpReduceMin(T varName, unsigned int mask)
     #endif
 }
 
-template<uint32_t LogicalWarpSize, WarpTransferrableC T>
+template<WarpTransferrableC T>
 MR_GF_DEF
 T WarpReduceMax(T varName, unsigned int mask)
 {
@@ -190,7 +244,7 @@ T WarpReduceMax(T varName, unsigned int mask)
     #endif
 }
 
-template<uint32_t LogicalWarpSize, WarpTransferrableC T>
+template<WarpTransferrableC T>
 MR_GF_DECL T WarpReduceAnd(T varName, unsigned int mask)
 {
     #ifdef __CUDA_ARCH__
@@ -208,7 +262,7 @@ MR_GF_DECL T WarpReduceAnd(T varName, unsigned int mask)
     #endif
 }
 
-template<uint32_t LogicalWarpSize, WarpTransferrableC T>
+template<WarpTransferrableC T>
 MR_GF_DECL T WarpReduceOr(T varName, unsigned int mask)
 {
     #ifdef __CUDA_ARCH__
@@ -226,7 +280,7 @@ MR_GF_DECL T WarpReduceOr(T varName, unsigned int mask)
     #endif
 }
 
-template<uint32_t LogicalWarpSize, ImplicitLifetimeC T>
+template<WarpTransferrableC T>
 MR_GF_DECL T WarpReduceXor(T varName, unsigned int mask)
 {
     #ifdef __CUDA_ARCH__

@@ -1,16 +1,16 @@
 #include "MediaTracker.h"
 
 #include "Device/GPUSystem.hpp"
+#include "Device/GPUWarp.h"
 
 #include "Core/TracerConstants.h"
 #include "Core/TracerI.h"
 
-MR_HF_DECL
 void SortByPrio(std::array<uint32_t, MAX_NESTED_MEDIA>& ml,
-                std::array<uint32_t, MAX_NESTED_MEDIA>& priorities,
+                std::array<int32_t, MAX_NESTED_MEDIA>& priorities,
                 uint32_t indexCount)
 {
-    auto IsLess = [&](uint32_t j, uint32_t index, uint32_t prio) -> bool
+    auto IsLess = [&](uint32_t j, uint32_t index, int32_t prio) -> bool
     {
         bool less = priorities[j] < prio;
         bool eqLess = (priorities[j] == prio);
@@ -21,7 +21,7 @@ void SortByPrio(std::array<uint32_t, MAX_NESTED_MEDIA>& ml,
     // Insertion Sort
     for(uint32_t i = 1; i < indexCount; i++)
     {
-        uint32_t prio = priorities[i];
+        int32_t prio = priorities[i];
         uint32_t index = ml[i];
 
         int32_t j = i - 1;
@@ -79,11 +79,11 @@ void KCSetStartingVolumeIndirect(// Output
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCAddNewVolumeToRayListIndirect(// I-O
-                                    MRAY_GRID_CONSTANT const Span<RayMediaListPack> dPacks,
-                                    MRAY_GRID_CONSTANT const MediaTrackerView tracker,
-                                    //
-                                    MRAY_GRID_CONSTANT const Span<const VolumeIndex> dNewVolumeIndices,
-                                    MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
+                                     MRAY_GRID_CONSTANT const Span<RayMediaListPack> dPacks,
+                                     MRAY_GRID_CONSTANT const MediaTrackerView tracker,
+                                     //
+                                     MRAY_GRID_CONSTANT const Span<const VolumeIndex> dNewVolumeIndices,
+                                     MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices)
 {
     KernelCallParams kp;
     uint32_t rayCount = uint32_t(dRayIndices.size());
@@ -166,10 +166,6 @@ MediaTracker::MediaTracker(const VolumeList& globalVolumeList,
     queue.MemcpyAsync(dGlobalVolumeList, Span<const VolumeKeyPack>(kp));
     queue.MemsetAsync(dLocksHT, 0x00);
     queue.MemsetAsync(dMediaListHT, 0xFF);
-    static_assert(MediaTrackerView::EMPTY_VAL == UINT32_MAX,
-                  "MediaTrackerViev::EMPTY_VAL is changed, change the memset "
-                  "according to the new value");
-
     // TODO: This may be redundant
     queue.Barrier().Wait();
 }
@@ -184,8 +180,8 @@ void MediaTracker::SetStartingVolumeIndirect(// Output
 {
     //
     std::array<uint32_t, MAX_NESTED_MEDIA> unpackedList;
-    std::array<uint32_t, MAX_NESTED_MEDIA> priorities;
-    unpackedList.fill(MediaTrackerView::EMPTY_VAL);
+    std::array<int32_t, MAX_NESTED_MEDIA> priorities;
+    unpackedList.fill(MediaList::INVALID_VAL);
 
     uint32_t i = 0;
     for(VolumeId v : startVolumeList)
@@ -195,7 +191,7 @@ void MediaTracker::SetStartingVolumeIndirect(// Output
         i++;
     }
     SortByPrio(unpackedList, priorities, i);
-    MediaList l; l.Pack(unpackedList);
+    MediaList l; l.PackAll(unpackedList);
 
     queue.IssueWorkKernel<KCSetStartingVolumeIndirect>
     (
@@ -229,16 +225,16 @@ void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& h
         // So only adding these to the HT
         // Others complex interaction will be handled automatically
         std::array<uint32_t, MAX_NESTED_MEDIA> unpackedList;
-        unpackedList.fill(MediaTrackerView::EMPTY_VAL);
+        unpackedList.fill(MediaList::INVALID_VAL);
         unpackedList[0] = FindVolumeIndex(boundaryVolume);
         unpackedList[1] = FindVolumeIndex(vId);
 
-        std::array<uint32_t, MAX_NESTED_MEDIA> priorities;
+        std::array<int32_t, MAX_NESTED_MEDIA> priorities;
         priorities[0] = globalVolumeList[unpackedList[0]].second.priority;
         priorities[1] = globalVolumeList[unpackedList[1]].second.priority;
         SortByPrio(unpackedList, priorities, 2);
 
-        MediaList l; l.Pack(unpackedList);
+        MediaList l; l.PackAll(unpackedList);
         mediaLists.push_back(l);
     }
 
@@ -256,7 +252,7 @@ void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& h
         uint32_t totalCombinations = 1u << bList.size();
 
         StaticVector<uint32_t, MAX_NESTED_MEDIA> volIndices;
-        StaticVector<uint32_t, MAX_NESTED_MEDIA> priorities;
+        StaticVector<int32_t, MAX_NESTED_MEDIA> priorities;
 
         for(VolumeId v : bList)
         {
@@ -271,8 +267,8 @@ void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& h
         for(uint32_t i = 1; i < totalCombinations; i++)
         {
             std::array<uint32_t, MAX_NESTED_MEDIA> unpackedList;
-            std::array<uint32_t, MAX_NESTED_MEDIA> curPriorities;
-            unpackedList.fill(MediaTrackerView::EMPTY_VAL);
+            std::array<int32_t, MAX_NESTED_MEDIA> curPriorities;
+            unpackedList.fill(MediaList::INVALID_VAL);
 
             uint32_t counter = 0;
             for(uint32_t j = 0; j < MAX_NESTED_MEDIA; j++)
@@ -284,7 +280,7 @@ void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& h
             }
             SortByPrio(unpackedList, curPriorities, counter);
 
-            MediaList l; l.Pack(unpackedList);
+            MediaList l; l.PackAll(unpackedList);
             mediaLists.push_back(l);
         }
     }

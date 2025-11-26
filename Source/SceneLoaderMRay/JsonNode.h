@@ -50,7 +50,7 @@ struct VolumeStruct
 {
     uint32_t mediumId;
     uint32_t transformId;
-    uint32_t priority;
+    int32_t  priority;
 };
 
 struct SurfaceStruct

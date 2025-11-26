@@ -90,7 +90,7 @@ struct VolumeParams
 {
     MediumId    mediumId;
     TransformId transformId;
-    uint32_t    priority;
+    int32_t     priority;
 
     auto operator<=>(const VolumeParams&) const = default;
 };

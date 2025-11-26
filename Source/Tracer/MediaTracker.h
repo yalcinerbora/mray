@@ -104,15 +104,19 @@ struct MediaList
     using IndexList = std::array<uint32_t, MAX_NESTED_MEDIA>;
     using PackedList = std::array<uint32_t, MEDIA_LIST_WORDS>;
 
-    static constexpr uint32_t INVALID_INDEX = (1 << MAX_MEDIA_BITS) - 1;
+    static constexpr uint32_t INVALID_VAL = (1 << MAX_MEDIA_BITS) - 1;
 
     PackedList listRaw;
     // Functionality to lift the data to register space
     // TODO: This may be a waste, we did not implemented the
     // usage yet
-    MR_PF_DECL   IndexList Unpack() const;
-    MR_PF_DECL_V void      Pack(const IndexList&);
-    MR_PF_DECL   bool       operator==(const MediaList&) const;
+    MR_PF_DECL IndexList UnpackAll() const;
+    MR_PF_DECL uint32_t  Unpack(uint32_t i) const;
+
+    MR_PF_DECL_V void    PackAll(const IndexList&);
+    MR_PF_DECL   bool    operator==(const MediaList&) const;
+
+    MR_PF_DEF void InsertVolToLoc(uint32_t i, uint32_t newVIndex);
 };
 
 class RayMediaListPack
@@ -164,21 +168,15 @@ class MediaTrackerView
     using LockInt = uint32_t;
 
     public:
-    static constexpr auto EMPTY_VAL    = uint32_t(UINT32_MAX);
-    static constexpr auto LOCK_VAL     = LockInt(1);
-    static constexpr auto UNLOCKED_VAL = LockInt(0);
     struct InsertResult
     {
         uint32_t index;
         bool     isInserted;
     };
 
-    private:
     Span<const VolumeKeyPack> dGlobalVolumeList;
     Span<MediaList>           dValues;
     Span<LockInt>             dLocks;
-
-
 
     public:
     // Constructors & Destructor
@@ -317,7 +315,7 @@ void RayMediaListPack::SetPassthrough(bool b)
 
 MR_PF_DEF
 typename MediaList::IndexList
-MediaList::Unpack() const
+MediaList::UnpackAll() const
 {
     // TODO: I just hand rolled the fetch routines
     // Did not bother generating a dynamic code.
@@ -360,8 +358,48 @@ MediaList::Unpack() const
     return result;
 }
 
+MR_PF_DEF
+uint32_t MediaList::Unpack(uint32_t i) const
+{
+    // Get the ith element from 20-bit, 5-element
+    // array. Maybe it can be generic with some effort
+    // but did not bother (also maybe less register pressure
+    // since values are immediate maybe?)
+    static_assert(MAX_MEDIA_BITS == 20 && MAX_NESTED_MEDIA == 8,
+                  "The code statically rolled for these values only!");
+    switch(i)
+    {
+        case 0: return Bit::FetchSubPortion(listRaw[0], {0, 20});
+        case 1: return Bit::Compose<12, 8>
+        (
+            Bit::FetchSubPortion(listRaw[0], {20, 32}),
+            Bit::FetchSubPortion(listRaw[1], {0 , 8})
+        );
+        case 2: return Bit::FetchSubPortion(listRaw[1], {8, 28});
+        case 3: return Bit::Compose<4, 16>
+        (
+            Bit::FetchSubPortion(listRaw[1], {28, 32}),
+            Bit::FetchSubPortion(listRaw[2], {0 , 16})
+        );
+        case 4: return Bit::Compose<16, 4>
+        (
+            Bit::FetchSubPortion(listRaw[2], {16, 32}),
+            Bit::FetchSubPortion(listRaw[3], {0 ,  4})
+        );
+        case 5: return Bit::FetchSubPortion(listRaw[3], {4, 24});
+        case 6: return Bit::Compose<8, 12>
+        (
+            Bit::FetchSubPortion(listRaw[3], {24, 32}),
+            Bit::FetchSubPortion(listRaw[4], {0 ,  12})
+        );
+        case 7: return Bit::FetchSubPortion(listRaw[4], {12, 32});
+        //
+        default: return UINT32_MAX;
+    }
+}
+
 MR_PF_DEF_V
-void MediaList::Pack(const IndexList& list)
+void MediaList::PackAll(const IndexList& list)
 {
     static_assert(MAX_MEDIA_BITS == 20 && MAX_NESTED_MEDIA == 8,
                   "The code statically rolled for these values only!");
@@ -385,6 +423,95 @@ void MediaList::Pack(const IndexList& list)
     listRaw[4] = Bit::SetSubPortion(listRaw[4], list[6] >>  8, { 0, 12});
     // 7
     listRaw[4] = Bit::SetSubPortion(listRaw[4], list[7]      , {12, 32});
+}
+
+MR_PF_DEF
+void MediaList::InsertVolToLoc(uint32_t i, uint32_t newVIndex)
+{
+    // Unrolled loop for insert.
+    // ith -> last valid element is swapped
+    // ith element is changed with "newVInded"
+    //
+    // There may be a pattern to make this a loop and make it generic
+    // but I just brute forced it.
+    static_assert(MAX_MEDIA_BITS == 20 && MAX_NESTED_MEDIA == 8,
+                  "The code statically rolled for these values only!");
+    uint32_t L = newVIndex;
+    uint32_t t;
+    if(i <= 0)
+    {
+        t = Bit::FetchSubPortion(listRaw[0], {0, 20});
+        listRaw[0] = Bit::SetSubPortion(listRaw[0], L, {0, 20});
+        L = t;
+    }
+    if(L == MediaList::INVALID_VAL) return;
+    if(i <= 1)
+    {
+        t  = Bit::Compose<12, 8>
+        (
+            Bit::FetchSubPortion(listRaw[0], {20, 32}),
+            Bit::FetchSubPortion(listRaw[1], {0 , 8})
+        );
+        listRaw[0] = Bit::SetSubPortion(listRaw[0], L      , {20, 32});
+        listRaw[1] = Bit::SetSubPortion(listRaw[1], L >> 12, { 0, 8});
+        L = t;
+    }
+    if(L == MediaList::INVALID_VAL) return;
+    if(i <= 2)
+    {
+        t = Bit::FetchSubPortion(listRaw[1], {8, 28});
+        listRaw[1] = Bit::SetSubPortion(listRaw[1], L, {8, 28});
+        L = t;
+    }
+    if(L == MediaList::INVALID_VAL) return;
+    if(i <= 3)
+    {
+        t = Bit::Compose<4, 16>
+        (
+            Bit::FetchSubPortion(listRaw[1], {28, 32}),
+            Bit::FetchSubPortion(listRaw[2], {0 , 16})
+        );
+        listRaw[1] = Bit::SetSubPortion(listRaw[1], L      , {28, 32});
+        listRaw[2] = Bit::SetSubPortion(listRaw[2], L >>  4, { 0, 16});
+        L = t;
+    }
+    if(L == MediaList::INVALID_VAL) return;
+    if(i <= 4)
+    {
+        t = Bit::Compose<16, 4>
+        (
+            Bit::FetchSubPortion(listRaw[2], {16, 32}),
+            Bit::FetchSubPortion(listRaw[3], {0 ,  4})
+        );
+        listRaw[2] = Bit::SetSubPortion(listRaw[2], L      , {16, 32});
+        listRaw[3] = Bit::SetSubPortion(listRaw[3], L >> 16, { 0, 4});
+        L = t;
+    }
+    if(L == MediaList::INVALID_VAL) return;
+    if(i <= 5)
+    {
+        t = Bit::FetchSubPortion(listRaw[3], {4, 24});
+        listRaw[3] = Bit::SetSubPortion(listRaw[3], L, {4, 24});
+        L = t;
+    }
+    if(L == MediaList::INVALID_VAL) return;
+    if(i <= 6)
+    {
+        t = Bit::Compose<8, 12>
+        (
+            Bit::FetchSubPortion(listRaw[3], {24, 32}),
+            Bit::FetchSubPortion(listRaw[4], {0 ,  12})
+        );
+        listRaw[3] = Bit::SetSubPortion(listRaw[3], L      , {24, 32});
+        listRaw[4] = Bit::SetSubPortion(listRaw[4], L >>  8, { 0, 12});
+        L = t;
+    }
+    if(L == MediaList::INVALID_VAL) return;
+    if(i <= 7)
+    {
+        t = Bit::FetchSubPortion(listRaw[4], {12, 32});
+        listRaw[4] = Bit::SetSubPortion(listRaw[4], L, {12, 32});
+    }
 }
 
 MR_PF_DEF
@@ -413,83 +540,68 @@ MR_GF_DEF
 typename MediaTrackerView::InsertResult
 MediaTrackerView::TryInsertAtomic(const MediaList& list) const
 {
-    // CUDA stuff, it does not like gobal space constexpr
-    // assumes it is on host
-    static constexpr auto EMPTY    = EMPTY_VAL;
-    static constexpr auto LOCKED   = LOCK_VAL;
-    static constexpr auto UNLOCKED = UNLOCKED_VAL;
+    using InsertResult = typename MediaTrackerView::InsertResult;
+    static constexpr auto EMPTY        = uint32_t(0);
+    static constexpr auto LOCKED_WRITE = uint32_t(1);
+    static constexpr auto WRITE_DONE   = uint32_t(2);
 
     using RNGFunctions::HashPCG64::Hash;
     static_assert(MEDIA_LIST_WORDS == 5u, "This part of the code is static! Add/Remove hashes");
     uint32_t h = uint32_t(Hash(list.listRaw[0], list.listRaw[1],
                                list.listRaw[2], list.listRaw[3],
                                list.listRaw[4]));
-    if(h == EMPTY_VAL) h++;
 
     uint32_t tableSize = dValues.size();
     uint32_t divMask = uint32_t(tableSize - 1);
     assert(Bit::PopC(tableSize) == 1);
-
     // Hash table with linear probing
     uint32_t index = h & divMask;
     for(uint32_t i = index;; i = (i + 1) & divMask)
     {
         using namespace DeviceAtomic;
         // We will try to do atomic CAS lock shortly but we can
-        // pre-check the lock here, if it is unlocked
-        // writer already done writing all the indices.
-        if(AtomicLoad(dLocks[i]) == UNLOCKED && dValues[i] == list)
+        // pre-check the lock here, if it is stored as "written"
+        // writer thread is already done.
+        if(dLocks[i] == WRITE_DONE && dValues[i] == list)
             return InsertResult{i, false};
-
-        auto TryAcquire = [&]()
-        {
-            uint32_t old = AtomicCompSwap(dLocks[i], UNLOCKED, LOCKED);
-            ThreadFenceGrid();
-            return old != LOCK_VAL;
-        };
-        auto Release = [&]()
-        {
-            AtomicStore(dLocks[i], UNLOCKED);
-            ThreadFenceGrid();
-        };
-
         // Now the tricky part
         // Obviously device does not have 5x32-bit atomic operation,
         // (Although new NVIDIA devices has 128-bit atomics)
         // So we store hash list as both as a locking mechanism
         // and to fast check if we continue probing or not.
         //
-        // Another thing is that warps work on lockstep,
-        // so we can't spin until we acquire value since lane0 and lane1
-        // competes for the same location and we need to exit to write.
+        // Another thing is that warps work in lockstep,
+        // so we can't spin until we acquire value. For example,
+        // lane0 and lane1 competes for the same location and
+        // and spins forever due to lockstep.
         // So all checks are inside the spin lock.
-        bool locked = false;
+        uint32_t old;
         do
         {
-            locked = TryAcquire();
-            // Now we are fine (hopefully)
-            if(locked && dValues[i].listRaw[0] == EMPTY)
+            old = DeviceAtomic::AtomicCompSwap(dLocks[i], EMPTY, LOCKED_WRITE);
+            if(old == EMPTY)
             {
                 // Successfull Insert
                 dValues[i] = list;
-                Release();
+                // Wait for writes to be visible
+                ThreadFenceGrid();
+                // Mark as "written"
+                AtomicStore(dLocks[i], WRITE_DONE);
                 return InsertResult{i, true};
             }
-            else if(locked && dValues[i] == list)
-            {
-                Release();
+            // Value is marked as written
+            if(old == WRITE_DONE && dValues[i] == list)
                 return InsertResult{i, false};
-            }
-            // Occupied
-            Release();
+
+            // Last case: (do nothing) Something is being written to
+            // the slot. We have to wait it to properly check the value.
         }
-        while(!locked);
+        while(old != WRITE_DONE);
 
         //
         if(i == index - 1) break;
     }
-    printf("Media HT Full!\n");
-    return InsertResult{0, false};
+    return InsertResult{UINT32_MAX, false};
 }
 
 MR_GF_DEF
@@ -505,65 +617,42 @@ void MediaTrackerView::InsertNewVolume(RayMediaListPack& rayMediaListIndex,
         return;
 
     uint32_t htIndex = rayMediaListIndex.OuterIndex();
-    // Add new volume to the stack
-    using UnpackedList = typename MediaList::IndexList;
-    using UnpackedPrioList = UnpackedList;
-    UnpackedPrioList priorities = {};
-    UnpackedList volIndices = dValues[htIndex].Unpack();
-    // Must be valid index
-    assert(volIndices[0] != MediaList::INVALID_INDEX);
-    // First lift the priorities from the global list
-    // TODO: This can be baked to the following loop for perf maybe?
-    // Measure.
-    uint32_t elemCount = 0;
-    for(; elemCount < MAX_NESTED_MEDIA; elemCount++)
-    {
-        if(volIndices[elemCount] == MediaList::INVALID_INDEX) break;
-
-        uint32_t globalIndex = volIndices[elemCount];
-        priorities[elemCount] = dGlobalVolumeList[globalIndex].priority;
-    }
-    assert(elemCount <= MAX_NESTED_MEDIA);
     // New volume's index and priority
-    uint32_t newVolumeIndex = nextVolumeIndexPack.FetchIndexPortion();
-    uint32_t newVolumePrio = dGlobalVolumeList[newVolumeIndex].priority;
+    uint32_t newVIndex = nextVolumeIndexPack.FetchIndexPortion();
+    int32_t newVPrio = dGlobalVolumeList[newVIndex].priority;
 
-    // Add or Find
-    uint32_t liftPrio = newVolumePrio;
-    uint32_t liftIndex = newVolumeIndex;
+    // Find item or the split location
+    // Aka. lower bound
+    MediaList l = dValues[htIndex];
     bool isFound = false;
     uint32_t insertOrFoundLoc = UINT32_MAX;
-    for(uint32_t i = 0; i < elemCount; i++)
+    for(uint32_t i = 0; i < MAX_MEDIA_BITS; i++)
     {
-        if(liftIndex == volIndices[i])
+        uint32_t curVIndex = l.Unpack(i);
+        // Skip
+        if(curVIndex == MediaList::INVALID_VAL) break;
+        // Found
+        if(curVIndex == newVIndex)
         {
             isFound = true;
             insertOrFoundLoc = i;
             break;
         }
-
-        if(liftPrio > priorities[i] ||
-           liftPrio == priorities[i] && liftIndex > volIndices[i])
+        // Check if this is the split location
+        int32_t curVPrio = dGlobalVolumeList[curVIndex].priority;
+        if(newVPrio > curVPrio || (newVPrio == curVPrio && newVIndex > curVIndex))
         {
-            if(liftIndex == newVolumeIndex)
-                insertOrFoundLoc = i;
-
-            std::swap(liftPrio, priorities[i]);
-            std::swap(liftIndex, volIndices[i]);
+            insertOrFoundLoc = i;
+            break;
         }
     }
-    if(!isFound && elemCount != MAX_NESTED_MEDIA)
-    {
-        priorities[elemCount] = liftPrio;
-        volIndices[elemCount] = liftIndex;
-        if(liftIndex == newVolumeIndex)
-            insertOrFoundLoc = elemCount;
-    }
     assert(insertOrFoundLoc != UINT32_MAX);
+
+    // Now do a packed load
+    if(!isFound) l.InsertVolToLoc(insertOrFoundLoc, newVIndex);
     //
     uint32_t nextVolInnerIndex = insertOrFoundLoc;
     uint32_t curVolInnerIndex = (insertOrFoundLoc == 0) ? 1 : 0;
-
     rayMediaListIndex.SetEntering(!isFound);
     rayMediaListIndex.SetCurMediaIndex(curVolInnerIndex);
     rayMediaListIndex.SetNextMediaIndex(nextVolInnerIndex);
@@ -572,9 +661,8 @@ void MediaTrackerView::InsertNewVolume(RayMediaListPack& rayMediaListIndex,
     // set the material id as passthrough mat.
     bool isPassthroughMat = (nextVolumeIndexPack.FetchFlagPortion() ==
                              IS_PASSTHROUGH_MAT_FLAG);
-    // Also add the fake intersection state
-    bool isFakeIntersection = (priorities[nextVolInnerIndex] <
-                               priorities[curVolInnerIndex]);
+        // Also add the fake intersection state
+    bool isFakeIntersection = (curVolInnerIndex < nextVolInnerIndex);
     rayMediaListIndex.SetPassthrough(isPassthroughMat ||
                                      isFakeIntersection);
 
@@ -582,7 +670,6 @@ void MediaTrackerView::InsertNewVolume(RayMediaListPack& rayMediaListIndex,
     // if we actually added a new item to the stack
     if(!isFound)
     {
-        MediaList l; l.Pack(volIndices);
         auto [newIndex, _] = TryInsertAtomic(l);
         rayMediaListIndex.SetOuterIndex(newIndex);
     }
@@ -612,14 +699,14 @@ void MediaTrackerView::ResolveCurVolume(RayMediaListPack& rayMediaListIndex) con
     }
     // Now we can remove "next"
     using IndexList = typename MediaList::IndexList;
-    IndexList mediaIndices = dValues[rayMediaListIndex.OuterIndex()].Unpack();
+    IndexList mediaIndices = dValues[rayMediaListIndex.OuterIndex()].UnpackAll();
     uint32_t next = rayMediaListIndex.NextMediaIndex();
     if(next == MAX_NESTED_MEDIA - 1)
-        mediaIndices[next] = MediaList::INVALID_INDEX;
+        mediaIndices[next] = MediaList::INVALID_VAL;
     else for(uint32_t i = next; i < MAX_NESTED_MEDIA - 1; i++)
         mediaIndices[i] = mediaIndices[i + 1];
     //
-    MediaList l; l.Pack(mediaIndices);
+    MediaList l; l.PackAll(mediaIndices);
     auto [newLoc, _] = TryInsertAtomic(l);
     //
     rayMediaListIndex.SetOuterIndex(newLoc);
@@ -634,7 +721,7 @@ MR_HF_DEF
 VolumeKeyPack
 MediaTrackerView::GetVolumeKeyPack(RayMediaListPack p) const
 {
-    uint32_t i = dValues[p.OuterIndex()].Unpack()[p.CurMediaIndex()];
+    uint32_t i = dValues[p.OuterIndex()].Unpack(p.CurMediaIndex());
     return dGlobalVolumeList[i];
 }
 
