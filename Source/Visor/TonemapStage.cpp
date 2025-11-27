@@ -3,6 +3,7 @@
 #include <cassert>
 #include <utility>
 #include <map>
+#include <numeric>
 
 #include <Imgui/imgui.h>
 

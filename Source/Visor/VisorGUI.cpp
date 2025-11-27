@@ -15,6 +15,7 @@
 
 #include <vulkan/vulkan.hpp>
 #include <atomic>
+#include <numeric>
 
 enum class WindowLocationType
 {

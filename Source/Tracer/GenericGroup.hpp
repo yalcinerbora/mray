@@ -37,7 +37,13 @@ void GenericGroupT<ID, AI>::GenericCommit(Tuple<Span<Args>&...> output,
     }
     // Rename for clarity
     const auto& totalSize = offsets;
-    if(std::reduce(totalSize.cbegin(), totalSize.cend()) == 0)
+    size_t totalItems = 0;
+    {
+        for(size_t i = 0; i < totalSize.size(); i++)
+            totalItems += offsets[i];
+    }
+    //
+    if(totalItems == 0)
     {
         MRAY_WARNING_LOG("{:s}:{:d}: committing as empty, "
                          "is this correct?", this->Name(), groupId);

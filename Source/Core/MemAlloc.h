@@ -225,15 +225,12 @@ AllocateSegmentedData(Memory& memory, const std::vector<size_t>& counts,
     std::vector<size_t> alignedByteOffsets(counts.size() + 1u);
     alignedByteOffsets[0] = 0;
 
-    std::transform_inclusive_scan
-    (
-        counts.cbegin(), counts.cend(), alignedByteOffsets.begin() + 1,
-        std::plus{},
-        [alignment](size_t s)
-        {
-            return Math::NextMultiple(s * sizeof(T), alignment);
-        }
-    );
+    for(size_t i = 1; i < alignedByteOffsets.size(); i++)
+    {
+        size_t v = Math::NextMultiple(counts[i - 1] * sizeof(T), alignment);
+        alignedByteOffsets[i] = alignedByteOffsets[i - 1] + v;
+    }
+
     //
     size_t totalSize = alignedByteOffsets.back();
     memory.ResizeBuffer(totalSize);

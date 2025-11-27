@@ -6,6 +6,8 @@
 
 #include "Device/GPUAlgBinaryPartition.h"
 
+#include <numeric>
+
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static
 void KCAccumulateShadowRaysPT(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,

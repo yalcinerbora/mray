@@ -155,7 +155,9 @@ void Polygon::ClipEars(Span<Vector3ui, N - 2> localIndicesOut,
     // We "expand" the vertices to previous/next we will access elements
     // via this
     auto indices = StaticVector<uint32_t, N>(StaticVecSize(N));
-    std::iota(indices.begin(), indices.end(), 0u);
+    uint32_t c = 0u;
+    for(size_t i = 0; i < indices.size(); i++)
+        indices[i] = c++;
     //
     const auto Next = [&indices](uint32_t i) -> uint32_t
     {

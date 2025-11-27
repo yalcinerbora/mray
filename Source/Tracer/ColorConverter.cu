@@ -11,6 +11,8 @@
 #include "Core/GraphicsFunctions.h"
 #include "Core/Algorithm.h"
 
+#include <numeric>
+
 using MipBlockCountList = StaticVector<uint32_t, TracerConstants::MaxTextureMipCount>;
 
 static constexpr uint32_t BC_TEX_PER_BATCH = 16;

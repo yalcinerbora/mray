@@ -5,7 +5,6 @@
 #include "MathForward.h"
 #include "BitFunctions.h"
 
-#include <numeric>
 #include <cmath>
 #include <cstdlib>
 
@@ -186,7 +185,9 @@ constexpr void MovingAverage<N>::FeedValue(Float v) noexcept
 template<uint32_t N>
 constexpr Float MovingAverage<N>::Average() const noexcept
 {
-    Float total = std::reduce(values.cbegin(), values.cend(), Float(0));
+    Float total = Float(0);
+    for(uint32_t i = 0; i < N; i++)
+        total += values[i];
     return total * AVG_MULTIPLIER;
 }
 

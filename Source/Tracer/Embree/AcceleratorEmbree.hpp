@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AcceleratorEmbree.h"
+#include <numeric>
 
 template<PrimitiveGroupC PG, TransformGroupC TG = TransformGroupIdentity,
          auto GenerateTransformContext = MRAY_PRIM_TGEN_FUNCTION(PG, TG)>

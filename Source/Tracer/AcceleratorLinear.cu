@@ -6,6 +6,8 @@
 
 #include "TypeFormat.h"
 
+#include <numeric>
+
 // Generic PrimitiveKey copy kernel
 // TODO: find a way to put this somewhere proper
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT

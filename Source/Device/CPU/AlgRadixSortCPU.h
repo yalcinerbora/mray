@@ -5,6 +5,8 @@
 #include "Core/Types.h"
 #include "GPUSystemCPU.h"
 
+#include <numeric>
+
 namespace mray::host::algorithms
 {
 

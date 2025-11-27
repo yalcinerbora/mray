@@ -11,6 +11,8 @@
 #include "Core/ColorFunctions.h"
 #include "Core/GraphicsFunctions.h"
 
+#include <numeric>
+
 #ifdef MRAY_GPU_BACKEND_CUDA
     #include <cub/block/block_reduce.cuh>
 #endif

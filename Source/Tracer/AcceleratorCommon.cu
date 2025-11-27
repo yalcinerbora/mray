@@ -1,6 +1,8 @@
 #include "AcceleratorC.h"
 #include "Device/GPUSystem.hpp" // IWYU pragma: keep
+
 #include <memory>
+#include <numeric>
 
 class KeyGeneratorFunctor
 {

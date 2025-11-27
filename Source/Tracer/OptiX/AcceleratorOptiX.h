@@ -7,6 +7,8 @@
 #include <optix_host.h>
 #include <optix_stubs.h>
 
+#include <numeric>
+
 void OptiXAssert(OptixResult code, const char* file, int line);
 
 #ifdef MRAY_DEBUG

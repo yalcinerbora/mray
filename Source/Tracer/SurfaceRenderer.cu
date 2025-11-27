@@ -10,6 +10,8 @@
 
 #include "RendererCommon.h"
 
+#include <numeric>
+
 struct IsValidRayFunctor
 {
     private:

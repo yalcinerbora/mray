@@ -9,6 +9,8 @@
 
 #include "TypeFormat.h"
 
+#include <numeric>
+
 // Explicitly instantiate these
 // These are used by "AcceleratorGroupLBVH::MultiBuildBVH"
 //
