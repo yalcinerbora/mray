@@ -16,8 +16,10 @@ function(tracer_kernel_gen_file_names)
          "_GEN_RequestedTypes.h"
          "_GEN_RequestedRenderers.h")
     foreach(i RANGE 1 ${TRACER_KERNEL_GEN_NUM_FILES})
-        list(APPEND KERNEL_GEN_INSTANTIATIONS "_GEN_Kernels${i}.cu")
+        list(APPEND KERNEL_GEN_INSTANTIATIONS "_GEN_RendererKernels${i}.cu")
     endforeach()
+
+    list(APPEND KERNEL_GEN_INSTANTIATIONS "_GEN_CommonKernels.cu")
 
     set(TRACER_KERNEL_GEN_HEADERS ${KERNEL_GEN_FILES} PARENT_SCOPE)
     set(TRACER_KERNEL_GEN_INSTANTIATIONS

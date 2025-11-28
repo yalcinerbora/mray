@@ -461,9 +461,12 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
         {
             Vector3 n = triangleDataNormals[i];
             Vector3 t = Math::Normalize(triangleDataTangents[i]);
+            // Tangents of the triangles are cancelled or precision
+            // error. Generate orthogonal vector
+            if(!Math::IsFinite(t)) t = Graphics::OrthogonalVector(n);
             t = Graphics::GSOrthonormalize(t, n);
-            // tangents of the triangles are cancelled or precision
-            // error. Generate orthogonal vector again
+            // Mesh is corrupt t = n probably
+            // Generate orthogonal vector again
             if(!Math::IsFinite(t)) t = Graphics::OrthogonalVector(n);
 
             Vector3 b = Math::Cross(n, t);

@@ -48,16 +48,26 @@ function(gen_tracer_dll_target)
     gen_tracer_target(NAME ${GEN_TRACER_DLL_NAME}
                       MACRO ${GEN_TRACER_DLL_MACRO})
 
-    # Kernel and Type file generation
-    # Generate the file names
-    # TODO: Max thread is overkill but how to set programatically?
-    # Create a cache variable and mark it as advanced later
-    # cmake_host_system_information(RESULT NUM_CORES
-    #                               QUERY NUMBER_OF_LOGICAL_CORES)
-    set(NUM_CORES 8)
-    tracer_kernel_gen_file_names(NUM_FILES ${NUM_CORES})
+    # Kernel and Type file generation (Generate the file names)
+    # Here to aid incremental compilation each file
+    # will hold all the kernels that is required by that renderer.
+    #
+    # So when a renderer work function is changed only that file
+    # is compiled. Unfortunately, this approach requires the CMake to know
+    # how many files that is going to be generated beforehand.
+    # (So that it sets these files as dependencies on the DLL target)
+    #
+    # Instead, we statically generate the N files here,
+    # some may be empty. In future we may need to set this as advanced
+    # CMake variable so that user can change it as needed.
+    #
+    # Currently it is static, since this variable is local to the file.
+    # It needs some wiring to propagate this variable upwards
+    set(RENDER_KERNEL_FILE_COUNT 16)
+    tracer_kernel_gen_file_names(NUM_FILES ${RENDER_KERNEL_FILE_COUNT})
     list(TRANSFORM TRACER_KERNEL_GEN_HEADERS PREPEND ${CMAKE_CURRENT_BINARY_DIR}/)
     list(TRANSFORM TRACER_KERNEL_GEN_INSTANTIATIONS PREPEND ${CMAKE_CURRENT_BINARY_DIR}/)
+    #
     source_group("" FILES ${TRACER_KERNEL_GEN_HEADERS})
     source_group("Kernel Instantiations" FILES ${TRACER_KERNEL_GEN_INSTANTIATIONS})
     set(SRC_ALL ${SRC_ALL}
@@ -70,7 +80,7 @@ function(gen_tracer_dll_target)
                        ${TRACER_KERNEL_GEN_INSTANTIATIONS}
                        COMMAND TracerKernelGen
                             ${CURRENT_SOURCE_DIR}/TracerTypeGenInput.txt
-                            ${NUM_CORES}
+                            ${RENDER_KERNEL_FILE_COUNT}
                             $<BOOL:${GEN_TRACER_DLL_ENABLE_HW_ACCEL}>
                             ${CMAKE_CURRENT_BINARY_DIR}
                             ${GEN_TRACER_DLL_MACRO}

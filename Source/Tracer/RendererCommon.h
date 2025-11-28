@@ -2,6 +2,7 @@
 
 #include "RendererC.h"
 #include "RayPartitioner.h"
+#include "MediaTracker.h"
 
 // Some common kernels
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
@@ -18,7 +19,8 @@ void KCGenerateSurfaceWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenerateMediumWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
                                       MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
-                                      MRAY_GRID_CONSTANT const Span<const HitKeyPack> dInputKeys,
+                                      MRAY_GRID_CONSTANT const Span<const RayMediaListPack> dRayMLPacks,
+                                      MRAY_GRID_CONSTANT const MediaTrackerView tracker,
                                       MRAY_GRID_CONSTANT const RenderMediumWorkHasher workHasher);
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT

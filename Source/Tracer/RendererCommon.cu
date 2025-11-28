@@ -40,16 +40,17 @@ void KCGenerateSurfaceWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenerateMediumWorkKeysIndirect(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
                                       MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
-                                      MRAY_GRID_CONSTANT const Span<const VolumeKeyPack> dInputKeys,
+                                      MRAY_GRID_CONSTANT const Span<const RayMediaListPack> dRayMLPacks,
+                                      MRAY_GRID_CONSTANT const MediaTrackerView tracker,
                                       MRAY_GRID_CONSTANT const RenderMediumWorkHasher workHasher)
 {
     KernelCallParams kp;
     uint32_t keyCount = static_cast<uint32_t>(dIndices.size());
     for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
     {
-        RayIndex keyIndex = dIndices[i];
-        auto keyPack = dInputKeys[keyIndex];
-        dWorkKey[i] = workHasher.GenerateWorkKeyGPU(keyPack, keyIndex);
+        RayIndex rayIndex = dIndices[i];
+        auto keyPack = tracker.GetVolumeKeyPack(dRayMLPacks[rayIndex]);
+        dWorkKey[i] = workHasher.GenerateWorkKeyGPU(keyPack, rayIndex);
     }
 }
 

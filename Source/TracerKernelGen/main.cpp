@@ -14,9 +14,11 @@
 
 namespace pmr = std::pmr;
 
-static constexpr auto KERNEL_FILE_FMT = "_GEN_Kernels{}.cu"sv;
+static constexpr auto RENDER_KERNEL_FILE_FMT = "_GEN_RendererKernels{}.cu"sv;
+static constexpr auto COMMON_KERNEL_FILE = "_GEN_CommonKernels.cu"sv;
 static constexpr auto TYPEGEN_HEADER_FILE = "_GEN_RequestedTypes.h"sv;
 static constexpr auto TYPEGEN_RENDER_HEADER_FILE = "_GEN_RequestedRenderers.h"sv;
+static constexpr auto FILE_PER_RENDERER = size_t(2);
 
 auto globalAllocator = pmr::monotonic_buffer_resource(2 * 1ull << 20);
 
@@ -485,7 +487,7 @@ void FindAccelNames(std::array<std::string_view, 2>& linAccelNamePair,
 
         if(loc == lp.accels.end())
         {
-            fmt::println(stderr, "No {}-marked accelerator found in input file",
+            fmt::println(stderr, "No \"{}\" marked accelerator found in input file",
                          name);
             std::exit(1);
         };
@@ -681,14 +683,9 @@ void WriteRequestedTypesFiles(const LinePack& lp,
     ConditionallyWriteToFile(rendReqFilePath, fileStr);
 }
 
-void GenerateKernelInstantiationFiles(const LinePack& lp,
-                                      std::filesystem::path outDir,
-                                      size_t fileCount)
+void GenerateCommonKernelInstantiationFile(const LinePack& lp,
+                                           std::filesystem::path outDir)
 {
-    static constexpr auto WORK_FMT = "MRAY_RENDERER_KERNEL_INSTANTIATE({}, {}, {}, {}, {});\n"sv;
-    static constexpr auto LIGHT_WORK_FMT = "MRAY_RENDERER_LIGHT_KERNEL_INSTANTIATE({}, {}, {}, {});\n"sv;
-    static constexpr auto CAM_WORK_FMT = "MRAY_RENDERER_CAM_KERNEL_INSTANTIATE({}, {}, {}, {});\n"sv;
-    static constexpr auto MED_WORK_FMT = "MRAY_RENDERER_MEDIUM_KERNEL_INSTANTIATE({}, {}, {}, {});\n"sv;
     //
     static constexpr auto ACCEL_PRIM_CENTER_FMT = "MRAY_ACCEL_PRIM_CENTER_KERNEL_INSTANTIATE({}, {}, {});\n"sv;
     static constexpr auto ACCEL_PRIM_AABB_FMT = "MRAY_ACCEL_PRIM_AABB_KERNEL_INSTANTIATE({}, {}, {});\n"sv;
@@ -703,83 +700,12 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
     static constexpr auto CAM_RAYGEN_FMT = "MRAY_RAYGEN_GENRAYS_KERNEL_INSTANTIATE({}, {});\n"sv;
     static constexpr auto CAM_RAYGEN_STOCHASTIC_FMT = "MRAY_RAYGEN_GENRAYS_STOCHASTIC_KERNEL_INSTANTIATE({}, {}, {});\n"sv;
 
-    namespace pmr = pmr;
+    //
     using StringViewVec = pmr::vector<std::string_view>;
-    auto workInstantiations = StringViewVec(&globalAllocator);      workInstantiations.reserve(1024);
-    auto lightWorkInstantiations = StringViewVec(&globalAllocator); lightWorkInstantiations.reserve(1024);
-    auto camWorkInstantiations = StringViewVec(&globalAllocator);   camWorkInstantiations.reserve(1024);
-    auto medWorkInstantiations = StringViewVec(&globalAllocator);   medWorkInstantiations.reserve(1024);
     //
-    auto accelInstantiations = StringViewVec(&globalAllocator);     accelInstantiations.reserve(1024);
+    auto accelInstantiations  = StringViewVec(&globalAllocator); accelInstantiations.reserve(1024);
+    auto rayGenInstantiations = StringViewVec(&globalAllocator); rayGenInstantiations.reserve(1024);
     //
-    auto rayGenInstantiations = StringViewVec(&globalAllocator);    rayGenInstantiations.reserve(1024);
-    // Work Gen
-    for(const auto& r : lp.renders)
-    {
-        // SCATTER WORKS
-        for(const auto& p : lp.prims)
-        {
-            if(p.typeName == "PrimGroupEmpty"sv) continue;
-            for(const auto& m : lp.mats)
-            {
-                if(LookFilterAndSkip(p.matFilters, m)) continue;
-                if(LookFilterAndSkip(m.primFilters, p)) continue;
-                for(const auto& t : lp.trans)
-                for(uint32_t i = 0; i < r.workCount; i++)
-                {
-                    if(LookFilterAndSkip(p.transFilters, t)) continue;
-                    if(LookFilterAndSkip(m.transFilters, t)) continue;
-                    if(LookFilterAndSkip(t.primFilters, p)) continue;
-                    if(LookFilterAndSkip(t.matFilters, m)) continue;
-
-                    auto wILine = FormatToGlobalBuffer(WORK_FMT.size(), WORK_FMT,
-                                                       r.typeName, p.typeName,
-                                                       m.typeName, t.typeName, i);
-                    workInstantiations.emplace_back(wILine);
-                }
-            }
-        }
-        // LIGHT WORKS
-        for(const auto& l : lp.lights)
-        for(const auto& t : lp.trans)
-        for(uint32_t i = 0; i < r.lightWorkCount; i++)
-        {
-            if(LookFilterAndSkip(l.transFilters, t)) continue;
-
-            auto wlLine = FormatToGlobalBuffer(LIGHT_WORK_FMT.size(),
-                                                LIGHT_WORK_FMT,
-                                                r.typeName, l.typeName,
-                                                t.typeName, i);
-            lightWorkInstantiations.emplace_back(wlLine);
-        }
-        // CAMERA WORKS
-        for(const auto& c : lp.cams)
-        for(const auto& t : lp.trans)
-        for(uint32_t i = 0; i < r.camWorkCount; i++)
-        {
-            if(LookFilterAndSkip(c.transFilters, t)) continue;
-
-            auto wcLine = FormatToGlobalBuffer(CAM_WORK_FMT.size(),
-                                               CAM_WORK_FMT,
-                                               r.typeName, c.typeName,
-                                               t.typeName, i);
-            camWorkInstantiations.emplace_back(wcLine);
-        }
-        // MEDIA WORKS
-        for(const auto& m : lp.meds)
-        for(const auto& t : lp.trans)
-        for(uint32_t i = 0; i < r.mediaWorkCount; i++)
-        {
-            if(LookFilterAndSkip(m.transFilters, t)) continue;
-
-            auto wcLine = FormatToGlobalBuffer(MED_WORK_FMT.size(),
-                                               MED_WORK_FMT,
-                                               r.typeName, m.typeName,
-                                               t.typeName, i);
-            medWorkInstantiations.emplace_back(wcLine);
-        }
-    }
-
     // Accel Gen
     for(const auto& a : lp.accels)
     for(const auto& t : lp.trans)
@@ -869,77 +795,176 @@ void GenerateKernelInstantiationFiles(const LinePack& lp,
         };
     }
     //
-    using PerFileVector = pmr::vector<std::array<pmr::string, 6>>;
-    PerFileVector perFileLists(fileCount, &globalAllocator);
-    // Propagation of our allocator stops due to "std::array"
-    // Manually allocate and reserve
-    for(auto& arr : perFileLists)
-    for(auto& s : arr)
+    size_t sizeAccel = 64;
+    for(const auto sv : accelInstantiations) sizeAccel += sv.size();
+    size_t sizeRayGen = 64;
+    for(const auto sv : rayGenInstantiations) sizeRayGen += sv.size();
+    //
+    pmr::string accelInstantiateList(&globalAllocator);  accelInstantiateList.reserve(sizeAccel);
+    pmr::string rayGenInstantiateList(&globalAllocator); rayGenInstantiateList.reserve(sizeRayGen);
+    for(const auto sv : accelInstantiations)  accelInstantiateList += sv;
+    for(const auto sv : rayGenInstantiations) rayGenInstantiateList += sv;
+    //
+    auto fContents = FormatToGlobalBuffer(COMMON_KERNEL_FILE_TEMPLATE.size(),
+                                          COMMON_KERNEL_FILE_TEMPLATE,
+                                          accelInstantiateList,
+                                          rayGenInstantiateList);
+    ConditionallyWriteToFile(outDir / COMMON_KERNEL_FILE, fContents);
+}
+
+void GenerateRenderKernelInstantiationFiles(const LinePack& lp,
+                                            std::filesystem::path outDir,
+                                            size_t fileCount)
+{
+    static constexpr auto WORK_FMT = "MRAY_RENDERER_KERNEL_INSTANTIATE({}, {}, {}, {}, {});\n"sv;
+    static constexpr auto LIGHT_WORK_FMT = "MRAY_RENDERER_LIGHT_KERNEL_INSTANTIATE({}, {}, {}, {});\n"sv;
+    static constexpr auto CAM_WORK_FMT = "MRAY_RENDERER_CAM_KERNEL_INSTANTIATE({}, {}, {}, {});\n"sv;
+    static constexpr auto MED_WORK_FMT = "MRAY_RENDERER_MEDIUM_KERNEL_INSTANTIATE({}, {}, {}, {});\n"sv;
+
+    namespace pmr = pmr;
+    using StringViewVec = pmr::vector<std::string_view>;
+    auto workInstantiations = StringViewVec(&globalAllocator);      workInstantiations.reserve(1024);
+    auto lightWorkInstantiations = StringViewVec(&globalAllocator); lightWorkInstantiations.reserve(1024);
+    auto camWorkInstantiations = StringViewVec(&globalAllocator);   camWorkInstantiations.reserve(1024);
+    auto medWorkInstantiations = StringViewVec(&globalAllocator);   medWorkInstantiations.reserve(1024);
+
+    // Alloc 128KiB chars for each data
+    pmr::string workInstList(&globalAllocator); workInstList.resize(1 << 15);
+    pmr::string lightWorkInstList(&globalAllocator); lightWorkInstList.resize(1 << 15);
+    pmr::string camWorkInstList(&globalAllocator); camWorkInstList.resize(1 << 15);
+    pmr::string medWorkInstList(&globalAllocator); medWorkInstList.resize(1 << 15);
+
+    // Work Gen
+    uint32_t fileI = 0;
+    for(const auto& r : lp.renders)
     {
-        s = pmr::string(&globalAllocator);
-        s.reserve(4096);
+        workInstantiations.clear();
+        lightWorkInstantiations.clear();
+        camWorkInstantiations.clear();
+        medWorkInstantiations.clear();
+
+        // SCATTER WORKS
+        for(const auto& p : lp.prims)
+        {
+            if(p.typeName == "PrimGroupEmpty"sv) continue;
+            for(const auto& m : lp.mats)
+            {
+                if(LookFilterAndSkip(p.matFilters, m)) continue;
+                if(LookFilterAndSkip(m.primFilters, p)) continue;
+                for(const auto& t : lp.trans)
+                for(uint32_t i = 0; i < r.workCount; i++)
+                {
+                    if(LookFilterAndSkip(p.transFilters, t)) continue;
+                    if(LookFilterAndSkip(m.transFilters, t)) continue;
+                    if(LookFilterAndSkip(t.primFilters, p)) continue;
+                    if(LookFilterAndSkip(t.matFilters, m)) continue;
+
+                    auto wILine = FormatToGlobalBuffer(WORK_FMT.size(), WORK_FMT,
+                                                       r.typeName, p.typeName,
+                                                       m.typeName, t.typeName, i);
+                    workInstantiations.emplace_back(wILine);
+                }
+            }
+        }
+        // LIGHT WORKS
+        for(const auto& l : lp.lights)
+        for(const auto& t : lp.trans)
+        for(uint32_t i = 0; i < r.lightWorkCount; i++)
+        {
+            if(LookFilterAndSkip(l.transFilters, t)) continue;
+
+            auto wlLine = FormatToGlobalBuffer(LIGHT_WORK_FMT.size(),
+                                                LIGHT_WORK_FMT,
+                                                r.typeName, l.typeName,
+                                                t.typeName, i);
+            lightWorkInstantiations.emplace_back(wlLine);
+        }
+        // CAMERA WORKS
+        for(const auto& c : lp.cams)
+        for(const auto& t : lp.trans)
+        for(uint32_t i = 0; i < r.camWorkCount; i++)
+        {
+            if(LookFilterAndSkip(c.transFilters, t)) continue;
+
+            auto wcLine = FormatToGlobalBuffer(CAM_WORK_FMT.size(),
+                                               CAM_WORK_FMT,
+                                               r.typeName, c.typeName,
+                                               t.typeName, i);
+            camWorkInstantiations.emplace_back(wcLine);
+        }
+        // MEDIA WORKS
+        for(const auto& m : lp.meds)
+        for(const auto& t : lp.trans)
+        for(uint32_t i = 0; i < r.mediaWorkCount; i++)
+        {
+            if(LookFilterAndSkip(m.transFilters, t)) continue;
+
+            auto wcLine = FormatToGlobalBuffer(MED_WORK_FMT.size(),
+                                               MED_WORK_FMT,
+                                               r.typeName, m.typeName,
+                                               t.typeName, i);
+            medWorkInstantiations.emplace_back(wcLine);
+        }
+
+        // Split kernels into multiple files
+        auto FindRange = [](const StringViewVec& instList, size_t i, size_t  total)
+        {
+            size_t itemFile = (instList.size() + total - 1) / total;
+            std::array range =
+            {
+                std::min(itemFile * (i + 0), instList.size()),
+                std::min(itemFile * (i + 1), instList.size()),
+            };
+            std::span result = std::span(instList).subspan(range[0], range[1] - range[0]);
+            return result;
+        };
+
+        for(uint32_t i = 0; i < FILE_PER_RENDERER; i++)
+        {
+            workInstList.clear();
+            lightWorkInstList.clear();
+            camWorkInstList.clear();
+            medWorkInstList.clear();
+
+            auto wRange = FindRange(workInstantiations, i, FILE_PER_RENDERER);
+            auto lRange = FindRange(lightWorkInstantiations, i, FILE_PER_RENDERER);
+            auto cRange = FindRange(camWorkInstantiations, i, FILE_PER_RENDERER);
+            auto mRange = FindRange(medWorkInstantiations, i, FILE_PER_RENDERER);
+            //
+            for(const auto sv : wRange) workInstList += sv;
+            for(const auto sv : lRange) lightWorkInstList += sv;
+            for(const auto sv : cRange) camWorkInstList += sv;
+            for(const auto sv : mRange) medWorkInstList += sv;
+
+            if(workInstList.empty() && lightWorkInstList.empty() &&
+               camWorkInstList.empty() && medWorkInstList.empty())
+                continue;
+
+            auto fContents = FormatToGlobalBuffer(RENDER_KERNEL_FILE_TEMPLATE.size(),
+                                                  RENDER_KERNEL_FILE_TEMPLATE,
+                                                  r.headerFile,
+                                                  workInstList,
+                                                  lightWorkInstList,
+                                                  camWorkInstList,
+                                                  medWorkInstList);
+
+            std::string_view fName = FormatToGlobalBuffer(RENDER_KERNEL_FILE_FMT.size(),
+                                                          RENDER_KERNEL_FILE_FMT,
+                                                          fileI + 1);
+            ConditionallyWriteToFile(outDir / fName, fContents);
+            fileI++;
+        }
     }
 
-    // Split the works
-    auto AppendInstantiations = [fileCount](PerFileVector& perFileLists,
-                                            uint32_t listIndex,
-                                            const StringViewVec& instantiationList)
+
+    // fill the remaining files as empty
+    for(uint32_t i = fileI; i < fileCount; i++)
     {
-        size_t workInstantiationPerFile = (instantiationList.size() + fileCount - 1) / fileCount;
-        for(size_t i = 0; i < fileCount; i++)
-        for(size_t j = 0; j < workInstantiationPerFile; j++)
-        {
-            size_t instantiationIndex = i * workInstantiationPerFile + j;
-            if(instantiationIndex >= instantiationList.size()) break;
-
-            perFileLists[i][listIndex] += instantiationList[instantiationIndex];
-        }
-    };
-    AppendInstantiations(perFileLists, 0, workInstantiations);
-    AppendInstantiations(perFileLists, 1, lightWorkInstantiations);
-    AppendInstantiations(perFileLists, 2, camWorkInstantiations);
-    AppendInstantiations(perFileLists, 3, medWorkInstantiations);
-    AppendInstantiations(perFileLists, 4, accelInstantiations);
-    AppendInstantiations(perFileLists, 5, rayGenInstantiations);
-    // for(size_t i = 0; i < workInstantiations.size(); i++)
-    //     perFileLists[i % fileCount][0] += workInstantiations[i];
-    // for(size_t i = 0; i < lightWorkInstantiations.size(); i++)
-    //     perFileLists[i % fileCount][1] += lightWorkInstantiations[i];
-    // for(size_t i = 0; i < camWorkInstantiations.size(); i++)
-    //     perFileLists[i % fileCount][2] += camWorkInstantiations[i];
-    // for(size_t i = 0; i < medWorkInstantiations.size(); i++)
-    //     perFileLists[i % fileCount][3] += medWorkInstantiations[i];
-
-    // for(size_t i = 0; i < accelInstantiations.size(); i++)
-    //     perFileLists[i % fileCount][4] += accelInstantiations[i];
-    // for(size_t i = 0; i < rayGenInstantiations.size(); i++)
-    //     perFileLists[i % fileCount][5] += rayGenInstantiations[i];
-
-    for(size_t i = 0; i < size_t(fileCount); i++)
-    {
-        std::string_view fName = FormatToGlobalBuffer(KERNEL_FILE_FMT.size(),
-                                                      KERNEL_FILE_FMT, i + 1);
-
-        if(perFileLists[i][0].empty() &&
-           perFileLists[i][1].empty() &&
-           perFileLists[i][2].empty() &&
-           perFileLists[i][3].empty() &&
-           perFileLists[i][4].empty() &&
-           perFileLists[i][5].empty())
-        {
-            ConditionallyWriteToFile(outDir / fName, {});
-            continue;
-        }
-
-        auto fContents = FormatToGlobalBuffer(KERNEL_FILE_TEMPLATE.size(),
-                                              KERNEL_FILE_TEMPLATE,
-                                              perFileLists[i][0],
-                                              perFileLists[i][1],
-                                              perFileLists[i][2],
-                                              perFileLists[i][3],
-                                              perFileLists[i][4],
-                                              perFileLists[i][5]);
-        ConditionallyWriteToFile(outDir / fName, fContents);
+        std::string_view fName = FormatToGlobalBuffer(RENDER_KERNEL_FILE_FMT.size(),
+                                                      RENDER_KERNEL_FILE_FMT,
+                                                      i + 1);
+        ConditionallyWriteToFile(outDir / fName, {});
+        continue;
     }
 }
 
@@ -1014,7 +1039,20 @@ int main(int argc, const char* argv[])
     RemoveUnusedAccelTypes(lp.accels, hwAccelTag, skipHWAccelInstances);
     WriteRequestedTypesFiles(lp, outDir, headerGuard, hwAccelTag);
 
+    // We were unable to add instatiations of all
+    // renderers since given
+    if(fileCount < lp.renders.size() * FILE_PER_RENDERER)
+    {
+        fmt::println("Can not fill entire renderers into {} files! "
+                     "Total renderer count in the system is {}, each renderer "
+                     "uses {} files.",
+                     fileCount,
+                     lp.renders.size(),
+                     FILE_PER_RENDERER);
+        return 1;
+    }
 
-    GenerateKernelInstantiationFiles(lp, outDir, fileCount);
+    GenerateCommonKernelInstantiationFile(lp, outDir);
+    GenerateRenderKernelInstantiationFiles(lp, outDir, fileCount);
     return 0;
 }

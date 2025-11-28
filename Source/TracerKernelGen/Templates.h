@@ -162,7 +162,40 @@ using RendererWorkTypesList = TypePack
 >;
 )"sv;
 
-static constexpr auto KERNEL_FILE_TEMPLATE =
+static constexpr auto COMMON_KERNEL_FILE_TEMPLATE =
+R"(// =========================== //
+// GENERATED FILE DO NOT EDIT! //
+// =========================== //
+#ifdef MRAY_WINDOWS
+    // After nvcc passes through
+    // some residual code caught by msvc
+    // and "unreachable code" is generated
+    // TODO: Investigate
+    #pragma warning( disable : 4702)
+#endif
+
+// Definitions
+#include "Tracer/RayGenKernels.h"
+#include "Tracer/AcceleratorWork.h"
+#include "Tracer/Filters.h"
+
+// Implementations
+#include "Tracer/RayGenKernels.kt.h"
+#include "Tracer/AcceleratorWork.kt.h"
+#include "Tracer/TextureView.hpp"
+
+// Types
+#include "InstantiationMacros.h"
+
+#include "RequestedTypes.h"
+
+// Accelerator Work Instantiations
+{}
+// Camera Raygen Instantiations
+{}
+)"sv;
+
+static constexpr auto RENDER_KERNEL_FILE_TEMPLATE =
 R"(// =========================== //
 // GENERATED FILE DO NOT EDIT! //
 // =========================== //
@@ -177,19 +210,17 @@ R"(// =========================== //
 // Definitions
 #include "Tracer/RayGenKernels.h"
 #include "Tracer/RenderWork.h"
-#include "Tracer/AcceleratorWork.h"
 
 // Implementations
 #include "Tracer/RayGenKernels.kt.h"
 #include "Tracer/RenderWork.kt.h"
-#include "Tracer/AcceleratorWork.kt.h"
 #include "Tracer/TextureView.hpp"
 
 // Types
 #include "InstantiationMacros.h"
 
 #include "RequestedTypes.h"
-#include "RequestedRenderers.h"
+#include {}
 
 // Kernel Work Instantiations
 {}
@@ -198,9 +229,5 @@ R"(// =========================== //
 // Kernel Camera Work Instantiations
 {}
 // Kernel Media Work Instantiations
-{}
-// Accelerator Work Instantiations
-{}
-// Camera Raygen Instantiations
 {}
 )"sv;
