@@ -2426,6 +2426,7 @@ TracerIdPack SceneLoaderMRay::MoveIdPack(double durationMS)
         .mats = std::move(matMappings.map),
         .mediums = std::move(mediumMappings.map),
         .textures = std::move(texMappings),
+        .volumes = std::move(volMappings),
         .surfaces = std::move(mRaySurfaces),
         .camSurfaces = std::move(mRayCamSurfaces),
         .lightSurfaces = std::move(mRayLightSurfaces),

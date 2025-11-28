@@ -131,7 +131,7 @@ class SpectrumContextJakob2019 : public SpectrumContextI
                                            Span<const RayIndex> dRayIndices,
                                            // Constants
                                            const GPUQueue& queue) const override;
-    RNRequestList SampleSpectrumRNList() const;
+    RNRequestList SampleSpectrumRNList() const override;
 
     //
     void ConvertSpectrumToRGB(// I-O

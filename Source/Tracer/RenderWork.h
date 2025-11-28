@@ -389,7 +389,7 @@ class RenderCameraWork : public RenderCameraWorkT<R>
                                TransformKey transKey,
                                // Constants
                                const Vector2ui regionCount,
-                               const GPUQueue& queue) const;
+                               const GPUQueue& queue) const override;
 
     std::string_view    Name() const override;
     RNRequestList       SampleRayRNList() const override;

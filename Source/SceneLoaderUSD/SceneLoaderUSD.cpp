@@ -953,7 +953,8 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             .cameraId = outCam.second,
             .transformId = cameraSurfTIds.empty()
                                 ? TracerConstants::IdentityTransformId
-                                : cameraSurfTIds[0]
+                                : cameraSurfTIds[0],
+            .nestedVolumes = {}
         };
         CamSurfaceId csId = tracer.CreateCameraSurface(surface);
         camSurfaceList.emplace_back(outCam.first, csId);

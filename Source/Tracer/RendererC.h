@@ -1094,8 +1094,8 @@ RendererBase::RendererBase(const RenderImagePtr& rb,
                            const RenderWorkPack& wp,
                            TracerView tv, const GPUSystem& s,
                            ThreadPool& tp, std::string_view rendererName)
-    : rendererName(rendererName)
-    , workPack(wp)
+    : workPack(wp)
+    , rendererName(rendererName)
     , globalThreadPool(tp)
     , gpuSystem(s)
     , tracerView(tv)

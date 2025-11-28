@@ -5,6 +5,38 @@
 
 #include "../GPUTypes.h"
 
+namespace mray::cuda::atomic::detail
+{
+
+    template <class T> struct IntegralOf
+    {
+        static_assert(!std::is_same_v<T, T>,
+                        "Type does not have a proper integral wrapper!");
+    };
+
+    template <class T>
+    requires (sizeof(T) == 8 && alignof(T) >= alignof(uint64_t))
+    struct IntegralOf<T>
+    {
+        // TODO: NVCC on linux defines the 64-bit atomic operations
+        // with "unsigned long long" type but uint64_t is "unisgned long"
+        // and it can't deduce it....
+        #ifdef MRAY_LINUX
+            using type = unsigned long long;
+        #else
+            using type = uint64_t;
+        #endif
+    };
+
+    template <class T>
+    requires (sizeof(T) == 4 && alignof(T) >= alignof(uint32_t))
+    struct IntegralOf<T> { using type = uint32_t; };
+
+    template <class T>
+    requires (sizeof(T) == 2 && alignof(T) >= alignof(uint16_t))
+    struct IntegralOf<T> { using type = uint16_t; };
+}
+
 namespace mray::cuda::atomic
 {
     template<class T, class Func>
@@ -53,7 +85,7 @@ MR_GF_DEF
 T EmulateAtomicOp(T& address, Func&& F)
 {
     #ifdef __CUDA_ARCH__
-        using I = typename IntegralOf<T>::type;
+        using I = typename detail::template IntegralOf<T>::type;
         // Classic CAS wrapper for the operation
         // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
         I* integralAddress = std::launder(reinterpret_cast<I*>(&address));
@@ -256,11 +288,11 @@ MR_GF_DEF
 T AtomicCompSwap(T& t, T compVal, T storeVal)
 {
     #ifdef __CUDA_ARCH__
-        using Int = typename IntegralOf<T>::type;
+        using Int = typename detail::template IntegralOf<T>::type;
         auto* tp = reinterpret_cast<Int*>(&t);
-        return T(atomicCAS(tp,
-                           static_cast<Int>(compVal),
-                           static_cast<Int>(storeVal)));
+        return Bit::BitCast<T>(atomicCAS(tp,
+                               Bit::BitCast<Int>(compVal),
+                               Bit::BitCast<Int>(storeVal)));
     #else
         return t + compVal + storeVal;
     #endif

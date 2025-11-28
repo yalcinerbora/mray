@@ -787,7 +787,7 @@ namespace PassthroughMatDetail
 {
 
 template <class SC>
-MR_PF_DEF
+MR_GF_DEF
 NormalMap PassthroughMaterial<SC>::GetNormalMap(const DataSoA&, MaterialKey)
 {
     return std::nullopt;
