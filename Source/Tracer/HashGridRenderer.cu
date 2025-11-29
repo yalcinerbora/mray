@@ -443,22 +443,11 @@ void HashGridRenderer::PathTraceAndQuery()
 
         // Issue the work kernels
         IssueSurfaceWorkKernelsToPartitions<This>(workHasher, partitionOutput,
-        [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
-                 uint32_t, uint32_t partitionSize)
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
         {
-            RNRequestList rnList = workI.SampleRNList(0);
-            uint32_t rnCount = rnList.TotalRNCount();
-            auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
-            rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-                                                 dPathRNGDimensions,
-                                                 rnList,
-                                                 processQueue);
-
-            DeviceAlgorithms::InPlaceTransformIndirect
-            (
-                dPathRNGDimensions, dLocalIndices, processQueue,
-                ConstAddFunctor_U16(uint16_t(rnCount))
-            );
+            FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
+                             dLocalIndices, workI.SampleRNList(0),
+                             rnGenerator, processQueue);
             workI.DoWork_0(dRayState, dRays,
                            dRayCones, dLocalIndices,
                            dRandomNumBuffer,
@@ -466,8 +455,7 @@ void HashGridRenderer::PathTraceAndQuery()
                            globalState, processQueue);
         },
         //
-        [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
-                  uint32_t, uint32_t)
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
         {
             workI.DoBoundaryWork_0(dRayState,
                                    dRays, dRayCones,

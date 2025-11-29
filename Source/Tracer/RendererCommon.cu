@@ -3,6 +3,7 @@
 #include "RendererCommon.h"
 
 #include "Device/GPUSystem.hpp"
+#include "Device/GPUAlgGeneric.h"
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGenerateSurfaceWorkKeys(MRAY_GRID_CONSTANT const Span<CommonKey> dWorkKey,
@@ -503,4 +504,26 @@ uint32_t RendererBase::GenerateMediumWorkMappings(uint32_t workStart)
     for(const auto& [_, p] : tracerView.globalVolumeList)
         GenMediumWork(p);
     return workStart;
+}
+
+void RendererBase::FillRandomBuffer(Span<RandomNumber> dRNBuffer,
+                                    Span<uint16_t> dRayRNDimensions,
+                                    Span<const RayIndex> dRayIndices,
+                                    RNRequestList rnList,
+                                    const RNGeneratorPtr& rnGenerator,
+                                    const GPUQueue& queue)
+{
+    uint32_t rayCount = uint32_t(dRayIndices.size());
+    uint32_t rnCount = rnList.TotalRNCount();
+    auto dLocalRNBuffer = dRNBuffer.subspan(0, rayCount * rnCount);
+    rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dRayIndices,
+                                         dRayRNDimensions,
+                                         rnList,
+                                         queue);
+    //
+    DeviceAlgorithms::InPlaceTransformIndirect
+    (
+        dRayRNDimensions, dRayIndices, queue,
+        ConstAddFunctor_U16(uint16_t(rnCount))
+    );
 }

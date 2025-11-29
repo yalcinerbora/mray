@@ -776,22 +776,12 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     IssueSurfaceWorkKernelsToPartitions<This>
     (
         workHasher, partitionOutput,
-        [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
-                  uint32_t, uint32_t partitionSize)
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
         {
-            RNRequestList rnList = workI.SampleRNList(0);
-            uint32_t rnCount = rnList.TotalRNCount();
-            auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
-            rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
-                                                 dPathRNGDimensions,
-                                                 rnList,
-                                                 processQueue);
-            DeviceAlgorithms::InPlaceTransformIndirect
-            (
-                dPathRNGDimensions, dLocalIndices, processQueue,
-                ConstAddFunctor_U16(uint16_t(rnCount))
-            );
 
+            FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
+                             dLocalIndices, workI.SampleRNList(0),
+                             rnGenerator, processQueue);
             // 1. vMF Generation & Sampling / Shadow Ray Generation
             // 2. Virtually lifting a Markov Chain
             // 3. Path & Shadow ray single-channel irradiance
@@ -803,8 +793,7 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
                            globalState, processQueue);
         },
         // Light selection
-        [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
-                  uint32_t, uint32_t)
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
         {
             // Light emission calculation / direct backpropogation
             // of irradiance

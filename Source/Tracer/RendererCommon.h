@@ -73,12 +73,12 @@ void RendererBase::IssueSurfaceWorkKernelsToPartitions(const RenderSurfaceWorkHa
         if(wLoc != this->currentWorks.cend())
         {
             const auto& workPtr = UpcastRenderWork<Renderer>(wLoc->workPtr);
-            WF(workPtr, dLocalIndices, partitionStart, partitionSize);
+            WF(workPtr, dLocalIndices, partitionStart);
         }
         else if(lightWLoc != this->currentLightWorks.cend())
         {
             const auto& workPtr = UpcastRenderLightWork<Renderer>(lightWLoc->workPtr);
-            LWF(workPtr, dLocalIndices, partitionStart, partitionSize);
+            LWF(workPtr, dLocalIndices, partitionStart);
         }
         else throw MRayError("[{}]: Unkown work id is found ({}).",
                              rendererName, key);

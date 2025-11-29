@@ -708,7 +708,7 @@ class RendererBase : public RendererI
                                                    uint32_t maxRayCount,
                                                    const GPUQueue& queue);
 
-    // Some common functions between renderer
+    // Some common functions between renderers
     template<class Renderer, class WorkF, class LightWorkF = EmptyFunctor, class CamWorkF = EmptyFunctor>
     void IssueSurfaceWorkKernelsToPartitions(const RenderSurfaceWorkHasher&,
                                              const MultiPartitionOutput&,
@@ -720,6 +720,17 @@ class RendererBase : public RendererI
     void IssueMediumWorkKernelsToPartitions(const RenderMediumWorkHasher&,
                                             const MultiPartitionOutput&,
                                             WorkF&&) const;
+    //
+    static void FillRandomBuffer(// Output
+                                 Span<RandomNumber> dRNBuffer,
+                                 // I-O
+                                 Span<uint16_t> dRayRNDimensions,
+                                 // Input
+                                 Span<const RayIndex> dRayIndices,
+                                 // Constants
+                                 RNRequestList rnList,
+                                 const RNGeneratorPtr& rnGenerator,
+                                 const GPUQueue& processQueue);
 
     public:
                         RendererBase(const RenderImagePtr&,
