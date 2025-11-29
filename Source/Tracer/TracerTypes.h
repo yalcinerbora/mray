@@ -213,8 +213,6 @@ struct VolumeKeyPack
     MediumKey    medKey;
     TransformKey transKey;
     int32_t      priority;
-
-    auto operator<=>(const VolumeKeyPack&) const = default;
 };
 
 template <class HitType>

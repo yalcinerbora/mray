@@ -264,7 +264,7 @@ void TracerBase::AdjustSurfaceVolumes()
                             CommonKey(l[0]));
 
         size_t maxIndex = 0;
-        uint32_t curPrioMax = firstLoc->second.priority;
+        int32_t curPrioMax = firstLoc->second.priority;
         for(size_t i = 1; i < l.size(); i++)
         {
             auto loc = std::find_if(volumesVec.cbegin(), volumesVec.cend(),
@@ -275,7 +275,7 @@ void TracerBase::AdjustSurfaceVolumes()
             if(loc == volumesVec.cend())
                 throw MRayError("Unable to find volume with id ({})",
                                 CommonKey(l[i]));
-            uint32_t prio = loc->second.priority;
+            int32_t prio = loc->second.priority;
             if(prio > curPrioMax)
             {
                 maxIndex = i;
@@ -1468,7 +1468,7 @@ LightSurfaceId TracerBase::SetBoundarySurface(LightId lightId,
     else
         lightSId = boundarySurface.first;
 
-    boundarySurface = {lightSId, {lightId, transformId}};
+    boundarySurface = {lightSId, {lightId, transformId, {}}};
     return lightSId;
 }
 

@@ -525,7 +525,6 @@ uint32_t GaussLobeMixtureSharedT<N>::LoadStochastic(const Vector3& position,
                                                     //
                                                     const GlobalState& gs)
 {
-    static constexpr auto N = GaussianLobeMixture::LobeCount;
     uint32_t liftedNodeIndex = INVALID_MC_INDEX;
     for(uint32_t i = 0; i < N; i++)
     {

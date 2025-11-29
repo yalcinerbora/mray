@@ -225,7 +225,7 @@ namespace PassthroughMatDetail
         const Surface& surface;
 
         public:
-        MR_PF_DECL
+        MR_GF_DECL
         static NormalMap GetNormalMap(const DataSoA& soa, MaterialKey k);
 
         MR_PF_DECL_V

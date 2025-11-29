@@ -1,5 +1,3 @@
-#pragma once
-
 #include "RendererC.h"
 #include "MediumC.h"
 #include "RendererCommon.h"

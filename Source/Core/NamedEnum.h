@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <cassert>
+#include <compare>
 
 #include "Error.h"
 
@@ -38,15 +39,15 @@ constexpr NamedEnum<Enum, NamesIn>::NamedEnum(E eIn)
 template<class Enum, const std::array<const char*, static_cast<size_t>(Enum::END)>& NamesIn>
 constexpr NamedEnum<Enum, NamesIn>::NamedEnum(std::string_view sv)
 {
-    auto loc = std::find_if(Names.cbegin(), Names.cend(),
-                            [&](std::string_view r)
+    uint32_t loc = 0;
+    for(; loc < Names.size(); loc++)
     {
-        return sv == r;
-    });
-    if(loc == Names.cend())
+        if(Names[loc] == sv) break;
+    }
+    if(loc == Names.size())
         throw MRayError("Bad enum name");
 
-    e = E(std::distance(Names.cbegin(), loc));
+    e = E(loc);
 }
 
 template<class Enum, const std::array<const char*, static_cast<size_t>(Enum::END)>& NamesIn>

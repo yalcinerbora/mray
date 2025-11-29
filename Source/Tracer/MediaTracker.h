@@ -116,7 +116,7 @@ struct MediaList
     MR_PF_DECL_V void    PackAll(const IndexList&);
     MR_PF_DECL   bool    operator==(const MediaList&) const;
 
-    MR_PF_DEF void InsertVolToLoc(uint32_t i, uint32_t newVIndex);
+    MR_PF_DEF_V  void    InsertVolToLoc(uint32_t i, uint32_t newVIndex);
 };
 
 class RayMediaListPack
@@ -425,7 +425,7 @@ void MediaList::PackAll(const IndexList& list)
     listRaw[4] = Bit::SetSubPortion(listRaw[4], list[7]      , {12, 32});
 }
 
-MR_PF_DEF
+MR_PF_DEF_V
 void MediaList::InsertVolToLoc(uint32_t i, uint32_t newVIndex)
 {
     // Unrolled loop for insert.

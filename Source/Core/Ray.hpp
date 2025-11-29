@@ -82,7 +82,7 @@ RayT<T>::IntersectsSphere(Vector<3, T>& intersectPos, T& t,
             };
         }
     }
-    return RayIntersectResult{false};
+    return RayIntersectResult{false, false};
 
     // Geometric solution
     //Vector<3, T> centerDir = sphereCenter - pos;
@@ -138,7 +138,7 @@ RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
     bool backfaceHit = (det < SmallEpsilon<T>());
     bool nearlyParallel = (Math::Abs(det) < SmallEpsilon<T>());
     if((cullFace && backfaceHit) || nearlyParallel)
-        return RayIntersectResult{false};
+        return RayIntersectResult{false, false};
 
     T invDet = 1 / det;
 
@@ -146,17 +146,17 @@ RayT<T>::IntersectsTriangle(Vector<3, T>& baryCoords, T& t,
     baryCoords[0] = Math::Dot(tVec, p) * invDet;
     // Early Skip
     if(baryCoords[0] < 0 || baryCoords[0] > 1)
-        return RayIntersectResult{false};
+        return RayIntersectResult{false, false};
 
     Vector<3, T> qVec = Math::Cross(tVec, e0);
     baryCoords[1] = Math::Dot(dir, qVec) * invDet;
     // Early Skip 2
     if((baryCoords[1] < 0) || (baryCoords[1] + baryCoords[0]) > 1)
-        return RayIntersectResult{false};
+        return RayIntersectResult{false, false};
 
     t = Math::Dot(e1, qVec) * invDet;
     if(t <= SmallEpsilon<T>())
-        return RayIntersectResult{false};
+        return RayIntersectResult{false, false};
 
     // Calculate C
     baryCoords[2] = 1 - baryCoords[0] - baryCoords[1];
@@ -181,7 +181,7 @@ RayT<T>::IntersectsPlane(Vector<3, T>& intersectPos, T& t,
     if(Math::Abs(nDotD) <= Epsilon<T>)
     {
         t = std::numeric_limits<T>::infinity();
-        return RayIntersectResult{false};
+        return RayIntersectResult{false, false};
     }
     t = (planePos - pos).Dot(normal) / nDotD;
     intersectPos = pos + t * dir;
@@ -233,7 +233,7 @@ RayT<T>::IntersectsAABB(const Vector<3, T>& aabbMin,
 template<FloatC T>
 MR_PF_DEF
 RayIntersectResult
-RayT<T>::IntersectsAABB(Vector<3, T>& pos, T& tOut,
+RayT<T>::IntersectsAABB(Vector<3, T>& posOut, T& tOut,
                         const Vector<3, T>& aabbMin,
                         const Vector<3, T>& aabbMax,
                         const Vector<2, T>& tMinMax) const noexcept
@@ -243,7 +243,7 @@ RayT<T>::IntersectsAABB(Vector<3, T>& pos, T& tOut,
     if(result.intersected)
     {
         tOut = t[0];
-        pos = AdvancedPos(t[0]);
+        posOut = AdvancedPos(t[0]);
     }
     return result;
 }
