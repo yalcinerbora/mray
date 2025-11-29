@@ -64,14 +64,14 @@ namespace PathTraceRDetail
         // Path state
         Span<Spectrum>          dThroughput;
         Span<PathDataPack>      dPathDataPack;
-        // Next set of rays
-        Span<RayGMem>           dOutRays;
-        Span<RayCone>           dOutRayCones;
-        // Only used when NEE/MIS is active
-        Span<Float>             dPrevMatPDF;
-        Span<Spectrum>          dShadowRayRadiance;
         // May be empty if not spectral
         Span<SpectrumWaves>     dPathWavelengths;
+
+        // Only used when NEE/MIS is active
+        Span<RayGMem>           dShadowRays;
+        Span<RayCone>           dShadowRayCones;
+        Span<Spectrum>          dShadowRayRadiance;
+        Span<Float>             dPrevMatPDF;
 
         // Volume rendering related
         Span<BackupRNGState>    dBackupRNGStates;
@@ -276,9 +276,9 @@ void WorkFunction<P, M, T, SC>::Call(const Primitive&, const Material& mat, cons
         // so we put flt_max here.
         Vector2 tMMOut = Vector2(MathConstants::LargeEpsilon<Float>(),
                                  std::numeric_limits<Float>::max());
-        RayToGMem(params.rayState.dOutRays, rayIndex, rayOut, tMMOut);
+        RayToGMem(params.common.dRays, rayIndex, rayOut, tMMOut);
         // Continue the ray cone
-        params.rayState.dOutRayCones[rayIndex] = rayConeOut;
+        params.common.dRayCones[rayIndex] = rayConeOut;
     }
     else
     {
@@ -357,10 +357,10 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
     Vector3 wO = Math::Normalize(tContext.InvApplyV(-rayIn.dir));
     const LightSampler& lightSampler = params.globalState.lightSampler;
     Vector3 worldPos = surf.position;
-    RayConeSurface refractedRayCone = mat.RefractRayCone(surfRayCone, wO);
+    RayConeSurface rConeRefract = mat.RefractRayCone(surfRayCone, wO);
     LightSample lightSample = lightSampler.SampleLight(rng, specConverter,
                                                        worldPos, surf.geoNormal,
-                                                       refractedRayCone);
+                                                       rConeRefract);
     auto [shadowRay, shadowTMM] = lightSample.value.SampledRay(worldPos);
     Ray wI = tContext.InvApply(shadowRay);
 
@@ -417,8 +417,11 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
         if(matEval.isPassedThrough)
             nudgeNormal *= Float(-1);
         shadowRay = shadowRay.Nudge(nudgeNormal);
-        RayToGMem(params.rayState.dOutRays, rayIndex,
+        RayToGMem(params.rayState.dShadowRays, rayIndex,
                   shadowRay, shadowTMM);
+        RayCone rayConeOut = rConeRefract.ConeAfterScatter(shadowRay.dir,
+                                                           surf.geoNormal);
+        params.rayState.dShadowRayCones[rayIndex] = rayConeOut;
         // We can't overwrite the path throughput,
         // we will need it on next iteration
         params.rayState.dShadowRayRadiance[rayIndex] = shadowRadiance;

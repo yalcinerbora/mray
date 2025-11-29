@@ -112,25 +112,6 @@ void PathTracerRendererT<SC>::PushAttribute(uint32_t attributeIndex,
 }
 
 template<SpectrumContextC SC>
-void PathTracerRendererT<SC>::CopyAliveRays(Span<const RayIndex> dAliveRayIndices,
-                                            const GPUQueue& processQueue)
-{
-    if(dAliveRayIndices.empty()) return;
-
-    uint32_t aliveRayCount = static_cast<uint32_t>(dAliveRayIndices.size());
-    processQueue.IssueWorkKernel<KCCopyRaysIndirect>
-    (
-        "KCCopyRaysIndirect",
-        DeviceWorkIssueParams{.workCount = aliveRayCount},
-        //
-        dRays, dRayCones,
-        dAliveRayIndices,
-        dOutRays,
-        dOutRayCones
-    );
-}
-
-template<SpectrumContextC SC>
 uint32_t
 PathTracerRendererT<SC>::FindMaxSamplePerIteration(uint32_t rayCount,
                                                    PathTraceRDetail::SampleMode sampleMode)
@@ -182,11 +163,12 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         .dFilmFilterWeights = dFilmFilterWeights,
         .dThroughput        = dThroughputs,
         .dPathDataPack      = dPathDataPack,
-        .dOutRays           = dOutRays,
-        .dOutRayCones       = dOutRayCones,
-        .dPrevMatPDF        = dPrevMatPDF,
+        .dPathWavelengths   = dPathWavelengths,
+        .dShadowRays        = dShadowRays,
+        .dShadowRayCones    = dShadowRayCones,
         .dShadowRayRadiance = dShadowRayRadiance,
-        .dPathWavelengths   = dPathWavelengths
+        .dPrevMatPDF        = dPrevMatPDF,
+
     };
 
     assert(sppLimit != 0);
@@ -363,7 +345,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         processQueue.MemsetAsync(dShadowRayRadiance, 0x00);
         processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
         // CUDA Init check error, we access the rays even if it is not written
-        processQueue.MemsetAsync(dOutRays, 0x00);
+        processQueue.MemsetAsync(dShadowRays, 0x00);
         // Do the NEE kernel + boundary work
         IssueSurfaceWorkKernelsToPartitions<This>(surfaceWorkHasher, partitionOutput,
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices,
@@ -405,7 +387,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         tracerView.baseAccelerator.CastVisibilityRays
         (
             dIsVisibleBitSpan, dBackupRNGStates,
-            dOutRays, dIndices, processQueue
+            dShadowRays, dIndices, processQueue
         );
 
         // Accumulate the pre-calculated radiance selectively
@@ -454,6 +436,14 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
 }
 
 template<SpectrumContextC SC>
+Span<RayIndex>
+PathTracerRendererT<SC>::DoRenderPassWithMedia(uint32_t sppLimit,
+                                               const GPUQueue& processQueue)
+{
+    return Span<RayIndex>();
+}
+
+template<SpectrumContextC SC>
 RendererOutput
 PathTracerRendererT<SC>::DoThroughputSingleTileRender(const GPUDevice& device,
                                                       const GPUQueue& processQueue)
@@ -498,9 +488,6 @@ PathTracerRendererT<SC>::DoThroughputSingleTileRender(const GPUDevice& device,
     renderOut = AddRadianceToRenderBufferThroughput(dDeadRayIndices,
                                                     processQueue,
                                                     transferQueue);
-
-    // Copy continuing set of rays to actual ray buffer for next iteration
-    CopyAliveRays(dAliveRayIndices, processQueue);
 
     // We do not need to wait here, but we time
     // from CPU side so we need to wait
@@ -590,7 +577,6 @@ PathTracerRendererT<SC>::DoLatencyRender(uint32_t passCount,
             deadAlivePartitionOut.Spanify();
 
         AddRadianceToRenderBufferLatency(dDeadRayIndices, processQueue);
-        CopyAliveRays(dAliveRayIndices, processQueue);
 
         assert(dInvalidRayIndices.size() == 0);
         invalidRayCount += (static_cast<uint32_t>(dDeadRayIndices.size()));
@@ -703,8 +689,7 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                 dHits, dHitKeys, dRays, dRayCones,
                 dPathRadiance, dImageCoordinates,
                 dFilmFilterWeights, dThroughputs,
-                dPathDataPack, dOutRays,
-                dOutRayCones, dPathRNGDimensions,
+                dPathDataPack, dPathRNGDimensions,
                 // Per path (but can be zero if not spectral)
                 dPathWavelengths,
                 dSpectrumWavePDFs,
@@ -721,7 +706,7 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                 // Per path
                 maxRayCount, maxRayCount, maxRayCount, maxRayCount,
                 maxRayCount, maxRayCount, maxRayCount, maxRayCount,
-                maxRayCount, maxRayCount, maxRayCount, maxRayCount,
+                maxRayCount, maxRayCount,
                 // Per path (but can be zero if not spectral)
                 wavelengthCount, wavelengthCount,
                 // Per path bounce, max used random number of that bounce
@@ -745,7 +730,7 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
                 dHits, dHitKeys, dRays, dRayCones,
                 dPathRadiance, dImageCoordinates,
                 dFilmFilterWeights, dThroughputs,
-                dPathDataPack, dOutRays, dOutRayCones,
+                dPathDataPack, dShadowRays, dShadowRayCones,
                 dPrevMatPDF, dShadowRayRadiance,
                 dPathRNGDimensions,
                 // Per path (but can be zero if not spectral)

@@ -76,19 +76,19 @@ class PathTracerRendererT final : public PathTracerRendererBase
     Span<MetaHit>       dHits;
     Span<HitKeyPack>    dHitKeys;
     Span<uint32_t>      dShadowRayVisibilities;
-    // Buffer for next set of rays
-    Span<RayGMem>       dOutRays;
-    Span<RayCone>       dOutRayCones;
+    //
+    Span<RayGMem>       dShadowRays;
+    Span<RayCone>       dShadowRayCones;
+    Span<Spectrum>      dShadowRayRadiance;
     //
     Span<Float>         dPrevMatPDF;
-    Span<Spectrum>      dShadowRayRadiance;
     //
     bool                saveImage  = false;
 
     // Helpers
-    void                CopyAliveRays(Span<const RayIndex> dAliveRayIndices, const GPUQueue&);
     uint32_t            FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
     Span<RayIndex>      DoRenderPass(uint32_t sppLimit, const GPUQueue&);
+    Span<RayIndex>      DoRenderPassWithMedia(uint32_t sppLimit, const GPUQueue&);
     // Implementations
     RendererOutput      DoThroughputSingleTileRender(const GPUDevice&, const GPUQueue&) override;
     RendererOutput      DoLatencyRender(uint32_t passCount, const GPUDevice&,
