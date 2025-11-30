@@ -35,6 +35,36 @@ class Bitspan
     MR_HF_DECL static T             CountT(uint32_t bitCount);
 };
 
+// Binary partition etc. will use this
+// to check if a bit is set (or not)
+template<std::unsigned_integral T>
+struct IsBitSetFunctor
+{
+    bool        invert = false;
+    Bitspan<T>  span;
+    //
+    MR_HF_DECL      IsBitSetFunctor(Bitspan<T> span, bool invert = false);
+    MR_HF_DECL bool operator()(uint32_t i) const;
+};
+
+template<std::unsigned_integral T>
+IsBitSetFunctor(Bitspan<T>, bool) -> IsBitSetFunctor<T>;
+
+template<std::unsigned_integral T>
+MR_HF_DEF
+IsBitSetFunctor<T>::IsBitSetFunctor(Bitspan<T> span, bool invert)
+    : span(span)
+    , invert(invert)
+{}
+
+template<std::unsigned_integral T>
+MR_HF_DEF
+bool IsBitSetFunctor<T>::operator()(uint32_t i) const
+{
+    return std::as_const(span)[i] == (!invert);
+}
+
+
 template<class T>
 constexpr Bitspan<const T> ToConstSpan(Bitspan<T> s)
 {

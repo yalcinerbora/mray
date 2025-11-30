@@ -31,6 +31,36 @@ void KCAccumulateShadowRaysPT(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceO
     }
 }
 
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCAccumulateShadowRaysPTMedia(MRAY_GRID_CONSTANT const Span<Spectrum>,
+                                   MRAY_GRID_CONSTANT const Span<const Spectrum>,
+                                   MRAY_GRID_CONSTANT const Span<const Spectrum>,
+                                   MRAY_GRID_CONSTANT const Span<const Spectrum>,
+                                   MRAY_GRID_CONSTANT const Bitspan<const uint32_t>,
+                                   MRAY_GRID_CONSTANT const Span<const PathDataPack>,
+                                   MRAY_GRID_CONSTANT const Vector2ui)
+{
+    // TODO:
+    assert(false);
+    //KernelCallParams kp;
+    //uint32_t shadowRayCount = static_cast<uint32_t>(dShadowRayRadiance.size());
+    //for(uint32_t i = kp.GlobalId(); i < shadowRayCount; i += kp.TotalSize())
+    //{
+    //    PathDataPack dataPack = dPathDataPack[i];
+
+    //    using enum RayType;
+    //    bool isShadowRay = (dataPack.type == SHADOW_RAY);
+    //    // +2 is correct here, we did not increment the depth yet
+    //    bool inDepthLimit = ((dataPack.depth + 2u) <= rrRange[1]);
+    //    if(inDepthLimit && isShadowRay && dIsVisibleBuffer[i])
+    //    {
+    //        // Unlike simple PT, radiance does not hold the
+    //        //
+    //        dRadianceOut[i] += dShadowRayRadiance[i];
+    //    }
+    //}
+}
+
 template<SpectrumContextC SC>
 PathTracerRendererT<SC>::PathTracerRendererT(const RenderImagePtr& rb,
                                              TracerView tv,
@@ -152,9 +182,21 @@ PathTracerRendererT<SC>::FindMaxSamplePerIteration(uint32_t rayCount,
 
 template<SpectrumContextC SC>
 Span<RayIndex>
-PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
-                                      const GPUQueue& processQueue)
+PathTracerRendererT<SC>::DoRenderPassPure(Span<RayIndex> dIndices,
+                                          Span<CommonKey> dKeys,
+                                          const GPUQueue& processQueue)
 {
+    // Execution diagram (simplified).
+    // This one is simple, just given for completeness.
+    //
+    // Rays  Ray Cast    Mat. Scatter
+    //  |       |           |
+    //  |       |           |
+    //  |  -->  | -[Prt.]-> |      -------> NEXT
+    //  |       |           |
+    //  |       |           |
+    //  |       |           |
+
     const SpectrumContext& typedSpectrumContext = *static_cast<const SpectrumContext*>(spectrumContext.get());
     RayState dRayState =
     {
@@ -171,27 +213,122 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
 
     };
 
-    assert(sppLimit != 0);
-    // Find the ray count. Ray count is tile count
-    // but tile can exceed film boundaries so clamp,
-    uint32_t rayCount = imageTiler.CurrentTileSize().Multiply();
-    // Start the partitioner, again worst case work count
-    // Get the K/V pair buffer
-    uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
-    auto[dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount,
-                                                 processQueue, true);
+    // Cast rays
+    using namespace std::string_view_literals;
+    Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
+    processQueue.IssueWorkKernel<KCSetBoundaryWorkKeysIndirect>
+    (
+        "KCSetBoundaryWorkKeys"sv,
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        dHitKeys,
+        ToConstSpan(dIndices),
+        this->boundaryLightKeyPack
+    );
+    // Actual Ray Casting
+    // Repurpose random number buffer volume indices
+    tracerView.baseAccelerator.CastRays
+    (
+        Span<VolumeIndex>(),
+        dHitKeys, dHits, dBackupRNGStates,
+        dRays, dIndices, false, processQueue
+    );
 
-    // Iota the indices
-    DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
-    // Create RNG state for each ray
-    rnGenerator->SetupRange(imageTiler.LocalTileStart(),
-                            imageTiler.LocalTileEnd(),
+    // Generate work keys from hit packs
+    processQueue.IssueWorkKernel<KCGenerateSurfaceWorkKeysIndirect>
+    (
+        "KCGenerateSurfaceWorkKeysIndirect",
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        dKeys,
+        ToConstSpan(dIndices),
+        ToConstSpan(dHitKeys),
+        surfaceWorkHasher
+    );
+
+    // Finally, partition using the generated keys.
+    // Fully partitioning here by using a single sort
+    auto& rp = rayPartitioner;
+    auto partitionOutput = rp.MultiPartition(dKeys, dIndices,
+                                             surfaceWorkHasher.WorkBatchDataRange(),
+                                             surfaceWorkHasher.WorkBatchBitRange(),
+                                             processQueue, false);
+    // Wait for results to be available in host buffers
+    // since we need partition ranges on the CPU to Issue kernels.
+    processQueue.Barrier().Wait();
+    // Old Indices array (and the key) is invalidated
+    // Change indices to the partitioned one
+    dIndices = partitionOutput.dPartitionIndices;
+    // =================== //
+    //  Pure Path Tracing  //
+    // =================== //
+    // Work_0           = BxDF sample
+    // BoundaryWork_0   = Accumulate light radiance value to the path
+    using GlobalState = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
+    GlobalState globalState
+    {
+        .russianRouletteRange = currentOptions.russianRouletteRange,
+        .sampleMode = currentOptions.sampleMode,
+        .lightSampler = EmptyType{},
+        .specContextData = typedSpectrumContext.GetData()
+    };
+
+    IssueSurfaceWorkKernelsToPartitions<This>
+    (
+        surfaceWorkHasher, partitionOutput,
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
+        {
+            FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
+                                dLocalIndices, workI.SampleRNList(0),
+                                rnGenerator, processQueue);
+            workI.DoWork_0(dRayState, dRays,
+                            dRayCones, dLocalIndices,
+                            dRandomNumBuffer, dHits,
+                            dHitKeys, globalState,
                             processQueue);
-    // Reload dead paths with new
-    auto [dReloadIndices, _, aliveRayCount] = ReloadPaths(dIndices, sppLimit,
-                                                          processQueue);
-    dIndices = dReloadIndices.subspan(0, aliveRayCount);
-    dKeys = dKeys.subspan(0, aliveRayCount);
+        },
+        //
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
+        {
+            workI.DoBoundaryWork_0(dRayState,
+                                    dRays, dRayCones,
+                                    dLocalIndices,
+                                    Span<const RandomNumber>{},
+                                    dHits, dHitKeys,
+                                    globalState, processQueue);
+        }
+    );
+    return dIndices;
+}
+
+template<SpectrumContextC SC>
+Span<RayIndex>
+PathTracerRendererT<SC>::DoRenderPassNEE(Span<RayIndex> dIndices,
+                                         Span<CommonKey> dKeys,
+                                         const GPUQueue& processQueue)
+{
+    // Execution Diagram (simplified).
+    // Rays  Ray Cast   Shadow R. Gen   Shadow R. Cast  Mat Scatter
+    //  |       |             |                |             |
+    //  |       |             |                |             |
+    //  |  -->  | -[Prt.]->   |      -->       |     -->     |     -------> NEXT
+    //  |       |             |                |             |
+    //  |       |             |                |             |
+    //  |       |             |                |             |
+
+    const SpectrumContext& typedSpectrumContext = *static_cast<const SpectrumContext*>(spectrumContext.get());
+    RayState dRayState =
+    {
+        .dPathRadiance = dPathRadiance,
+        .dImageCoordinates = dImageCoordinates,
+        .dFilmFilterWeights = dFilmFilterWeights,
+        .dThroughput = dThroughputs,
+        .dPathDataPack = dPathDataPack,
+        .dPathWavelengths = dPathWavelengths,
+        .dShadowRays = dShadowRays,
+        .dShadowRayCones = dShadowRayCones,
+        .dShadowRayRadiance = dShadowRayRadiance,
+        .dPrevMatPDF = dPrevMatPDF,
+
+    };
 
     // Cast rays
     using namespace std::string_view_literals;
@@ -211,34 +348,10 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
         dHitKeys, dHits, dBackupRNGStates,
         dRays, dIndices, false, processQueue
     );
-
-    if(currentOptions.sampleMedia)
-    {
-        // Generate work keys for media
-
-        // N -way Partition wrt. medium/transform pair
-
-        // Call Media Transmit
-
-        // Binary Partition wrt. scatter/not scatter event
-
-        // For scattered rays,
-        //    set their hit pack to invalid.
-        //
-        //    Launch shadow rays and find visibility
-        //      Shadow ray launch is recursive if media is on
-        //    (if NEE is on)
-        //    Resolve transmittence on the media
-        //    Accumulate light if transmittance is ok and visibility
-        //    is ok
-    }
-
-
     // Generate work keys from hit packs
-    using namespace std::string_literals;
     processQueue.IssueWorkKernel<KCGenerateSurfaceWorkKeysIndirect>
     (
-        "KCGenerateSurfaceWorkKeysIndirect"sv,
+        "KCGenerateSurfaceWorkKeysIndirect",
         DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         dKeys,
         ToConstSpan(dIndices),
@@ -260,125 +373,526 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
     // Change indices to the partitioned one
     dIndices = partitionOutput.dPartitionIndices;
 
-    if(currentOptions.sampleMode == SampleMode::E::PURE)
-    {
-        // =================== //
-        //  Pure Path Tracing  //
-        // =================== //
-        // Work_0           = BxDF sample
-        // BoundaryWork_0   = Accumulate light radiance value to the path
-        using GlobalState = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
-        GlobalState globalState
-        {
-            .russianRouletteRange = currentOptions.russianRouletteRange,
-            .sampleMode = currentOptions.sampleMode,
-            .lightSampler = EmptyType{},
-            .specContextData = typedSpectrumContext.GetData()
-        };
+    // ================================== //
+    //  Path Tracing with NEE and/or MIS  //
+    // ================================== //
+    // Work_0           = BxDF sample
+    // Work_1           = NEE sample only
+    // BoundaryWork_1   = Same as light accumulation but with many states
+    //                    regarding NEE and MIS
+    // ================================== //
+    //  Sample Light and Gen. Shadow Ray  //
+    // ================================== //
+    UniformLightSampler lightSampler(metaLightArray.Array(),
+                                     metaLightArray.IndexHashTable());
 
-        IssueSurfaceWorkKernelsToPartitions<This>(surfaceWorkHasher, partitionOutput,
+    using GlobalState = PathTraceRDetail::GlobalState<UniformLightSampler, SpectrumConverter>;
+    GlobalState globalState
+    {
+        .russianRouletteRange = currentOptions.russianRouletteRange,
+        .sampleMode = currentOptions.sampleMode,
+        .lightSampler = lightSampler,
+        .specContextData = typedSpectrumContext.GetData()
+    };
+    // Clear the shadow ray radiance buffer
+    processQueue.MemsetAsync(dShadowRayRadiance, 0x00);
+    // CUDA Init check error, we access the rays even if it is not written
+    processQueue.MemsetAsync(dShadowRays, 0x00);
+    // Do the NEE kernel + boundary work
+    IssueSurfaceWorkKernelsToPartitions<This>
+    (
+        surfaceWorkHasher, partitionOutput,
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
         {
             FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
-                             dLocalIndices, workI.SampleRNList(0),
-                             rnGenerator, processQueue);
-            workI.DoWork_0(dRayState, dRays,
-                           dRayCones, dLocalIndices,
-                           dRandomNumBuffer, dHits,
-                           dHitKeys, globalState,
-                           processQueue);
-        },
-        //
-        [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
-        {
-            workI.DoBoundaryWork_0(dRayState,
-                                   dRays, dRayCones,
-                                   dLocalIndices,
-                                   Span<const RandomNumber>{},
-                                   dHits, dHitKeys,
-                                   globalState, processQueue);
-        });
-    }
-    else
-    {
-        // =================================  //
-        //  Path Tracing with NEE and/or MIS  //
-        // ================================== //
-        // Work_0           = BxDF sample
-        // Work_1           = NEE sample only
-        // BoundaryWork_1   = Same as light accumulation but with many states
-        //                    regarding NEE and MIS
-        UniformLightSampler lightSampler(metaLightArray.Array(),
-                                         metaLightArray.IndexHashTable());
-
-        using GlobalState = PathTraceRDetail::GlobalState<UniformLightSampler, SpectrumConverter>;
-        GlobalState globalState
-        {
-            .russianRouletteRange = currentOptions.russianRouletteRange,
-            .sampleMode = currentOptions.sampleMode,
-            .lightSampler = lightSampler,
-            .specContextData = typedSpectrumContext.GetData()
-        };
-        using GlobalStateE = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
-        GlobalStateE globalStateE
-        {
-            .russianRouletteRange = currentOptions.russianRouletteRange,
-            .sampleMode = currentOptions.sampleMode,
-            .lightSampler = EmptyType{},
-            .specContextData = typedSpectrumContext.GetData()
-        };
-
-        // Clear the shadow ray radiance buffer
-        processQueue.MemsetAsync(dShadowRayRadiance, 0x00);
-        processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
-        // CUDA Init check error, we access the rays even if it is not written
-        processQueue.MemsetAsync(dShadowRays, 0x00);
-        // Do the NEE kernel + boundary work
-        IssueSurfaceWorkKernelsToPartitions<This>(surfaceWorkHasher, partitionOutput,
-        [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
-        {
-            FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
-                             dLocalIndices, workI.SampleRNList(1),
-                             rnGenerator, processQueue);
+                                dLocalIndices, workI.SampleRNList(1),
+                                rnGenerator, processQueue);
             workI.DoWork_1(dRayState, dRays,
                            dRayCones, dLocalIndices,
-                           dRandomNumBuffer,  dHits,
+                           dRandomNumBuffer, dHits,
                            dHitKeys, globalState,
                            processQueue);
         },
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
         {
             workI.DoBoundaryWork_1(dRayState,  dRays,
-                                   dRayCones, dLocalIndices,
-                                   Span<const RandomNumber>{},
-                                   dHits, dHitKeys,
-                                   globalState, processQueue);
-        });
+                                    dRayCones, dLocalIndices,
+                                    Span<const RandomNumber>{},
+                                    dHits, dHitKeys,
+                                    globalState, processQueue);
+        }
+    );
 
-        // After the kernel call(s), "dOutRays" holds the
-        // shadow rays. Check for visibility.
-        Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
-        tracerView.baseAccelerator.CastVisibilityRays
-        (
-            dIsVisibleBitSpan, dBackupRNGStates,
-            dShadowRays, dIndices, processQueue
-        );
+    // ================================== //
+    //     Shadow Ray Visibility Check    //
+    // ================================== //
+    // If media is not tracked, do a simple visibility check.
+    // If it is being tracked, oh boy...
+    processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
+    Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
+    tracerView.baseAccelerator.CastVisibilityRays
+    (
+        dIsVisibleBitSpan, dBackupRNGStates,
+        dShadowRays, dIndices, processQueue
+    );
+    // Accumulate the pre-calculated radiance selectively
+    processQueue.IssueWorkKernel<KCAccumulateShadowRaysPT>
+    (
+        "KCAccumulateShadowRays",
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dShadowRayRadiance.size())},
+        //
+        dPathRadiance,
+        ToConstSpan(dShadowRayRadiance),
+        ToConstSpan(dIsVisibleBitSpan),
+        ToConstSpan(dPathDataPack),
+        currentOptions.russianRouletteRange
+    );
 
-        // Accumulate the pre-calculated radiance selectively
-        processQueue.IssueWorkKernel<KCAccumulateShadowRaysPT>
-        (
-            "KCAccumulateShadowRays",
-            DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dShadowRayRadiance.size())},
-            //
-            dPathRadiance,
-            ToConstSpan(dShadowRayRadiance),
-            ToConstSpan(dIsVisibleBitSpan),
-            ToConstSpan(dPathDataPack),
-            currentOptions.russianRouletteRange
-        );
+    // ================================== //
+    //     Scatter Rays via Material      //
+    // ================================== //
+    using GlobalStateE = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
+    GlobalStateE globalStateE
+    {
+        .russianRouletteRange = currentOptions.russianRouletteRange,
+        .sampleMode = currentOptions.sampleMode,
+        .lightSampler = EmptyType{},
+        .specContextData = typedSpectrumContext.GetData()
+    };
+    // Do the actual kernel
+    IssueSurfaceWorkKernelsToPartitions<This>
+    (
+        surfaceWorkHasher, partitionOutput,
+        [&](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
+        {
+            FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
+                                dLocalIndices, workI.SampleRNList(0),
+                                rnGenerator, processQueue);
+            workI.DoWork_0(dRayState, dRays,
+                            dRayCones, dLocalIndices,
+                            dRandomNumBuffer,
+                            dHits, dHitKeys,
+                            globalStateE, processQueue);
+        },
+        // Empty Invocation for lights this pass
+        [&](const auto&, Span<uint32_t>, uint32_t) {}
+    );
+    return dIndices;
+}
 
-        // Do the actual kernel
-        IssueSurfaceWorkKernelsToPartitions<This>(surfaceWorkHasher, partitionOutput,
+template<SpectrumContextC SC>
+Span<RayIndex>
+PathTracerRendererT<SC>::DoRenderPassWithMediaPure(Span<RayIndex> dIndices,
+                                                   Span<CommonKey> dKeys,
+                                                   const GPUQueue& processQueue)
+{
+    // Execution diagram. (simplified and hopefully it does clarify instead of
+    // confuse)
+    //
+    // Rays     Media Resolve                   Mat. Scatter
+    //  |            |                 |             |     |
+    //  |            |  [Transmitted]  |  -[Prt]->   | --> |
+    //  |  -[Prt]->  |_________________|_____________|     | ---->  NEXT
+    //  |            |                                     |
+    //  |            |       [Media Scattered]         --> |
+    //  |            |                                     |
+
+    const SpectrumContext& typedSpectrumContext = *static_cast<const SpectrumContext*>(spectrumContext.get());
+    RayState dRayState =
+    {
+        .dPathRadiance = dPathRadiance,
+        .dImageCoordinates = dImageCoordinates,
+        .dFilmFilterWeights = dFilmFilterWeights,
+        .dThroughput = dThroughputs,
+        .dPathDataPack = dPathDataPack,
+        .dPathWavelengths = dPathWavelengths,
+        .dShadowRays = dShadowRays,
+        .dShadowRayCones = dShadowRayCones,
+        .dShadowRayRadiance = dShadowRayRadiance,
+        .dPrevMatPDF = dPrevMatPDF,
+
+    };
+
+    // Cast rays
+    using namespace std::string_view_literals;
+    Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
+    processQueue.IssueWorkKernel<KCSetBoundaryWorkKeysIndirect>
+    (
+        "KCSetBoundaryWorkKeys"sv,
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        dHitKeys,
+        ToConstSpan(dIndices),
+        this->boundaryLightKeyPack
+    );
+    // Actual Ray Casting
+    // Repurpose random number buffer volume indices
+    Span<VolumeIndex> dVolumeIndices = MemAlloc::RepurposeAlloc<VolumeIndex>(dRandomNumBuffer);
+    tracerView.baseAccelerator.CastRays
+    (
+        dVolumeIndices, dHitKeys, dHits, dBackupRNGStates,
+        dRays, dIndices, true,
+        processQueue
+    );
+    mediaTracker->AddNewVolumeToRaysIndirect(dRayMediaListPacks,
+                                             dVolumeIndices,
+                                             dIndices,
+                                             processQueue);
+    // Generate work keys from hit packs
+    processQueue.IssueWorkKernel<KCGenerateMediumWorkKeysIndirect>
+    (
+        "KCGenerateMediumWorkKeysIndirect",
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        dKeys,
+        ToConstSpan(dIndices),
+        ToConstSpan(dRayMediaListPacks),
+        mediaTracker->View(),
+        mediumWorkHasher
+    );
+
+    // N-way Partition wrt. medium/transform pair
+    auto& rp = rayPartitioner;
+    auto partitionOutput = rp.MultiPartition(dKeys, dIndices,
+                                             mediumWorkHasher.WorkBatchDataRange(),
+                                             mediumWorkHasher.WorkBatchBitRange(),
+                                             processQueue, false);
+    processQueue.Barrier().Wait();
+    // Call Media Transmit
+    // Repurpose shadow ray visiblity bit buffer
+    // for media scatter events
+    Bitspan<uint32_t> dIsScatteredBitSpan(dShadowRayVisibilities);
+    IssueMediumWorkKernelsToPartitions<This>
+    (
+        mediumWorkHasher, partitionOutput,
+        [&, this](const auto&, Span<uint32_t>, uint32_t)
+        {
+            assert(false);
+            //FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
+            //                 dLocalIndices, workI.SampleRNList(0),
+            //                 rnGenerator, processQueue);
+            //workI.DoWork_0(dRayState, dRays,
+            //               dRayCones, dLocalIndices,
+            //               dRandomNumBuffer, dHits,
+            //               dHitKeys, globalState,
+            //               processQueue);
+        }
+    );
+    // Rename output buffers as input, since multi partition can change it
+    dKeys = partitionOutput.dPartitionKeys;
+    dIndices = partitionOutput.dPartitionIndices;
+    // Binary Partition wrt. scatter/not scatter event
+    auto bpOut = rp.BinaryPartition(dIndices,
+                                    processQueue,
+                                    IsBitSetFunctor(dIsScatteredBitSpan, true));
+
+    auto dScatteredIndices = bpOut.Spanify()[1];
+    // Scattered paths due to media interaction is handled here
+    mediaTracker->ResolveCurVolumesOfRaysIndirect(dRayMediaListPacks,
+                                                  dScatteredIndices,
+                                                  processQueue);
+
+    // Generate work keys from hit packs
+    auto dTransmittedIndices = bpOut.Spanify()[0];
+    processQueue.IssueWorkKernel<KCGenerateSurfaceWorkKeysIndirect>
+    (
+        "KCGenerateSurfaceWorkKeysIndirect",
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        dKeys,
+        ToConstSpan(dTransmittedIndices),
+        ToConstSpan(dHitKeys),
+        surfaceWorkHasher
+    );
+
+    // Finally, partition using the generated keys.
+    // Fully partitioning here by using a single sort
+    partitionOutput = rp.MultiPartition(dKeys, dTransmittedIndices,
+                                        surfaceWorkHasher.WorkBatchDataRange(),
+                                        surfaceWorkHasher.WorkBatchBitRange(),
+                                        processQueue, false);
+    // Wait for results to be available in host buffers
+    // since we need partition ranges on the CPU to Issue kernels.
+    processQueue.Barrier().Wait();
+    // Old Indices array (and the key) is invalidated
+    // Change indices to the partitioned one
+    dTransmittedIndices = partitionOutput.dPartitionIndices;
+
+    // =================== //
+    //  Pure Path Tracing  //
+    // =================== //
+    // Work_0           = BxDF sample
+    // BoundaryWork_0   = Accumulate light radiance value to the path
+    using GlobalState = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
+    GlobalState globalState
+    {
+        .russianRouletteRange = currentOptions.russianRouletteRange,
+        .sampleMode = currentOptions.sampleMode,
+        .lightSampler = EmptyType{},
+        .specContextData = typedSpectrumContext.GetData()
+    };
+
+    IssueSurfaceWorkKernelsToPartitions<This>
+    (
+        surfaceWorkHasher, partitionOutput,
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
+        {
+            FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
+                                dLocalIndices, workI.SampleRNList(0),
+                                rnGenerator, processQueue);
+            workI.DoWork_0(dRayState, dRays,
+                            dRayCones, dLocalIndices,
+                            dRandomNumBuffer, dHits,
+                            dHitKeys, globalState,
+                            processQueue);
+        },
+        //
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
+        {
+            workI.DoBoundaryWork_0(dRayState,
+                                    dRays, dRayCones,
+                                    dLocalIndices,
+                                    Span<const RandomNumber>{},
+                                    dHits, dHitKeys,
+                                    globalState, processQueue);
+        }
+    );
+
+    // We scattered via material
+    // resolve the next media of the path
+    //
+    // Material Kernels should've updated "dRayMediaListPacks"
+    // accordingly (isPassedThrough bit should set or not etc.)
+    mediaTracker->ResolveCurVolumesOfRaysIndirect(dRayMediaListPacks,
+                                                  dTransmittedIndices,
+                                                  processQueue);
+    return dIndices;
+}
+
+template<SpectrumContextC SC>
+Span<RayIndex>
+PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
+                                                  Span<CommonKey> dKeys,
+                                                  const GPUQueue& processQueue)
+{
+    // Execution diagram. (simplified and hopefully it does clarify instead of
+    // confuse)
+    //
+    // Rays     Media Resolve                     SR Cast      Mat. Scatter
+    //  |            |                           (Recursive)        |        |
+    //  |            |                 |              |             |        |
+    //  |            |  [Transmitted]  |   -[Prt]->   | ----------> | -----> |
+    //  |  -[Prt]->  |_________________|______________|_____________|        | -->  NEXT
+    //  |            |                                |                      |
+    //  |            |     --[Media Scattered]-->     |         ----->       |
+    //  |            |                                |                      |
+    const SpectrumContext& typedSpectrumContext = *static_cast<const SpectrumContext*>(spectrumContext.get());
+    RayState dRayState =
+    {
+        .dPathRadiance = dPathRadiance,
+        .dImageCoordinates = dImageCoordinates,
+        .dFilmFilterWeights = dFilmFilterWeights,
+        .dThroughput = dThroughputs,
+        .dPathDataPack = dPathDataPack,
+        .dPathWavelengths = dPathWavelengths,
+        .dShadowRays = dShadowRays,
+        .dShadowRayCones = dShadowRayCones,
+        .dShadowRayRadiance = dShadowRayRadiance,
+        .dPrevMatPDF = dPrevMatPDF,
+
+    };
+
+    // Cast rays
+    using namespace std::string_view_literals;
+    Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
+    processQueue.IssueWorkKernel<KCSetBoundaryWorkKeysIndirect>
+    (
+        "KCSetBoundaryWorkKeys"sv,
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        dHitKeys,
+        ToConstSpan(dIndices),
+        this->boundaryLightKeyPack
+    );
+    // Actual Ray Casting
+    // Repurpose random number buffer volume indices
+    Span<VolumeIndex> dVolumeIndices = MemAlloc::RepurposeAlloc<VolumeIndex>(dRandomNumBuffer);
+    tracerView.baseAccelerator.CastRays
+    (
+        dVolumeIndices,
+        dHitKeys, dHits, dBackupRNGStates,
+        dRays, dIndices, true,
+        processQueue
+    );
+
+    mediaTracker->AddNewVolumeToRaysIndirect(dRayMediaListPacks,
+                                             dVolumeIndices,
+                                             dIndices,
+                                             processQueue);
+    // Generate work keys from hit packs
+    processQueue.IssueWorkKernel<KCGenerateMediumWorkKeysIndirect>
+    (
+        "KCGenerateMediumWorkKeysIndirect",
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        dKeys,
+        ToConstSpan(dIndices),
+        ToConstSpan(dRayMediaListPacks),
+        mediaTracker->View(),
+        mediumWorkHasher
+    );
+
+    // N-way Partition wrt. medium/transform pair
+    auto& rp = rayPartitioner;
+    auto partitionOutput = rp.MultiPartition(dKeys, dIndices,
+                                             mediumWorkHasher.WorkBatchDataRange(),
+                                             mediumWorkHasher.WorkBatchBitRange(),
+                                             processQueue, false);
+    processQueue.Barrier().Wait();
+
+    // Call Media Transmit
+    // Repurpose shadow ray visiblity bit buffer
+    // for media scatter events
+    Bitspan<uint32_t> dIsScatteredBitSpan(dShadowRayVisibilities);
+    IssueMediumWorkKernelsToPartitions<This>
+    (
+        mediumWorkHasher, partitionOutput,
+        [&, this](const auto&, Span<uint32_t>, uint32_t)
+        {
+            assert(false);
+        }
+    );
+    // Rename output buffers as input, since multi partition can change it
+    dKeys = partitionOutput.dPartitionKeys;
+    dIndices = partitionOutput.dPartitionIndices;
+    // Binary Partition wrt. scatter/not scatter event
+    auto bpOut = rp.BinaryPartition(partitionOutput.dPartitionIndices,
+                                    processQueue,
+                                    IsBitSetFunctor(dIsScatteredBitSpan, true));
+
+    auto dScatteredIndices = bpOut.Spanify()[1];
+    // Scattered paths due to media interaction is handled here
+    mediaTracker->ResolveCurVolumesOfRaysIndirect(dRayMediaListPacks,
+                                                  dScatteredIndices,
+                                                  processQueue);
+
+    // Generate work keys from hit packs
+    auto dTransmittedIndices = bpOut.Spanify()[0];
+    processQueue.IssueWorkKernel<KCGenerateSurfaceWorkKeysIndirect>
+    (
+        "KCGenerateSurfaceWorkKeysIndirect",
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+        dKeys,
+        ToConstSpan(dTransmittedIndices),
+        ToConstSpan(dHitKeys),
+        surfaceWorkHasher
+    );
+
+    // Finally, partition using the generated keys.
+    // Fully partitioning here by using a single sort
+    partitionOutput = rp.MultiPartition(dKeys, dTransmittedIndices,
+                                        surfaceWorkHasher.WorkBatchDataRange(),
+                                        surfaceWorkHasher.WorkBatchBitRange(),
+                                        processQueue, false);
+    // Wait for results to be available in host buffers
+    // since we need partition ranges on the CPU to Issue kernels.
+    processQueue.Barrier().Wait();
+    // Old Indices array (and the key) is invalidated
+    // Change indices to the partitioned one
+    dTransmittedIndices = partitionOutput.dPartitionIndices;
+
+    // ================================== //
+    //  Path Tracing with NEE and/or MIS  //
+    // ================================== //
+    // Work_0           = BxDF sample
+    // Work_1           = NEE sample only
+    // BoundaryWork_1   = Same as light accumulation but with many states
+    //                    regarding NEE and MIS
+    // ================================== //
+    //  Sample Light and Gen. Shadow Ray  //
+    // ================================== //
+    UniformLightSampler lightSampler(metaLightArray.Array(),
+                                        metaLightArray.IndexHashTable());
+
+    using GlobalState = PathTraceRDetail::GlobalState<UniformLightSampler, SpectrumConverter>;
+    GlobalState globalState
+    {
+        .russianRouletteRange = currentOptions.russianRouletteRange,
+        .sampleMode = currentOptions.sampleMode,
+        .lightSampler = lightSampler,
+        .specContextData = typedSpectrumContext.GetData()
+    };
+    // Clear the shadow ray radiance buffer
+    processQueue.MemsetAsync(dShadowRayRadiance, 0x00);
+    // CUDA Init check error, we access the rays even if it is not written
+    processQueue.MemsetAsync(dShadowRays, 0x00);
+    // Do the NEE kernel + boundary work
+    IssueSurfaceWorkKernelsToPartitions<This>
+    (
+        surfaceWorkHasher, partitionOutput,
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
+        {
+            FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
+                                dLocalIndices, workI.SampleRNList(1),
+                                rnGenerator, processQueue);
+            workI.DoWork_1(dRayState, dRays,
+                            dRayCones, dLocalIndices,
+                            dRandomNumBuffer,  dHits,
+                            dHitKeys, globalState,
+                            processQueue);
+        },
+        [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
+        {
+            workI.DoBoundaryWork_1(dRayState,  dRays,
+                                    dRayCones, dLocalIndices,
+                                    Span<const RandomNumber>{},
+                                    dHits, dHitKeys,
+                                    globalState, processQueue);
+        }
+    );
+
+    // ================================== //
+    //     Shadow Ray Visibility Check    //
+    // ================================== //
+    // If media is not tracked, do a simple visibility check.
+    // If it is being tracked, oh boy...
+    processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
+    Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
+    if(currentOptions.sampleMedia)
+    {
+
+        // We should be fine now.
+
+
+        // Again rn buffer to the rescue. Use it as a temporary buffer
+        // for shadow rays' media pack.
+        //
+        Span<RayMediaListPack> dShadowRayMediaListPack
+            = MemAlloc::RepurposeAlloc<RayMediaListPack>(dRandomNumBuffer);
+
+        // TODO: Copy all of the rays
+        assert(false);
+
+
+        //
+        RecursiveShadowRayCast(dIsVisibleBitSpan, dBackupRNGStates,
+                                dIndices, processQueue);
+
+        // TODO: Accumulate shadow ray radiance
+        assert(false);
+    }
+
+    // ================================== //
+    //     Scatter Rays via Material      //
+    // ================================== //
+    using namespace PathTraceRDetail;
+    using GlobalStateE = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
+    GlobalStateE globalStateE
+    {
+        .russianRouletteRange = currentOptions.russianRouletteRange,
+        .sampleMode = currentOptions.sampleMode,
+        .lightSampler = EmptyType{},
+        .specContextData = typedSpectrumContext.GetData()
+    };
+    // Do the actual kernel
+    IssueSurfaceWorkKernelsToPartitions<This>
+    (
+        surfaceWorkHasher, partitionOutput,
         [&](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
         {
             FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
@@ -391,18 +905,96 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit,
                            globalStateE, processQueue);
         },
         // Empty Invocation for lights this pass
-        [&](const auto&, Span<uint32_t>, uint32_t) {});
-    }
+        [&](const auto&, Span<uint32_t>, uint32_t) {}
+    );
+
+    mediaTracker->ResolveCurVolumesOfRaysIndirect(dRayMediaListPacks,
+                                                  dTransmittedIndices,
+                                                  processQueue);
+
+    // So we "restart" the partitioner and get fresh dIndices array.
+    // We need to be careful since fresh array will have
+    // invalid rays (due to we are about to reach spp limit and we did not
+    // reload all paths that can fill the buffer).
+    //
+    uint32_t rayCount = imageTiler.CurrentTileSize().Multiply();
+    uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
+    auto p = rayPartitioner.Start(rayCount, maxWorkCount,
+                                  processQueue, true);
+    DeviceAlgorithms::Iota(p.dIndices, RayIndex(0), processQueue);
+    dIndices = p.dIndices;
 
     return dIndices;
 }
 
 template<SpectrumContextC SC>
 Span<RayIndex>
-PathTracerRendererT<SC>::DoRenderPassWithMedia(uint32_t sppLimit,
-                                               const GPUQueue& processQueue)
+PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit, const GPUQueue& processQueue)
 {
+    assert(sppLimit != 0);
+    // Find the ray count. Ray count is tile count
+    // but tile can exceed film boundaries so clamp,
+    uint32_t rayCount = imageTiler.CurrentTileSize().Multiply();
+    // Start the partitioner, again worst case work count
+    // Get the K/V pair buffer
+    uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
+    auto [dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount,
+                                                  processQueue, true);
+
+     // Iota the indices
+    DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
+    // Create RNG state for each ray
+    rnGenerator->SetupRange(imageTiler.LocalTileStart(),
+                            imageTiler.LocalTileEnd(),
+                            processQueue);
+    // Reload dead paths with new
+    auto [dReloadIndices, _, aliveRayCount] = ReloadPaths(dIndices, sppLimit,
+                                                          processQueue);
+    dIndices = dReloadIndices.subspan(0, aliveRayCount);
+    dKeys = dKeys.subspan(0, aliveRayCount);
+
+    // After 2 more modes (Media NEE, Media Pure),
+    // I've split the function into multiple types.
+    // It will be easier to understand I hope.
+    if(currentOptions.sampleMode == SampleMode::E::PURE &&
+       currentOptions.sampleMedia == false)
+    {
+        return DoRenderPassPure(dIndices, dKeys, processQueue);
+    }
+    if(currentOptions.sampleMode != SampleMode::E::PURE &&
+       currentOptions.sampleMedia == false)
+    {
+        return DoRenderPassNEE(dIndices, dKeys, processQueue);
+    }
+    if(currentOptions.sampleMode == SampleMode::E::PURE &&
+       currentOptions.sampleMedia == true)
+    {
+        return DoRenderPassWithMediaPure(dIndices, dKeys, processQueue);
+    }
+    if(currentOptions.sampleMode != SampleMode::E::PURE &&
+       currentOptions.sampleMedia == true)
+    {
+        return DoRenderPassWithMediaNEE(dIndices, dKeys, processQueue);
+    }
     return Span<RayIndex>();
+}
+
+template<SpectrumContextC SC>
+void
+PathTracerRendererT<SC>::RecursiveShadowRayCast(// Output
+                                                Bitspan<uint32_t>,
+                                                // I-O
+                                                Span<BackupRNGState>,
+                                                // Input
+                                                Span<const RayIndex>,
+                                                const GPUQueue&)
+{
+    //Span<RayGMem> dShadowRays,
+    //Span<RayCone> dShadowRayCones,
+
+    // We need to hold shadow ray's media indices
+    // We also need storage for volume indices
+    //
 }
 
 template<SpectrumContextC SC>
@@ -523,11 +1115,7 @@ PathTracerRendererT<SC>::DoLatencyRender(uint32_t passCount,
     do
     {
         Span<RayIndex> dIndices = DoRenderPass(sppLimit, processQueue);
-
         // Find the dead paths again
-        // Every path is processed, so we do not need to use the scrambled
-        // index buffer. Iota again
-        //DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
         // Do a 3-way partition,
         auto deadAlivePartitionOut = rayPartitioner.TernaryPartition
         (

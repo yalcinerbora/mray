@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Tracer/PathTracerRendererBase.h"
+#include "Tracer/MediaTracker.h"
 
 #include "RequestedTypes.h" // IWYU pragma: keep
 #include "PathTracerRendererShaders.h"
@@ -17,6 +18,7 @@ class PathTracerRendererT final : public PathTracerRendererBase
 
     public:
     //
+    using MediaTrackerPtr       = std::unique_ptr<MediaTracker>;
     using UniformLightSampler   = DirectLightSamplerUniform<MetaLightList>;
     using AttribInfoList        = typename RendererBase::AttribInfoList;
     using SpectrumContext       = SpectrumContextT;
@@ -84,11 +86,28 @@ class PathTracerRendererT final : public PathTracerRendererBase
     Span<Float>         dPrevMatPDF;
     //
     bool                saveImage  = false;
+    // Media Related
+    MediaTrackerPtr         mediaTracker;
+    Span<RayMediaListPack>  dRayMediaListPacks;
 
     // Helpers
     uint32_t            FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
+
+
+    Span<RayIndex>      DoRenderPassPure(Span<RayIndex>, Span<CommonKey>,
+                                         const GPUQueue&);
+    Span<RayIndex>      DoRenderPassNEE(Span<RayIndex>, Span<CommonKey>,
+                                        const GPUQueue&);
+    Span<RayIndex>      DoRenderPassWithMediaPure(Span<RayIndex>, Span<CommonKey>,
+                                                  const GPUQueue&);
+    Span<RayIndex>      DoRenderPassWithMediaNEE(Span<RayIndex>, Span<CommonKey>,
+                                                 const GPUQueue&);
     Span<RayIndex>      DoRenderPass(uint32_t sppLimit, const GPUQueue&);
-    Span<RayIndex>      DoRenderPassWithMedia(uint32_t sppLimit, const GPUQueue&);
+    void                RecursiveShadowRayCast(Bitspan<uint32_t> isVisibleBitSpan,
+                                               // I-O
+                                               Span<BackupRNGState> dBackupRNGStates,
+                                               Span<const RayIndex> dRayIndices,
+                                               const GPUQueue& queue);
     // Implementations
     RendererOutput      DoThroughputSingleTileRender(const GPUDevice&, const GPUQueue&) override;
     RendererOutput      DoLatencyRender(uint32_t passCount, const GPUDevice&,

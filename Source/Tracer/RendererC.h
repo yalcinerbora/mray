@@ -536,7 +536,7 @@ template<class Renderer>
 const RenderCameraWorkT<Renderer>&
 UpcastRenderCameraWork(const std::unique_ptr<RenderCameraWorkI>& ptr)
 {
-    using ResultT = RenderCameraWorkT<Renderer>*;
+    using ResultT = RenderCameraWorkT<Renderer>;
     return *static_cast<const ResultT*>(ptr.get());
 }
 
@@ -544,7 +544,7 @@ template<class Renderer>
 const RenderMediumWorkT<Renderer>&
 UpcastRenderMediumWork(const std::unique_ptr<RenderMediumWorkI>& ptr)
 {
-    using ResultT = RenderMediumWorkT<Renderer>*;
+    using ResultT = RenderMediumWorkT<Renderer>;
     return *static_cast<const ResultT*>(ptr.get());
 }
 

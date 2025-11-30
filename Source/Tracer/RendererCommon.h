@@ -109,10 +109,10 @@ void RendererBase::IssueMediumWorkKernelsToPartitions(const RenderMediumWorkHash
         {
             return workInfo.workGroupId == key;
         });
-        if(wLoc != this->currentWorks.cend())
+        if(wLoc != this->currentMediumWorks.cend())
         {
-            const auto& workPtr = UpcastRenderWork<Renderer>(wLoc->workPtr);
-            WF(workPtr, dLocalIndices, partitionStart, partitionSize);
+            const auto& workPtr = UpcastRenderMediumWork<Renderer>(wLoc->workPtr);
+            WF(workPtr, dLocalIndices, partitionStart);
         }
         else throw MRayError("[{}]: Unkown work id is found ({}).",
                              rendererName, key);
