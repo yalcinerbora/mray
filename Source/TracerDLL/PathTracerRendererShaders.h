@@ -178,6 +178,18 @@ namespace PathTraceRDetail
         static void Call(const Medium&, const TContext&, SpectrumConv&,
                          RNGDispenser&, const Params&, RayIndex, uint32_t);
     };
+
+    template<MediumGroupC MGType, TransformGroupC TGType,
+             class SpectrumCtxType>
+    struct MediumWorkFunctionTransmittance
+    {
+        MRAY_MEDIUM_WORK_FUNCTOR_DEFINE_TYPES(MGType, TGType, SpectrumCtxType, 1u);
+        using Params = MediumWorkParams<EmptyType, SpectrumConv, MG, TG>;
+
+        MR_HF_DECL
+        static void Call(const Medium&, const TContext&, SpectrumConv&,
+                         RNGDispenser&, const Params&, RayIndex, uint32_t);
+    };
 }
 
 namespace PathTraceRDetail
@@ -641,5 +653,15 @@ void MediumWorkFunctionWithNEE<M, T, SC, LS>::Call(const Medium& medium, const T
     rS.dRLight[rIndex] = rLight;
     rS.dPathDataPack[rIndex] = pathState;
 }
+
+// =============================== //
+// PATH TRACE MEDIUM TRANSMITTANCE //
+//     (For Shadow Ray Casting)    //
+// =============================== //
+template<MediumGroupC M, TransformGroupC T, class SC>
+MR_HF_DEF
+void MediumWorkFunctionTransmittance<M, T, SC>::Call(const Medium&, const TContext&, SpectrumConv&,
+                                                     RNGDispenser&, const Params&, RayIndex, uint32_t)
+{}
 
 }

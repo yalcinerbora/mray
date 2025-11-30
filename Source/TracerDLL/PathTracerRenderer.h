@@ -25,9 +25,18 @@ class PathTracerRendererT final : public PathTracerRendererBase
     using SpectrumConverter     = typename SpectrumContext::Converter;
     static constexpr bool IsSpectral = !std::is_same_v<SpectrumContext, SpectrumContextIdentity>;
     //
-    using GlobalStateList       = TypePack<PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>,
-                                           PathTraceRDetail::GlobalState<UniformLightSampler, SpectrumConverter>>;
-    using RayStateList          = TypePack<PathTraceRDetail::RayState, PathTraceRDetail::RayState>;
+    using GlobalStateList = TypePack
+    <
+        PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>,
+        PathTraceRDetail::GlobalState<UniformLightSampler, SpectrumConverter>,
+        PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>
+    >;
+    using RayStateList = TypePack
+    <
+        PathTraceRDetail::RayState,
+        PathTraceRDetail::RayState,
+        PathTraceRDetail::RayState
+    >;
 
     // Work Functions
     template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
@@ -49,7 +58,8 @@ class PathTracerRendererT final : public PathTracerRendererBase
     using MediumWorkFunctions = TypePack
     <
         PathTraceRDetail::MediumWorkFunction<MG, TG, SpectrumContext>,
-        PathTraceRDetail::MediumWorkFunctionWithNEE<MG, TG, SpectrumContext, UniformLightSampler>
+        PathTraceRDetail::MediumWorkFunctionWithNEE<MG, TG, SpectrumContext, UniformLightSampler>,
+        PathTraceRDetail::MediumWorkFunctionTransmittance<MG, TG, SpectrumContext>
     >;
 
     static std::string_view TypeName();
@@ -92,8 +102,6 @@ class PathTracerRendererT final : public PathTracerRendererBase
 
     // Helpers
     uint32_t            FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
-
-
     Span<RayIndex>      DoRenderPassPure(Span<RayIndex>, Span<CommonKey>,
                                          const GPUQueue&);
     Span<RayIndex>      DoRenderPassNEE(Span<RayIndex>, Span<CommonKey>,

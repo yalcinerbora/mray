@@ -59,8 +59,8 @@ A HW_CPU  BaseAcceleratorEmbree   AcceleratorGroupEmbree  "Tracer/Embree/Acceler
 #      Name                         Header File              WorkOverload             LWorkOverload               CWorkOverload            MWorkOverload    WorkCount   LWorkCount  CWorkCount  MWorkCount
 R TexViewRenderer             "Tracer/TexViewRenderer.h"    RenderWork              RenderLightWork             RenderCameraWork          RenderMediumWork		0           0			0           0
 R SurfaceRenderer             "Tracer/SurfaceRenderer.h"    SurfaceRenderWork       SurfaceRenderLightWork      SurfaceRenderCamWork      RenderMediumWork		2           1           0           0
-R PathTracerRendererRGB       "PathTracerRenderer.h"        PathTracerRenderWork    PathTracerRenderLightWork   PathTracerRenderCamWork   RenderMediumWork		2           2           0           2
-R PathTracerRendererSpectral  "PathTracerRenderer.h"        PathTracerRenderWork    PathTracerRenderLightWork   PathTracerRenderCamWork   RenderMediumWork		2           2           0           2
+R PathTracerRendererRGB       "PathTracerRenderer.h"        PathTracerRenderWork    PathTracerRenderLightWork   PathTracerRenderCamWork   RenderMediumWork		2           2           0           3
+R PathTracerRendererSpectral  "PathTracerRenderer.h"        PathTracerRenderWork    PathTracerRenderLightWork   PathTracerRenderCamWork   RenderMediumWork		2           2           0           3
 R HashGridRenderer            "Tracer/HashGridRenderer.h"   HashGridRenderWork      HashGridRenderLightWork     HashGridRenderCamWork     RenderMediumWork		1           1           0           0
 R GuidedPTRendererSpectral	  "GuidedPTRenderer.h"			GuidedPTRenderWork      GuidedPTRenderLightWork	    GuidedPTRenderCamWork	  RenderMediumWork		1           1           0           0
 

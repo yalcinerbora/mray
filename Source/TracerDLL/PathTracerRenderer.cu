@@ -496,7 +496,6 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaPure(Span<RayIndex> dIndices,
     //  |            |                                     |
     //  |            |       [Media Scattered]         --> |
     //  |            |                                     |
-
     const SpectrumContext& typedSpectrumContext = *static_cast<const SpectrumContext*>(spectrumContext.get());
     RayState dRayState =
     {
