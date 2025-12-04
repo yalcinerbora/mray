@@ -9,7 +9,7 @@
 
 struct KCInvertTransforms
 {
-    MR_PF_DECL Matrix4x4 operator()(const Matrix4x4&) const noexcept;
+    MR_PF_DECL Matrix3x4 operator()(const Matrix3x4&) const noexcept;
 };
 
 template <class TContext>
@@ -45,7 +45,7 @@ concept TransformGroupC = requires(TGType tg)
     {tg.SoA()}-> std::same_as<typename TGType::DataSoA>;
 
     {TGType::AcquireCommonTransform(typename TGType::DataSoA{}, TransformKey{})
-    }->std::same_as<Matrix4x4>;
+    }->std::same_as<Matrix3x4>;
 
     requires GenericGroupC<TGType>;
 };
@@ -93,7 +93,7 @@ class TransformGroupIdentity final : public GenericGroupTransform<TransformGroup
     static std::string_view TypeName();
 
     MR_HF_DECL
-    static Matrix4x4 AcquireCommonTransform(DataSoA, TransformKey);
+    static Matrix3x4 AcquireCommonTransform(DataSoA, TransformKey);
 
     public:
                     TransformGroupIdentity(uint32_t groupId, const GPUSystem&);
@@ -117,7 +117,7 @@ class TransformGroupIdentity final : public GenericGroupTransform<TransformGroup
 };
 
 MR_PF_DEF
-Matrix4x4 KCInvertTransforms::operator()(const Matrix4x4& matrix) const noexcept
+Matrix3x4 KCInvertTransforms::operator()(const Matrix3x4& matrix) const noexcept
 {
     return matrix.Inverse();
 }
@@ -217,9 +217,9 @@ inline std::string_view TransformGroupIdentity::TypeName()
 }
 
 MR_HF_DEF
-Matrix4x4 TransformGroupIdentity::AcquireCommonTransform(DataSoA, TransformKey)
+Matrix3x4 TransformGroupIdentity::AcquireCommonTransform(DataSoA, TransformKey)
 {
-    return Matrix4x4::Identity();
+    return Matrix3x4::Identity();
 }
 
 inline TransformGroupIdentity::TransformGroupIdentity(uint32_t groupId,

@@ -125,7 +125,7 @@ void KCGeneratePrimAABBs(// Output
 template<TransformGroupC TG>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGetCommonTransforms(// Output
-                           MRAY_GRID_CONSTANT const Span<Matrix4x4> dTransforms,
+                           MRAY_GRID_CONSTANT const Span<Matrix3x4> dTransforms,
                            // Inputs
                            MRAY_GRID_CONSTANT const Span<const TransformKey> dTransformKeys,
                            MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA)
@@ -135,7 +135,7 @@ void KCGetCommonTransforms(// Output
     KernelCallParams kp;
     for(uint32_t i = kp.GlobalId(); i < tCount; i += kp.TotalSize())
     {
-        Matrix4x4 transform = TG::AcquireCommonTransform(tSoA, dTransformKeys[i]);
+        Matrix3x4 transform = TG::AcquireCommonTransform(tSoA, dTransformKeys[i]);
         dTransforms[i] = transform;
     }
 }

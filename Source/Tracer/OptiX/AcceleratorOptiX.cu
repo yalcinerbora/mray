@@ -25,7 +25,7 @@ MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCCopyToOptixInstance(// Output
                            MRAY_GRID_CONSTANT const Span<OptixInstance> dInstances,
                            // Input
-                           MRAY_GRID_CONSTANT const Span<const Matrix4x4> dMatrices,
+                           MRAY_GRID_CONSTANT const Span<const Matrix3x4> dMatrices,
                            MRAY_GRID_CONSTANT const Span<const uint32_t> dInstanceFlags,
                            MRAY_GRID_CONSTANT const Span<const OptixTraversableHandle> dHandles,
                            MRAY_GRID_CONSTANT const Span<const uint32_t> dGlobalSBTOffsets)
@@ -266,7 +266,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     DeviceMemory tempMem({gpuSystem.AllGPUs()}, 32_MiB, 128_MiB);
     Span<AABB3> dLeafAABBs;
     Span<OptixTraversableHandle> dTraversableHandles;
-    Span<Matrix4x4> dInstanceMatrices;
+    Span<Matrix3x4> dInstanceMatrices;
     Span<uint32_t> dSBTCounts;
     Span<uint32_t> dFlags;
     Span<OptixInstance> dInstanceBuildData;

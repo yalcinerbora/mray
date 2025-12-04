@@ -130,7 +130,7 @@ using GetMWF = GetMWFT<R, MG, TG, I>::Type;
 
 #define MRAY_ACCEL_COMMON_TRANSFORM_KERNEL_INSTANTIATE(T)                           \
     template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT                          \
-    void KCGetCommonTransforms<T>(MRAY_GRID_CONSTANT const Span<Matrix4x4>,         \
+    void KCGetCommonTransforms<T>(MRAY_GRID_CONSTANT const Span<Matrix3x4>,         \
                                   MRAY_GRID_CONSTANT const Span<const TransformKey>,\
                                   MRAY_GRID_CONSTANT const typename T::DataSoA)
 

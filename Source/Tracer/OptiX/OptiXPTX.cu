@@ -383,7 +383,7 @@ void KCLocalRayGenOptix()
     uint32_t globalIndex = params.lParams.batchStartOffset + aKey.FetchIndexPortion();
     OptixTraversableHandle traversable = params.lParams.dGlobalInstanceTraversables[globalIndex];
 
-    Matrix4x4 invTransform = params.lParams.dGlobalInstanceInvTransforms[globalIndex];
+    Matrix3x4 invTransform = params.lParams.dGlobalInstanceInvTransforms[globalIndex];
     Vector3 dir = invTransform * ray.dir;
     Vector3 pos = Vector3(invTransform * Vector4(ray.pos, Float(1)));
     ray = Ray(dir, pos);

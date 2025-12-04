@@ -225,7 +225,7 @@ class TracerBase : public TracerI
                                       TransientData data) override;
     void            TransformPrimitives(PrimGroupId,
                                         std::vector<PrimBatchId>,
-                                        std::vector<Matrix4x4>) override;
+                                        std::vector<Matrix3x4>) override;
 
     MatGroupId      CreateMaterialGroup(std::string typeName) override;
     MaterialId      ReserveMaterial(MatGroupId, AttributeCountList) override;

@@ -764,7 +764,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         std::sort(uniqueMeshPrims.begin(), uniqueMeshPrims.end());
 
         std::vector<PrimBatchId> meshPrimBatches;
-        std::vector<Matrix4x4>  meshTransforms;
+        std::vector<Matrix3x4>  meshTransforms;
         // Traverse through unique prim batches, add transform application list
         for(auto& surface : meshMatPrims.surfaces)
         {
@@ -780,7 +780,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             for(PrimBatchId pbId : uniqueMeshPrimBatches.at(surface.uniquePrim))
             {
                 meshPrimBatches.push_back(pbId);
-                meshTransforms.push_back(transform);
+                meshTransforms.push_back(Matrix3x4(transform));
             }
             surface.surfaceTransform = std::nullopt;
         }

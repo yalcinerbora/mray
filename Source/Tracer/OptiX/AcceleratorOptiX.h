@@ -159,7 +159,7 @@ class AcceleratorGroupOptixI
     virtual ~AcceleratorGroupOptixI() = default;
 
     virtual void AcquireIASConstructionParams(Span<OptixTraversableHandle> dTraversableHandles,
-                                              Span<Matrix4x4> dInstanceMatrices,
+                                              Span<Matrix3x4> dInstanceMatrices,
                                               Span<uint32_t> dSBTCounts,
                                               Span<uint32_t> dFlags,
                                               const GPUQueue& queue) const = 0;
@@ -245,7 +245,7 @@ class AcceleratorGroupOptiX final
                                       Span<AcceleratorKey> dKeyWriteRegion,
                                       const GPUQueue&) const override;
     void    AcquireIASConstructionParams(Span<OptixTraversableHandle> dTraversableHandles,
-                                         Span<Matrix4x4> dInstanceMatrices,
+                                         Span<Matrix3x4> dInstanceMatrices,
                                          Span<uint32_t> dSBTCounts,
                                          Span<uint32_t> dFlags,
                                          const GPUQueue& queue) const override;
@@ -311,7 +311,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     Span<EmptyHitRecord>        dEmptyRecords;
     // For local ray casting
     std::vector<size_t>             instanceBatchStartOffsets;
-    Span<Matrix4x4>                 dGlobalInstanceInvTransforms;
+    Span<Matrix3x4>                 dGlobalInstanceInvTransforms;
     Span<OptixTraversableHandle>    dGlobalTraversableHandles;
 
     // State of the CC

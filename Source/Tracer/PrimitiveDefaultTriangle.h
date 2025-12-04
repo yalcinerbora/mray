@@ -124,8 +124,8 @@ namespace DefaultSkinnedTriangleDetail
     {
         private:
         // These are generated on the fly (so no reference)
-        Matrix4x4 transform;
-        Matrix4x4 invTransform;
+        Matrix3x4 transform;
+        Matrix3x4 invTransform;
 
         public:
         MR_HF_DECL
@@ -268,7 +268,7 @@ class PrimGroupTriangle final : public GenericGroupPrimitive<PrimGroupTriangle>
     void                    Finalize(const GPUQueue& queue) override;
 
     void                    ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
-                                                 const std::vector<Matrix4x4>& batchTransformations,
+                                                 const std::vector<Matrix3x4>& batchTransformations,
                                                  const GPUQueue& deviceQueue) override;
 
     Vector2ui               BatchRange(PrimBatchKey id) const override;

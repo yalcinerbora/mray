@@ -688,7 +688,7 @@ void TracerBase::PushPrimAttribute(PrimGroupId gId,
 
 void TracerBase::TransformPrimitives(PrimGroupId gId,
                                      std::vector<PrimBatchId> primBatchIds,
-                                     std::vector<Matrix4x4> transforms)
+                                     std::vector<Matrix3x4> transforms)
 {
     auto primGroup = primGroups.at(gId);
     if(!primGroup)

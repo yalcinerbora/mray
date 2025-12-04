@@ -536,6 +536,7 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaPure(Span<RayIndex> dIndices,
                                              dVolumeIndices,
                                              dIndices,
                                              processQueue);
+
     // Generate work keys from hit packs
     processQueue.IssueWorkKernel<KCGenerateMediumWorkKeysIndirect>
     (

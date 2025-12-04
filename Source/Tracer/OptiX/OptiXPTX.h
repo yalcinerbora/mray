@@ -56,7 +56,7 @@ struct LocalRayCastArgPackOptiX
     Span<const AcceleratorKey>  dAcceleratorKeys;
     // Constants
     Span<const OptixTraversableHandle>  dGlobalInstanceTraversables;
-    Span<const Matrix4x4>               dGlobalInstanceInvTransforms;
+    Span<const Matrix3x4>               dGlobalInstanceInvTransforms;
     uint32_t                            batchStartOffset;
     bool                                resolveMedia;
 };

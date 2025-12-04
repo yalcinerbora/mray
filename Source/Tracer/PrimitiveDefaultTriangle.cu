@@ -69,8 +69,8 @@ void KCApplyTransformsTriangle(// I-O
                                MRAY_GRID_CONSTANT const Span<Vector3> dPositionsInOut,
                                MRAY_GRID_CONSTANT const Span<Quaternion> dNormalsInOut,
                                // Input
-                               MRAY_GRID_CONSTANT const Span<const Matrix4x4> dBatchTransforms,
-                               MRAY_GRID_CONSTANT const Span<const Matrix4x4> dBatchInvTransforms,
+                               MRAY_GRID_CONSTANT const Span<const Matrix3x4> dBatchTransforms,
+                               MRAY_GRID_CONSTANT const Span<const Matrix3x4> dBatchInvTransforms,
                                MRAY_GRID_CONSTANT const Span<const Vector2ul> dVertexRanges,
                                MRAY_GRID_CONSTANT const uint32_t blockPerBatch)
 {
@@ -84,8 +84,8 @@ void KCApplyTransformsTriangle(// I-O
         uint32_t batchI = blockId / blockPerBatch;
         uint32_t localBatchI = blockId % blockPerBatch;
 
-        MRAY_SHARED_MEMORY Matrix4x4 sBatchTransform;
-        MRAY_SHARED_MEMORY Matrix4x4 sBatchInvTransform;
+        MRAY_SHARED_MEMORY Matrix3x4 sBatchTransform;
+        MRAY_SHARED_MEMORY Matrix3x4 sBatchInvTransform;
         MRAY_SHARED_MEMORY Vector2ul sVertexRanges;
         #ifdef MRAY_GPU_BACKEND_CPU
             if(kp.threadId == 0)
@@ -97,18 +97,18 @@ void KCApplyTransformsTriangle(// I-O
         #else
             assert(kp.blockSize >= 34);
             // Load matrices / ranges
-            if(kp.threadId < 16)
+            if(kp.threadId < 12)
             {
                 uint32_t i = kp.threadId;
                 sBatchTransform[i] = dBatchTransforms[batchI][i];
 
             }
-            else if(kp.threadId >= 16 && kp.threadId < 32)
+            else if(kp.threadId >= 12 && kp.threadId < 24)
             {
                 uint32_t i = kp.threadId - 16;
                 sBatchInvTransform[i] = dBatchInvTransforms[batchI][i];
             }
-            else if(kp.threadId >= 32 && kp.threadId < 34)
+            else if(kp.threadId >= 24 && kp.threadId < 26)
             {
                 uint32_t i = kp.threadId - 32;
                 sVertexRanges[i] = dVertexRanges[batchI][i];
@@ -135,9 +135,9 @@ void KCApplyTransformsTriangle(// I-O
             Vector3 b = tbn.OrthoBasisY();
             Vector3 n = tbn.OrthoBasisZ();
             // We need to multiply these with normal matrix
-            t = Math::Normalize(Vector3(sBatchInvTransform.LeftMultiply(Vector4(t, 0))));
-            b = Math::Normalize(Vector3(sBatchInvTransform.LeftMultiply(Vector4(b, 0))));
-            n = Math::Normalize(Vector3(sBatchInvTransform.LeftMultiply(Vector4(n, 0))));
+            t = Math::Normalize(sBatchInvTransform.LeftMultiply(t));
+            b = Math::Normalize(sBatchInvTransform.LeftMultiply(b));
+            n = Math::Normalize(sBatchInvTransform.LeftMultiply(n));
             auto[tN, bN] = Graphics::GSOrthonormalize(t, b, n);
             //
             Quaternion tbnOut = TransformGen::ToSpaceQuat(tN, bN, n);
@@ -299,7 +299,7 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
 }
 
 void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
-                                             const std::vector<Matrix4x4>& batchTransformations,
+                                             const std::vector<Matrix3x4>& batchTransformations,
                                              const GPUQueue& queue)
 {
     if(primBatches.empty()) return;
@@ -316,8 +316,8 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
     size_t batchCount = primBatches.size();
 
     Span<Vector2ul> dVertexRanges;
-    Span<Matrix4x4> dTransformations;
-    Span<Matrix4x4> dInvTransformations;
+    Span<Matrix3x4> dTransformations;
+    Span<Matrix3x4> dInvTransformations;
     DeviceLocalMemory tempMem(*queue.Device());
     MemAlloc::AllocateMultiData(Tie(dVertexRanges,
                                     dTransformations,
@@ -327,7 +327,7 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
 
     // Issue transformation inverting before finding batch ranges
     queue.MemcpyAsync(dTransformations,
-                      Span<const Matrix4x4>(batchTransformations.data(), batchCount));
+                      Span<const Matrix3x4>(batchTransformations.data(), batchCount));
     DeviceAlgorithms::Transform(dInvTransformations, ToConstSpan(dTransformations),
                                 queue, KCInvertTransforms());
 

@@ -43,6 +43,9 @@ class Vector;
 template<unsigned int N, ArithmeticC T>
 class Matrix;
 
+template<ArithmeticC T>
+class Matrix3x4T;
+
 template<FloatC T>
 class Quat;
 
@@ -101,22 +104,17 @@ using Vector4uc = Vector<4, uint8_t>;
 using Matrix2x2 = Matrix<2, Float>;
 using Matrix3x3 = Matrix<3, Float>;
 using Matrix4x4 = Matrix<4, Float>;
+using Matrix3x4 = Matrix3x4T<Float>;
 // Float Type
 using Matrix2x2f = Matrix<2, float>;
 using Matrix3x3f = Matrix<3, float>;
 using Matrix4x4f = Matrix<4, float>;
+using Matrix3x4f = Matrix3x4T<float>;
 // Double Type
 using Matrix2x2d = Matrix<2, double>;
 using Matrix3x3d = Matrix<3, double>;
 using Matrix4x4d = Matrix<4, double>;
-// Integer Type
-using Matrix2x2i = Matrix<2, int>;
-using Matrix3x3i = Matrix<3, int>;
-using Matrix4x4i = Matrix<4, int>;
-// Unsigned Integer Type
-using Matrix2x2ui = Matrix<2, unsigned int>;
-using Matrix3x3ui = Matrix<3, unsigned int>;
-using Matrix4x4ui = Matrix<4, unsigned int>;
+using Matrix3x4d = Matrix3x4T<double>;
 
 // Quaternion Alias
 using Quaternion = Quat<Float>;
@@ -150,6 +148,7 @@ using AABB4d = AABB<4, double>;
     using Matrix2x2h = Matrix2x2<2, half>;
     using Matrix3x3h = Matrix3x3<3, half>;
     using Matrix4x4h = Matrix4x4<4, half>;
+    using Matrix4x3h = Matrix4x3T<half>;
 
     using QuaternionH = Quat<half>;
 

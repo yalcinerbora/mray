@@ -364,7 +364,7 @@ MRAY_GENERIC_PUSH_ATTRIB_INST(, PrimBatchKey, PrimAttributeInfo, UNorm4x8);
 // ================== //
 //     TRANSFORM      //
 // ================== //
-MRAY_GENERIC_PUSH_ATTRIB_INST(, TransformKey, TransAttributeInfo, Matrix4x4);
+MRAY_GENERIC_PUSH_ATTRIB_INST(, TransformKey, TransAttributeInfo, Matrix3x4);
 
 // ================== //
 //       CAMERA       //

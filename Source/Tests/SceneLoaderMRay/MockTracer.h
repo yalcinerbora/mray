@@ -208,7 +208,7 @@ class TracerMock : public TracerI
                                       TransientData data) override;
     void            TransformPrimitives(PrimGroupId gId,
                                         std::vector<PrimBatchId> primBatchIds,
-                                        std::vector<Matrix4x4> transforms) override;
+                                        std::vector<Matrix3x4> transforms) override;
 
     MatGroupId      CreateMaterialGroup(std::string typeName) override;
     MaterialId      ReserveMaterial(MatGroupId, AttributeCountList) override;
@@ -839,7 +839,7 @@ inline void TracerMock::PushPrimAttribute(PrimGroupId gId,
 
 inline void TracerMock::TransformPrimitives(PrimGroupId,
                                             std::vector<PrimBatchId>,
-                                            std::vector<Matrix4x4>)
+                                            std::vector<Matrix3x4>)
 {
 }
 

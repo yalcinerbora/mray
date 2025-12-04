@@ -49,7 +49,7 @@ class AcceleratorWorkI
                                            Span<const TransformKey> dTransformKeys,
                                            const GPUQueue& queue) const = 0;
     // Transform related
-    virtual void    GetCommonTransforms(Span<Matrix4x4> dTransforms,
+    virtual void    GetCommonTransforms(Span<Matrix3x4> dTransforms,
                                         Span<const TransformKey> dTransformKeys,
                                         const GPUQueue& queue) const = 0;
     virtual void    TransformLocallyConstantAABBs(// Output

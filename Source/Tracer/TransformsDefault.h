@@ -12,22 +12,22 @@ namespace TransformDetail
 {
     struct alignas(32) SingleTransformSoA
     {
-        Span<const Matrix4x4> transforms;
-        Span<const Matrix4x4> invTransforms;
+        Span<const Matrix3x4> transforms;
+        Span<const Matrix3x4> invTransforms;
     };
 
     struct alignas(32) MultiTransformSoA
     {
-        Span<const Span<const Matrix4x4>> transforms;
-        Span<const Span<const Matrix4x4>> invTransforms;
+        Span<const Span<const Matrix3x4>> transforms;
+        Span<const Span<const Matrix3x4>> invTransforms;
     };
 }
 
 class TransformContextSingle
 {
     private:
-    Ref<const Matrix4x4>    transform;
-    Ref<const Matrix4x4>    invTransform;
+    Ref<const Matrix3x4>    transform;
+    Ref<const Matrix3x4>    invTransform;
 
     public:
     MR_HF_DECL          TransformContextSingle(const typename TransformDetail::SingleTransformSoA&,
@@ -54,11 +54,11 @@ class TransformGroupSingle final : public GenericGroupTransform<TransformGroupSi
     static std::string_view     TypeName();
 
     MR_HF_DECL
-    static Matrix4x4 AcquireCommonTransform(DataSoA, TransformKey);
+    static Matrix3x4 AcquireCommonTransform(DataSoA, TransformKey);
 
     private:
-    Span<Matrix4x4> dTransforms;
-    Span<Matrix4x4> dInvTransforms;
+    Span<Matrix3x4> dTransforms;
+    Span<Matrix3x4> dInvTransforms;
     DataSoA         soa;
 
     public:
@@ -91,13 +91,13 @@ class TransformGroupMulti final : public GenericGroupTransform<TransformGroupMul
     static std::string_view     TypeName();
 
     MR_HF_DECL
-    static Matrix4x4 AcquireCommonTransform(DataSoA, TransformKey);
+    static Matrix3x4 AcquireCommonTransform(DataSoA, TransformKey);
 
     private:
-    Span<Matrix4x4> dTransforms;
-    Span<Matrix4x4> dInvTransforms;
-    Span<Span<const Matrix4x4>> dTransformSpan;
-    Span<Span<const Matrix4x4>> dInvTransformSpan;
+    Span<Matrix3x4> dTransforms;
+    Span<Matrix3x4> dInvTransforms;
+    Span<Span<const Matrix3x4>> dTransformSpan;
+    Span<Span<const Matrix3x4>> dInvTransformSpan;
 
     DataSoA         soa;
 
@@ -152,17 +152,17 @@ inline std::string_view TransformGroupMulti::TypeName()
 }
 
 MR_HF_DEF
-Matrix4x4 TransformGroupSingle::AcquireCommonTransform(DataSoA soa, TransformKey tKey)
+Matrix3x4 TransformGroupSingle::AcquireCommonTransform(DataSoA soa, TransformKey tKey)
 {
     CommonKey index = tKey.FetchIndexPortion();
     return  soa.transforms[index];
 }
 
 MR_HF_DEF
-Matrix4x4 TransformGroupMulti::AcquireCommonTransform(DataSoA, TransformKey)
+Matrix3x4 TransformGroupMulti::AcquireCommonTransform(DataSoA, TransformKey)
 {
     // We return identity, there is no common transform
-    return Matrix4x4::Identity();
+    return Matrix3x4::Identity();
 }
 
 #include "TransformsDefault.hpp"

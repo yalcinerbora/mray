@@ -208,7 +208,7 @@ class [[nodiscard]] TracerI
                                               TransientData data) = 0;
     virtual void            TransformPrimitives(PrimGroupId,
                                                 std::vector<PrimBatchId>,
-                                                std::vector<Matrix4x4>) = 0;
+                                                std::vector<Matrix3x4>) = 0;
     //================================//
     //            Material            //
     //================================//

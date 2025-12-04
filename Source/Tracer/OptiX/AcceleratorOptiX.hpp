@@ -665,7 +665,7 @@ void AcceleratorGroupOptiX<PG>::OffsetAccelKeyInRecords()
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupOptiX<PG>::AcquireIASConstructionParams(Span<OptixTraversableHandle> dTraversableHandles,
-                                                             Span<Matrix4x4> dInstanceMatrices,
+                                                             Span<Matrix3x4> dInstanceMatrices,
                                                              Span<uint32_t> dSBTCounts,
                                                              Span<uint32_t> dFlags,
                                                              const GPUQueue& queue) const

@@ -278,7 +278,7 @@ class GenericGroupPrimitiveT : public GenericGroupT<PrimBatchKey, PrimAttributeI
                                        size_t initialReservationSize = 64_MiB);
     //
     virtual void ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
-                                      const std::vector<Matrix4x4>& batchTransformations,
+                                      const std::vector<Matrix3x4>& batchTransformations,
                                       const GPUQueue& deviceQueue) = 0;
     virtual void SegmentedTransformReduceAABBs(Span<AABB3> dConcreteAABBs,
                                                Span<Byte> dTransformSegReduceTM,
@@ -302,7 +302,7 @@ class GenericGroupPrimitive : public GenericGroupPrimitiveT
                                   size_t allocationGranularity = 16_MiB,
                                   size_t initialReservationSize = 64_MiB);
     void    ApplyTransformations(const std::vector<PrimBatchKey>& primBatches,
-                                 const std::vector<Matrix4x4>& batchTransformations,
+                                 const std::vector<Matrix3x4>& batchTransformations,
                                  const GPUQueue& deviceQueue) override;
     void    SegmentedTransformReduceAABBs(Span<AABB3> dConcreteAABBs,
                                           Span<Byte> dTransformSegReduceTM,
@@ -445,7 +445,7 @@ GenericGroupPrimitive<C>::GenericGroupPrimitive(uint32_t groupId,
 
 template<class C>
 inline void GenericGroupPrimitive<C>::ApplyTransformations(const std::vector<PrimBatchKey>&,
-                                                           const std::vector<Matrix4x4>&,
+                                                           const std::vector<Matrix3x4>&,
                                                            const GPUQueue&)
 {
     throw MRayError("{:s}:{:d}: \"ApplyTransformations\" functionality "

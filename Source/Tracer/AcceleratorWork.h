@@ -50,7 +50,7 @@ void KCGeneratePrimAABBs(// Output
 template<TransformGroupC TG = TransformGroupIdentity>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCGetCommonTransforms(// Output
-                           MRAY_GRID_CONSTANT const Span<Matrix4x4> dTransforms,
+                           MRAY_GRID_CONSTANT const Span<Matrix3x4> dTransforms,
                            // Inputs
                            MRAY_GRID_CONSTANT const Span<const TransformKey> dTransformKeys,
                            MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA);
@@ -164,7 +164,7 @@ class AcceleratorWork : public BaseType
                                 const GPUQueue& queue) const override;
 
     // Transformation Related
-    void GetCommonTransforms(Span<Matrix4x4> dTransforms,
+    void GetCommonTransforms(Span<Matrix3x4> dTransforms,
                              Span<const TransformKey> dTransformKeys,
                              const GPUQueue& queue) const override;
     void TransformLocallyConstantAABBs(// Output
@@ -331,7 +331,7 @@ void AcceleratorWork<AG, TG, BT>::GeneratePrimitiveAABBs(Span<AABB3> dAllLeafAAB
 }
 
 template<AccelGroupC AG, TransformGroupC TG, AccelWorkBaseC BT>
-void AcceleratorWork<AG, TG, BT>::GetCommonTransforms(Span<Matrix4x4> dTransforms,
+void AcceleratorWork<AG, TG, BT>::GetCommonTransforms(Span<Matrix3x4> dTransforms,
                                                       Span<const TransformKey> dTransformKeys,
                                                       const GPUQueue& queue) const
 {

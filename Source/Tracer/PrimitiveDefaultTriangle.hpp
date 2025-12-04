@@ -642,11 +642,11 @@ TransformContextSkinned::TransformContextSkinned(const typename TransformGroupMu
 {
     Vector4 weights = Vector4(triData.skinWeights[pK.FetchIndexPortion()]);
     Vector4uc indices = triData.skinIndices[pK.FetchIndexPortion()];
-    const Span<const Matrix4x4>& t = transformData.transforms[tK.FetchIndexPortion()];
-    const Span<const Matrix4x4>& tInverse = transformData.invTransforms[tK.FetchIndexPortion()];
+    const Span<const Matrix3x4>& t = transformData.transforms[tK.FetchIndexPortion()];
+    const Span<const Matrix3x4>& tInverse = transformData.invTransforms[tK.FetchIndexPortion()];
 
     // Blend Transforms
-    transform = Matrix4x4::Zero();
+    transform = Matrix3x4::Zero();
     MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < TRANSFORM_PER_PRIMITIVE; i++)
     {
@@ -654,7 +654,7 @@ TransformContextSkinned::TransformContextSkinned(const typename TransformGroupMu
     }
 
     // Blend Inverse Transforms
-    invTransform = Matrix4x4::Zero();
+    invTransform = Matrix3x4::Zero();
     MRAY_UNROLL_LOOP
     for(unsigned int i = 0; i < TRANSFORM_PER_PRIMITIVE; i++)
     {

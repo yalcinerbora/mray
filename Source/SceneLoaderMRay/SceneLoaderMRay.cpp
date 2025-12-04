@@ -489,7 +489,7 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
     assert(list.size() == 1);
     assert(totalCounts.size() == 1);
     std::vector<TransientData> result;
-    result.push_back(TransientData(std::in_place_type_t<Matrix4x4>{},
+    result.push_back(TransientData(std::in_place_type_t<Matrix3x4>{},
                                    totalCounts.front()));
 
     const GenericAttributeInfo& info = list.front();
@@ -513,7 +513,7 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
                 transform = TransformGen::Rotate(rRadians[1], Vector3::YAxis()) * transform;
                 transform = TransformGen::Rotate(rRadians[2], Vector3::ZAxis()) * transform;
                 transform = TransformGen::Translate(t) * transform;
-                return transform;
+                return Matrix3x4(transform);
             };
 
             if(isArray)
@@ -538,8 +538,8 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
                     Vector3 r = (rSpan.empty()) ? rSpan[i] : Vector3::Zero();
                     Vector3 s = (sSpan.empty()) ? sSpan[i] : Vector3(1);
 
-                    Matrix4x4 transform = GenTransformFromTRS(t, r, s);
-                    result[0].Push(Span<const Matrix4x4>(&transform, 1));
+                    Matrix3x4 transform = GenTransformFromTRS(t, r, s);
+                    result[0].Push(Span<const Matrix3x4>(&transform, 1));
                 }
             }
             else
@@ -548,8 +548,8 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
                 Vector3 r = n.AccessOptionalData<Vector3>(ROTATE).value_or(Vector3::Zero());
                 Vector3 s = n.AccessOptionalData<Vector3>(SCALE).value_or(Vector3(1));
 
-                Matrix4x4 transform = GenTransformFromTRS(t, r, s);
-                result[0].Push(Span<const Matrix4x4>(&transform, 1));
+                Matrix3x4 transform = GenTransformFromTRS(t, r, s);
+                result[0].Push(Span<const Matrix3x4>(&transform, 1));
             }
 
         }
@@ -560,12 +560,20 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
             if(isArray)
             {
                 TransientData t = n.AccessDataArray<Matrix4x4>(MATRIX);
-                result[0].Push(t.AccessAs<const Matrix4x4>());
+                size_t elemCount = t.Size<Matrix4x4>();
+                TransientData t3x4 = TransientData(std::in_place_type_t<Matrix3x4>{},
+                                                   elemCount);
+                auto spanOut = t3x4.AccessAs<Matrix3x4>();
+                auto spanIn = t.AccessAs<Matrix4x4>();
+                for(uint32_t i = 0; i < elemCount; i++)
+                    spanOut[i] = Matrix3x4(spanIn[i]);
+
+                result[0].Push(ToConstSpan(spanOut));
             }
             else
             {
-                Matrix4x4 t = n.AccessData<Matrix4x4>(MATRIX);
-                result[0].Push(Span<const Matrix4x4>(&t, 1));
+                Matrix3x4 t = Matrix3x4(n.AccessData<Matrix4x4>(MATRIX));
+                result[0].Push(Span<const Matrix3x4>(&t, 1));
             }
         }
         else

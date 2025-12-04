@@ -340,7 +340,7 @@ MR_PF_DEF T Matrix<N, T>::Determinant() const noexcept requires (N == 4)
     // Implementation of Equation 15.
     auto Det2x2 = [](T m00, T m01, T m10, T m11)
     {
-        return m00 * m11 - m01 * m10;
+        return Math::FMA(m00 * m11, -m01 * m10);
     };
 
     // Notation here (x,y) show the row-major index of the matrix
@@ -384,7 +384,7 @@ MR_PF_DEF Matrix<N, T> Matrix<N, T>::Inverse() const noexcept requires FloatC<T>
     // Some data is used on the matrix itself
     constexpr auto Det2x2 = [](T m00, T m01, T m10, T m11)
     {
-        return m00 * m11 - m01 * m10;
+        return Math::FMA(m00, m11, -m01 * m10);
     };
 
     const auto& m = matrix;
@@ -417,7 +417,7 @@ MR_PF_DEF Matrix<N, T> Matrix<N, T>::Inverse() const noexcept requires FloatC<T>
     // Implementation of Equation 15.
     constexpr auto Det2x2 = [](T m00, T m01, T m10, T m11)
     {
-        return m00 * m11 - m01 * m10;
+        return Math::FMA(m00, m11, -m01 * m10);
     };
     const auto& m = matrix;
 
@@ -569,6 +569,404 @@ MR_PF_DEF Matrix<N, T> operator*(T t, const Matrix<N, T>& mat) noexcept
     return mat * t;
 }
 
+template <ArithmeticC T>
+template <std::convertible_to<T> C>
+MR_PF_DEF_V
+Matrix3x4T<T>::Matrix3x4T(C c) noexcept
+{
+    for(T& m : matrix) m = c;
+}
+
+template <ArithmeticC T>
+template <std::convertible_to<T> C>
+MR_PF_DEF_V
+Matrix3x4T<T>::Matrix3x4T(Span<const C, 4 * 3> data) noexcept
+    : matrix{data}
+{
+    matrix[0] = data[0];
+    matrix[1] = data[1];
+    matrix[2] = data[2];
+    matrix[3] = data[3];
+    //
+    matrix[4] = data[4];
+    matrix[5] = data[5];
+    matrix[6] = data[6];
+    matrix[7] = data[7];
+    //
+    matrix[ 8] = data[ 8];
+    matrix[ 9] = data[ 9];
+    matrix[10] = data[10];
+    matrix[11] = data[11];
+}
+
+template <ArithmeticC T>
+template <class... Args>
+MR_PF_DEF_V
+Matrix3x4T<T>::Matrix3x4T(const Args... dataList) noexcept
+    requires (std::convertible_to<Args, T> && ...) && (sizeof...(Args) == 12)
+    : matrix{dataList...}
+{}
+
+template <ArithmeticC T>
+MR_PF_DEF_V
+Matrix3x4T<T>::Matrix3x4T(const Vector<4, T>& row0,
+                          const Vector<4, T>& row1,
+                          const Vector<4, T>& row2) noexcept
+{
+    matrix[0] = row0[0];
+    matrix[1] = row0[1];
+    matrix[2] = row0[2];
+    matrix[3] = row0[3];
+    //
+    matrix[4] = row1[0];
+    matrix[5] = row1[1];
+    matrix[6] = row1[2];
+    matrix[7] = row1[3];
+    //
+    matrix[ 8] = row2[0];
+    matrix[ 9] = row2[1];
+    matrix[10] = row2[2];
+    matrix[11] = row2[3];
+}
+
+template <ArithmeticC T>
+MR_PF_DEF_V
+Matrix3x4T<T>::Matrix3x4T(const Matrix<4, T>& other) noexcept
+{
+    for(uint32_t i = 0; i < 3; i++)
+    for(uint32_t j = 0; j < 4; j++)
+        matrix[i * 4 + j] = other(i, j);
+}
+
+template <ArithmeticC T>
+template<std::convertible_to<T> C>
+MR_PF_DEF_V
+Matrix3x4T<T>::Matrix3x4T(const Matrix3x4T<C>& other)
+{
+    for(uint32_t i = 0; i < 12; i++)
+        matrix[i] = other.matrix[i];
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+T& Matrix3x4T<T>::operator[](unsigned int i) noexcept
+{
+    return matrix[i];
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+const T& Matrix3x4T<T>::operator[](unsigned int i) const noexcept
+{
+    return matrix[i];
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+T& Matrix3x4T<T>::operator()(unsigned int row, unsigned int column) noexcept
+{
+    return matrix[row * 4 + column];
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+const T& Matrix3x4T<T>::operator()(unsigned int row, unsigned int column) const noexcept
+{
+    return matrix[row * 4 + column];
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+const std::array<T, 12>& Matrix3x4T<T>::AsArray() const noexcept
+{
+    return matrix;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+std::array<T, 12>& Matrix3x4T<T>::AsArray() noexcept
+{
+    return matrix;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF_V
+void Matrix3x4T<T>::operator+=(const Matrix3x4T& right) noexcept
+{
+    MRAY_UNROLL_LOOP
+    for(uint32_t i = 0; i < 12; i++)
+        matrix[i] += right.matrix[i];
+}
+
+template <ArithmeticC T>
+MR_PF_DEF_V
+void Matrix3x4T<T>::operator*=(const Matrix3x4T& right) noexcept
+{
+    Matrix3x4T m;
+    m = (*this) * right;
+    (*this) = m;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF_V
+void Matrix3x4T<T>::operator*=(T t) noexcept
+{
+    MRAY_UNROLL_LOOP
+    for(uint32_t i = 0; i < 12; i++)
+        matrix[i] *= t;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF Matrix3x4T<T>
+Matrix3x4T<T>::operator+(const Matrix3x4T& right) const noexcept
+{
+    Matrix3x4T<T> out;
+    MRAY_UNROLL_LOOP
+    for(uint32_t i = 0; i < 12; i++)
+        out.matrix[i] = matrix[i] + right.matrix[i];
+}
+
+template <ArithmeticC T>
+MR_PF_DEF Matrix3x4T<T>
+Matrix3x4T<T>::operator*(const Matrix3x4T& right) const noexcept
+{
+    auto Dot = [](T a0, T a1, T a2, T b0, T b1, T b2)
+    {
+        return Math::FMA(a0, b0, Math::FMA(a1, b1, a2 * b2));
+    };
+    Matrix3x4T out;
+    const auto& m0 = matrix;
+    const auto& m1 = right.matrix;
+
+    out[0] = Dot(m0[0], m0[1], m0[2], m1[0], m1[4], m1[ 8]);
+    out[1] = Dot(m0[0], m0[1], m0[2], m1[1], m1[5], m1[ 9]);
+    out[2] = Dot(m0[0], m0[1], m0[2], m1[2], m1[6], m1[10]);
+    out[3] = Dot(m0[0], m0[1], m0[2], m1[3], m1[7], m1[11]);
+    out[3] += m0[3];
+    //
+    out[4] = Dot(m0[4], m0[5], m0[6], m1[0], m1[4], m1[ 8]);
+    out[5] = Dot(m0[4], m0[5], m0[6], m1[1], m1[5], m1[ 9]);
+    out[6] = Dot(m0[4], m0[5], m0[6], m1[2], m1[6], m1[10]);
+    out[7] = Dot(m0[4], m0[5], m0[6], m1[3], m1[7], m1[11]);
+    out[7] += m0[7];
+    //
+    out[ 8] = Dot(m0[8], m0[9], m0[10], m1[0], m1[4], m1[ 8]);
+    out[ 9] = Dot(m0[8], m0[9], m0[10], m1[1], m1[5], m1[ 9]);
+    out[10] = Dot(m0[8], m0[9], m0[10], m1[2], m1[6], m1[10]);
+    out[11] = Dot(m0[8], m0[9], m0[10], m1[3], m1[7], m1[11]);
+    out[11] += m0[11];
+    return out;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+Vector<3, T> Matrix3x4T<T>::operator*(const Vector<3, T>& v) const noexcept
+{
+    using V = Vector<3, T>;
+    const auto& m = matrix;
+    //
+    V out;
+    out[0] = Math::Dot(V(m[0], m[1], m[ 2]), v);
+    out[1] = Math::Dot(V(m[4], m[5], m[ 6]), v);
+    out[2] = Math::Dot(V(m[8], m[9], m[10]), v);
+    return out;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+Vector<4, T> Matrix3x4T<T>::operator*(const Vector<4, T>& v) const noexcept
+{
+    using V = Vector<4, T>;
+    const auto& m = matrix;
+    //
+    V out;
+    out[0] = Math::Dot(V(m[0], m[1], m[ 2], m[ 3]), v);
+    out[1] = Math::Dot(V(m[4], m[5], m[ 6], m[ 7]), v);
+    out[2] = Math::Dot(V(m[8], m[9], m[10], m[11]), v);
+    return out;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+Matrix3x4T<T> Matrix3x4T<T>::operator*(T c) const noexcept
+{
+    Matrix3x4T<T> out;
+    MRAY_UNROLL_LOOP
+    for(uint32_t i = 0; i < 12; i++)
+        out[i] = matrix[i] * c;
+    return out;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+bool Matrix3x4T<T>::operator==(const Matrix3x4T& other) const noexcept
+{
+    MRAY_UNROLL_LOOP
+    for(uint32_t i = 0; i < 12; i++)
+        if(matrix[i] != other.matrix[i]) return false;
+    //
+    return true;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+bool Matrix3x4T<T>::operator!=(const Matrix3x4T& other) const noexcept
+{
+    return !(other == (*this));
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+T Matrix3x4T<T>::Determinant() const noexcept requires FloatC<T>
+{
+    const T* m = matrix;
+    // Changing this to the PBRT-v4 version
+    // https://www.geometrictools.com/Documentation/LaplaceExpansionTheorem.pdf
+    // I did not know you can expand non-row/column way.
+    // Implementation of Equation 15.
+    //
+    // This is optimized for 3x4 matrix where bottom row is
+    // virtually (0, 0, 0, 1). So all terms that become zero is explicitly deleted.
+    auto Det2x2 = [](T m00, T m01, T m10, T m11)
+    {
+        return Math::FMA(m00 * m11, -m01 * m10);
+    };
+
+    // Notation here (x,y) show the row-major index of the matrix
+    T s0 = Det2x2(m[0], m[1], m[4], m[5]);
+    T s1 = Det2x2(m[0], m[2], m[4], m[6]);
+    T s2 = Det2x2(m[0], m[3], m[4], m[7]);
+    T s3 = Det2x2(m[1], m[2], m[5], m[6]);
+    T s4 = Det2x2(m[1], m[3], m[5], m[7]);
+    T s5 = Det2x2(m[2], m[3], m[6], m[7]);
+    //
+    T c5 = m[10];
+    T c4 = m[ 9];
+    T c2 = m[ 8];
+
+    T det = ((s0 * c5) - (s1 * c4) + (s3 * c2));
+    return det;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+Matrix3x4T<T> Matrix3x4T<T>::Inverse() const noexcept requires FloatC<T>
+{
+     // Changing this to the PBRT-v4 version
+    // https://www.geometrictools.com/Documentation/LaplaceExpansionTheorem.pdf
+    // I did not know you can expand non-row/column way.
+    // Implementation of Equation 15.
+    //
+    // This is optimized for 3x4 matrix where bottom row is
+    // virtually (0, 0, 0, 1). So all terms that become zero is explicitly deleted.
+    constexpr auto Det2x2 = [](T m00, T m01, T m10, T m11)
+    {
+        return Math::FMA(m00, m11, -m01 * m10);
+    };
+    const auto& m = matrix;
+
+    T s0 = Det2x2(m[0], m[1], m[4], m[5]);
+    T s1 = Det2x2(m[0], m[2], m[4], m[6]);
+    T s2 = Det2x2(m[0], m[3], m[4], m[7]);
+    T s3 = Det2x2(m[1], m[2], m[5], m[6]);
+    T s4 = Det2x2(m[1], m[3], m[5], m[7]);
+    T s5 = Det2x2(m[2], m[3], m[6], m[7]);
+    //
+    T c5 = m[10];
+    T c4 = m[ 9];
+    T c2 = m[ 8];
+
+    T det = ((s0 * c5) - (s1 * c4) + (s3 * c2));
+    T detInv = T(1) / det;
+
+    Matrix3x4T<T> inv
+    (
+        // Row0
+        (+m[ 5] * c5 - m[ 6] * c4             ),
+        (-m[ 1] * c5 + m[ 2] * c4             ),
+        (                                   s3),
+        (-m[ 9] * s5 + m[10] * s4 - m[11] * s3),
+        // Row1
+        (-m[ 4] * c5 + m[ 6] * c2             ),
+        (+m[ 0] * c5 - m[ 2] * c2             ),
+        (                                   s1),
+        (+m[ 8] * s5 - m[10] * s2 + m[11] * s1),
+        // Row2
+        (+m[ 4] * c4 - m[ 5] * c2             ),
+        (-m[ 0] * c4 + m[ 1] * c2             ),
+        (                                   s0),
+        (-m[ 8] * s4 + m[ 9] * s2 - m[11] * s0)
+    );
+    // Assert that the bottom right corner of the matrix (4x4 Matrix) corresponds to 1
+    assert((Float(1) - Math::Abs(m[8] * s3 - m[9] * s1 + m[10] * s0) * detInv)
+           < MathConstants::Epsilon<T>());
+    return inv * detInv;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+RayT<T> Matrix3x4T<T>::TransformRay(const RayT<T>& r) const noexcept
+{
+    auto tDir = (*this) * r.dir;
+    auto tPos = Vector<3, T>((*this) * Vector<4, T>(r.pos, T{1}));
+    return RayT<T>(tDir, tPos);
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+AABB<3, T> Matrix3x4T<T>::TransformAABB(const AABB<3, T>& aabb) const noexcept
+{
+    AABB<3, T> result = AABB<3, T>::Negative();
+    Vector<4, T> vertex = Vector<4, T>(1);
+    for(unsigned int i = 0; i < AABB<3, T>::AABBVertexCount; i++)
+    {
+        MRAY_UNROLL_LOOP
+        for(unsigned int j = 0; j < 3; j ++)
+            vertex[j] = ((i >> j) & 0b1) ? aabb.Max()[j] : aabb.Min()[j];
+        //
+        vertex = (*this) * vertex;
+        result.SetMax(Math::Max(result.Max(), Vector<3, T>(vertex)));
+        result.SetMin(Math::Min(result.Min(), Vector<3, T>(vertex)));
+    }
+    return result;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+Vector<3, T> Matrix3x4T<T>::LeftMultiply(const Vector<3, T>& v) const noexcept
+{
+    using V = Vector<3, T>;
+    const auto& m = matrix;
+    V out;
+    out[0] = Math::Dot(V(m[0], m[4], m[ 8]), v);
+    out[1] = Math::Dot(V(m[1], m[5], m[ 9]), v);
+    out[2] = Math::Dot(V(m[2], m[6], m[10]), v);
+    return out;
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+Matrix3x4T<T> Matrix3x4T<T>::Identity() noexcept
+{
+    return Matrix3x4T(T{1}, T{0}, T{0}, T{0},
+                      T{0}, T{1}, T{0}, T{0},
+                      T{0}, T{0}, T{1}, T{0});
+}
+
+template <ArithmeticC T>
+MR_PF_DEF
+Matrix3x4T<T> Matrix3x4T<T>::Zero() noexcept
+{
+    return Matrix3x4T(T{0});
+}
+
+template<ArithmeticC T>
+MR_PF_DECL
+Matrix3x4T<T> operator*(T v, const Matrix3x4T<T>& m) noexcept
+{
+    return m * v;
+}
+
 // Spacial Matrix4x4 -> Matrix3x3
 template<FloatC T>
 MR_PF_DEF Matrix<4, T> ToMatrix4x4(const Matrix<3, T>& m) noexcept
@@ -581,6 +979,23 @@ MR_PF_DEF Matrix<4, T> ToMatrix4x4(const Matrix<3, T>& m) noexcept
 
 template<FloatC T>
 MR_PF_DEF Vector<3, T> TransformGen::ExtractScale(const Matrix<4, T>& m) noexcept
+{
+    // This is not proper!
+    // This should fail if transform matrix has shear
+    // (didn't tested tho)
+    //
+    // Proper version, still assumes scale did not have translate component
+    // https://theswissbay.ch/pdf/Gentoomen%20Library/Game%20Development/Programming/Graphics%20Gems%202.pdf
+    // Chapter VII
+
+    T sX = Math::Length(Vector<3, T>(m[0], m[1], m[2]));
+    T sY = Math::Length(Vector<3, T>(m[4], m[5], m[6]));
+    T sZ = Math::Length(Vector<3, T>(m[8], m[9], m[10]));
+    return Vector<3, T>(sX, sY, sZ);
+}
+
+template<FloatC T>
+MR_PF_DEF Vector<3, T> TransformGen::ExtractScale(const Matrix3x4T<T>& m) noexcept
 {
     // This is not proper!
     // This should fail if transform matrix has shear

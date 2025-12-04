@@ -15,9 +15,6 @@ class Timer
     uint64_t    elapsed;
     uint64_t    start;
 
-    //Duration    elapsed;
-    //TimePoint   start;
-
     public:
     // Utility
     void        Start();
