@@ -685,7 +685,6 @@ void TracerBase::PushPrimAttribute(PrimGroupId gId,
                                            queue);
 }
 
-
 void TracerBase::TransformPrimitives(PrimGroupId gId,
                                      std::vector<PrimBatchId> primBatchIds,
                                      std::vector<Matrix3x4> transforms)

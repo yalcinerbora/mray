@@ -403,9 +403,9 @@ MR_PF_DEF Matrix<N, T> Matrix<N, T>::Inverse() const noexcept requires FloatC<T>
     T det = m[0] * m00 - m[1] * m01 + m[2] * m02;
     T detInv = T(1) / det;
 
-    return detInv * Matrix<3, T>(m00, -m10, m20,
-                                 -m01, m11, -m21,
-                                 m02, -m12, m22);
+    return detInv * Matrix<3, T>( m00, -m10,  m20,
+                                 -m01,  m11, -m21,
+                                  m02, -m12,  m22);
 }
 
 template <unsigned int N, ArithmeticC T>
@@ -852,7 +852,7 @@ template <ArithmeticC T>
 MR_PF_DEF
 Matrix3x4T<T> Matrix3x4T<T>::Inverse() const noexcept requires FloatC<T>
 {
-     // Changing this to the PBRT-v4 version
+    // Changing this to the PBRT-v4 version
     // https://www.geometrictools.com/Documentation/LaplaceExpansionTheorem.pdf
     // I did not know you can expand non-row/column way.
     // Implementation of Equation 15.
