@@ -30,7 +30,6 @@ concept IntegralC = std::integral<T>;
 template<typename T>
 concept SignedIntegralC = std::signed_integral<T>;
 
-
 template<typename T>
 concept ArithmeticC = std::integral<T> || FloatC<T>;
 
@@ -168,8 +167,8 @@ concept ArrayLikeC = requires(T t, Span<const typename T::InnerType, T::Dims> sp
     typename T::InnerType;
     T::Dims;
     T(span);
-    { t.AsArray() } -> std::same_as<std::array<typename T::InnerType, T::Dims>&>;
-    { std::as_const(t).AsArray() } -> std::same_as<const std::array<typename T::InnerType, T::Dims>&>;
+    {t.AsSpan()} -> std::same_as<Span<typename T::InnerType, T::Dims>>;
+    {std::as_const(t).AsSpan()} -> std::same_as<Span<const typename T::InnerType, T::Dims>>;
 };
 
 // Vector Concept
@@ -202,14 +201,16 @@ template<class T>
 concept FloatVectorOrFloatC = (FloatVectorC<T> || std::floating_point<T>);
 
 // Vector, AABB print helpers
-template <ArrayLikeC V>
-auto format_as(const V& v) { return v.AsArray(); }
+//template <ArrayLikeC V>
+//auto format_as(const V& v) { return v.AsSpan(); }
 
 template <unsigned int N, FloatC T>
 auto format_as(const AABB<N, T>& v)
 {
-    std::array<std::array<T, N>, 2> result;
-    result[0] = v.Min().AsArray();
-    result[1] = v.Max().AsArray();
+    std::array<Span<const T, N>, 2> result =
+    {
+        v.Min().AsSpan(),
+        v.Max().AsSpan()
+    };
     return result;
 }

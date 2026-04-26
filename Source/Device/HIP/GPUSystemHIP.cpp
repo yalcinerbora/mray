@@ -1,15 +1,84 @@
 #include "GPUSystemHIP.h"
 #include "DeviceMemoryHIP.h"
 
-#include "Core/Error.hpp"
 #include "Core/TimelineSemaphore.h"
 
 #include <hip/hip_runtime.h>
+#include <fmt/color.h>
 
 #include "Core/Timer.h"
 
 namespace mray::hip
 {
+
+void GPUAssertHost(hipError_t code, const char* file, int line)
+{
+    #ifndef __HIP_DEVICE_COMPILE__
+        if(code == hipSuccess) return;
+
+        MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
+                        fmt::format(fg(fmt::color::fire_brick),
+                                    std::string("HIP Failure")),
+                        hipGetErrorString(code), file, line);
+        assert(false);
+    #else
+        if(code == hipSuccess) return;
+
+        printf("%s: %s %s:%d", "HIP Failure",
+                hipGetErrorString(code), file, line);
+        // TODO: hip does not have breakpoint or trap
+        // directly aborting
+        abort();
+    #endif
+}
+
+void GPUMemThrow(hipError_t code, const char* file, int line)
+{
+    if(code == hipErrorMemoryAllocation)
+    {
+        MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
+                        fmt::format(fg(fmt::color::fire_brick),
+                                    std::string("HIP Failure")),
+                        hipGetErrorString(code),
+                        file,
+                        line);
+
+        throw MRayError("GPU Device is out of memory!");
+    }
+}
+
+void GPUDriverAssert(hipError_t code, const char* file, int line)
+{
+    if(code != hipSuccess)
+    {
+        std::string greenErrorCode = fmt::format(fg(fmt::color::fire_brick),
+                                                    std::string("HIP Failure"));
+        const char* errStr = hipGetErrorString(code);
+
+        MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
+                        fmt::format(fg(fmt::color::fire_brick),
+                                    std::string("HIP Failure")),
+                        errStr, file, line);
+        assert(false);
+    }
+}
+
+void GPUDriverMemThrow(hipError_t code, const char* file, int line)
+{
+    if(code == hipErrorMemoryAllocation)
+    {
+        std::string greenErrorCode = fmt::format(fg(fmt::color::fire_brick),
+                                                    std::string("HIP Failure"));
+        const char* errStr = hipGetErrorString(code);
+
+        MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
+                        fmt::format(fg(fmt::color::fire_brick),
+                                    std::string("HIP Failure")),
+                        errStr, file, line);
+
+        throw MRayError("GPU Device is out of memory!");
+    }
+}
 
 GPUAnnotationHIP::Scope::Scope(AnnotationHandle d)
     : domain(d)
@@ -188,7 +257,7 @@ const GPUQueueHIP& GPUDeviceHIP::GetTransferQueue() const
     return transferQueue;
 }
 
-GPUSystemHIP::GPUSystemHIP()
+GPUSystemHIP::GPUSystemHIP(bool logBanner)
     // TODO:
     : roctxDomain(0)
 {
@@ -221,6 +290,34 @@ GPUSystemHIP::GPUSystemHIP()
 
     // TODO: a design leak but what else you can do?
     globalGPUListPtr = &systemGPUs;
+
+        // Skip the banner if not requested
+    if(!logBanner) return;
+
+    std::string banner;
+    banner.reserve(1024);
+    bool isFirst = true;
+    for(const auto& gpu : systemGPUs)
+    {
+        if(!isFirst)
+        {
+            banner += "---------------------\n";
+            isFirst = false;
+        }
+
+        double memGiB = double(gpu.TotalMemory());
+        memGiB /= 1024.0;
+        memGiB /= 1024.0;
+        memGiB /= 1204.0;
+        banner += MRAY_FORMAT("Name      : {}\n"
+                              "CC        : {}\n"
+                              "Memory    : {:.3f} GiB\n"
+                              "---------------------\n",
+                              gpu.Name(),
+                              gpu.ComputeCapability(),
+                              memGiB);
+    }
+    MRAY_LOG("----Tracer-GPU(s)----\n{}\n", banner);
 }
 
 GPUSystemHIP::~GPUSystemHIP()

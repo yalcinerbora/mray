@@ -1,13 +1,13 @@
 #pragma once
 
 #include <cstdint>
-#include <array>
 
 #include "Device/GPUTypes.h"
 #include "Device/GPUTextureView.h"
 
 #include "Core/GraphicsFunctions.h"
 #include "Core/DataStructures.h"
+#include "Core/Array.h"
 
 #include "Random.h"
 #include "Bitspan.h"
@@ -240,7 +240,7 @@ struct StreamingTextureDeviceData
 
     static constexpr auto PTC = StreamingTexParams::MaxPhysicalTextureCount;
     template<uint32_t C, class T>
-    using ArrayOfArrays = std::array<std::array<TextureView<2, T>, PTC>, C>;
+    using ArrayOfArrays = Array<Array<TextureView<2, T>, PTC>, C>;
 
     public:
     ArrayOfArrays<COUNT_1C_TEX, Float>      texViews1C;
@@ -261,8 +261,8 @@ struct TextureStreamingContext
         static H Hash(K v)
         {
             uint64_t hash = RNGFunctions::HashPCG64::Hash(v);
-            uint32_t hashH = uint32_t(Bit::FetchSubPortion(hash, {32, 64}));
-            uint32_t hashL = uint32_t(Bit::FetchSubPortion(hash, {0, 32}));
+            uint32_t hashH = uint32_t(Bit::FetchSubPortion(hash, {32u, 64u}));
+            uint32_t hashL = uint32_t(Bit::FetchSubPortion(hash, {0u, 32u}));
             uint32_t hashFold = hashH + hashL;
             // Dump values correspond to these set to zero and one
             // We could uniformly distribute these with double hashing maybe

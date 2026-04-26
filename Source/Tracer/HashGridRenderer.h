@@ -16,12 +16,10 @@ class HashGridRenderer final : public RendererBase
 {
     public:
     static std::string_view TypeName();
-    static AttribInfoList StaticAttributeInfo();
+    static AttribInfoList   StaticAttributeInfo();
 
     using RayState          = HashGridRDetail::RayState;
     using GlobalState       = HashGridRDetail::GlobalState;
-    using GlobalStateList   = TypePack<GlobalState>;
-    using RayStateList      = TypePack<RayState>;
     using SpectrumContext   = SpectrumContextIdentity;
 
     template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>

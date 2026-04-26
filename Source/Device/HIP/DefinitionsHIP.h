@@ -5,16 +5,17 @@
 
 namespace mray::hip
 {
+
+    MRAY_HOST void GPUAssertHost(hipError_t code, const char* file, int line);
+    MRAY_HOST void GPUMemThrow(hipError_t code, const char* file, int line);
+    MRAY_HOST void GPUDriverAssert(hipError_t code, const char* file, int line);
+    MRAY_HOST void GPUDriverMemThrow(hipError_t code, const char* file, int line);
+
     inline constexpr void GPUAssert(hipError_t code, const char* file, int line)
     {
         #ifndef __HIP_DEVICE_COMPILE__
             if(code == hipSuccess) return;
-
-            MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
-                            fmt::format(fg(fmt::color::green),
-                                        std::string("HIP Failure")),
-                            hipGetErrorString(code), file, line);
-            assert(false);
+            GPUAssertHost(code, file, line);
         #else
             if(code == hipSuccess) return;
 
@@ -25,55 +26,6 @@ namespace mray::hip
             abort();
         #endif
     }
-
-    inline constexpr void GPUMemThrow(hipError_t code, const char* file, int line)
-    {
-        if(code == hipErrorMemoryAllocation)
-        {
-            MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
-                           fmt::format(fg(fmt::color::green),
-                                       std::string("HIP Failure")),
-                           hipGetErrorString(code),
-                           file,
-                           line);
-
-            throw MRayError("GPU Device is out of memory!");
-        }
-    }
-
-    inline constexpr void GPUDriverAssert(hipError_t code, const char* file, int line)
-    {
-        if(code != hipSuccess)
-        {
-            std::string greenErrorCode = fmt::format(fg(fmt::color::green),
-                                                     std::string("HIP Failure"));
-            const char* errStr = hipGetErrorString(code);
-
-            MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
-                           fmt::format(fg(fmt::color::green),
-                                       std::string("HIP Failure")),
-                           errStr, file, line);
-            assert(false);
-        }
-    }
-
-    inline constexpr void GPUDriverMemThrow(hipError_t code, const char* file, int line)
-    {
-        if(code == hipErrorMemoryAllocation)
-        {
-            std::string greenErrorCode = fmt::format(fg(fmt::color::green),
-                                                     std::string("HIP Failure"));
-            const char* errStr = hipGetErrorString(code);
-
-            MRAY_ERROR_LOG("{:s}: {:s} {:s}:{:d}",
-                           fmt::format(fg(fmt::color::green),
-                                       std::string("HIP Failure")),
-                           errStr, file, line);
-
-            throw MRayError("GPU Device is out of memory!");
-        }
-    }
-
 }
 
 

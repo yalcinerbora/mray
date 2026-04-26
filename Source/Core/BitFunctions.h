@@ -8,11 +8,12 @@
 
 #include "Definitions.h"
 #include "Tuple.h"
+#include "Array.h"
 
 namespace Bit
 {
     template <class T>
-    using TPair = std::array<T, 2>;
+    using TPair = Array<T, 2>;
 
     template<class To, class From>
     MR_PF_DECL To BitCast(const From& value) noexcept;
@@ -186,7 +187,7 @@ MR_PF_DEF R Bit::BitCast(const T& value) noexcept
 }
 
 template<std::integral T>
-MR_PF_DEF T Bit::FetchSubPortion(T value, std::array<T, 2> bitRange) noexcept
+MR_PF_DEF T Bit::FetchSubPortion(T value, Bit::TPair<T> bitRange) noexcept
 {
     T bitCount = bitRange[1] - bitRange[0];
     assert(bitRange[0] < bitRange[1]);
@@ -200,7 +201,7 @@ MR_PF_DEF T Bit::FetchSubPortion(T value, std::array<T, 2> bitRange) noexcept
 
 template<std::integral T, std::integral C>
 requires (std::convertible_to<C, T>)
-MR_PF_DEF T Bit::SetSubPortion(T value, C in, std::array<T, 2> bitRange) noexcept
+MR_PF_DEF T Bit::SetSubPortion(T value, C in, Bit::TPair<T> bitRange) noexcept
 {
     T bitCount = bitRange[1] - bitRange[0];
     assert(bitRange[0] < bitRange[1]);
@@ -226,7 +227,7 @@ Bit::Compose(Ts... values) noexcept
                   "Template \"Is\" must not exceed the entire bit range");
     // Convert the index sequence to runtime
     // TODO: Can we "scan" in comptime via expansion?
-    std::array<RetT, E + 1> offsets = {0, Is...};
+    Array<RetT, E + 1> offsets = {RetT(0), RetT(Is)...};
     // Check the data validity
     if constexpr(MRAY_IS_DEBUG)
     {
@@ -300,8 +301,8 @@ Bit::RotateLeft(TPair<uint64_t> value, uint32_t shift) noexcept
     return result;
 }
 
-MR_PF_DEF typename Bit::TPair<uint64_t>
-Bit::RotateRight(TPair<uint64_t> value, uint32_t shift) noexcept
+MR_PF_DEF
+Bit::TPair<uint64_t> Bit::RotateRight(TPair<uint64_t> value, uint32_t shift) noexcept
 {
     uint64_t shift64 = uint64_t(shift);
     constexpr uint64_t Bits = sizeof(uint64_t) * CHAR_BIT;

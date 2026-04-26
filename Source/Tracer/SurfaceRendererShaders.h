@@ -119,7 +119,9 @@ namespace SurfRDetail
     {
         MRAY_WORK_FUNCTOR_DEFINE_TYPES(PGType, MGType, TGType,
                                        SpectrumContextIdentity, 1u);
-        using Params = RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>;
+        using Params      = RenderWorkParams<GlobalState, RayStateCommon, PG, MG, TG>;
+        using GlobalState = SurfRDetail::GlobalState;
+        using RayState    = SurfRDetail::RayStateCommon;
 
         MR_HF_DECL
         static void Call(const Primitive&, const Material&, const Surface&,
@@ -135,7 +137,9 @@ namespace SurfRDetail
     {
         MRAY_WORK_FUNCTOR_DEFINE_TYPES(PGType, MGType, TGType,
                                        SpectrumContextIdentity, 1u);
-        using Params = RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>;
+        using Params      = RenderWorkParams<GlobalState, RayStateAO, PG, MG, TG>;
+        using GlobalState = SurfRDetail::GlobalState;
+        using RayState    = SurfRDetail::RayStateAO;
 
         MR_HF_DECL
         static void Call(const Primitive&, const Material&, const Surface&,
@@ -151,7 +155,9 @@ namespace SurfRDetail
     {
         MRAY_LIGHT_WORK_FUNCTOR_DEFINE_TYPES(LGType, TGType,
                                              SpectrumContextIdentity, 1u);
-        using Params = RenderLightWorkParams<GlobalState, RayStateCommon, LG, TG>;
+        using Params      = RenderLightWorkParams<GlobalState, RayStateCommon, LG, TG>;
+        using GlobalState = SurfRDetail::GlobalState;
+        using RayState    = SurfRDetail::RayStateCommon;
 
         MR_HF_DECL
         static void Call(const Light&, RNGDispenser&, const SpectrumConv&,

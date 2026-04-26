@@ -24,19 +24,28 @@ namespace mray::hip::atomic::detail
 namespace mray::hip::atomic
 {
     template<class T>
-    MRAY_GPU T AtomicAdd(T& t, T v);
+    MR_GF_DECL T AtomicAdd(T& t, T v);
 
     template<class T>
     requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
-    MRAY_GPU T AtomicAnd(T& t, T v);
+    MR_GF_DECL T AtomicAnd(T& t, T v);
 
     template<class T>
     requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
-    MRAY_GPU T AtomicOr(T& t, T v);
+    MR_GF_DECL T AtomicOr(T& t, T v);
 
     template<class T>
     requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
-    MRAY_GPU T AtomicXor(T& t, T v);
+    MR_GF_DECL T AtomicXor(T& t, T v);
+
+    template<class T>
+    MR_GF_DECL T AtomicCompSwap(T& t, T compVal, T storeVal);
+
+    template<class T>
+    MR_GF_DECL T AtomicLoad(T& t);
+
+    template<class T>
+    MR_GF_DECL void AtomicStore(T& t, T val);
 }
 
 // A dirty fix to host side to not whine about
@@ -46,7 +55,7 @@ namespace mray::hip::atomic::detail
 {
 
 template<class T, class Func>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T EmulateAtomicOp(T* address, T val, Func&& F)
 {
     // TODO:
@@ -77,7 +86,7 @@ namespace mray::hip::atomic
 {
 
 template<>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 double AtomicAdd(double& t, double v)
 {
     return detail::EmulateAtomicOp(&t, v, [](double l, double r)
@@ -87,7 +96,7 @@ double AtomicAdd(double& t, double v)
 }
 
 template<>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 Vector2 AtomicAdd(Vector2& t, Vector2 v)
 {
     static_assert(std::is_same_v<Float, float>,
@@ -100,7 +109,7 @@ Vector2 AtomicAdd(Vector2& t, Vector2 v)
 }
 
 template<>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 Vector3 AtomicAdd(Vector3& t, Vector3 v)
 {
     static_assert(std::is_same_v<Float, float>,
@@ -115,7 +124,7 @@ Vector3 AtomicAdd(Vector3& t, Vector3 v)
 }
 
 template<>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 Vector4 AtomicAdd(Vector4& t, Vector4 v)
 {
     static_assert(std::is_same_v<Float, float>,
@@ -131,7 +140,7 @@ Vector4 AtomicAdd(Vector4& t, Vector4 v)
 }
 
 template<class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T AtomicAdd(T& t, T v)
 {
     // TODO: Check proper template instantiations
@@ -147,7 +156,7 @@ T AtomicAdd(T& t, T v)
 
 template<class T>
 requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T AtomicAnd(T& t, T v)
 {
     return atomicAnd(&t, v);
@@ -155,7 +164,7 @@ T AtomicAnd(T& t, T v)
 
 template<class T>
 requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T AtomicOr(T& t, T v)
 {
     return atomicOr(&t, v);
@@ -163,10 +172,35 @@ T AtomicOr(T& t, T v)
 
 template<class T>
 requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T AtomicXor(T& t, T v)
 {
     return atomicXor(&t, v);
+}
+
+template<class T>
+MR_GF_DEF
+T AtomicCompSwap(T& t, T compVal, T storeVal)
+{
+    using Int = typename detail::template IntegralOf<T>::type;
+    auto* tp = reinterpret_cast<Int*>(&t);
+    return Bit::BitCast<T>(atomicCAS(tp,
+                           Bit::BitCast<Int>(compVal),
+                           Bit::BitCast<Int>(storeVal)));
+}
+
+template<class T>
+MR_GF_DECL T AtomicLoad(T& t)
+{
+    // TODO: Use proper load when it is available on windows
+    return atomicAdd(&t, 0);
+}
+
+template<class T>
+MR_GF_DECL void AtomicStore(T& t, T val)
+{
+    // TODO: Use proper store when it is available on windows
+    atomicExch(&t, val);
 }
 
 }

@@ -136,16 +136,16 @@ BC1::ExtractColors(Vector2ui block)
     auto BisectColor565 = [](uint32_t color) -> Vector3
     {
         using NormConversion::FromUNormVarying;
-        uint32_t b = Bit::FetchSubPortion(color, {0, 5});
-        uint32_t g = Bit::FetchSubPortion(color, {5, 11});
-        uint32_t r = Bit::FetchSubPortion(color, {11, 16});
+        uint32_t b = Bit::FetchSubPortion(color, {0u, 5u});
+        uint32_t g = Bit::FetchSubPortion(color, {5u, 11u});
+        uint32_t r = Bit::FetchSubPortion(color, {11u, 16u});
         return Vector3(FromUNormVarying<Float>(r, 5u),
                        FromUNormVarying<Float>(g, 6u),
                        FromUNormVarying<Float>(b, 5u));
 
     };
-    uint32_t color0 = Bit::FetchSubPortion(block[0], {0, 16});
-    uint32_t color1 = Bit::FetchSubPortion(block[0], {16, 32});
+    uint32_t color0 = Bit::FetchSubPortion(block[0], {0u, 16u});
+    uint32_t color1 = Bit::FetchSubPortion(block[0], {16u, 32u});
     return { BisectColor565(color0), BisectColor565(color1) };
 }
 
@@ -167,8 +167,8 @@ Vector2ui BC1::InjectColors(Vector2ui block, const ColorPack& colorIn,
     uint32_t color1 = ComposeColor565(colorIn[1]);
     // 1-bit alpha mode
     // https://learn.microsoft.com/en-us/windows/uwp/graphics-concepts/opaque-and-1-bit-alpha-textures
-    uint32_t c0 = Bit::FetchSubPortion(block[0], {0, 16});
-    uint32_t c1 = Bit::FetchSubPortion(block[0], {16, 32});
+    uint32_t c0 = Bit::FetchSubPortion(block[0], {0u, 16u});
+    uint32_t c1 = Bit::FetchSubPortion(block[0], {16u, 32u});
     bool opaqueMode = (c0 > c1);
     bool alphaMode = !opaqueMode;
     // Due to conversion, new color's magnitudes are changed
@@ -240,8 +240,8 @@ BC4<IsSigned>::ExtractColors(Vector2ui block)
 {
     using namespace Bit;
     using namespace NormConversion;
-    uint8_t color0 = uint8_t(FetchSubPortion(block[0], {0, 8}));
-    uint8_t color1 = uint8_t(FetchSubPortion(block[0], {8, 16}));
+    uint8_t color0 = uint8_t(FetchSubPortion(block[0], {0u, 8u}));
+    uint8_t color1 = uint8_t(FetchSubPortion(block[0], {8u, 16u}));
 
     Float c0, c1;
     if constexpr(IsSigned)
@@ -265,8 +265,8 @@ Vector2ui BC4<IsSigned>::InjectColors(Vector2ui block, const ColorPack& colorIn)
     using namespace NormConversion;
     using Math::Clamp;
 
-    uint32_t c0 = FetchSubPortion(block[0], {0, 8});
-    uint32_t c1 = FetchSubPortion(block[0], {8, 16});
+    uint32_t c0 = FetchSubPortion(block[0], {0u, 8u});
+    uint32_t c1 = FetchSubPortion(block[0], {8u, 16u});
     // Due to conversion new color's magnitudes
     // may have changed. Obey the actual mode.
     bool opaqueMode = (c0 > c1);
@@ -309,7 +309,7 @@ Vector2ui BC4<IsSigned>::InjectColors(Vector2ui block, const ColorPack& colorIn)
         // TODO: Change this
         std::swap(color0, color1);
     }
-    uint32_t block0 = Compose<8, 8, 16>(c0, c1, FetchSubPortion(block[0], {16, 32}));
+    uint32_t block0 = Compose<8, 8, 16>(c0, c1, FetchSubPortion(block[0], {16u, 32u}));
     return Vector2ui(block0, block[1]);
 }
 
@@ -420,11 +420,13 @@ Vector3 BC7::ExtractColor(uint32_t i) const
 {
     using Bit::FetchSubPortion;
     using Bit::RotateRight;
+    using Arr = Array<uint64_t, 2>;
+
     uint32_t mode = Mode();
     if(i >= ColorCount(mode)) return Vector3::Zero();
 
     // Rotation bits (only valid for mode 4 and 5)
-    uint32_t rotation = uint32_t(FetchSubPortion(block[0], {mode + 1, mode + 3}));
+    uint32_t rotation = uint32_t(FetchSubPortion(block[0], Arr{mode + 1, mode + 3}));
     bool hasRotation = (mode == 5 || mode == 4) && (rotation != 0);
     bool hasPBits = (HasUniquePBits(mode) || (mode == 1));
 
@@ -432,14 +434,14 @@ Vector3 BC7::ExtractColor(uint32_t i) const
     const uint32_t CC = ColorCount(mode);
     const uint32_t B = ColorBits(mode);
     const uint32_t O = B * i;
-    auto b = RotateRight(block.AsArray(), ColorStartOffset(mode));
+    auto b = RotateRight({block[0], block[1]}, ColorStartOffset(mode));
 
     // R,G,B
     Vector3ui c = Vector3ui::Zero();
     MRAY_UNROLL_LOOP
     for(uint32_t idx = 0; idx < 3; idx++)
     {
-        c[idx] = uint32_t(FetchSubPortion(b[0], {O, O + B}));
+        c[idx] = uint32_t(FetchSubPortion(b[0], Arr{O, O + B}));
         b = RotateRight(b, CC * B);
     }
     // Skip alpha row for mode 6 & 7
@@ -450,7 +452,7 @@ Vector3 BC7::ExtractColor(uint32_t i) const
     {
         // Shared P-bits (first 2 color use one p-bit etc.)
         uint32_t o = (mode == 1) ? i >> 1 : i;
-        uint32_t p = uint32_t(FetchSubPortion(b[0], {o, o + 1}));
+        uint32_t p = uint32_t(FetchSubPortion(b[0], Arr{o, o + 1}));
         assert(p <= 1);
         c[0] = (c[0] << 1u) | p;
         c[1] = (c[1] << 1u) | p;
@@ -462,7 +464,7 @@ Vector3 BC7::ExtractColor(uint32_t i) const
     {
         // Alpha bits are one-bit larger so offset is different
         uint32_t o = (B + 1) * i;
-        c[rotation - 1] = uint32_t(FetchSubPortion(b[0], {o, o + B + 1}));
+        c[rotation - 1] = uint32_t(FetchSubPortion(b[0], Arr{o, o + B + 1}));
         // This is little bit different than the generic
         // case might as well return here
         uint32_t rb = (rotation == 1) ? (B + 1) : B;
@@ -493,6 +495,9 @@ Vector3 BC7::ExtractColor(uint32_t i) const
 MR_HF_DEF
 void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
 {
+    using Bit::FetchSubPortion;
+    using Arr = Array<uint64_t, 2>;
+
     uint32_t mode = Mode();
     if(i >= ColorCount(mode)) return;
 
@@ -500,7 +505,7 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
     const uint32_t B = ColorBits(mode);
     const uint32_t O = B * i;
     // Rotation bits (only valid for mode 4 and 5)
-    uint32_t rotation = uint32_t(Bit::FetchSubPortion(block[0], {mode + 1, mode + 3}));
+    uint32_t rotation = uint32_t(FetchSubPortion(block[0], Arr{mode + 1, mode + 3}));
     bool hasRotation = (mode == 5 || mode == 4) && (rotation != 0);
     bool hasPBits = (HasUniquePBits(mode) || (mode == 1));
 
@@ -553,7 +558,7 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
     // Cycle through bits and write
     using Bit::SetSubPortion;
     using Bit::RotateRight;
-    auto b  = RotateRight(block.AsArray(), ColorStartOffset(mode));
+    auto b  = RotateRight({block[0], block[1]}, ColorStartOffset(mode));
 
     // R,G,B
     MRAY_UNROLL_LOOP
@@ -580,7 +585,7 @@ void BC7::InjectColor(uint32_t i, const Vector3& colorIn)
         // We need to find the rounded bit between two different colors
         // However we do not store the previous bit (TODO: Later)
         // Fetch the current set bit and do some heuristic
-        uint32_t pPrev = uint32_t(Bit::FetchSubPortion(b[0], {o, o + 1}));
+        uint32_t pPrev = uint32_t(FetchSubPortion(b[0], Arr{o, o + 1}));
         pBit = (pPrev + pBit) >> 1;
         b[0] = SetSubPortion(b[0], pBit, {o, o + 1});
     }

@@ -8,11 +8,11 @@
 #include "CameraC.h"
 #include "TransformC.h"
 #include "LightC.h"
+#include "MediumC.h"
 #include "TracerTypes.h"
 #include "AcceleratorC.h"
 #include "Texture.h"
 #include "TextureFilter.h"
-#include "MediaTracker.h"
 
 #include "Core/Algorithm.h"
 #include "Core/TypePack.h"
@@ -40,6 +40,7 @@ using GenericGroupMediumT    = GenericTexturedGroupT<MediumKey, MediumAttributeI
 using GenericGroupMaterialT  = GenericTexturedGroupT<MaterialKey, MatAttributeInfo>;
 
 class MediaTrackerView;
+class RayMediaListPack;
 
 struct FlatSurfParams
 {
@@ -176,6 +177,7 @@ class RenderMediumWorkI
 
     virtual RNRequestList    SampleRNList(uint32_t workIndex) const = 0;
     virtual std::string_view Name() const = 0;
+    virtual bool             IsVacuumMedia() const = 0;
 };
 
 using RenderImagePtr = std::unique_ptr<RenderImage>;
@@ -219,12 +221,6 @@ concept RendererC = requires(RendererType rt,
                              const GPUSystem& gpuSystem,
                              const GPUQueue& q)
 {
-    // Global State
-    // These parameters are work agnostic.
-    typename RendererType::GlobalStateList;
-    // These parameters are work related.
-    // (Not used but exposed for future use maybe?)
-    typename RendererType::RayStateList;
     typename RendererType::SpectrumContext;
     // Host side things
     typename RendererType::AttribInfoList;
@@ -286,36 +282,101 @@ class RendererI
 
 using RendererPtr = std::unique_ptr<RendererI>;
 
+#define MRAY_WORK_LIST_DEFAULT WorkFunctions<PrimGroupEmpty, MatGroupPassthrough, TransformGroupIdentity>
+#define MRAY_LIGHT_WORK_LIST_DEFAULT LightWorkFunctions<LightGroupNull, TransformGroupIdentity>
+#define MRAY_CAM_WORK_LIST_DEFAULT CamWorkFunctions<CameraGroupNull, TransformGroupIdentity>
+#define MRAY_MEDIUM_WORK_LIST_DEFAULT MediumWorkFunctions<MediumGroupVacuum, TransformGroupIdentity>
+
 namespace RendererDetail
 {
+
+
     // https://stackoverflow.com/questions/28432977/generic-way-of-lazily-evaluating-short-circuiting-with-stdconditional-t
     // Short circuit conditional
+    // Render Work
     template<RendererC R, uint32_t I, bool B>
-    struct RenderGlobalState;
+    struct RenderWorkStates;
 
     template<RendererC R, uint32_t I>
-    struct RenderGlobalState<R, I, false> { using type = EmptyType;};
+    struct RenderWorkStates<R, I, false>
+    {
+        using GS = EmptyType;
+        using RS = EmptyType;
+    };
 
     template<RendererC R, uint32_t I>
-    struct RenderGlobalState<R, I, true>
-    { using type = TypePackElement<I, typename R::GlobalStateList>; };
+    struct RenderWorkStates<R, I, true>
+    {
+        using GS = TypePackElement<I, typename R::template MRAY_WORK_LIST_DEFAULT>::GlobalState;
+        using RS = TypePackElement<I, typename R::template MRAY_WORK_LIST_DEFAULT>::RayState;
+    };
 
+    // Render Light Work
     template<RendererC R, uint32_t I, bool B>
-    struct RenderRayState;
+    struct RenderLightWorkStates;
 
     template<RendererC R, uint32_t I>
-    struct RenderRayState<R, I, false> { using type = EmptyType;};
+    struct RenderLightWorkStates<R, I, false>
+    {
+        using GS = EmptyType;
+        using RS = EmptyType;
+    };
 
     template<RendererC R, uint32_t I>
-    struct RenderRayState<R, I, true>
-    { using type = TypePackElement<I, typename R::RayStateList>; };
+    struct RenderLightWorkStates<R, I, true>
+    {
+        using GS = TypePackElement<I, typename R::template MRAY_LIGHT_WORK_LIST_DEFAULT>::GlobalState;
+        using RS = TypePackElement<I, typename R::template MRAY_LIGHT_WORK_LIST_DEFAULT>::RayState;
+    };
 
+    // Render Camera Work
+    template<RendererC R, uint32_t I, bool B>
+    struct RenderCamWorkStates;
+
+    template<RendererC R, uint32_t I>
+    struct RenderCamWorkStates<R, I, false>
+    {
+        using GS = EmptyType;
+        using RS = EmptyType;
+    };
+
+    template<RendererC R, uint32_t I>
+    struct RenderCamWorkStates<R, I, true>
+    {
+        using GS = TypePackElement<I, typename R::template MRAY_CAM_WORK_LIST_DEFAULT>::GlobalState;
+        using RS = TypePackElement<I, typename R::template MRAY_CAM_WORK_LIST_DEFAULT>::RayState;
+    };
+
+    // Render Medium Work
+    template<RendererC R, uint32_t I, bool B>
+    struct RenderMediumWorkStates;
+
+    template<RendererC R, uint32_t I>
+    struct RenderMediumWorkStates<R, I, false>
+    {
+        using GS = EmptyType;
+        using RS = EmptyType;
+    };
+
+    template<RendererC R, uint32_t I>
+    struct RenderMediumWorkStates<R, I, true>
+    {
+        using GS = TypePackElement<I, typename R::template MRAY_MEDIUM_WORK_LIST_DEFAULT>::GlobalState;
+        using RS = TypePackElement<I, typename R::template MRAY_MEDIUM_WORK_LIST_DEFAULT>::RayState;
+    };
 }
 
 template<RendererC R, uint32_t I>
-using RenderGlobalState = RendererDetail::RenderGlobalState<R, I, I < TypePackSize<typename R::GlobalStateList>>::type;
+using RenderWorkStates = RendererDetail::RenderWorkStates<R, I, I < TypePackSize<typename R::template MRAY_WORK_LIST_DEFAULT>>;
+
 template<RendererC R, uint32_t I>
-using RenderRayState = RendererDetail::RenderRayState<R, I, I < TypePackSize<typename R::RayStateList>>::type;
+using RenderLightWorkStates = RendererDetail::RenderLightWorkStates<R, I, I < TypePackSize<typename R::template MRAY_LIGHT_WORK_LIST_DEFAULT>>;
+
+template<RendererC R, uint32_t I>
+using RenderCamWorkStates = RendererDetail::RenderCamWorkStates<R, I, I < TypePackSize<typename R::template MRAY_CAM_WORK_LIST_DEFAULT>>;
+
+template<RendererC R, uint32_t I>
+using RenderMediumWorkStates = RendererDetail::RenderMediumWorkStates<R, I, I < TypePackSize<typename R::template MRAY_MEDIUM_WORK_LIST_DEFAULT>>;
 
 // Some renderers will require multiple "work"
 // per tuple/pair. Renderer itself (orchestrator)
@@ -328,101 +389,101 @@ using RenderRayState = RendererDetail::RenderRayState<R, I, I < TypePackSize<typ
 // RendererWork instances will implement these functions.
 // These macros are here to reduce boilerplate since
 // function argument count is quite large
-#define MRAY_RENDER_DO_WORK_DECL(tag)             \
-void DoWork_##tag                                 \
-(                                                 \
-    const RenderRayState<R, tag>& dRayStates,     \
-    Span<RayGMem> dRaysIn,                        \
-    Span<RayCone> dRayDiffsIn,                    \
-    Span<const RayIndex> dRayIndicesIn,           \
-    Span<const RandomNumber> dRandomNumbers,      \
-    Span<const MetaHit> dHitsIn,                  \
-    Span<const HitKeyPack> dKeysIn,               \
-    const RenderGlobalState<R, tag>& globalState, \
-    const GPUQueue& queue                         \
+#define MRAY_RENDER_DO_WORK_DECL(tag)                         \
+void DoWork_##tag                                             \
+(                                                             \
+    const typename RenderWorkStates<R, tag>::RS& dRayStates,  \
+    Span<RayGMem> dRaysIn,                                    \
+    Span<RayCone> dRayDiffsIn,                                \
+    Span<const RayIndex> dRayIndicesIn,                       \
+    Span<const RandomNumber> dRandomNumbers,                  \
+    Span<const MetaHit> dHitsIn,                              \
+    Span<const HitKeyPack> dKeysIn,                           \
+    const typename RenderWorkStates<R, tag>::GS& globalState, \
+    const GPUQueue& queue                                     \
 ) const
 
-#define MRAY_RENDER_DO_WORK_DEF(tag)    \
-void DoWork_##tag                       \
-(                                       \
-    const RenderRayState<R, tag>& a,    \
-    Span<RayGMem> b,                    \
-    Span<RayCone> c,                    \
-    Span<const RayIndex> d,             \
-    Span<const RandomNumber> e,         \
-    Span<const MetaHit> f,              \
-    Span<const HitKeyPack> g,           \
-    const RenderGlobalState<R, tag>& h, \
-    const GPUQueue& i                   \
-) const override                        \
-{                                       \
-    DoWorkInternal<tag>(a, b, c, d,     \
-                        e, f, g, h, i); \
+#define MRAY_RENDER_DO_WORK_DEF(tag)                \
+void DoWork_##tag                                   \
+(                                                   \
+    const typename RenderWorkStates<R, tag>::RS& a, \
+    Span<RayGMem> b,                                \
+    Span<RayCone> c,                                \
+    Span<const RayIndex> d,                         \
+    Span<const RandomNumber> e,                     \
+    Span<const MetaHit> f,                          \
+    Span<const HitKeyPack> g,                       \
+    const typename RenderWorkStates<R, tag>::GS& h, \
+    const GPUQueue& i                               \
+) const override                                    \
+{                                                   \
+    DoWorkInternal<tag>(a, b, c, d,                 \
+                        e, f, g, h, i);             \
 }
 
-#define MRAY_RENDER_DO_LIGHT_WORK_DECL(tag)       \
-void DoBoundaryWork_##tag                         \
-(                                                 \
-    const RenderRayState<R, tag>& dRayStates,     \
-    Span<RayGMem> dRaysIO,                        \
-    Span<RayCone> dRayDiffsIO,                    \
-    Span<const RayIndex> dRayIndicesIn,           \
-    Span<const uint32_t> dRandomNumbers,          \
-    Span<const MetaHit> dHitsIn,                  \
-    Span<const HitKeyPack> dKeysIn,               \
-    const RenderGlobalState<R, tag>& globalState, \
-    const GPUQueue& queue                         \
+#define MRAY_RENDER_DO_LIGHT_WORK_DECL(tag)                        \
+void DoBoundaryWork_##tag                                          \
+(                                                                  \
+    const typename RenderLightWorkStates<R, tag>::RS& dRayStates,  \
+    Span<RayGMem> dRaysIO,                                         \
+    Span<RayCone> dRayDiffsIO,                                     \
+    Span<const RayIndex> dRayIndicesIn,                            \
+    Span<const uint32_t> dRandomNumbers,                           \
+    Span<const MetaHit> dHitsIn,                                   \
+    Span<const HitKeyPack> dKeysIn,                                \
+    const typename RenderLightWorkStates<R, tag>::GS& globalState, \
+    const GPUQueue& queue                                          \
 ) const
 
-#define MRAY_RENDER_DO_LIGHT_WORK_DEF(tag)  \
-void DoBoundaryWork_##tag                   \
-(                                           \
-    const RenderRayState<R, tag>& a,        \
-    Span<RayGMem> b,                        \
-    Span<RayCone> c,                        \
-    Span<const RayIndex> d,                 \
-    Span<const uint32_t> e,                 \
-    Span<const MetaHit> f,                  \
-    Span<const HitKeyPack> g,               \
-    const RenderGlobalState<R, tag>& h,     \
-    const GPUQueue& i                       \
-) const override                            \
-{                                           \
-    DoBoundaryWorkInternal<tag>(a, b, c,    \
-                                d, e, f,    \
-                                g, h, i);   \
+#define MRAY_RENDER_DO_LIGHT_WORK_DEF(tag)               \
+void DoBoundaryWork_##tag                                \
+(                                                        \
+    const typename RenderLightWorkStates<R, tag>::RS& a, \
+    Span<RayGMem> b,                                     \
+    Span<RayCone> c,                                     \
+    Span<const RayIndex> d,                              \
+    Span<const uint32_t> e,                              \
+    Span<const MetaHit> f,                               \
+    Span<const HitKeyPack> g,                            \
+    const typename RenderLightWorkStates<R, tag>::GS& h, \
+    const GPUQueue& i                                    \
+) const override                                         \
+{                                                        \
+    DoBoundaryWorkInternal<tag>(a, b, c,                 \
+                                d, e, f,                 \
+                                g, h, i);                \
 }
 
-#define MRAY_RENDER_MEDIUM_DO_WORK_DECL(tag)            \
-void DoWork_##tag                                       \
-(                                                       \
-    const RenderRayState<R, tag>& dRayStates,           \
-    Span<RayGMem> dRaysIO,                              \
-    Span<RayCone> dRayDiffsIO,                          \
-    Span<const RayIndex> dRayIndices,                   \
-    Span<const RayMediaListPack> dRayMediaPacks,        \
-    Span<const RandomNumber> dRandomNumbers,            \
-    const MediaTrackerView& mediaTracker,               \
-    const RenderGlobalState<R, tag>& globalState,       \
-    const GPUQueue& queue                               \
+#define MRAY_RENDER_MEDIUM_DO_WORK_DECL(tag)                        \
+void DoWork_##tag                                                   \
+(                                                                   \
+    const typename RenderMediumWorkStates<R, tag>::RS& dRayStates,  \
+    Span<RayGMem> dRaysIO,                                          \
+    Span<RayCone> dRayDiffsIO,                                      \
+    Span<const RayIndex> dRayIndices,                               \
+    Span<const RayMediaListPack> dRayMediaPacks,                    \
+    Span<const RandomNumber> dRandomNumbers,                        \
+    const MediaTrackerView& mediaTracker,                           \
+    const typename RenderMediumWorkStates<R, tag>::GS& globalState, \
+    const GPUQueue& queue                                           \
 ) const
 
-#define MRAY_RENDER_MEDIUM_DO_WORK_DEF(tag) \
-void DoWork_##tag                           \
-(                                           \
-    const RenderRayState<R, tag>& a,        \
-    Span<RayGMem> b,                        \
-    Span<RayCone> c,                        \
-    Span<const RayIndex> d,                 \
-    Span<const RayMediaListPack> e,         \
-    Span<const RandomNumber> f,             \
-    const MediaTrackerView& g,              \
-    const RenderGlobalState<R, tag>& h,     \
-    const GPUQueue& i                       \
-) const override                            \
-{                                           \
-    DoWorkInternal<tag>(a, b, c, d,         \
-                        e, f, g, h, i);     \
+#define MRAY_RENDER_MEDIUM_DO_WORK_DEF(tag)               \
+void DoWork_##tag                                         \
+(                                                         \
+    const typename RenderMediumWorkStates<R, tag>::RS& a, \
+    Span<RayGMem> b,                                      \
+    Span<RayCone> c,                                      \
+    Span<const RayIndex> d,                               \
+    Span<const RayMediaListPack> e,                       \
+    Span<const RandomNumber> f,                           \
+    const MediaTrackerView& g,                            \
+    const typename RenderMediumWorkStates<R, tag>::GS& h, \
+    const GPUQueue& i                                     \
+) const override                                          \
+{                                                         \
+    DoWorkInternal<tag>(a, b, c, d,                       \
+                        e, f, g, h, i);                   \
 }
 
 template<class R>
@@ -431,6 +492,7 @@ class RenderWorkT : public RenderWorkI
     public:
     virtual MRAY_RENDER_DO_WORK_DECL(0) = 0;
     virtual MRAY_RENDER_DO_WORK_DECL(1) = 0;
+    virtual MRAY_RENDER_DO_WORK_DECL(2) = 0;
 };
 
 template<class R>
@@ -439,6 +501,7 @@ class RenderLightWorkT : public RenderLightWorkI
     public:
     virtual MRAY_RENDER_DO_LIGHT_WORK_DECL(0) = 0;
     virtual MRAY_RENDER_DO_LIGHT_WORK_DECL(1) = 0;
+    virtual MRAY_RENDER_DO_LIGHT_WORK_DECL(2) = 0;
 };
 
 template<class R>
@@ -455,6 +518,7 @@ class RenderMediumWorkT : public RenderMediumWorkI
     public:
     virtual MRAY_RENDER_MEDIUM_DO_WORK_DECL(0) = 0;
     virtual MRAY_RENDER_MEDIUM_DO_WORK_DECL(1) = 0;
+    virtual MRAY_RENDER_MEDIUM_DO_WORK_DECL(2) = 0;
 };
 
 // Renderer holds its work in a linear array.
@@ -877,7 +941,7 @@ CommonKey RenderSurfaceWorkHasher::HashWorkDataPortion(HitKeyPack p, RayIndex i)
         uint32_t start = currentBit;
         uint32_t end = currentBit + bitsForItem;
         assert(end <= sizeof(CommonKey) * CHAR_BIT);
-        std::array range = {CommonKey(start), CommonKey(end)};
+        Array range = {CommonKey(start), CommonKey(end)};
         result = Bit::SetSubPortion(result, item, range);
         remainingBits -= bitsForItem;
         currentBit += bitsForItem;
@@ -911,6 +975,7 @@ CommonKey RenderSurfaceWorkHasher::GenerateWorkKeyGPU(HitKeyPack p, RayIndex ray
         }
         i++;
     }
+    assert(i < dWorkBatchHashes.size() && "Unable to find media!");
     // Compose the sort key
     CommonKey hashLower = HashWorkDataPortion(p, rayIndex);
     CommonKey result = Bit::SetSubPortion(hashLower, batchId,
@@ -1001,7 +1066,7 @@ RenderMediumWorkHasher::HashWorkDataPortion(VolumeKeyPack p, RayIndex i) const
         uint32_t start = currentBit;
         uint32_t end = currentBit + bitsForItem;
         assert(end <= sizeof(CommonKey) * CHAR_BIT);
-        std::array range = {CommonKey(start), CommonKey(end)};
+        Array range = {CommonKey(start), CommonKey(end)};
         result = Bit::SetSubPortion(result, item, range);
         remainingBits -= bitsForItem;
         currentBit += bitsForItem;
@@ -1034,6 +1099,7 @@ RenderMediumWorkHasher::GenerateWorkKeyGPU(VolumeKeyPack p, RayIndex rayIndex) c
         }
         i++;
     }
+    assert(i < dWorkBatchHashes.size() && "Unable to find media!");
     // Compose the sort key
     CommonKey hashLower = HashWorkDataPortion(p, rayIndex);
     CommonKey result = Bit::SetSubPortion(hashLower, batchId,

@@ -242,6 +242,23 @@ class [[nodiscard]] TracerI
     // TODO: add more later (sub data etc)
     virtual void        PushTextureData(TextureId, uint32_t mipLevel,
                                         TransientData data) = 0;
+
+    //================================//
+    //   Sparse Texture Toplogy (3D)  //
+    //================================//
+    virtual TopologyId   CreateSparseTopology(MRayTopologyType,
+                                              TopologyLayerSizeList) = 0;
+    virtual void         CommitSparseTopologies() = 0;
+    virtual void         PushSparseTopologyData(TopologyId, TransientData data,
+                                                size_t offset = 0) = 0;
+    //
+    virtual TextureId    CreateSparseTexture3D(TopologyId,
+                                               MRayTextureParameters) = 0;
+    virtual void         CommitSparseTextures() = 0;
+    virtual void         PushSparseTextureData(TextureId,
+                                               TransientData data,
+                                               size_t offset = 0) = 0;
+
     //================================//
     //          Transform             //
     //================================//

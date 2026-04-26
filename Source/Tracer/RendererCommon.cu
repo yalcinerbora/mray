@@ -97,6 +97,28 @@ void KCCopyRaysIndirect(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
     }
 }
 
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCAdvanceRayIndirect(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysInOut,
+                          MRAY_GRID_CONSTANT const Span<RayCone> dRayDiffInOut,
+                          MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices)
+{
+    KernelCallParams kp;
+    uint32_t pathCount = static_cast<uint32_t>(dIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < pathCount; i += kp.TotalSize())
+    {
+        RayIndex index = dIndices[i];
+        auto [ray, tMM] = RayFromGMem(dRaysInOut, index);
+        RayCone cone = dRayDiffInOut[index];
+
+        // TODO: Was it tMM[1] - tMM[0]?
+        cone = cone.Advance(tMM[1]);
+        ray.pos = ray.AdvancedPos(tMM[1]);
+        tMM = Vector2(MathConstants::LargeEpsilon<Float>(),
+                      std::numeric_limits<Float>::max());
+        RayToGMem(dRaysInOut, index, ray, tMM);
+        dRayDiffInOut[index] = cone;
+    }
+}
 
 MRAY_HOST
 void

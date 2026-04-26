@@ -78,6 +78,9 @@ set(MRAY_MSVC_OPTIONS
     /bigobj
     # MT Build
     /MP
+
+    # CUDA 13.2 warns about non standard msvc preprocessor
+    /Zc:preprocessor
 )
 
 # MSVC Arch related
@@ -205,6 +208,10 @@ if(MSVC)
         # -Xcompiler=/W3
         # -Xcompiler=/Zi
         -Xcompiler=/external:W0
+
+        # CUDA 13.2 warns about non standard msvc preprocessor
+        -Xcompiler=/Zc:preprocessor
+
         # Test
         # DROPPED W4 On MSVC it shows many unnecessary info
         # These Flags for W4 however /external does not work properly i think

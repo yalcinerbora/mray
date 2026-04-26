@@ -10,7 +10,7 @@ namespace mray::hip::algorithms
 {
 
 template <class T>
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DECL
 size_t LowerBound(Span<const T> range, const T& value)
 {
     return rocprim::lower_bound(range.data(), range.size(), value);

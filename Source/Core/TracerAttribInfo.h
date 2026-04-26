@@ -55,6 +55,7 @@ using PrimAttributeInfoList = StaticVector<PrimAttributeInfo,
                                            TracerConstants::MaxAttributePerGroup>;
 // Texture Related
 MRAY_GENERIC_ID(TextureId, CommonId);
+MRAY_GENERIC_ID(TopologyId, CommonId);
 // Transform Related
 MRAY_GENERIC_ID(TransGroupId, CommonId);
 MRAY_GENERIC_ID(TransformId, CommonId);
@@ -101,6 +102,9 @@ using OptionalAlphaMapList  = StaticVector<Optional<TextureId>, TracerConstants:
 using CullBackfaceFlagList  = StaticVector<bool, TracerConstants::MaxPrimBatchPerSurface>;
 using SurfaceVolumeList     = StaticVector<VolumeId, TracerConstants::MaxPrimBatchPerSurface>;
 using BoundaryVolumeList    = StaticVector<VolumeId, TracerConstants::MaxNestedVolumes>;
+//
+using TopologyLayerSizeList = StaticVector<size_t, TracerConstants::MaxSparseTopologyLayers>;
+
 // Renderer Related
 MRAY_GENERIC_ID(RendererId, CommonId);
 using RendererAttributeInfo = GenericAttributeInfo;

@@ -136,6 +136,14 @@ PathTracerRendererBase::ReloadPaths(Span<const RayIndex> dIndices,
                 dFilledRayIndices
             );
 
+            if(mediaTracker)
+            {
+                mediaTracker->SetStartingVolumeIndirect(dRayMediaListPacks,
+                                                        dFilledRayIndices,
+                                                        curCamSurfaceParams.nestedVolumes,
+                                                        processQueue);
+            }
+
             // Init path state set the throughput to one.
             // Now we can call spectral wavelength sample routine.
             // It stores the PDF values in the througput
@@ -210,6 +218,14 @@ void PathTracerRendererBase::ResetAllPaths(const GPUQueue& queue)
     DeviceAlgorithms::InPlaceTransform(dPathDataPack, queue,
                                        SetPathStateFunctor(PathStatusEnum::INVALID, true));
     queue.MemsetAsync(dPathRNGDimensions, 0x00);
+}
+
+void PathTracerRendererBase::MarkPathsTransmittedIndirect(Span<PathDataPack> dPathDataPackLocal,
+                                                          Span<const RayIndex> dRayIndices,
+                                                          const GPUQueue& queue)
+{
+    DeviceAlgorithms::InPlaceTransformIndirect(dPathDataPackLocal, dRayIndices, queue,
+                                               SetPathStateFunctor(PathStatusEnum::MEDIUM_TRANSMITTED, false));
 }
 
 Optional<RenderImageSection>

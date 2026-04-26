@@ -114,16 +114,16 @@ template<class Renderer, uint32_t I, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG>
 using RenderWorkParamsR = RenderWorkParams
 <
-    RenderGlobalState<Renderer, I>,
-    RenderRayState<Renderer, I>,
+    typename RenderWorkStates<Renderer, I>::GS,
+    typename RenderWorkStates<Renderer, I>::RS,
     PG, MG, TG
 >;
 template<class Renderer, uint32_t I,
          LightGroupC LG, TransformGroupC TG>
 using RenderLightWorkParamsR = RenderLightWorkParams
 <
-    RenderGlobalState<Renderer, I>,
-    RenderRayState<Renderer, I>,
+    typename RenderLightWorkStates<Renderer, I>::GS,
+    typename RenderLightWorkStates<Renderer, I>::RS,
     LG, TG
 >;
 
@@ -131,8 +131,8 @@ template<class Renderer, uint32_t I,
          CameraGroupC CG, TransformGroupC TG>
 using RenderCameraWorkParamsR = RenderCameraWorkParams
 <
-    RenderGlobalState<Renderer, I>,
-    RenderRayState<Renderer, I>,
+    typename RenderCamWorkStates<Renderer, I>::GS,
+    typename RenderCamWorkStates<Renderer, I>::RS,
     CG, TG
 >;
 
@@ -140,8 +140,8 @@ template<class Renderer, uint32_t I,
          MediumGroupC MG, TransformGroupC TG>
 using RenderMediumWorkParamsR = RenderMediumWorkParams
 <
-    RenderGlobalState<Renderer, I>,
-    RenderRayState<Renderer, I>,
+    typename RenderMediumWorkStates<Renderer, I>::GS,
+    typename RenderMediumWorkStates<Renderer, I>::RS,
     MG, TG
 >;
 
@@ -246,7 +246,7 @@ class RenderWork : public RenderWorkT<R>
 
     template<uint32_t I>
     void DoWorkInternal(// I-O
-                        const RenderRayState<R, I>& dRayStates,
+                        const typename RenderWorkStates<R, I>::RS& dRayStates,
                         Span<RayGMem> dRaysIO,
                         Span<RayCone> dRayDiffsIO,
                         // Input
@@ -257,7 +257,7 @@ class RenderWork : public RenderWorkT<R>
                         Span<const MetaHit> dHitsIn,
                         Span<const HitKeyPack> dKeysIn,
                         // Constants
-                        const RenderGlobalState<R, I>& globalState,
+                        const typename RenderWorkStates<R, I>::GS& globalState,
                         const GPUQueue& queue) const;
 
     public:
@@ -269,6 +269,7 @@ class RenderWork : public RenderWorkT<R>
     //
     MRAY_RENDER_DO_WORK_DEF(0)
     MRAY_RENDER_DO_WORK_DEF(1)
+    MRAY_RENDER_DO_WORK_DEF(2)
 
     RNRequestList    SampleRNList(uint32_t workIndex) const override;
     std::string_view Name() const override;
@@ -287,7 +288,7 @@ class RenderLightWork : public RenderLightWorkT<R>
 
     template<uint32_t I>
     void    DoBoundaryWorkInternal(// I-O
-                                   const RenderRayState<R, I>& dRayStates,
+                                   const typename RenderLightWorkStates<R, I>::RS& dRayStates,
                                    Span<RayGMem> dRaysIn,
                                    Span<RayCone> dRayDiffsIn,
                                    // Input
@@ -298,7 +299,7 @@ class RenderLightWork : public RenderLightWorkT<R>
                                    Span<const MetaHit> dHitsIn,
                                    Span<const HitKeyPack> dKeysIn,
                                    // Constants
-                                   const RenderGlobalState<R, I>& globalState,
+                                   const typename RenderLightWorkStates<R, I>::GS& globalState,
                                    const GPUQueue& queue) const;
 
     public:
@@ -309,6 +310,7 @@ class RenderLightWork : public RenderLightWorkT<R>
     //
     MRAY_RENDER_DO_LIGHT_WORK_DEF(0)
     MRAY_RENDER_DO_LIGHT_WORK_DEF(1)
+    MRAY_RENDER_DO_LIGHT_WORK_DEF(2)
 
     RNRequestList       SampleRNList(uint32_t workIndex) const override;
     std::string_view    Name() const override;
@@ -409,14 +411,14 @@ class RenderMediumWork : public RenderMediumWorkT<R>
 
     template<uint32_t I>
     void DoWorkInternal(// I-O
-                        const RenderRayState<R, I>& dRayStates,
+                        const typename RenderMediumWorkStates<R, I>::RS& dRayStates,
                         Span<RayGMem> dRaysIO,
                         Span<RayCone> dRayDiffsIO,
                         Span<const RayIndex> dRayIndices,
                         Span<const RayMediaListPack> dRayInterfacePacks,
                         Span<const RandomNumber> dRandomNumbers,
                         const MediaTrackerView& mediaTracker,
-                        const RenderGlobalState<R, I>& globalState,
+                        const typename RenderMediumWorkStates<R, I>::GS& globalState,
                         const GPUQueue& queue) const;
 
     public:
@@ -427,9 +429,11 @@ class RenderMediumWork : public RenderMediumWorkT<R>
 
     MRAY_RENDER_MEDIUM_DO_WORK_DEF(0)
     MRAY_RENDER_MEDIUM_DO_WORK_DEF(1)
+    MRAY_RENDER_MEDIUM_DO_WORK_DEF(2)
 
     RNRequestList    SampleRNList(uint32_t workIndex) const override;
     std::string_view Name() const override;
+    bool             IsVacuumMedia() const override;
 };
 
 template<WorkFuncC WorkFunction,
@@ -478,7 +482,7 @@ template<RendererC R, PrimitiveGroupC PG,
          MaterialGroupC MG, TransformGroupC TG>
 template<uint32_t I>
 void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
-                                               const RenderRayState<R, I>& dRayStates,
+                                               const typename RenderWorkStates<R, I>::RS& dRayStates,
                                                Span<RayGMem> dRaysIO,
                                                Span<RayCone> dRayDiffsIO,
                                                // Input
@@ -489,7 +493,7 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
                                                Span<const MetaHit> dHitsIn,
                                                Span<const HitKeyPack> dKeysIn,
                                                // Constants
-                                               const RenderGlobalState<R, I>& globalState,
+                                               const typename RenderWorkStates<R, I>::GS& globalState,
                                                const GPUQueue& queue) const
 {
     // Please check the kernel for details
@@ -501,8 +505,8 @@ void RenderWork<R, PG, MG, TG>::DoWorkInternal(// I-O
     }
     else
     {
-        using GlobalState = RenderGlobalState<R, I>;
-        using RayState    = RenderRayState<R, I>;
+        using GlobalState = typename RenderWorkStates<R, I>::GS;
+        using RayState    = typename RenderWorkStates<R, I>::RS;
         using RWParams    = RenderWorkParams<GlobalState, RayState, PG, MG, TG>;
         const RWParams params =
         {
@@ -578,7 +582,7 @@ RenderLightWork<R, L, T>::RenderLightWork(const GenericGroupLightT& l,
 template<RendererC R, LightGroupC LG, TransformGroupC TG>
 template<uint32_t I>
 void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
-                                                        const RenderRayState<R, I>& dRayStates,
+                                                        const typename RenderLightWorkStates<R, I>::RS& dRayStates,
                                                         Span<RayGMem> dRaysIO,
                                                         Span<RayCone> dRayDiffsIO,
                                                         // Input
@@ -589,7 +593,7 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
                                                         Span<const MetaHit> dHitsIn,
                                                         Span<const HitKeyPack> dKeysIn,
                                                         // Constants
-                                                        const RenderGlobalState<R, I>& globalState,
+                                                        const typename RenderLightWorkStates<R, I>::GS& globalState,
                                                         const GPUQueue& queue) const
 {
     using WFList = R:: template LightWorkFunctions<LG, TG>;
@@ -601,8 +605,8 @@ void RenderLightWork<R, LG, TG>::DoBoundaryWorkInternal(// I-O
     else
     {
         const auto& pg    = lg.PrimitiveGroup();
-        using GlobalState = RenderGlobalState<R, I>;
-        using RayState    = RenderRayState<R, I>;
+        using GlobalState = typename RenderLightWorkStates<R, I>::GS;
+        using RayState    = typename RenderLightWorkStates<R, I>::RS;
         using RWParams    = RenderLightWorkParams<GlobalState, RayState, LG, TG>;
         const RWParams params =
         {
@@ -934,14 +938,14 @@ RenderMediumWork<R, MG, TG>::RenderMediumWork(const GenericGroupMediumT& mgIn,
 template<RendererC R, MediumGroupC MG, TransformGroupC TG>
 template<uint32_t I>
 void RenderMediumWork<R, MG, TG>::DoWorkInternal(// I-O
-                                                 const RenderRayState<R, I>& dRayStates,
+                                                 const typename RenderMediumWorkStates<R, I>::RS& dRayStates,
                                                  Span<RayGMem> dRaysIO,
                                                  Span<RayCone> dRayDiffsIO,
                                                  Span<const RayIndex> dRayIndices,
                                                  Span<const RayMediaListPack> dRayMediaPacks,
                                                  Span<const RandomNumber> dRandomNumbers,
                                                  const MediaTrackerView& mediaTracker,
-                                                 const RenderGlobalState<R, I>& globalState,
+                                                 const typename RenderMediumWorkStates<R, I>::GS& globalState,
                                                  const GPUQueue& queue) const
 {
     // Please check the kernel for details
@@ -953,8 +957,8 @@ void RenderMediumWork<R, MG, TG>::DoWorkInternal(// I-O
     }
     else
     {
-        using GlobalState = RenderGlobalState<R, I>;
-        using RayState    = RenderRayState<R, I>;
+        using GlobalState = typename RenderMediumWorkStates<R, I>::GS;
+        using RayState    = typename RenderMediumWorkStates<R, I>::RS;
         using RWParams    = RenderMediumWorkParams<GlobalState, RayState, MG, TG>;
         const RWParams params =
         {
@@ -1006,3 +1010,10 @@ std::string_view RenderMediumWork<R, MG, TG>::Name() const
 {
     return TypeName();
 }
+
+template<RendererC R, MediumGroupC MG, TransformGroupC TG>
+bool RenderMediumWork<R, MG, TG>::IsVacuumMedia() const
+{
+    return std::is_same_v<MG, MediumGroupVacuum>;
+}
+

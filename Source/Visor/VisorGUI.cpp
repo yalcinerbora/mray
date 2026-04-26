@@ -743,12 +743,16 @@ GUIChanges VisorGUI::Render(ImFont* windowScaledFont, const VisorState& visorSta
 
     if(inputChecker.CheckKeyPress(PRINT_CUSTOM_CAMERA))
     {
+        std::span<const Float, 3> test(visorState.transform.gazePoint.AsSpan().data(), 3);
+
         MRAY_LOG("\"gaze\"     : {},\n"
                  "\"position\" : {},\n"
                  "\"up\"       : {}",
-                 visorState.transform.gazePoint.AsArray(),
-                 visorState.transform.position.AsArray(),
-                 visorState.transform.up.AsArray());
+                 //test, test, test
+                 visorState.transform.gazePoint.AsSpan(),
+                 visorState.transform.position.AsSpan(),
+                 visorState.transform.up.AsSpan()
+                 );
     }
 
     if(topBarOn)

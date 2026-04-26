@@ -157,8 +157,15 @@
 #endif
 
 // Pure function definition / declaration attributes
-#define MR_PF_DECL   MRAY_HYBRID NO_DISCARD MRAY_ATTRIB_PURE MRAY_FORCE_INLINE_DECL constexpr
-#define MR_PF_DEF    MRAY_HYBRID MRAY_ATTRIB_PURE MRAY_FORCE_INLINE_DEF constexpr
+// TODO: Same as above (aka. [[nodiscard]])
+// PURE attribute is the very first attribute
+#if defined MRAY_GPU_BACKEND_HIP
+    #define MR_PF_DECL   MRAY_ATTRIB_PURE MRAY_HYBRID NO_DISCARD MRAY_FORCE_INLINE_DECL constexpr
+    #define MR_PF_DEF    MRAY_ATTRIB_PURE MRAY_HYBRID MRAY_FORCE_INLINE_DEF constexpr
+#else
+    #define MR_PF_DECL   MRAY_HYBRID NO_DISCARD MRAY_ATTRIB_PURE MRAY_FORCE_INLINE_DECL constexpr
+    #define MR_PF_DEF    MRAY_HYBRID MRAY_ATTRIB_PURE MRAY_FORCE_INLINE_DEF constexpr
+#endif
 #define MR_PF_DECL_V MRAY_HYBRID MRAY_FORCE_INLINE_DECL constexpr
 #define MR_PF_DEF_V  MRAY_HYBRID MRAY_FORCE_INLINE_DEF constexpr
 // GPU function definition / declaration attributes
@@ -463,6 +470,7 @@ enum class MRayTextureInterpEnum : uint8_t
 {
     MR_NEAREST,
     MR_LINEAR,
+    MR_CUBIC,
     MR_ENUM_END
 };
 
@@ -504,6 +512,27 @@ enum class MRayTextureIsIlluminant : uint8_t
 {
     IS_ALBEDO,
     IS_ILLUMINANT
+};
+
+enum class MRayTopologyType : uint8_t
+{
+    // Most common NVDB 5-4-3 Format
+    TOPOLOGY_5_4_3_INDEXED_32_BIT,
+    TOPOLOGY_5_4_3_INDEXED_64_BIT,
+    //
+    // 6-3-3-...-3 topology
+    // Top layer is 2^6 (128x128x128)
+    // There can be n layers of 8x8x8 chunks below.
+    //
+    // All data is indexed each cell either holds an index to the
+    // data, or childern index ptr. Index (offset) is relative to
+    // topology local location and it can either be 32-bit or 64-bit
+    // More or lass the NVDB layout.
+    TOPOLOGY_6_3_INDEXED_32_BIT,
+    TOPOLOGY_6_3_INDEXED_64_BIT,
+    // With this approach we can seperate the data (and all of its types)
+    // from the topology.
+    MR_ENUM_END
 };
 
 struct MRayDataTypeStringifier
@@ -629,7 +658,8 @@ struct MRayTextureInterpStringifier
     static constexpr std::array<const std::string_view, size_t(MR_ENUM_END)> Names =
     {
         "Nearest",
-        "Linear"
+        "Linear",
+        "Cubic"
     };
     static constexpr std::string_view   ToString(MRayTextureInterpEnum e);
     static constexpr
@@ -666,6 +696,21 @@ struct MRayTextureReadModeStringifier
     static constexpr
     MRayTextureReadMode                 FromString(std::string_view);
 };
+
+struct MRayTopologyTypeStringifier
+{
+    using enum MRayTopologyType;
+    static constexpr std::array<const std::string_view, size_t(MR_ENUM_END)> Names =
+    {
+        "5_4_3_Indexed_32_Bit",
+        "5_4_3_Indexed_64_Bit",
+        "6_3_Indexed_32_Bit",
+        "6_3_Indexed_64_Bit"
+    };
+    static constexpr std::string_view   ToString(MRayTopologyType);
+    static constexpr MRayTopologyType   FromString(std::string_view);
+};
+
 
 // Block Compressed pixel "types"
 // These are aligned with Vector<> template to match the types
@@ -792,4 +837,18 @@ MRayTextureReadModeStringifier::FromString(std::string_view sv)
 {
     auto loc = std::find(Names.cbegin(), Names.cend(), sv);
     return static_cast<MRayTextureReadMode>(std::distance(Names.cbegin(), loc));
+}
+
+constexpr std::string_view
+MRayTopologyTypeStringifier::ToString(MRayTopologyType e)
+{
+    assert(e < MRayTopologyType::MR_ENUM_END);
+    return Names[static_cast<uint32_t>(e)];
+}
+
+constexpr MRayTopologyType
+MRayTopologyTypeStringifier::FromString(std::string_view sv)
+{
+    auto loc = std::find(Names.cbegin(), Names.cend(), sv);
+    return static_cast<MRayTopologyType>(std::distance(Names.cbegin(), loc));
 }

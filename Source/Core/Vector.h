@@ -10,11 +10,11 @@ N should be 2, 3 or 4 at most.
 
 #include <type_traits>
 #include <concepts>
-#include <array>
 
 #include "MathForward.h"
 #include "NormTypes.h"
 #include "Types.h"
+#include "Span.h"
 
 static consteval unsigned int ChooseVectorAlignment(unsigned int totalSize)
 {
@@ -40,7 +40,7 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     static constexpr unsigned int Dims  = N;
 
     private:
-    std::array<T, N>                vector;
+    T vector[N];
 
     public:
     // Constructors & Destructor
@@ -57,6 +57,8 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     template<std::convertible_to<T> C>
     MR_PF_DECL_V explicit Vector(std::array<C, N>&& data);
     template<std::convertible_to<T> C>
+    MR_PF_DECL_V explicit Vector(Array<C, N>&& data);
+    template<std::convertible_to<T> C>
     MR_PF_DECL_V explicit Vector(const Vector<N, C>&);
     template <unsigned int M>
     MR_PF_DECL_V explicit Vector(const Vector<M, T>&) requires (M > N);
@@ -70,8 +72,8 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Vector
     MR_PF_DECL T&       operator[](unsigned int);
     MR_PF_DECL const T& operator[](unsigned int) const;
     // Structured Binding Helper
-    MR_PF_DECL  const std::array<T, N>&   AsArray() const;
-    MR_PF_DECL  std::array<T, N>&         AsArray();
+    MR_PF_DECL Span<const T, N> AsSpan() const;
+    MR_PF_DECL Span<T, N>       AsSpan();
 
     // Type cast
     template<unsigned int M, class C>
@@ -143,6 +145,40 @@ static_assert(sizeof(Vector4) == 16, "Vector4 should be tightly packed");
 static_assert(ArrayLikeC<Vector2>, "Vec2 is not ArrayLike!");
 static_assert(ArrayLikeC<Vector3>, "Vec3 is not ArrayLike!");
 static_assert(ArrayLikeC<Vector4>, "Vec4 is not ArrayLike!");
+
+template <size_t I, unsigned int N, class T>
+constexpr T& get(Vector<N, T>& t) noexcept
+{
+    static_assert(I < N, "I exceeds the Array size \"N\"");
+    return t[I];
+}
+
+template <size_t I, unsigned int N, class T>
+constexpr const T& get(const Vector<N, T>& t) noexcept
+{
+    static_assert(I < N, "I exceeds the Array size \"N\"");
+    return t[I];
+}
+
+template <size_t I, unsigned int N, class T>
+constexpr T&& get(Vector<N, T>&& t) noexcept
+{
+    static_assert(I < N, "I exceeds the Array size \"N\"");
+    return std::move(t[I]);
+}
+
+namespace std
+{
+    template <unsigned int N, class T>
+    struct tuple_size<Vector<N, T>> : std::integral_constant<size_t, N>
+    {};
+
+    template <size_t I, unsigned int N, class T>
+    struct tuple_element<I, Vector<N, T>>
+    {
+        using type = T;
+    };
+}
 
 // Implementation
 #include "Vector.hpp"

@@ -65,6 +65,8 @@ InitializeCommands() noexcept
     return CommandList;
 };
 
+static constexpr auto WTF_IS_THIS = std::is_same_v<signed char, char>;
+
 int main(int argc, const char* const argv[])
 {
     ProcessTimer processTimer;

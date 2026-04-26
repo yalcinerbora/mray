@@ -499,7 +499,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     auto [a1, a2] = rayCone.Project(f, d);
     assert(Math::IsFinite(a1) && Math::IsFinite(a2));
     Matrix3x3 M = Matrix3x3(Normalize(a1), Normalize(a2), geoNormal);
-    assert(std::all_of(M.AsArray().begin(), M.AsArray().end(),
+    assert(std::all_of(M.AsSpan().begin(), M.AsSpan().end(),
                        [](const auto& a) { return Math::IsFinite(a); }));
 
     // Curvatures

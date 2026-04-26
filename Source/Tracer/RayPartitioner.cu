@@ -26,7 +26,7 @@ void KCFindSplits(//Output
     assert(gMarks.size() == gSortedKeys.size());
     KernelCallParams kp;
 
-    std::array<CommonKey, 2> range = {batchBitRange[0], batchBitRange[1]};
+    Array<CommonKey, 2> range = {batchBitRange[0], batchBitRange[1]};
     uint32_t locCount = static_cast<uint32_t>(gSortedKeys.size() - 1);
 
     for(uint32_t globalId = kp.GlobalId();
@@ -284,9 +284,6 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
     Span<CommonKey> dKeysDB[2] = {dKeysIn, dKeysOut};
     Span<CommonIndex> dIndicesDB[2] = {dIndicesIn, dIndicesOut};
 
-    // TODO: Why are we doing two separate sorts? Keys almost always should be contiguous.
-    // If not we are wasting information space here.
-    // So a single pass should suffice maybe? Reason about this more later
     auto IssueSort = [&](const Vector2ui& sortRange)
     {
         uint32_t outIndex = RadixSort<true>(Span<Span<CommonKey>, 2>(dKeysDB),
@@ -382,7 +379,6 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
         }
         assert(foundPartitionCount <= hdPartitionKeys.size());
     }
-
     // Mark the split positions
     queue.IssueWorkKernel<KCFindBinMatIds>
     (
@@ -396,6 +392,13 @@ MultiPartitionOutput RayPartitioner::MultiPartition(Span<CommonKey> dKeysIn,
         ToConstSpan(hPartCountStatic),
         partitionedRayCount
     );
+
+    // In debug, invalidate the other buffer of keys/ids
+    if constexpr(MRAY_IS_DEBUG)
+    {
+        queue.MemsetAsync(dIndicesDB[1], 0xFF);
+        queue.MemsetAsync(dKeysDB[1], 0xFF);
+    }
 
     return MultiPartitionOutput
     {

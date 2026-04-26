@@ -16,7 +16,7 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
     static constexpr unsigned int Dims   = N * N;
 
     private:
-    std::array<T, N*N>              matrix;
+    T matrix[N * N];
 
     public:
     // Constructors & Destructor
@@ -42,8 +42,8 @@ class alignas(ChooseVectorAlignment(N * sizeof(T))) Matrix
     MR_PF_DECL T&        operator()(unsigned int row, unsigned int column) noexcept;
     MR_PF_DECL const T&  operator()(unsigned int row, unsigned int column) const noexcept;
     // Structured Binding Helper
-    MR_PF_DECL const std::array<T, N*N>& AsArray() const noexcept;
-    MR_PF_DECL std::array<T, N*N>&       AsArray() noexcept;
+    MR_PF_DECL Span<const T, N*N> AsSpan() const noexcept;
+    MR_PF_DECL Span<T, N*N>       AsSpan() noexcept;
 
     // Modify
     MR_PF_DECL_V void   operator+=(const Matrix&) noexcept;
@@ -94,7 +94,7 @@ class alignas(ChooseVectorAlignment(4 * sizeof(T))) Matrix3x4T
     static constexpr unsigned int Dims = 12;
 
     private:
-    std::array<T, 12>   matrix;
+    T matrix[12];
 
     public:
     // Constructors & Destructor
@@ -119,8 +119,8 @@ class alignas(ChooseVectorAlignment(4 * sizeof(T))) Matrix3x4T
     MR_PF_DECL T&       operator()(unsigned int row, unsigned int column) noexcept;
     MR_PF_DECL const T& operator()(unsigned int row, unsigned int column) const noexcept;
     // Structured Binding Helper
-    MR_PF_DECL const std::array<T, 12>& AsArray() const noexcept;
-    MR_PF_DECL std::array<T, 12>&       AsArray() noexcept;
+    MR_PF_DECL Span<const T, 12> AsSpan() const noexcept;
+    MR_PF_DECL Span<T, 12>       AsSpan() noexcept;
     // Modify
     MR_PF_DECL_V void       operator+=(const Matrix3x4T&) noexcept;
     MR_PF_DECL_V void       operator*=(const Matrix3x4T&) noexcept;

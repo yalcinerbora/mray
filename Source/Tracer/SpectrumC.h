@@ -252,7 +252,7 @@ Spectrum SpectrumConverterIdentity::ConvertRadiance(const Vector3& c) const noex
 MR_PF_DEF
 SpectrumWaves SpectrumConverterIdentity::Wavelengths() const noexcept
 {
-    return SpectrumWaves(VisibleSpectrumMiddle);
+    return VisibleSpectrumFakeWavelengths;
 }
 
 MR_PF_DEF_V

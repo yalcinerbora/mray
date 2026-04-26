@@ -5,6 +5,7 @@
 #include "TracerTypes.h"
 #include "GenericGroup.h"
 #include "TextureView.h"
+#include "SpectrumC.h"
 
 namespace MaterialCommon
 {
@@ -124,12 +125,204 @@ class GenericGroupMaterial : public GenericGroupMaterialT
     std::string_view    Name() const override;
 };
 
+namespace PassthroughMatDetail
+{
+    template <class SpectrumContext = SpectrumContextIdentity>
+    struct PassthroughMaterial
+    {
+        using Surface           = DefaultSurface;
+        using DataSoA           = EmptyType;
+        using SpectrumConverter = typename SpectrumContext::Converter;
+        //
+        static constexpr RNRequestList SampleRNList = RNRequestList();
+
+        private:
+        const Surface& surface;
+
+        public:
+        MR_GF_DECL
+        static NormalMap GetNormalMap(const DataSoA& soa, MaterialKey k);
+
+        MR_PF_DECL_V
+        PassthroughMaterial(const SpectrumConverter& sTransContext,
+                            const Surface& surface,
+                            const DataSoA& soa, MaterialKey mk);
+
+        MR_PF_DECL
+        BxDFSample          SampleBxDF(const Vector3& wO,
+                                       RNGDispenser& dispenser) const;
+        MR_PF_DECL Float    Pdf(const Ray& wI, const Vector3& wO) const;
+
+        MR_PF_DECL BxDFEval Evaluate(const Ray& wI, const Vector3& wO) const;
+        MR_PF_DECL bool     IsEmissive() const;
+        MR_PF_DECL Spectrum Emit(const Vector3& wO) const;
+        MR_PF_DECL Float    Specularity() const;
+        MR_PF_DECL
+        RayConeSurface      RefractRayCone(const RayConeSurface&, const Vector3& wO) const;
+
+        MR_PF_DECL
+        static bool         IsAllTexturesAreResident(const Surface&, const DataSoA&,
+                                                     MaterialKey);
+    };
+}
+
+class MatGroupPassthrough final : public GenericGroupMaterial<MatGroupPassthrough>
+{
+    public:
+    using DataSoA   = EmptyType;
+    template<class STContext = SpectrumContextIdentity>
+    using Material  = PassthroughMatDetail::PassthroughMaterial<STContext>;
+    using Surface   = typename Material<>::Surface;
+
+    private:
+    protected:
+
+    public:
+    static std::string_view TypeName();
+
+    MatGroupPassthrough(uint32_t groupId,
+                        const GPUSystem&,
+                        const TextureViewMap&,
+                        const TextureMap&);
+    void            CommitReservations() override;
+    AttribInfoList  AttributeInfo() const override;
+    void            PushAttribute(MaterialKey id,
+                                  uint32_t attributeIndex,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushAttribute(MaterialKey id,
+                                  uint32_t attributeIndex,
+                                  const Vector2ui& subRange,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                  uint32_t attributeIndex,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+
+    // Extra
+    void            PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                     uint32_t attributeIndex,
+                                     TransientData,
+                                     std::vector<Optional<TextureId>>,
+                                     const GPUQueue& queue) override;
+    void            PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                     uint32_t attributeIndex,
+                                     std::vector<Optional<TextureId>>,
+                                     const GPUQueue& queue) override;
+    void            PushTexAttribute(MaterialKey idStart, MaterialKey idEnd,
+                                     uint32_t attributeIndex,
+                                     std::vector<TextureId>,
+                                     const GPUQueue& queue) override;
+
+    DataSoA         SoA() const;
+    void            Finalize(const GPUQueue&) override;
+};
+
 MR_PF_DEF
 bool MaterialCommon::IsSpecular(Float specularity) noexcept
 {
     constexpr auto Threshold = SpecularThreshold;
     return specularity >= Threshold;
 }
+
+namespace PassthroughMatDetail
+{
+
+template <class SC>
+MR_GF_DEF
+NormalMap PassthroughMaterial<SC>::GetNormalMap(const DataSoA&, MaterialKey)
+{
+    return std::nullopt;
+}
+
+template <class SC>
+MR_PF_DEF_V
+PassthroughMaterial<SC>::PassthroughMaterial(const SpectrumConverter&,
+                                             const Surface& surface,
+                                             const DataSoA&, MaterialKey)
+    : surface(surface)
+{}
+
+template <class SC>
+MR_PF_DEF
+BxDFSample
+PassthroughMaterial<SC>::SampleBxDF(const Vector3& wO,
+                                    RNGDispenser&) const
+{
+    return BxDFSample
+    {
+        .wI     = Ray(-wO, surface.position),
+        .pdf    = Float(1.0),
+        .eval   = BxDFEval
+        {
+            .reflectance     = Spectrum(1.0),
+            .isPassedThrough = true,
+            .isDispersed     = false
+        }
+    };
+}
+
+template <class SC>
+MR_PF_DEF
+Float
+PassthroughMaterial<SC>::Pdf(const Ray&, const Vector3&) const
+{
+    // We can not sample this
+    return Float(0);
+}
+
+template <class SC>
+MR_PF_DEF
+BxDFEval PassthroughMaterial<SC>::Evaluate(const Ray&, const Vector3&) const
+{
+    return BxDFEval
+    {
+        .reflectance     = Spectrum(1),
+        .isPassedThrough = true,
+        .isDispersed     = false
+    };
+}
+
+template <class SC>
+MR_PF_DEF
+bool PassthroughMaterial<SC>::IsEmissive() const
+{
+    return false;
+}
+
+template <class SC>
+MR_PF_DEF
+Spectrum PassthroughMaterial<SC>::Emit(const Vector3&) const
+{
+    return Spectrum::Zero();
+}
+
+template <class SC>
+MR_PF_DEF
+Float PassthroughMaterial<SC>::Specularity() const
+{
+    return Float(1);
+}
+
+template <class SC>
+MR_PF_DEF
+RayConeSurface PassthroughMaterial<SC>::RefractRayCone(const RayConeSurface& r,
+                                                       const Vector3&) const
+{
+    return r;
+}
+
+template <class SC>
+MR_PF_DEF
+bool PassthroughMaterial<SC>::IsAllTexturesAreResident(const Surface&, const DataSoA&,
+                                                       MaterialKey)
+{
+    return true;
+}
+
+}
+
 
 template <class C>
 GenericGroupMaterial<C>::GenericGroupMaterial(uint32_t groupId, const GPUSystem& system,

@@ -247,7 +247,9 @@ namespace GuidedPTRDetail
     {
         MRAY_WORK_FUNCTOR_DEFINE_TYPES(PGType, MGType, TGType,
                                        SpectrumContextJakob2019, 1u);
-        using Params = RenderWorkParams<GlobalState, RayState, PG, MG, TG>;
+        using Params      = RenderWorkParams<GlobalState, RayState, PG, MG, TG>;
+        using GlobalState = GuidedPTRDetail::GlobalState;
+        using RayState    = GuidedPTRDetail::RayState;
 
         MR_GF_DECL
         static void Call(const Primitive&, const Material&, const Surface&,
@@ -262,7 +264,9 @@ namespace GuidedPTRDetail
     {
         MRAY_LIGHT_WORK_FUNCTOR_DEFINE_TYPES(LGType, TGType,
                                              SpectrumContextJakob2019, 1u);
-        using Params = RenderLightWorkParams<GlobalState, RayState, LG, TG>;
+        using Params      = RenderLightWorkParams<GlobalState, RayState, LG, TG>;
+        using GlobalState = GuidedPTRDetail::GlobalState;
+        using RayState    = GuidedPTRDetail::RayState;
 
         MR_HF_DECL
         static void Call(const Light&, RNGDispenser&, const SpectrumConv&,

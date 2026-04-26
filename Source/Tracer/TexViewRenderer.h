@@ -13,8 +13,6 @@ class TexViewRenderer final : public RendererBase
     static std::string_view TypeName();
     static AttribInfoList StaticAttributeInfo();
 
-    using GlobalStateList   = TypePack<>;
-    using RayStateList      = TypePack<>;
     using SpectrumContext = SpectrumContextIdentity;
 
     template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>

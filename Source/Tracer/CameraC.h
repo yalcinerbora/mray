@@ -97,6 +97,215 @@ class GenericGroupCamera : public GenericGroupCameraT
     std::string_view Name() const override;
 };
 
+namespace CameraDetail
+{
+    class CameraNull
+    {
+        public:
+        using DataSoA = EmptyType;
+        static constexpr RNRequestList SampleRayRNList = GenRNRequestList<0>();
+
+        private:
+        public:
+        constexpr       CameraNull() = default;
+        MR_PF_DECL_V    CameraNull(const DataSoA&, CameraKey);
+        // Ray Sampling
+        MR_PF_DECL
+        CameraRaySample SampleRay(// Input
+                                  const Vector2ui& generationIndex,
+                                  const Vector2ui& stratumCount,
+                                  // I-O
+                                  RNGDispenser&) const;
+        MR_PF_DECL
+        CameraRaySample EvaluateRay(const Vector2ui& generationIndex,
+                                    const Vector2ui& stratumCount,
+                                    const Vector2& stratumOffset,
+                                    const Vector2& stratumRange) const;
+
+        MR_PF_DECL
+        Float           PdfRay(const Ray&) const;
+
+        MR_PF_DECL
+        CameraRayOutput ReconstructRay(const ImageCoordinate&,
+                                       const Vector2ui& stratumCount) const;
+        // Misc
+        MR_PF_DECL
+        bool            CanBeSampled() const;
+        MR_PF_DECL
+        CameraTransform GetCameraTransform() const;
+        MR_PF_DECL_V
+        void            OverrideTransform(const CameraTransform&);
+        MR_PF_DECL
+        CameraNull      GenerateSubCamera(const Vector2ui& regionId,
+                                          const Vector2ui& regionCount) const;
+        MR_PF_DECL
+        Vector3         GetCameraPosition() const;
+    };
+}
+
+class CameraGroupNull : public GenericGroupCamera<CameraGroupNull>
+{
+    public:
+    using DataSoA   = EmptyType;
+    using Camera    = CameraDetail::CameraNull;
+    static constexpr RNRequestList SampleRayRNList = Camera::SampleRayRNList;
+
+    private:
+    public:
+    static std::string_view TypeName();
+    //
+                            CameraGroupNull(uint32_t groupId,
+                                            const GPUSystem& system);
+
+    void                    CommitReservations() override;
+    CamAttributeInfoList    AttributeInfo() const override;
+    void                    PushAttribute(CameraKey camKey,
+                                          uint32_t attributeIndex,
+                                          TransientData data,
+                                          const GPUQueue& queue) override;
+    void                    PushAttribute(CameraKey camKey,
+                                          uint32_t attributeIndex,
+                                          const Vector2ui& subRange,
+                                          TransientData data,
+                                          const GPUQueue& queue) override;
+    void                    PushAttribute(CameraKey idStart, CameraKey idEnd,
+                                          uint32_t attributeIndex,
+                                          TransientData data,
+                                          const GPUQueue& queue) override;
+    CameraTransform         AcquireCameraTransform(CameraKey) const override;
+
+    DataSoA                 SoA() const;
+};
+
+
+namespace CameraDetail
+{
+
+MR_PF_DEF_V
+CameraNull::CameraNull(const DataSoA&, CameraKey)
+{}
+
+MR_PF_DEF
+CameraRaySample
+CameraNull::SampleRay(// Input
+                      const Vector2ui&,
+                      const Vector2ui&,
+                      // I-O
+                      RNGDispenser&) const
+{
+    return CameraRaySample
+    {
+        .value =
+        {
+            .ray = Ray(Vector3::Zero(), Vector3::Zero()),
+            .tMinMax = Vector2::Zero(),
+            .imgCoords =
+            {
+                .pixelIndex = Vector2us::Zero(),
+                .offset     = SNorm2x16(0, 0)
+            },
+            .rayCone = RayCone
+            {
+                .aperture = Float(0),
+                .width    = Float(0)
+            }
+        },
+        .pdf = Float(1.0)
+    };
+}
+
+MR_PF_DEF
+CameraRaySample
+CameraNull::EvaluateRay(const Vector2ui&,
+                        const Vector2ui&,
+                        const Vector2&,
+                        const Vector2&) const
+{
+    return CameraRaySample
+    {
+        .value =
+        {
+            .ray = Ray(Vector3::Zero(), Vector3::Zero()),
+            .tMinMax = Vector2::Zero(),
+            .imgCoords =
+            {
+                .pixelIndex = Vector2us::Zero(),
+                .offset     = SNorm2x16(0, 0)
+            },
+            .rayCone = RayCone
+            {
+                .aperture = Float(0),
+                .width    = Float(0)
+            }
+        },
+        .pdf = Float(1.0)
+    };
+}
+
+MR_PF_DEF
+Float CameraNull::PdfRay(const Ray&) const
+{
+    return Float(0.0);
+}
+
+MR_PF_DEF
+CameraRayOutput
+CameraNull::ReconstructRay(const ImageCoordinate&,
+                           const Vector2ui&) const
+{
+    return CameraRayOutput
+    {
+        .ray = Ray(Vector3::Zero(), Vector3::Zero()),
+        .tMinMax = Vector2::Zero(),
+        .imgCoords =
+        {
+            .pixelIndex = Vector2us::Zero(),
+            .offset = SNorm2x16(0, 0)
+        },
+        .rayCone = RayCone
+        {
+            .aperture = Float(0),
+            .width = Float(0)
+        }
+    };
+}
+
+MR_PF_DEF
+bool CameraNull::CanBeSampled() const
+{
+    return false;
+}
+
+MR_PF_DEF
+CameraTransform CameraNull::GetCameraTransform() const
+{
+    return CameraTransform
+    {
+        .position   = Vector3::Zero(),
+        .gazePoint  = Vector3::Zero(),
+        .up         = Vector3::Zero(),
+    };
+}
+
+MR_PF_DEF_V
+void CameraNull::OverrideTransform(const CameraTransform&)
+{}
+
+MR_PF_DEF
+CameraNull CameraNull::GenerateSubCamera(const Vector2ui&,
+                                         const Vector2ui&) const
+{
+    return CameraNull{};
+}
+
+MR_PF_DEF
+Vector3 CameraNull::GetCameraPosition() const
+{
+    return Vector3::Zero();
+}
+
+}
+
 inline
 GenericGroupCameraT::GenericGroupCameraT(uint32_t groupId,
                                          const GPUSystem& sys,

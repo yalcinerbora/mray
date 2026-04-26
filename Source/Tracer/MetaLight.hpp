@@ -134,8 +134,8 @@ uint32_t LightSurfKeyHasher::Hash(const LightSurfKeyPack& pack)
     using RNGFunctions::HashPCG64::Hash;
 
     uint64_t hash = Hash(pack.lK, pack.tK, pack.pK);
-    uint32_t v0 = uint32_t(Bit::FetchSubPortion(hash, {0, 32}));
-    uint32_t v1 = uint32_t(Bit::FetchSubPortion(hash, {32, 64}));
+    uint32_t v0 = uint32_t(Bit::FetchSubPortion(hash, {0u, 32u}));
+    uint32_t v1 = uint32_t(Bit::FetchSubPortion(hash, {32u, 64u}));
 
     uint32_t result = v0 ^ v1;
     if(IsSentinel(result))  result -= 1;

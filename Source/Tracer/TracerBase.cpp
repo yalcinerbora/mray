@@ -906,6 +906,41 @@ void TracerBase::PushTextureData(TextureId id, uint32_t mipLevel,
     texMem.PushTextureData(id, mipLevel, std::move(data));
 }
 
+TopologyId TracerBase::CreateSparseTopology(MRayTopologyType tt,
+                                            TopologyLayerSizeList l)
+{
+    return texMem.CreateSparseTopology(tt, l);
+}
+
+void TracerBase::CommitSparseTopologies()
+{
+    texMem.CommitSparseTopologies();
+}
+
+void TracerBase::PushSparseTopologyData(TopologyId tId, TransientData data,
+                                        size_t offset)
+{
+    texMem.PushSparseTopologyData(tId, std::move(data), offset);
+}
+
+TextureId TracerBase::CreateSparseTexture3D(TopologyId tId,
+                                            MRayTextureParameters p)
+{
+    return texMem.CreateSparseTexture3D(tId, p);
+}
+
+void TracerBase::CommitSparseTextures()
+{
+    texMem.CommitSparseTextures();
+}
+
+void TracerBase::PushSparseTextureData(TextureId tId,
+                                       TransientData data,
+                                       size_t offset)
+{
+    return texMem.PushSparseTextureData(tId, std::move(data), offset);
+}
+
 TransGroupId TracerBase::CreateTransformGroup(std::string name)
 {
     if(name == TracerConstants::IdentityTransName)

@@ -7,6 +7,9 @@
     #include "Device/GPUSystem.hpp"
 #endif
 
+//===========================//
+//           Vacuum          //
+//===========================//
 std::string_view MediumGroupVacuum::TypeName()
 {
     using namespace TypeNameGen::CompTime;
@@ -30,7 +33,7 @@ void MediumGroupVacuum::CommitReservations()
 
 MediumAttributeInfoList MediumGroupVacuum::AttributeInfo() const
 {
-    return AttribInfoList{};
+    return MediumAttributeInfoList{};
 }
 
 void MediumGroupVacuum::PushAttribute(MediumKey,
@@ -71,6 +74,9 @@ void MediumGroupVacuum::PushTexAttribute(MediumKey, MediumKey,
                                          const GPUQueue&)
 {}
 
+//===========================//
+//        Homogeneous        //
+//===========================//
 typename MediumGroupVacuum::DataSoA
 MediumGroupVacuum::SoA() const
 {
@@ -110,16 +116,16 @@ MediumAttributeInfoList MediumGroupHomogeneous::AttributeInfo() const
     using enum AttributeTexturable;
     using enum AttributeIsArray;
     using enum AttributeIsColor;
-    static const MatAttributeInfoList LogicList =
+    static const MediumAttributeInfoList LogicList =
     {
-        MatAttributeInfo("sigmaA", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
-                         MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
-        MatAttributeInfo("sigmaS", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
-                         MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
-        MatAttributeInfo("emission", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
-                         MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
-        MatAttributeInfo("hgPhase", MRayDataTypeRT(MR_FLOAT), IS_SCALAR,
-                         MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
+        MediumAttributeInfo("sigmaA", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+                            MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
+        MediumAttributeInfo("sigmaS", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+                            MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
+        MediumAttributeInfo("emission", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+                            MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
+        MediumAttributeInfo("hgPhase", MRayDataTypeRT(MR_FLOAT), IS_SCALAR,
+                            MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA)
     };
     return LogicList;
 }
@@ -229,8 +235,120 @@ void MediumGroupHomogeneous::PushTexAttribute(MediumKey, MediumKey,
                     TypeName());
 }
 
+//===========================//
+//       Heterogeneous       //
+//===========================//
 typename MediumGroupHomogeneous::DataSoA
 MediumGroupHomogeneous::SoA() const
+{
+    return soa;
+}
+
+std::string_view MediumGroupHeterogeneous::TypeName()
+{
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "Heterogeneous"sv;
+    return MediumTypeName<Name>;
+}
+
+MediumGroupHeterogeneous::MediumGroupHeterogeneous(uint32_t groupId,
+                                                   const GPUSystem& sys,
+                                                   const TextureViewMap& texViewMap,
+                                                   const TextureMap& texMap)
+    : GenericGroupMedium<MediumGroupHeterogeneous>(groupId, sys,
+                                                   texViewMap, texMap)
+    // TODO: Multi-GPU
+    , majTexMemory(sys.BestDevice())
+{}
+
+void MediumGroupHeterogeneous::CommitReservations()
+{
+    throw MRayError("{:s} NOT IMPLEMENTED", TypeName());
+    //GenericCommit(Tie(dSigmaA, dSigmaS, dEmission, dPhaseVal),
+    //              {0, 0, 0, 0});
+
+    //soa = DataSoA(ToConstSpan(dSigmaA), ToConstSpan(dSigmaS),
+    //              ToConstSpan(dEmission), ToConstSpan(dPhaseVal));
+}
+
+MediumAttributeInfoList MediumGroupHeterogeneous::AttributeInfo() const
+{
+    using enum MRayDataEnum;
+    using enum AttributeOptionality;
+    using enum AttributeTexturable;
+    using enum AttributeIsArray;
+    using enum AttributeIsColor;
+    static const MediumAttributeInfoList LogicList =
+    {
+        MediumAttributeInfo("sigmaA", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+                            MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
+        MediumAttributeInfo("sigmaS", MRayDataTypeRT(MR_VECTOR_3), IS_SCALAR,
+                            MR_MANDATORY, MR_CONSTANT_ONLY, IS_COLOR),
+        MediumAttributeInfo("hgPhase", MRayDataTypeRT(MR_FLOAT), IS_SCALAR,
+                            MR_MANDATORY, MR_CONSTANT_ONLY, IS_PURE_DATA),
+        MediumAttributeInfo("density", MRayDataTypeRT(MR_FLOAT), IS_SCALAR,
+                            MR_MANDATORY, MR_TEXTURE_ONLY, IS_PURE_DATA),
+        MediumAttributeInfo("tempature", MRayDataTypeRT(MR_FLOAT), IS_SCALAR,
+                            MR_OPTIONAL, MR_TEXTURE_ONLY, IS_PURE_DATA),
+        MediumAttributeInfo("tempatureRange", MRayDataTypeRT(MR_VECTOR_2), IS_SCALAR,
+                            MR_OPTIONAL, MR_CONSTANT_ONLY, IS_PURE_DATA)
+    };
+    return LogicList;
+}
+
+void MediumGroupHeterogeneous::PushAttribute(MediumKey,
+                                             uint32_t,
+                                             TransientData,
+                                             const GPUQueue&)
+{
+    throw MRayError("{:s} NOT IMPLEMENTED", TypeName());
+}
+
+void MediumGroupHeterogeneous::PushAttribute(MediumKey,
+                                             uint32_t,
+                                             const Vector2ui&,
+                                             TransientData,
+                                             const GPUQueue&)
+{
+    throw MRayError("{:s} NOT IMPLEMENTED", TypeName());
+}
+
+void MediumGroupHeterogeneous::PushAttribute(MediumKey, MediumKey,
+                                             uint32_t,
+                                             TransientData,
+                                             const GPUQueue&)
+{
+    throw MRayError("{:s} NOT IMPLEMENTED", TypeName());
+}
+
+void MediumGroupHeterogeneous::PushTexAttribute(MediumKey, MediumKey,
+                                                uint32_t,
+                                                TransientData,
+                                                std::vector<Optional<TextureId>>,
+                                                const GPUQueue&)
+{
+    throw MRayError("{:s} NOT IMPLEMENTED", TypeName());
+}
+
+void MediumGroupHeterogeneous::PushTexAttribute(MediumKey, MediumKey,
+                                                uint32_t,
+                                                std::vector<Optional<TextureId>>,
+                                                const GPUQueue&)
+{
+    throw MRayError("{:s} NOT IMPLEMENTED", TypeName());
+}
+
+void MediumGroupHeterogeneous::PushTexAttribute(MediumKey, MediumKey,
+                                                uint32_t,
+                                                std::vector<TextureId>,
+                                                const GPUQueue&)
+{
+    throw MRayError("{:s} NOT IMPLEMENTED", TypeName());
+}
+
+typename MediumGroupHeterogeneous::DataSoA
+MediumGroupHeterogeneous::SoA() const
 {
     return soa;
 }

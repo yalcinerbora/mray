@@ -138,7 +138,6 @@ std::string_view GenericGroupTransform<C>::Name() const
     return C::TypeName();
 }
 
-
 static_assert(TransformContextC<TransformContextIdentity>);
 static_assert(TransformGroupC<TransformGroupIdentity>);
 

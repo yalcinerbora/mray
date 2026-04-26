@@ -39,6 +39,12 @@ namespace TracerConstants
     // These are unfortunately authored.
     static constexpr size_t MaxNestedVolumes = 8;
 
+    // Maximum layers on a topology data
+    // Currently it is 8, meaning you can have (for 6-3-...-3 topology)
+    // 128 * 8 * 15 = 15360 so,
+    // 15K x 15K x 15K cells.
+    static constexpr size_t MaxSparseTopologyLayers = 16;
+
     static constexpr std::string_view IdentityTransName  = "(T)Identity";
     static constexpr std::string_view NullLightName      = "(L)Null";
     static constexpr std::string_view EmptyPrimName      = "(P)Empty";

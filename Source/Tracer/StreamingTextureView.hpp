@@ -16,7 +16,7 @@ Vector4 TextureStreamingContext::FetchTextureGrad(VirtualTextureId tid, Vector2 
     uint32_t virtTexIndex = tid.TextureIndex();
     VirtualTexInfo texInfo = texInfoList[virtTexIndex];
     // Find the virtual tile
-    auto [virtMip, virtTile] = GenVirtualMipAndTileGrad(texInfo, uv, dpdx, dpdy).AsArray();
+    auto [virtMip, virtTile] = GenVirtualMipAndTileGrad(texInfo, uv, dpdx, dpdy);
     // HT Lookup
     uint64_t key = GenerateVirtualTextureKey(virtTexIndex, virtMip, virtTile);
     Optional<PhysicalTileId> physicalTileOpt = tileLookup[packIndex].Search(key);
@@ -66,7 +66,7 @@ Vector4 TextureStreamingContext::FetchTextureLod(VirtualTextureId tid, Vector2 u
     uint32_t virtTexIndex = tid.TextureIndex();
     VirtualTexInfo texInfo = texInfoList[virtTexIndex];
     // Find the virtual tile
-    auto [virtMip, virtTile] = GenVirtualMipAndTileLod(texInfo, uv, lod).AsArray();
+    auto [virtMip, virtTile] = GenVirtualMipAndTileLod(texInfo, uv, lod);
     // HT Lookup
     uint64_t key = GenerateVirtualTextureKey(virtTexIndex, virtMip, virtTile);
     Optional<PhysicalTileId> physicalTileOpt = tileLookup[packIndex].Search(key);

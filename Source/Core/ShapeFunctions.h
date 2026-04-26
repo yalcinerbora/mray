@@ -16,8 +16,8 @@ namespace Triangle
     MR_HF_DECL Float    Area(Span<const Vector3, TRI_VERTEX_COUNT> positions);
     MR_HF_DECL Vector3  Normal(Span<const Vector3, TRI_VERTEX_COUNT> positions);
     MR_HF_DECL Vector3  CalculateTangent(const Vector3& p0Normal,
-                                         const std::array<Vector3, 3>& positions,
-                                         const std::array<Vector2, 3>& uvs);
+                                         const Array<Vector3, 3>& positions,
+                                         const Array<Vector2, 3>& uvs);
     MR_HF_DECL Vector3  Project(Span<const Vector3, TRI_VERTEX_COUNT> positions,
                                 const Vector3& point);
     MR_HF_DECL Vector3  PointToBarycentrics(Span<const Vector3, TRI_VERTEX_COUNT> positions,
@@ -74,8 +74,8 @@ Vector3 Triangle::Normal(Span<const Vector3, TRI_VERTEX_COUNT> positions)
 
 MR_HF_DEF
 Vector3 Triangle::CalculateTangent(const Vector3& p0Normal,
-                                   const std::array<Vector3, 3>& p,
-                                   const std::array<Vector2, 3>& uv)
+                                   const Array<Vector3, 3>& p,
+                                   const Array<Vector2, 3>& uv)
 {
     // Edges (Tri is CCW)
     Vector3 e0 = p[1] - p[0];

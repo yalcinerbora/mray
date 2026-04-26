@@ -97,12 +97,12 @@ namespace Graphics
     // Orthonormalization Gram-Schmidt process
     // Returns first (n-1) modified vectors.
     MR_HF_DECL constexpr
-    Vector3                 GSOrthonormalize(const Vector3& x,
-                                             const Vector3& y);
+    Vector3            GSOrthonormalize(const Vector3& x,
+                                        const Vector3& y);
     MR_HF_DECL constexpr
-    std::array<Vector3, 2>  GSOrthonormalize(const Vector3& x,
-                                             const Vector3& y,
-                                             const Vector3& z);
+    Array<Vector3, 2>  GSOrthonormalize(const Vector3& x,
+                                        const Vector3& y,
+                                        const Vector3& z);
 
     MR_HF_DECL constexpr
     Vector2 UVToSphericalAngles(const Vector2& uv);
@@ -225,7 +225,7 @@ MR_HF_DEF constexpr
 Vector3 SphericalToCartesian(const Vector3& sphrRTP)
 {
     using Math::SinCos;
-    const auto& [r, theta, phi] = sphrRTP.AsArray();
+    const auto& [r, theta, phi] = sphrRTP;
     const auto& [sT, cT] = Math::SinCos(theta);
     const auto& [sP, cP] = Math::SinCos(phi);
     Float x = r * cT * sP;
@@ -252,7 +252,7 @@ Vector3 CartesianToSpherical(const Vector3& xyz)
 MR_HF_DEF constexpr
 Vector3 UnitSphericalToCartesian(const Vector2& sphrTP)
 {
-    const auto& [theta, phi] = sphrTP.AsArray();
+    const auto& [theta, phi] = sphrTP;
     const auto& [sT, cT] = Math::SinCos(theta);
     const auto& [sP, cP] = Math::SinCos(phi);
     Float x = cT * sP;
@@ -287,7 +287,7 @@ Vector2 CartesianToUnitSpherical(const Vector3& xyz)
 MR_HF_DEF constexpr
 Vector2 PolarToCartesian(const Vector2& polarRT)
 {
-    const auto& [r, theta] = polarRT.AsArray();
+    const auto& [r, theta] = polarRT;
     const auto& [s, c] = Math::SinCos(theta);
     Float x = r * s;
     Float y = r * c;
@@ -434,13 +434,13 @@ Vector3 GSOrthonormalize(const Vector3& x, const Vector3& y)
 }
 
 MR_HF_DEF constexpr
-std::array<Vector3, 2> GSOrthonormalize(const Vector3& x,
-                                        const Vector3& y,
-                                        const Vector3& z)
+Array<Vector3, 2> GSOrthonormalize(const Vector3& x,
+                                   const Vector3& y,
+                                   const Vector3& z)
 {
     Vector3 rY = GSOrthonormalize(y, z);
     Vector3 rX = GSOrthonormalize(x, rY);
-    return {rX, rY};
+    return Array<Vector3, 2>(rX, rY);
 }
 
 MR_HF_DEF constexpr

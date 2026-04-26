@@ -161,42 +161,7 @@ namespace LightDetail
                                                 const RayCone& rayCone) const;
     };
 
-    template <TransformContextC TContext = TransformContextIdentity,
-              class SpectrumContext = SpectrumContextIdentity>
-    class LightNull
-    {
-        public:
-        using DataSoA           = EmptyType;
-        using SpectrumConverter = typename SpectrumContext::Converter;
-        using Primitive         = EmptyPrimitive<TContext>;
-        //
-        static constexpr bool     IsPrimitiveBackedLight      = false;
-        static constexpr RNRequestList SampleSolidAngleRNList = RNRequestList();
-        static constexpr RNRequestList SampleRayRNList        = RNRequestList();
 
-        MR_HF_DECL          LightNull(const SpectrumConverter& sTransContext,
-                                      const Primitive& p,
-                                      const DataSoA& soa, LightKey);
-
-        MR_HF_DECL
-        SampleT<Vector3>    SampleSolidAngle(RNGDispenser&,
-                                             const Vector3&) const;
-        MR_HF_DECL
-        Float               PdfSolidAngle(const typename Primitive::Hit&,
-                                          const Vector3&,
-                                          const Vector3&) const;
-        MR_HF_DECL
-        SampleT<Ray>        SampleRay(RNGDispenser&) const;
-        MR_HF_DECL
-        Float               PdfRay(const Ray&) const;
-        MR_HF_DECL
-        Spectrum            EmitViaHit(const Vector3&,
-                                       const typename Primitive::Hit&,
-                                       const RayCone&) const;
-        MR_HF_DECL
-        Spectrum            EmitViaSurfacePoint(const Vector3&, const Vector3&,
-                                                const RayCone&) const;
-    };
 }
 
 // TODO: Making this class final breaks linking weirdly
@@ -357,67 +322,6 @@ class LightGroupSkysphere final : public GenericGroupLight<LightGroupSkysphere<C
     void                            SetSceneDiameter(Float) override;
     void                            Finalize(const GPUQueue& q) override;
     size_t                          GPUMemoryUsage() const override;
-};
-
-class LightGroupNull : public GenericGroupLight<LightGroupNull>
-{
-    public:
-    using PrimGroup = PrimGroupEmpty;
-    using DataSoA   = EmptyType;
-
-    template<class TContext = TransformContextIdentity>
-    using Primitive = EmptyPrimitive<TContext>;
-
-    template <class TContext = TransformContextIdentity,
-              class SpectrumContext = SpectrumContextIdentity>
-    using Light = LightDetail::LightNull<TContext, SpectrumContext>;
-
-    private:
-    const PrimGroup& primGroup;
-
-    public:
-    static std::string_view TypeName();
-
-    LightGroupNull(uint32_t groupId,
-                   const GPUSystem& system,
-                   const TextureViewMap&,
-                   const TextureMap&,
-                   const GenericGroupPrimitiveT&);
-
-    void                    CommitReservations() override;
-    LightAttributeInfoList  AttributeInfo() const override;
-
-    void            PushAttribute(LightKey,
-                                  uint32_t,
-                                  TransientData,
-                                  const GPUQueue&) override;
-    void            PushAttribute(LightKey,
-                                  uint32_t,
-                                  const Vector2ui&,
-                                  TransientData,
-                                  const GPUQueue&) override;
-    void            PushAttribute(LightKey, LightKey,
-                                  uint32_t,
-                                  TransientData,
-                                  const GPUQueue&) override;
-    void            PushTexAttribute(LightKey, LightKey,
-                                     uint32_t,
-                                     TransientData,
-                                     std::vector<Optional<TextureId>>,
-                                     const GPUQueue&) override;
-    void            PushTexAttribute(LightKey, LightKey,
-                                     uint32_t,
-                                     std::vector<Optional<TextureId>>,
-                                     const GPUQueue&) override;
-    void            PushTexAttribute(LightKey, LightKey,
-                                     uint32_t,
-                                     std::vector<TextureId>,
-                                     const GPUQueue&) override;
-
-    DataSoA                         SoA() const;
-    const PrimGroup&                PrimitiveGroup() const;
-    const GenericGroupPrimitiveT&   GenericPrimGroup() const override;
-    bool                            IsPrimitiveBacked() const override;
 };
 
 #include "LightsDefault.hpp"

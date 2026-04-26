@@ -5,15 +5,21 @@
 
 // Meta Texture Type
 template <uint32_t DIMS, class T>
-class ParamVaryingData
+class ParamVaryingData;
+
+template <class T>
+class ParamVaryingData<2, T>
 {
-    static_assert(DIMS == 1 || DIMS == 2 || DIMS == 3,
-                  "Surface varying data at most have 3 dimensions");
-    using Texture = TracerTexView<DIMS, T>;
-    using UV = Vector<DIMS, Float>;
+    using Texture = TracerTexView<2, T>;
+    using UV      = Vector2;
 
     private:
-    Variant<Texture, T> t;
+    union
+    {
+        Texture tex;
+        T       data;
+    };
+    bool isTexture;
 
     public:
     MR_HF_DECL  ParamVaryingData(const T&);
@@ -36,77 +42,218 @@ class ParamVaryingData
     MR_HF_DECL bool IsResident(UV uvCoords, Float mipLevel) const;
 };
 
-template <uint32_t DIMS, class T>
+template <class T>
+class ParamVaryingData<3, T>
+{
+    using Texture = TracerTexView<3, T>;
+    using UV      = Vector2;
+
+    enum Type : uint8_t
+    {
+        SCALAR,
+        DENSE_TEX,
+        SPARSE_TEX
+    };
+
+    private:
+    union
+    {
+        Texture     tex;
+        T           data;
+        const Byte* sparseData;
+    };
+    Type           type;
+    MRayPixelEnum  sparseDataType;
+
+    public:
+    MR_HF_DECL  ParamVaryingData(const T&);
+    MR_HF_DECL  ParamVaryingData(const Texture&);
+    MR_HF_DECL  ParamVaryingData(const Byte*, MRayPixelEnum);
+
+    // Sparse Access
+    MR_GF_DECL T   operator()(uint32_t i) const;
+    // Base Access
+    MR_GF_DECL T   operator()(UV uvCoords) const;
+    // Gradient Access
+    MR_GF_DECL T   operator()(UV uvCoords,
+                              UV dpdx,
+                              UV dpdy) const;
+    // Direct Mip Access
+    MR_GF_DECL T   operator()(UV uvCoords, Float mipLevel) const;
+    //
+    MR_HF_DECL bool IsScalar() const;
+    MR_HF_DECL bool IsDenseTex() const;
+    MR_HF_DECL bool IsSparseTex() const;
+};
+
+// ============ //
+//      2D      //
+// ============ //
+template <class T>
 MR_HF_DEF
-ParamVaryingData<DIMS, T>::ParamVaryingData(const T& tt)
-    : t(tt)
+ParamVaryingData<2, T>::ParamVaryingData(const T& d)
+    : data(d)
+    , isTexture(false)
 {}
 
-template <uint32_t DIMS, class T>
+template <class T>
 MR_HF_DEF
-ParamVaryingData<DIMS, T>::ParamVaryingData(const Texture& tt)
-    : t(tt)
+ParamVaryingData<2, T>::ParamVaryingData(const Texture& t)
+    : tex(t)
+    , isTexture(true)
 {}
 
-template <uint32_t DIMS, class T>
+template <class T>
 MR_GF_DEF
-T ParamVaryingData<DIMS, T>::operator()(Vector<DIMS, Float> uvCoords) const
+T ParamVaryingData<2, T>::operator()(UV uvCoords) const
 {
-    if(std::holds_alternative<Texture>(t))
-        return std::get<Texture>(t)(uvCoords);
-    return std::get<T>(t);
+    if(isTexture) return tex(uvCoords);
+    else          return data;
 }
 
-template <uint32_t DIMS, class T>
+template <class T>
 MR_GF_DEF
-T ParamVaryingData<DIMS, T>::operator()(Vector<DIMS, Float> uvCoords,
-                                        Vector<DIMS, Float> dpdx,
-                                        Vector<DIMS, Float> dpdy) const
+T ParamVaryingData<2, T>::operator()(UV uvCoords, UV dpdx, UV dpdy) const
 {
-    if(std::holds_alternative<Texture>(t))
-        return std::get<Texture>(t)(uvCoords, dpdx, dpdy);
-    return std::get<T>(t);
+    if(isTexture)   return tex(uvCoords, dpdx, dpdy);
+    else            return data;
 }
 
-template <uint32_t DIMS, class T>
+template <class T>
 MR_GF_DEF
-T ParamVaryingData<DIMS, T>::operator()(Vector<DIMS, Float> uvCoords,
-                                        Float mipLevel) const
+T ParamVaryingData<2, T>::operator()(UV uvCoords, Float mipLevel) const
 {
-    if(std::holds_alternative<Texture>(t))
-        return std::get<Texture>(t)(uvCoords, mipLevel);
-    return std::get<T>(t);
+    if(isTexture) return tex(uvCoords, mipLevel);
+    else          return data;
 }
 
-template <uint32_t DIMS, class T>
+template <class T>
 MR_HF_DEF
-bool ParamVaryingData<DIMS, T>::IsConstant() const
+bool ParamVaryingData<2, T>::IsConstant() const
 {
-    return (!std::holds_alternative<Texture>(t));
+    return !isTexture;
 }
 
-template <uint32_t DIMS, class T>
+template <class T>
 MR_HF_DEF
-bool ParamVaryingData<DIMS, T>::IsResident(UV uvCoords) const
+bool ParamVaryingData<2, T>::IsResident(UV uvCoords) const
 {
-    if(IsConstant()) return true;
-    return std::get<Texture>(t).IsResident(uvCoords);
+    if(isTexture) return tex.IsResident(uvCoords);
+    else          return true;
 }
 
-template <uint32_t DIMS, class T>
+template <class T>
 MR_HF_DEF
-bool ParamVaryingData<DIMS, T>::IsResident(UV uvCoords,
-                                           UV dpdx,
-                                           UV dpdy) const
+bool ParamVaryingData<2, T>::IsResident(UV uvCoords,
+                                        UV dpdx,
+                                        UV dpdy) const
 {
-    if(IsConstant()) return true;
-    return std::get<Texture>(t).IsResident(uvCoords, dpdx, dpdy);
+    if(isTexture) return tex.IsResident(uvCoords, dpdx, dpdy);
+    else          return true;
 }
 
-template <uint32_t DIMS, class T>
+template <class T>
 MR_HF_DEF
-bool ParamVaryingData<DIMS, T>::IsResident(UV uvCoords, Float mipLevel) const
+bool ParamVaryingData<2, T>::IsResident(UV uvCoords, Float mipLevel) const
 {
-    if(IsConstant()) return true;
-    return std::get<Texture>(t).IsResident(uvCoords, mipLevel);
+    if(isTexture) return tex.IsResident(uvCoords, mipLevel);
+    else          return true;
 }
+
+// ============ //
+//      3D      //
+// ============ //
+template <class T>
+MR_HF_DEF
+ParamVaryingData<3, T>::ParamVaryingData(const T& d)
+    : data(d)
+    , type(SCALAR)
+{}
+
+template <class T>
+MR_HF_DEF
+ParamVaryingData<3, T>::ParamVaryingData(const Texture& t)
+    : tex(t)
+    , type(DENSE_TEX)
+{}
+
+template <class T>
+MR_HF_DEF
+ParamVaryingData<3, T>::ParamVaryingData(const Byte* ptr,
+                                         MRayPixelEnum sType)
+    : sparseData(ptr)
+    , type(SPARSE_TEX)
+    , sparseDataType(sType)
+{}
+
+template <class T>
+MR_GF_DEF
+T ParamVaryingData<3, T>::operator()(uint32_t i) const
+{
+    if(type == SPARSE_TEX)
+    {
+        if constexpr(std::is_same_v<Float, T>)
+            return ReadGenericTexelData(sparseData, i, sparseDataType)[0];
+        else
+            return T(ReadGenericTexelData(sparseData, i, sparseDataType));
+    }
+    return T();
+}
+
+template <class T>
+MR_GF_DEF
+T ParamVaryingData<3, T>::operator()(UV uvCoords) const
+{
+    switch(type)
+    {
+        case SCALAR:    return data;
+        case DENSE_TEX: return tex(uvCoords);
+        default:        return T();
+    }
+}
+
+template <class T>
+MR_GF_DEF
+T ParamVaryingData<3, T>::operator()(UV uvCoords, UV dpdx, UV dpdy) const
+{
+    switch(type)
+    {
+        case SCALAR:    return data;
+        case DENSE_TEX: return tex(uvCoords, dpdx, dpdy);
+        default:        return T();
+    }
+}
+
+template <class T>
+MR_GF_DEF
+T ParamVaryingData<3, T>::operator()(UV uvCoords, Float mipLevel) const
+{
+    switch(type)
+    {
+        case SCALAR:    return data;
+        case DENSE_TEX: return tex(uvCoords, mipLevel);
+        default:        return T();
+    }
+}
+
+template <class T>
+MR_HF_DEF
+bool ParamVaryingData<3, T>::IsScalar() const
+{
+    return type == SCALAR;
+}
+
+template <class T>
+MR_HF_DEF
+bool ParamVaryingData<3, T>::IsDenseTex() const
+{
+    return type == DENSE_TEX;
+}
+
+template <class T>
+MR_HF_DEF
+bool ParamVaryingData<3, T>::IsSparseTex() const
+{
+    return type == SPARSE_TEX;
+}
+

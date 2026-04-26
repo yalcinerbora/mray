@@ -45,6 +45,7 @@ set(SRC_MATH
 )
 
 set(SRC_TYPES
+    ${CURRENT_SOURCE_DIR}/Array.h
     ${CURRENT_SOURCE_DIR}/Types.h
     ${CURRENT_SOURCE_DIR}/TypePack.h
     ${CURRENT_SOURCE_DIR}/Tuple.h
@@ -133,7 +134,7 @@ endif()
 # lib and include variables ?????
 if(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
     target_include_directories(CoreLib
-                               PUBLIC
+                               SYSTEM PUBLIC
                                ${CMAKE_HIP_COMPILER_ROCM_ROOT}/include)
 endif()
 

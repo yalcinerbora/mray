@@ -5,6 +5,10 @@
 #include "Random.h"
 #include "Texture.h"
 
+#include "VolumetricSVO.h"
+
+#include "Device/GPUTexture.h"
+
 // TODO: Transfer this to somewhere proper later.
 // Currently blackbody radiation is only used in volumes when
 // they have tempature
@@ -82,28 +86,27 @@ namespace BlackbodySPD
 
 namespace MediumDetail
 {
-    struct SingleSegmentIterator
+    template<uint32_t XYZ_BITS>
+    struct DenseDDAIterator
     {
-        RaySegment curSegment;
+        static constexpr Float DELTA_XYZ = Float(1) / Float(1 << XYZ_BITS);
 
-        MR_PF_DECL bool Advance();
-    };
-
-    template<class SegmentIteratorT>
-    struct MediumTraverser
-    {
-        using SegmentIterator = SegmentIteratorT;
-        SegmentIterator it;
-        Float           dt;
-
+        const TracerTexView<3, Float>& majDensityTex;
+        const Ray&                     r;
+        Spectrum                       sigmaT;
+        // State
+        Vector3                 nextAxes;
+        Vector3                 deltaT;
+        Float                   tMax; // Clamped to edge of grid
         //
-        MR_HF_DECL
-        MediumTraverser(const Ray& ray, const Vector2& tMM,
-                        const SegmentIterator& it);
+        RaySegment curSegment;
+        MR_GF_DECL DenseDDAIterator(const TracerTexView<3, Float>&,
+                                    Spectrum sigmaT,
+                                    const Ray& r,
+                                    const Vector2& tMM);
 
-        MR_HF_DECL
-        bool SampleTMajor(Spectrum& tMaj, Spectrum& sMaj,
-                          Float& rayT, Float xi);
+        MR_GF_DECL bool     Advance();
+        MR_PF_DECL uint32_t SelectAxis() const;
     };
 
     // Lets try the new SoA span on homogeneous medium
@@ -126,68 +129,42 @@ namespace MediumDetail
     };
 
     // TODO: Design volume pipeline
-    using VolumeTopology = void;
-    struct alignas(16) HeterogeneousMediumData
-        : public SoASpan <const Vector3, const Vector3,
-                          const Vector3, const Float,
-                          const VolumeTopology,
-                          const uint16_t,
-                          const uint16_t>
+    struct alignas(16) HeterogeneousMediumData : public SoASpan
+    <
+        const Vector3,                              // Sigma A
+        const Vector3,                              // Sigma S
+        const Float,                                // Phase G Term
+        const ParamVaryingData<3, Float>,           // Density
+        const Optional<ParamVaryingData<3, Float>>, // Tempature
+        const Vector2,                              // TempatureRange
+        const TracerTexView<3, Float>,              // Majorant
+        const VolumetricSVO::VolGrid6_2             // Topology
+    >
     {
-        using Base = SoASpan<const Vector3, const Vector3,
-                             const Vector3, const Float,
-                             const VolumeTopology,
-                             const uint16_t,
-                             const uint16_t>;
+        using Base = SoASpan
+        <
+            const Vector3,                              // Sigma A
+            const Vector3,                              // Sigma S
+            const Float,                                // Phase G Term
+            const ParamVaryingData<3, Float>,           // Density
+            const Optional<ParamVaryingData<3, Float>>, // Tempature
+            const Vector2,                              // TempatureRange
+            const TracerTexView<3, Float>,              // Majorant
+            const VolumetricSVO::VolGrid6_2             // Topology
+        >;
+
         enum I
         {
             SIGMA_A,
             SIGMA_S,
-            EMISSION,
             HG_PHASE,
-            TOPOLOGY,
             DENSITY,
-            TEMPATURE
+            TEMPATURE,
+            TEMPATURE_RANGE,
+            MAJORANT,
+            TOPOLOGY
         };
         using Base::Base;
-    };
-
-
-    template <class SpectrumContext = SpectrumContextIdentity>
-    class MediumVacuum
-    {
-        public:
-        using enum HomogeneousMediumData::I;
-        using DataSoA           = EmptyType;
-        using SpectrumConverter = typename SpectrumContext::Converter;
-        using Traverser         = MediumTraverser<SingleSegmentIterator>;
-
-        static constexpr RNRequestList SampleScatteringRNList = RNRequestList();
-
-        public:
-        MR_PF_DECL_V    MediumVacuum(const SpectrumConverter&,
-                                     const DataSoA&, MediumKey) noexcept;
-
-        MR_PF_DECL
-        ScatterSample   SampleScattering(const Vector3& wO,
-                                         const Vector3& p,
-                                         RNGDispenser& rng) const noexcept;
-        MR_PF_DECL
-        Float           PdfScattering(const Vector3& wI,
-                                      const Vector3& wO,
-                                      const Vector3& p) const noexcept;
-
-        MR_PF_DECL
-        Spectrum        SigmaA(const Vector3& p) const noexcept;
-        MR_PF_DECL
-        Spectrum        SigmaS(const Vector3& p) const noexcept;
-        MR_PF_DECL
-        Spectrum        Emission(const Vector3& p) const noexcept;
-        MR_PF_DECL
-        bool            HasEmission() const;
-
-        MR_HF_DECL
-        Traverser       GenTraverser(const Ray& ray, const Vector2& tMM) const;
     };
 
     template <class SpectrumContext = SpectrumContextIdentity>
@@ -202,10 +179,10 @@ namespace MediumDetail
         static constexpr RNRequestList SampleScatteringRNList = GenRNRequestList<2>();
 
         private:
-        Spectrum sigmaA;
-        Spectrum sigmaS;
-        Spectrum emission;
-        Float    g;
+        Spectrum           sigmaA;
+        Spectrum           sigmaS;
+        Optional<Spectrum> emission;
+        Float              g;
 
         public:
         MR_HF_DECL      MediumHomogeneous(const SpectrumConverter& specConverter,
@@ -219,15 +196,13 @@ namespace MediumDetail
         Float           PdfScattering(const Vector3& wI,
                                       const Vector3& wO,
                                       const Vector3& p) const;
+        MR_PF_DECL
+        Float           EvalScattering(const Vector3& wI,
+                                       const Vector3& wO,
+                                       const Vector3& p) const noexcept;
 
         MR_HF_DECL
-        Spectrum        SigmaA(const Vector3& p) const;
-        MR_HF_DECL
-        Spectrum        SigmaS(const Vector3& p) const;
-        MR_HF_DECL
-        Spectrum        Emission(const Vector3& p) const;
-        MR_PF_DECL
-        bool            HasEmission() const;
+        MediumQuery     Query(const Vector3& p, Float xi) const;
         MR_HF_DECL
         Traverser       GenTraverser(const Ray& ray, const Vector2& tMM) const;
     };
@@ -236,19 +211,30 @@ namespace MediumDetail
     class MediumHeterogeneous
     {
         public:
+        static constexpr uint32_t GRID_BITS = 6;
+        //
         using enum HeterogeneousMediumData::I;
         using DataSoA           = HeterogeneousMediumData;
         using SpectrumConverter = typename SpectrumContext::Converter;
-        // TODO: This needs to be changed!!!
-        using Traverser         = MediumTraverser<SingleSegmentIterator>;
+        // We use 64x64x64 data as dense tex
+        using Traverser         = MediumTraverser<DenseDDAIterator<GRID_BITS>>;
 
         static constexpr RNRequestList SampleScatteringRNList = GenRNRequestList<2>();
 
         private:
+        // These are constant so we pre-load these
         Spectrum sigmaA;
         Spectrum sigmaS;
-        Spectrum emission;
-        Float    g;
+        Float    phaseG;
+        Vector2  tempatureRange;
+        // These are constant but the data inside is not
+        ParamVaryingData<3, Float>           densityMap;
+        Optional<ParamVaryingData<3, Float>> tempatureMap;
+        TracerTexView<3, Float>              majMap;
+        // TODO: Check if this is better as reference
+        VolumetricSVO::VolGrid6_2            topology;
+        //
+        const SpectrumConverter* sc;
 
         public:
         MR_HF_DECL      MediumHeterogeneous(const SpectrumConverter& specConverter,
@@ -262,71 +248,16 @@ namespace MediumDetail
         Float           PdfScattering(const Vector3& wI,
                                       const Vector3& wO,
                                       const Vector3& p) const;
-
-        MR_HF_DECL
-        Spectrum        SigmaA(const Vector3& p) const;
-        MR_HF_DECL
-        Spectrum        SigmaS(const Vector3& p) const;
-        MR_HF_DECL
-        Spectrum        Emission(const Vector3& p) const;
         MR_PF_DECL
-        bool            HasEmission() const;
+        Float           EvalScattering(const Vector3& wI,
+                                       const Vector3& wO,
+                                       const Vector3& p) const noexcept;
+        MR_GF_DECL
+        MediumQuery     Query(const Vector3& p, Float xi) const;
         MR_HF_DECL
         Traverser       GenTraverser(const Ray& ray, const Vector2& tMM) const;
     };
 }
-
-class MediumGroupVacuum : public GenericGroupMedium<MediumGroupVacuum>
-{
-    public:
-    using DataSoA   = EmptyType;
-
-    template<class STContext = SpectrumContextIdentity>
-    using Medium  = MediumDetail::MediumVacuum<STContext>;
-
-    public:
-    static std::string_view TypeName();
-
-                    MediumGroupVacuum(uint32_t groupId,
-                                      const GPUSystem&,
-                                      const TextureViewMap&,
-                                      const TextureMap&);
-
-    //
-    void            CommitReservations() override;
-
-    AttribInfoList  AttributeInfo() const override;
-    void            PushAttribute(MediumKey id,
-                                  uint32_t attributeIndex,
-                                  TransientData data,
-                                  const GPUQueue& queue) override;
-    void            PushAttribute(MediumKey id,
-                                  uint32_t attributeIndex,
-                                  const Vector2ui& subRange,
-                                  TransientData data,
-                                  const GPUQueue& queue) override;
-    void            PushAttribute(MediumKey idStart, MediumKey idEnd,
-                                  uint32_t attributeIndex,
-                                  TransientData data,
-                                  const GPUQueue& queue) override;
-
-    // Extra
-    void            PushTexAttribute(MediumKey idStart, MediumKey idEnd,
-                                     uint32_t attributeIndex,
-                                     TransientData,
-                                     std::vector<Optional<TextureId>>,
-                                     const GPUQueue& queue) override;
-    void            PushTexAttribute(MediumKey idStart, MediumKey idEnd,
-                                     uint32_t attributeIndex,
-                                     std::vector<Optional<TextureId>>,
-                                     const GPUQueue& queue) override;
-    void            PushTexAttribute(MediumKey idStart, MediumKey idEnd,
-                                     uint32_t attributeIndex,
-                                     std::vector<TextureId>,
-                                     const GPUQueue& queue) override;
-
-    DataSoA         SoA() const;
-};
 
 class MediumGroupHomogeneous : public GenericGroupMedium<MediumGroupHomogeneous>
 {
@@ -386,9 +317,80 @@ class MediumGroupHomogeneous : public GenericGroupMedium<MediumGroupHomogeneous>
     DataSoA         SoA() const;
 };
 
+class MediumGroupHeterogeneous : public GenericGroupMedium<MediumGroupHeterogeneous>
+{
+    public:
+    using DataSoA   = MediumDetail::HeterogeneousMediumData;
+
+    template<class STContext = SpectrumContextIdentity>
+    using Medium  = MediumDetail::MediumHeterogeneous<STContext>;
+
+    private:
+    Span<Vector3>                              dSigmaA;
+    Span<Vector3>                              dSigmaS;
+    Span<Float>                                dPhases;
+    Span<ParamVaryingData<3, Float>>           dDensityMaps;
+    //
+    Span<Optional<ParamVaryingData<3, Float>>> dTempMaps;
+    Span<Vector2>                              dTempRanges;
+    Span<VolumetricSVO::VolGrid6_2>            dTopologies;
+    //
+    // Generated Data
+    TextureBackingMemory                       majTexMemory;
+    std::vector<Texture<3, Float>>             majTextures;
+    Span<TracerTexView<3, Float>>              dMajorantMaps;
+    //
+    DataSoA       soa;
+
+
+    public:
+    static std::string_view TypeName();
+
+                    MediumGroupHeterogeneous(uint32_t groupId,
+                                             const GPUSystem&,
+                                             const TextureViewMap&,
+                                             const TextureMap&);
+
+    void            CommitReservations() override;
+
+    AttribInfoList  AttributeInfo() const override;
+    void            PushAttribute(MediumKey id,
+                                  uint32_t attributeIndex,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushAttribute(MediumKey id,
+                                  uint32_t attributeIndex,
+                                  const Vector2ui& subRange,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+    void            PushAttribute(MediumKey idStart, MediumKey idEnd,
+                                  uint32_t attributeIndex,
+                                  TransientData data,
+                                  const GPUQueue& queue) override;
+
+    // Extra
+    void            PushTexAttribute(MediumKey idStart, MediumKey idEnd,
+                                     uint32_t attributeIndex,
+                                     TransientData,
+                                     std::vector<Optional<TextureId>>,
+                                     const GPUQueue& queue) override;
+    void            PushTexAttribute(MediumKey idStart, MediumKey idEnd,
+                                     uint32_t attributeIndex,
+                                     std::vector<Optional<TextureId>>,
+                                     const GPUQueue& queue) override;
+    void            PushTexAttribute(MediumKey idStart, MediumKey idEnd,
+                                     uint32_t attributeIndex,
+                                     std::vector<TextureId>,
+                                     const GPUQueue& queue) override;
+
+    DataSoA         SoA() const;
+};
+
 #include "MediumsDefault.hpp"
 
 static_assert(MediumC<MediumDetail::MediumVacuum<>>);
 static_assert(MediumGroupC<MediumGroupVacuum>);
 static_assert(MediumC<MediumDetail::MediumHomogeneous<>>);
 static_assert(MediumGroupC<MediumGroupHomogeneous>);
+static_assert(MediumC<MediumDetail::MediumHeterogeneous<>>);
+static_assert(MediumGroupC<MediumGroupHeterogeneous>);

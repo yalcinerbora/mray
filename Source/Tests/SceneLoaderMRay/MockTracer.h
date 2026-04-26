@@ -143,8 +143,11 @@ class TracerMock : public TracerI
     std::atomic_size_t  volumeCounter       = 0;
 
     // Texture Related
-    std::atomic_size_t  textureCounter  = 0;
-    bool                globalTexCommit = false;
+    std::atomic_size_t  textureCounter        = 0;
+    std::atomic_size_t  topologyCounter       = 0;
+    bool                globalTexCommit       = false;
+    bool                globalTopologyCommit  = false;
+    bool                globalSparseTexCommit = false;
 
     mutable std::mutex pGLock;
     mutable std::mutex cGLock;
@@ -235,6 +238,18 @@ class TracerMock : public TracerI
     void            PushTextureData(TextureId, uint32_t mipLevel,
                                     TransientData data) override;
 
+    TopologyId   CreateSparseTopology(MRayTopologyType,
+                                      TopologyLayerSizeList) override;
+    void         CommitSparseTopologies() override;
+    void         PushSparseTopologyData(TopologyId, TransientData data,
+                                        size_t offset) override;
+
+    TextureId    CreateSparseTexture3D(TopologyId,
+                                       MRayTextureParameters) override;
+    void         CommitSparseTextures() override;
+    void         PushSparseTextureData(TextureId,
+                                       TransientData data,
+                                       size_t offset) override;
 
     TransGroupId    CreateTransformGroup(std::string typeName) override;
     TransformId     ReserveTransformation(TransGroupId, AttributeCountList) override;
@@ -1045,6 +1060,9 @@ inline void TracerMock::CommitTextures()
     if(globalTexCommit)
         throw MRayError("Textures are already comitted!");
     globalTexCommit = true;
+
+    if(!print) return;
+    MRAY_LOG("Committing textures");
 }
 
 inline void TracerMock::PushTextureData(TextureId tId, uint32_t mipLevel,
@@ -1055,8 +1073,78 @@ inline void TracerMock::PushTextureData(TextureId tId, uint32_t mipLevel,
                         "You can not push data to textures!");
 
     if(!print) return;
-    MRAY_LOG("Pushing data to Texture({}) MipLevel:{}",
+    MRAY_LOG("Pushing data to Texture({}) MipLevel: {}",
              static_cast<CommonId>(tId), mipLevel);
+}
+
+inline TopologyId
+TracerMock::CreateSparseTopology(MRayTopologyType tt,
+                                 TopologyLayerSizeList)
+{
+    TopologyId tId = static_cast<TopologyId>(topologyCounter.fetch_add(1));
+    if(!print) return tId;
+
+    MRAY_LOG("Creating topology of \"{}\"",
+             MRayTopologyTypeStringifier::ToString(tt));
+    return tId;
+}
+
+inline void TracerMock::CommitSparseTopologies()
+{
+    globalTopologyCommit = true;
+
+    if(!print) return;
+    MRAY_LOG("Committing topologies.");
+}
+
+inline void TracerMock::PushSparseTopologyData(TopologyId tId,
+                                               TransientData,
+                                               size_t offset)
+{
+    if(!globalTopologyCommit)
+        throw MRayError("Topologies are not comitted. "
+                        "You can not push data to topologies!");
+
+    if(!print) return;
+    MRAY_LOG("Pushing data to Toplogy({}) Offset: {}",
+             static_cast<CommonId>(tId), offset);
+}
+
+inline TextureId TracerMock::CreateSparseTexture3D(TopologyId topoId,
+                                                   MRayTextureParameters p)
+{
+    size_t texId = textureCounter.fetch_add(1);
+    if(print)
+        MRAY_LOG("Creating Sparse Texture3D({}) ToplogyId: {}, "
+                 "PixelType:{}, ColorSpace:{}, IsColor:{}",
+                 static_cast<CommonId>(texId), static_cast<CommonId>(topoId),
+                 MRayPixelTypeStringifier::ToString(p.pixelType.Name()),
+                 MRayColorSpaceStringifier::ToString(p.colorSpace),
+                 (p.isColor == AttributeIsColor::IS_COLOR) ? true : false);
+    return TextureId(texId);
+}
+
+inline void TracerMock::CommitSparseTextures()
+{
+    if(globalSparseTexCommit)
+        throw MRayError("Sparse Textures are already comitted!");
+    globalSparseTexCommit = true;
+
+    if(!print) return;
+    MRAY_LOG("Committing sparse textures");
+}
+
+inline void TracerMock::PushSparseTextureData(TextureId tId,
+                                              TransientData,
+                                              size_t offset)
+{
+    if(!globalSparseTexCommit)
+        throw MRayError("Sparse Textures are not comitted. "
+                        "You can not push data to textures!");
+
+    if(!print) return;
+    MRAY_LOG("Pushing data to Sparse Texture({}) Offset: {}",
+             static_cast<CommonId>(tId), offset);
 }
 
 inline TransGroupId TracerMock::CreateTransformGroup(std::string name)

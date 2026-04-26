@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Vector.h"
+#include "Core/NormConvFunctions.h"
 
 #include <type_traits>
 
@@ -241,3 +242,74 @@ UVType<D> LinearToUV(const TextureExtent<D>& extents,
     UVType<D> extentsFloat = UVType<D>(extents);
     return indicesFloat / extentsFloat;
 }
+
+// Given properly aligned (256bytes) byte array, fetch data from
+// it with the given runtime pixel type "pixType".
+// This is used for volumetric data currently. It is put here since
+// we may abuse GPU intrinsics to reduce the complexity.
+MR_GF_DEF
+constexpr Vector4
+ReadGenericTexelData(const Byte* data, uint32_t index,
+                     MRayPixelEnum pixType)
+{
+    using namespace NormConversion;
+    const Byte* aData = std::assume_aligned<256>(data);
+    //
+    #define RIP(TYPE) reinterpret_cast<const TYPE*>(aData)[index]
+
+    Vector4 r;
+    switch(pixType)
+    {
+        using enum MRayPixelEnum;
+        // 1-Channel
+        case MR_R8_UNORM:  r[0] = FromUNorm<Float>(RIP(uint8_t));  break;
+        case MR_R16_UNORM: r[0] = FromUNorm<Float>(RIP(uint16_t)); break;
+        case MR_R8_SNORM:  r[0] = FromSNorm<Float>(RIP(int8_t));   break;
+        case MR_R16_SNORM: r[0] = FromSNorm<Float>(RIP(int16_t));  break;
+        //case MR_R_HALF:
+        case MR_R_FLOAT:   r[0] = Float(RIP(float));               break;
+
+        // 2-Channel
+        case MR_RG8_UNORM:  r[0] = FromUNorm<Float>(RIP(Vector2uc)[0]);
+                            r[1] = FromUNorm<Float>(RIP(Vector2uc)[1]); break;
+        case MR_RG16_UNORM: r[0] = FromUNorm<Float>(RIP(Vector2us)[0]);
+                            r[1] = FromUNorm<Float>(RIP(Vector2us)[1]); break;
+        case MR_RG8_SNORM:  r[0] = FromSNorm<Float>(RIP(Vector2c)[0]);
+                            r[1] = FromSNorm<Float>(RIP(Vector2c)[1]);  break;
+        case MR_RG16_SNORM: r[0] = FromSNorm<Float>(RIP(Vector2s)[0]);
+                            r[1] = FromSNorm<Float>(RIP(Vector2s)[1]);  break;
+        //case MR_RG_HALF:
+        case MR_RG_FLOAT:   r = Vector4(RIP(Vector2f), 0, 0);           break;
+
+        // 3-Channel
+        case MR_RGB8_UNORM:  r[0] = FromUNorm<Float>(RIP(Vector3uc)[0]);
+                             r[1] = FromUNorm<Float>(RIP(Vector3uc)[1]);
+                             r[2] = FromUNorm<Float>(RIP(Vector3uc)[2]); break;
+        case MR_RGB16_UNORM: r[0] = FromUNorm<Float>(RIP(Vector3us)[0]);
+                             r[1] = FromUNorm<Float>(RIP(Vector3us)[1]);
+                             r[2] = FromUNorm<Float>(RIP(Vector3us)[2]); break;
+        case MR_RGB8_SNORM:  r[0] = FromSNorm<Float>(RIP(Vector3c)[0]);
+                             r[1] = FromSNorm<Float>(RIP(Vector3c)[1]);
+                             r[2] = FromSNorm<Float>(RIP(Vector3c)[2]);  break;
+        case MR_RGB16_SNORM: r[0] = FromSNorm<Float>(RIP(Vector3s)[0]);
+                             r[1] = FromSNorm<Float>(RIP(Vector3s)[1]);
+                             r[2] = FromSNorm<Float>(RIP(Vector3s)[2]);  break;
+        //case MR_RGB_HALF:
+        case MR_RGB_FLOAT:  r = Vector4(RIP(Vector3f), Float(0));        break;
+
+        // 4-Channel
+        case MR_RGBA8_UNORM:  r = Vector4(RIP(UNorm4x8));  break;
+        case MR_RGBA16_UNORM: r = Vector4(RIP(UNorm4x16)); break;
+        case MR_RGBA8_SNORM:  r = Vector4(RIP(SNorm4x8));  break;
+        case MR_RGBA16_SNORM: r = Vector4(RIP(SNorm4x16)); break;
+        case MR_RGBA_FLOAT:   r = Vector4(RIP(Vector4f));  break;
+
+        // TODO:
+        //case MR_RGBA_HALF:
+        default: r = Vector4::Zero();
+    }
+    #undef RIP
+    //
+    return r;
+}
+

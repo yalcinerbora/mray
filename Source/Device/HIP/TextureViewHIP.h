@@ -10,6 +10,11 @@
 namespace mray::hip
 {
 
+
+// https://github.com/ROCm/rocm-systems/blob/develop/projects/clr/hipamd/include/hip/amd_detail/texture_fetch_functions.h#L23
+// So.. I dunno where the int8_t came from when AMD compiles but
+// it is returned as "signed char". So type trait does not work properly since
+// std::is_same_v<signed char, char> == false.
 using VectorTypeToHIP = TypeFinder::T_TMapper:: template Map
 <
     // Unsigned Int
@@ -18,7 +23,7 @@ using VectorTypeToHIP = TypeFinder::T_TMapper:: template Map
     TypeFinder::T_TMapper::template TTPair<Vector3ui,   uint4>,
     TypeFinder::T_TMapper::template TTPair<Vector4ui,   uint4>,
     // Int
-    TypeFinder::T_TMapper::template TTPair<int32_t,     int32_t>,
+    TypeFinder::T_TMapper::template TTPair<int32_t,     int>,
     TypeFinder::T_TMapper::template TTPair<Vector2i,    int2>,
     TypeFinder::T_TMapper::template TTPair<Vector3i,    int4>,
     TypeFinder::T_TMapper::template TTPair<Vector4i,    int4>,
@@ -28,7 +33,7 @@ using VectorTypeToHIP = TypeFinder::T_TMapper:: template Map
     TypeFinder::T_TMapper::template TTPair<Vector3us,   ushort4>,
     TypeFinder::T_TMapper::template TTPair<Vector4us,   ushort4>,
     // Short
-    TypeFinder::T_TMapper::template TTPair<int16_t,     int16_t>,
+    TypeFinder::T_TMapper::template TTPair<int16_t,     short>,
     TypeFinder::T_TMapper::template TTPair<Vector2s,    short2>,
     TypeFinder::T_TMapper::template TTPair<Vector3s,    short4>,
     TypeFinder::T_TMapper::template TTPair<Vector4s,    short4>,
@@ -38,7 +43,7 @@ using VectorTypeToHIP = TypeFinder::T_TMapper:: template Map
     TypeFinder::T_TMapper::template TTPair<Vector3uc,   uchar4>,
     TypeFinder::T_TMapper::template TTPair<Vector4uc,   uchar4>,
     // Char
-    TypeFinder::T_TMapper::template TTPair<int8_t,      int8_t>,
+    TypeFinder::T_TMapper::template TTPair<int8_t,      char>,
     TypeFinder::T_TMapper::template TTPair<Vector2c,    char2>,
     TypeFinder::T_TMapper::template TTPair<Vector3c,    char4>,
     TypeFinder::T_TMapper::template TTPair<Vector4c,    char4>,
@@ -145,13 +150,13 @@ class TextureViewHIP
     public:
     MRAY_HOST               TextureViewHIP(hipTextureObject_t t) : texHandle(t) {}
     // Base Access
-    MRAY_GPU T              operator()(UV uv) const;
+    MR_GF_DECL T            operator()(UV uv) const;
     // Gradient Access
-    MRAY_GPU T              operator()(UV uv,
+    MR_GF_DECL T            operator()(UV uv,
                                        UV dpdx,
                                        UV dpdy) const;
     // Direct Mip Access
-    MRAY_GPU T              operator()(UV uv, Float mipLevel) const;
+    MR_GF_DECL T            operator()(UV uv, Float mipLevel) const;
 };
 
 // Writable texture views (disregards normalization etc)
@@ -177,7 +182,7 @@ class RWTextureViewHIP
         MRAY_GPU            PixRef(hipSurfaceObject_t s,
                                    TextureExtent<DIM> ij);
         public:
-        MRAY_GPU PixRef&    operator=(const T&);
+        MR_GF_DECL PixRef&  operator=(const T&);
     };
 
     static constexpr uint32_t Channels = PixRef::Channels;
@@ -191,15 +196,15 @@ class RWTextureViewHIP
 
     public:
     // Full Texture object access
-    MRAY_HOST       RWTextureViewHIP(hipSurfaceObject_t t) : surfHandle(t) {}
+    MRAY_HOST         RWTextureViewHIP(hipSurfaceObject_t t) : surfHandle(t) {}
     // Write
-    MRAY_GPU PixRef operator()(TextureExtent<DIM>);
+    MR_GF_DECL PixRef operator()(TextureExtent<DIM>);
     // Read
-    MRAY_GPU T      operator()(TextureExtent<DIM>) const;
+    MR_GF_DECL T      operator()(TextureExtent<DIM>) const;
 };
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T TextureViewHIP<D, T>::operator()(UV uv) const
 {
     HipType t;
@@ -220,7 +225,7 @@ T TextureViewHIP<D, T>::operator()(UV uv) const
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T TextureViewHIP<D, T>::operator()(UV uv, UV dpdx, UV dpdy) const
 {
     HipType t;
@@ -246,7 +251,7 @@ T TextureViewHIP<D, T>::operator()(UV uv, UV dpdx, UV dpdy) const
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T TextureViewHIP<D, T>::operator()(UV uv, Float mipLevel) const
 {
     HipType t;
@@ -264,11 +269,11 @@ T TextureViewHIP<D, T>::operator()(UV uv, Float mipLevel) const
                               uv[0], uv[1], uv[2],
                               mipLevel);
     }
-    return ConvertType::Convert(t);    
+    return ConvertType::Convert(t);
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 RWTextureViewHIP<D, T>::PixRef::PixRef(hipSurfaceObject_t s,
                                        TextureExtent<D> in)
     : surfHandle(s)
@@ -276,7 +281,7 @@ RWTextureViewHIP<D, T>::PixRef::PixRef(hipSurfaceObject_t s,
 {}
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 typename RWTextureViewHIP<D, T>::PixRef&
 RWTextureViewHIP<D, T>::PixRef::operator=(const T& val)
 {
@@ -329,7 +334,7 @@ RWTextureViewHIP<D, T>::PixRef::operator=(const T& val)
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 typename RWTextureViewHIP<D, T>::PixRef
 RWTextureViewHIP<D, T>::operator()(TextureExtent<D> ij)
 {
@@ -337,7 +342,7 @@ RWTextureViewHIP<D, T>::operator()(TextureExtent<D> ij)
 }
 
 template<uint32_t D, class T>
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 T RWTextureViewHIP<D, T>::operator()(TextureExtent<D> ij) const
 {
     using PaddedHipType = typename PixRef::PaddedHipType;

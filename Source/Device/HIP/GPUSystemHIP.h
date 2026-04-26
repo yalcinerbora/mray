@@ -10,6 +10,8 @@
 
 #include "../GPUTypes.h"
 
+#include "TransientPool/TransientPool.h"
+
 class TimelineSemaphore;
 
 // Hip Kernel Optimization Hints
@@ -69,9 +71,9 @@ struct KernelCallParamsHIP
     uint32_t blockId;
     uint32_t threadId;
 
-    MRAY_GPU                KernelCallParamsHIP();
-    MRAY_HYBRID uint32_t    GlobalId() const;
-    MRAY_HYBRID uint32_t    TotalSize() const;
+    MRAY_GPU            KernelCallParamsHIP();
+    MR_PF_DECL uint32_t GlobalId() const;
+    MR_PF_DECL uint32_t TotalSize() const;
 };
 
 using AnnotationHandle = void*;
@@ -150,14 +152,14 @@ class GPUFenceHIP
     hipEvent_t                  eventC;
 
     public:
-    MRAY_HYBRID                 GPUFenceHIP(const GPUQueueHIP&);
-                                GPUFenceHIP(const GPUFenceHIP&) = delete;
-    MRAY_HYBRID                 GPUFenceHIP(GPUFenceHIP&&) noexcept;
-    GPUFenceHIP&                operator=(const GPUFenceHIP&) = delete;
-    MRAY_HYBRID GPUFenceHIP&    operator=(GPUFenceHIP&&) noexcept;
-    MRAY_HYBRID                 ~GPUFenceHIP();
+    MR_HF_DECL                 GPUFenceHIP(const GPUQueueHIP&);
+                               GPUFenceHIP(const GPUFenceHIP&) = delete;
+    MR_HF_DECL                 GPUFenceHIP(GPUFenceHIP&&) noexcept;
+    GPUFenceHIP&               operator=(const GPUFenceHIP&) = delete;
+    MR_HF_DECL GPUFenceHIP&    operator=(GPUFenceHIP&&) noexcept;
+    MR_HF_DECL                 ~GPUFenceHIP();
 
-    MRAY_HYBRID void            Wait() const;
+    MR_HF_DECL void            Wait() const;
 };
 
 class GPUQueueHIP
@@ -171,7 +173,7 @@ class GPUQueueHIP
     AnnotationHandle        roctxDomain         = nullptr;
     const GPUDeviceHIP*     myDevice            = nullptr;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     uint32_t            DetermineGridStrideBlock(const void* kernelPtr,
                                                  uint32_t sharedMemSize,
                                                  uint32_t threadCount,
@@ -181,16 +183,16 @@ class GPUQueueHIP
     // Constructors & Destructor
                                 GPUQueueHIP() = default;
     MRAY_HOST                   GPUQueueHIP(uint32_t multiprocessorCount,
-                                             AnnotationHandle domain,
-                                             const GPUDeviceHIP* device);
-    MRAY_GPU                    GPUQueueHIP(uint32_t multiprocessorCount,
-                                             AnnotationHandle domain,
-                                             DeviceQueueType t);
+                                            AnnotationHandle domain,
+                                            const GPUDeviceHIP* device);
+    MR_GF_DECL                  GPUQueueHIP(uint32_t multiprocessorCount,
+                                            AnnotationHandle domain,
+                                            DeviceQueueType t);
                                 GPUQueueHIP(const GPUQueueHIP&) = delete;
-    MRAY_HYBRID                 GPUQueueHIP(GPUQueueHIP&&) noexcept;
+    MR_HF_DECL                  GPUQueueHIP(GPUQueueHIP&&) noexcept;
     GPUQueueHIP&                operator=(const GPUQueueHIP&) = delete;
-    MRAY_HYBRID GPUQueueHIP&    operator=(GPUQueueHIP&&) noexcept;
-    MRAY_HYBRID                 ~GPUQueueHIP();
+    MR_HF_DECL GPUQueueHIP&     operator=(GPUQueueHIP&&) noexcept;
+    MR_HF_DECL                  ~GPUQueueHIP();
 
 
     // Grid-Stride Kernels
@@ -225,22 +227,22 @@ class GPUQueueHIP
     // because of that even if we dont call the kernel from the
     // device.
     template<auto Kernel, class... Args>
-    MRAY_GPU void   DeviceIssueWorkKernel(std::string_view name,
-                                                DeviceWorkIssueParams,
-                                                //
-                                                Args&&...) const;
+    MR_GF_DECL void DeviceIssueWorkKernel(std::string_view name,
+                                          DeviceWorkIssueParams,
+                                          //
+                                          Args&&...) const;
     template<class Lambda>
-    MRAY_GPU void   DeviceIssueWorkLambda(std::string_view name,
-                                                DeviceWorkIssueParams,
-                                                //
-                                                Lambda&&) const;
+    MR_GF_DECL void DeviceIssueWorkLambda(std::string_view name,
+                                          DeviceWorkIssueParams,
+                                          //
+                                          Lambda&&) const;
     template<auto Kernel, class... Args>
-    MRAY_GPU void   DeviceIssueBlockKernel(std::string_view name,
+    MR_GF_DECL void DeviceIssueBlockKernel(std::string_view name,
                                            DeviceBlockIssueParams,
                                            //
                                            Args&&...) const;
     template<class Lambda, uint32_t Bounds = StaticThreadPerBlock1D()>
-    MRAY_GPU void   DeviceIssueBlockLambda(std::string_view name,
+    MR_GF_DECL void DeviceIssueBlockLambda(std::string_view name,
                                            DeviceBlockIssueParams,
                                            //
                                            Lambda&&) const;
@@ -262,7 +264,7 @@ class GPUQueueHIP
     MRAY_HOST void      IssueBufferForDestruction(TransientData data) const;
 
     // Synchronization
-    MRAY_HYBRID NO_DISCARD
+    MR_HF_DECL NO_DISCARD
     GPUFenceHIP         Barrier() const;
     MRAY_HOST
     void                IssueSemaphoreWait(GPUSemaphoreViewHIP&) const;
@@ -274,12 +276,12 @@ class GPUQueueHIP
     MRAY_HYBRID
     uint32_t            SMCount() const;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     uint32_t            RecommendedBlockCountDevice(const void* kernelPtr,
                                                     uint32_t threadsPerBlock,
                                                     uint32_t sharedMemSize) const;
 
-    MRAY_HYBRID
+    MR_HF_DECL
     static uint32_t     RecommendedBlockCountSM(const void* kernelPtr,
                                                 uint32_t threadsPerBlock,
                                                 uint32_t sharedMemSize);
@@ -346,7 +348,7 @@ class GPUSystemHIP
     protected:
     public:
     // Constructors & Destructor
-                        GPUSystemHIP();
+                        GPUSystemHIP(bool logBanner = false);
                         GPUSystemHIP(const GPUSystemHIP&) = delete;
                         GPUSystemHIP(GPUSystemHIP&&) = delete;
     GPUSystemHIP&       operator=(const GPUSystemHIP&) = delete;
@@ -390,19 +392,19 @@ class GPUSystemHIP
 };
 
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 uint32_t KernelCallParamsHIP::GlobalId() const
 {
     return blockId * blockSize + threadId;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_PF_DEF
 uint32_t KernelCallParamsHIP::TotalSize() const
 {
     return gridSize * blockSize;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUFenceHIP::GPUFenceHIP(const GPUQueueHIP& q)
     : eventC(hipEvent_t(0))
 {
@@ -411,14 +413,14 @@ GPUFenceHIP::GPUFenceHIP(const GPUQueueHIP& q)
     HIP_CHECK(hipEventRecord(eventC, stream));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUFenceHIP::GPUFenceHIP(GPUFenceHIP&& other) noexcept
     : eventC(other.eventC)
 {
     other.eventC = hipEvent_t(0);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUFenceHIP& GPUFenceHIP::operator=(GPUFenceHIP&& other) noexcept
 {
     eventC = other.eventC;
@@ -426,14 +428,14 @@ GPUFenceHIP& GPUFenceHIP::operator=(GPUFenceHIP&& other) noexcept
     return *this;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUFenceHIP::~GPUFenceHIP()
 {
     if(eventC != hipEvent_t(0))
         HIP_CHECK(hipEventDestroy(eventC));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 void GPUFenceHIP::Wait() const
 {
     #ifndef __HIP_DEVICE_COMPILE__
@@ -460,7 +462,7 @@ GPUQueueHIP::GPUQueueHIP(uint32_t multiprocessorCount,
                                        hipStreamNonBlocking));
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DEF
 GPUQueueHIP::GPUQueueHIP(uint32_t multiprocessorCount,
                          AnnotationHandle domain,
                          DeviceQueueType)
@@ -492,7 +494,7 @@ GPUQueueHIP::GPUQueueHIP(uint32_t multiprocessorCount,
     // }
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUQueueHIP::GPUQueueHIP(GPUQueueHIP&& other) noexcept
     : stream(other.stream)
     , multiprocessorCount(other.multiprocessorCount)
@@ -502,7 +504,7 @@ GPUQueueHIP::GPUQueueHIP(GPUQueueHIP&& other) noexcept
     other.stream = hipStream_t(0);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUQueueHIP& GPUQueueHIP::operator=(GPUQueueHIP&& other) noexcept
 {
     multiprocessorCount = other.multiprocessorCount;
@@ -513,7 +515,7 @@ GPUQueueHIP& GPUQueueHIP::operator=(GPUQueueHIP&& other) noexcept
     return *this;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUQueueHIP::~GPUQueueHIP()
 {
 
@@ -604,7 +606,7 @@ void GPUQueueHIP::IssueBufferForDestruction(TransientData data) const
     HIP_CHECK(hipLaunchHostFunc(stream, &TransientPoolDestroyCallback, ptr));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 GPUFenceHIP GPUQueueHIP::Barrier() const
 {
     return GPUFenceHIP(*this);
@@ -628,13 +630,13 @@ void GPUQueueHIP::IssueWait(const GPUFenceHIP& barrier) const
     HIP_CHECK(hipStreamWaitEvent(stream, ToHandleHIP(barrier)));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t GPUQueueHIP::SMCount() const
 {
     return multiprocessorCount;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t GPUQueueHIP::RecommendedBlockCountSM(const void* kernelPtr,
                                               uint32_t threadsPerBlock,
                                               uint32_t sharedMemSize)
@@ -647,7 +649,7 @@ uint32_t GPUQueueHIP::RecommendedBlockCountSM(const void* kernelPtr,
     return static_cast<uint32_t>(numBlocks);
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t GPUQueueHIP::RecommendedBlockCountDevice(const void* kernelPtr,
                                                   uint32_t threadsPerBlock,
                                                   uint32_t sharedMemSize) const
@@ -657,7 +659,7 @@ uint32_t GPUQueueHIP::RecommendedBlockCountDevice(const void* kernelPtr,
     return multiprocessorCount* blockPerSM;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 uint32_t GPUQueueHIP::DetermineGridStrideBlock(const void* kernelPtr,
                                                uint32_t sharedMemSize,
                                                uint32_t threadCount,
@@ -703,13 +705,13 @@ void GPUSystemHIP::Memset(Span<T> region, uint8_t perByteValue) const
                         region.size_bytes()));
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 hipStream_t ToHandleHIP(const GPUQueueHIP& q)
 {
     return q.stream;
 }
 
-MRAY_HYBRID MRAY_CGPU_INLINE
+MR_HF_DEF
 hipEvent_t ToHandleHIP(const GPUFenceHIP& f)
 {
     return f.eventC;

@@ -97,6 +97,10 @@ class GenericTextureI
     // And All Done!
 };
 
+// TODO: Can we get away without a type for each data?
+struct GenericTopology
+{};
+
 class TextureMemory
 {
     using GPUIterator       = GPUQueueIteratorRoundRobin;
@@ -104,8 +108,8 @@ class TextureMemory
     using TSClampMap        = ThreadSafeMap<TextureId, TexClampParameters>;
     using TSTextureMap      = ThreadSafeMap<TextureId, GenericTexture>;
     using TSTextureViewMap  = ThreadSafeMap<TextureId, GenericTextureView>;
-    using TextureFilterPtr = std::unique_ptr<TextureFilterI>;
-
+    using TextureFilterPtr  = std::unique_ptr<TextureFilterI>;
+    using TSToplogyMap      = ThreadSafeMap<TopologyId, GenericTopology>;
 
     private:
     const GPUSystem&            gpuSystem;
@@ -115,6 +119,10 @@ class TextureMemory
     TextureMemList          texMemList;
     std::atomic_uint32_t    texCounter;
     TSTextureMap            textures;
+    //
+    std::atomic_uint32_t    sparseTopologyCounter;
+    // TODO: Add map etc.
+
     // Texture clamp related
     TSClampMap              texClampParams;
     //
@@ -148,8 +156,17 @@ class TextureMemory
     void            CommitTextures();
     void            PushTextureData(TextureId, uint32_t mipLevel,
                                     TransientData data);
+    //
+    TopologyId      CreateSparseTopology(MRayTopologyType, TopologyLayerSizeList);
+    void            CommitSparseTopologies();
+    void            PushSparseTopologyData(TopologyId, TransientData, size_t offset);
+    //
+    TextureId       CreateSparseTexture3D(TopologyId, const MRayTextureParameters&);
+    void            CommitSparseTextures();
+    void            PushSparseTextureData(TextureId, TransientData, size_t offset);
+    //
     void            Finalize();
-
+    //
     const TextureViewMap&   TextureViews() const;
     const TextureMap&       Textures() const;
 

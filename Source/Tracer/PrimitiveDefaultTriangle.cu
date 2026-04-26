@@ -19,7 +19,7 @@ void KCAdjustIndices(// I-O
     // We technically do an out of bounds access over the "std::array<uint32_t, 3>"
     // Sanity check, if there is a padding (it should not but just to be sure)
     static_assert(sizeof(std::array<Vector3ui, 2>) == sizeof(Vector3ui) * 2);
-    Span<uint32_t> dVertexIndices = Span<uint32_t>(dIndicesInOut.data()->AsArray().data(),
+    Span<uint32_t> dVertexIndices = Span<uint32_t>(dIndicesInOut.data()->AsSpan().data(),
                                                    dIndicesInOut.size() * Vector3ui::Dims);
 
     // Block-stride Loop

@@ -126,9 +126,9 @@ TEST(GraphicsFunctionsTest, GSOrthonormalize3D)
         x += Vector3::ZAxis() * MathConstants::LargeEpsilon<Float>();
         y += Vector3::XAxis() * MathConstants::LargeEpsilon<Float>();
         // Renormalize Y
-        std::tie(x, y) = GSOrthonormalize(x, y, z);
-        EXPECT_EQUAL_MRAY(y, Vector3::YAxis(), MathConstants::LargeEpsilon<Float>());
-        EXPECT_EQUAL_MRAY(x, Vector3::XAxis(), MathConstants::LargeEpsilon<Float>());
+        auto result = GSOrthonormalize(x, y, z);
+        EXPECT_EQUAL_MRAY(result[1], Vector3::YAxis(), MathConstants::LargeEpsilon<Float>());
+        EXPECT_EQUAL_MRAY(result[0], Vector3::XAxis(), MathConstants::LargeEpsilon<Float>());
     }
 
     {
@@ -138,9 +138,9 @@ TEST(GraphicsFunctionsTest, GSOrthonormalize3D)
         Vector3 y = Math::Normalize(Vector3(0.0, 0.5, 0.5));
         Vector3 z = Vector3::ZAxis();
         // Renormalize Y
-        std::tie(x, y) = GSOrthonormalize(x, y, z);
-        EXPECT_EQUAL_MRAY(y, Vector3::YAxis(), MathConstants::Epsilon<Float>());
-        EXPECT_EQUAL_MRAY(x, Vector3::XAxis(), MathConstants::Epsilon<Float>());
+        auto result = GSOrthonormalize(x, y, z);
+        EXPECT_EQUAL_MRAY(result[1], Vector3::YAxis(), MathConstants::Epsilon<Float>());
+        EXPECT_EQUAL_MRAY(result[0], Vector3::XAxis(), MathConstants::Epsilon<Float>());
     }
 }
 

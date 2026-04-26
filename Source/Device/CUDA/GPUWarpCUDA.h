@@ -121,8 +121,8 @@ MR_GF_DEF uint32_t WarpBallot(bool predicate, unsigned int mask)
 
     uint32_t fullVotes = uint32_t(__ballot_sync(mask, predicate));
     uint32_t o = localLogicalWarpId;
-    std::array bits = {(o + 0) * LogicalWarpSize,
-                       (o + 1) * LogicalWarpSize};
+    Array bits = {(o + 0) * LogicalWarpSize,
+                  (o + 1) * LogicalWarpSize};
     uint32_t result = Bit::FetchSubPortion(fullVotes, bits);
     return result;
 }

@@ -70,8 +70,8 @@ struct IndexLookupStrategy
     {
         // These are random, no special meaning
         uint64_t h = PCG64(PCG64(PCG64(t[0] + 1) + t[1]) + t[2]);
-
-        h = Bit::FetchSubPortion(h, {0, 32}) + Bit::FetchSubPortion(h, {32, 64});
+        h = (Bit::FetchSubPortion(h, {0u, 32u}) +
+             Bit::FetchSubPortion(h, {32u, 64u}));
 
         // Skip sentinel and empty marks
         if(h == 0 || h == 1) return 2u;

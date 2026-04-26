@@ -817,7 +817,7 @@ void AcceleratorGroupEmbree<PG>::CastVisibilityRays(// Output
 
 template<PrimitiveGroupC PG>
 void AcceleratorGroupEmbree<PG>::AcquireIASConstructionParams(Span<RTCScene> hSceneHandles,
-                                                              Span<Matrix4x4> hInstanceMatrices,
+                                                              Span<Matrix3x4> hInstanceMatrices,
                                                               Span<uint32_t> hInstanceHitRecordCounts,
                                                               Span<const EmbreeHitRecord<>*> dHitRecordPtrs,
                                                               const GPUQueue& queue) const

@@ -828,19 +828,17 @@ MR_PF_DEF
 SampleT<Float> Common::SampleExp(Float xi, Float sigma)
 {
     Float result = -Math::Log(Float(1) - xi) / sigma;
-    result *= sigma;
-
     return SampleT<Float>
     {
         .value = result,
-        .pdf = PDFExp(xi)
+        .pdf = PDFExp(result)
     };
 }
 
 MR_PF_DEF
 Float Common::PDFExp(Float x, Float sigma)
 {
-    return Math::Exp(-x * sigma) * sigma;
+    return sigma * Math::Exp(-x * sigma);
 }
 
 MR_PF_DEF

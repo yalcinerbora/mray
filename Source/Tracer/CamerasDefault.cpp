@@ -152,3 +152,52 @@ CameraGroupPinhole::SoA() const
 {
     return soa;
 }
+
+std::string_view CameraGroupNull::TypeName()
+{
+    using namespace TypeNameGen::CompTime;
+    using namespace std::string_view_literals;
+    static constexpr auto Name = "Null"sv;
+    return CameraTypeName<Name>;
+}
+
+CameraGroupNull::CameraGroupNull(uint32_t groupId,
+                                 const GPUSystem& system)
+    : GenericGroupCamera<CameraGroupNull>(groupId, system)
+{}
+
+void CameraGroupNull::CommitReservations()
+{
+    isCommitted = true;
+}
+
+CamAttributeInfoList CameraGroupNull::AttributeInfo() const
+{
+    return CamAttributeInfoList{};
+}
+
+void CameraGroupNull::PushAttribute(CameraKey, uint32_t,
+                                    TransientData, const GPUQueue&)
+{}
+
+void CameraGroupNull::PushAttribute(CameraKey, uint32_t,
+                                    const Vector2ui&,
+                                    TransientData,
+                                    const GPUQueue&)
+{}
+
+void CameraGroupNull::PushAttribute(CameraKey, CameraKey, uint32_t,
+                                       TransientData, const GPUQueue&)
+{}
+
+CameraTransform
+CameraGroupNull::AcquireCameraTransform(CameraKey) const
+{
+    return CameraTransform{};
+}
+
+EmptyType
+CameraGroupNull::SoA() const
+{
+    return EmptyType{};
+}

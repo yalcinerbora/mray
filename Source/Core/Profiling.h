@@ -163,8 +163,8 @@ ProfilerAnnotation::ProfilerAnnotation(std::string_view name,
            "null-terminated string!");
 
     uint64_t n = std::hash<std::string_view>{}(name);
-    uint32_t n32 = uint32_t(Bit::FetchSubPortion(n, {0, 32}) ^
-                            Bit::FetchSubPortion(n, {32, 64}));
+    uint32_t n32 = uint32_t(Bit::FetchSubPortion(n, {0u, 32u}) ^
+                            Bit::FetchSubPortion(n, {32u, 64u}));
     auto color = Color::RandomColorRGB(n32);
     using NormConversion::ToUNorm;
     uint32_t colorPack = Bit::Compose<8, 8, 8, 8>

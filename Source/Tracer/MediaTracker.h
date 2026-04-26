@@ -324,37 +324,37 @@ MediaList::UnpackAll() const
     //
     IndexList result;
     // 0
-    result[0] = Bit::FetchSubPortion(listRaw[0], {0, 20});
+    result[0] = Bit::FetchSubPortion(listRaw[0], {0u, 20u});
     // 1
     result[1] = Bit::Compose<12, 8>
     (
-        Bit::FetchSubPortion(listRaw[0], {20, 32}),
-        Bit::FetchSubPortion(listRaw[1], {0 , 8})
+        Bit::FetchSubPortion(listRaw[0], {20u, 32u}),
+        Bit::FetchSubPortion(listRaw[1], {0u , 8u})
     );
     // 2
-    result[2] = Bit::FetchSubPortion(listRaw[1], {8, 28});
+    result[2] = Bit::FetchSubPortion(listRaw[1], {8u, 28u});
     // 3
     result[3] = Bit::Compose<4, 16>
     (
-        Bit::FetchSubPortion(listRaw[1], {28, 32}),
-        Bit::FetchSubPortion(listRaw[2], {0 , 16})
+        Bit::FetchSubPortion(listRaw[1], {28u, 32u}),
+        Bit::FetchSubPortion(listRaw[2], {0u , 16u})
     );
     // 4
     result[4] = Bit::Compose<16, 4>
     (
-        Bit::FetchSubPortion(listRaw[2], {16, 32}),
-        Bit::FetchSubPortion(listRaw[3], {0 ,  4})
+        Bit::FetchSubPortion(listRaw[2], {16u, 32u}),
+        Bit::FetchSubPortion(listRaw[3], {0u ,  4u})
     );
     // 5
-    result[5] = Bit::FetchSubPortion(listRaw[3], {4, 24});
+    result[5] = Bit::FetchSubPortion(listRaw[3], {4u, 24u});
     // 6
     result[6] = Bit::Compose<8, 12>
     (
-        Bit::FetchSubPortion(listRaw[3], {24, 32}),
-        Bit::FetchSubPortion(listRaw[4], {0 ,  12})
+        Bit::FetchSubPortion(listRaw[3], {24u, 32u}),
+        Bit::FetchSubPortion(listRaw[4], {0u , 12u})
     );
     // 7
-    result[7] = Bit::FetchSubPortion(listRaw[4], {12, 32});
+    result[7] = Bit::FetchSubPortion(listRaw[4], {12u, 32u});
     return result;
 }
 
@@ -369,30 +369,30 @@ uint32_t MediaList::Unpack(uint32_t i) const
                   "The code statically rolled for these values only!");
     switch(i)
     {
-        case 0: return Bit::FetchSubPortion(listRaw[0], {0, 20});
+        case 0: return Bit::FetchSubPortion(listRaw[0], {0u, 20u});
         case 1: return Bit::Compose<12, 8>
         (
-            Bit::FetchSubPortion(listRaw[0], {20, 32}),
-            Bit::FetchSubPortion(listRaw[1], {0 , 8})
+            Bit::FetchSubPortion(listRaw[0], {20u, 32u}),
+            Bit::FetchSubPortion(listRaw[1], {0u , 8u})
         );
-        case 2: return Bit::FetchSubPortion(listRaw[1], {8, 28});
+        case 2: return Bit::FetchSubPortion(listRaw[1], {8u, 28u});
         case 3: return Bit::Compose<4, 16>
         (
-            Bit::FetchSubPortion(listRaw[1], {28, 32}),
-            Bit::FetchSubPortion(listRaw[2], {0 , 16})
+            Bit::FetchSubPortion(listRaw[1], {28u, 32u}),
+            Bit::FetchSubPortion(listRaw[2], {0u , 16u})
         );
         case 4: return Bit::Compose<16, 4>
         (
-            Bit::FetchSubPortion(listRaw[2], {16, 32}),
-            Bit::FetchSubPortion(listRaw[3], {0 ,  4})
+            Bit::FetchSubPortion(listRaw[2], {16u, 32u}),
+            Bit::FetchSubPortion(listRaw[3], {0u ,  4u})
         );
-        case 5: return Bit::FetchSubPortion(listRaw[3], {4, 24});
+        case 5: return Bit::FetchSubPortion(listRaw[3], {4u, 24u});
         case 6: return Bit::Compose<8, 12>
         (
-            Bit::FetchSubPortion(listRaw[3], {24, 32}),
-            Bit::FetchSubPortion(listRaw[4], {0 ,  12})
+            Bit::FetchSubPortion(listRaw[3], {24u, 32u}),
+            Bit::FetchSubPortion(listRaw[4], {0u,  12u})
         );
-        case 7: return Bit::FetchSubPortion(listRaw[4], {12, 32});
+        case 7: return Bit::FetchSubPortion(listRaw[4], {12u, 32u});
         //
         default: return UINT32_MAX;
     }
@@ -404,25 +404,25 @@ void MediaList::PackAll(const IndexList& list)
     static_assert(MAX_MEDIA_BITS == 20 && MAX_NESTED_MEDIA == 8,
                   "The code statically rolled for these values only!");
     // 0
-    listRaw[0] = Bit::SetSubPortion(listRaw[0], list[0]      , { 0, 20});
+    listRaw[0] = Bit::SetSubPortion(listRaw[0], list[0]      , { 0u, 20u});
     // 1
-    listRaw[0] = Bit::SetSubPortion(listRaw[0], list[1]      , {20, 32});
-    listRaw[1] = Bit::SetSubPortion(listRaw[1], list[1] >> 12, { 0, 8});
+    listRaw[0] = Bit::SetSubPortion(listRaw[0], list[1]      , {20u, 32u});
+    listRaw[1] = Bit::SetSubPortion(listRaw[1], list[1] >> 12, { 0u, 8u});
     // 2
-    listRaw[1] = Bit::SetSubPortion(listRaw[1], list[2]      , { 8, 28});
+    listRaw[1] = Bit::SetSubPortion(listRaw[1], list[2]      , { 8u, 28u});
     // 3
-    listRaw[1] = Bit::SetSubPortion(listRaw[1], list[3]      , {28, 32});
-    listRaw[2] = Bit::SetSubPortion(listRaw[2], list[3] >>  4, { 0, 16});
+    listRaw[1] = Bit::SetSubPortion(listRaw[1], list[3]      , {28u, 32u});
+    listRaw[2] = Bit::SetSubPortion(listRaw[2], list[3] >>  4, { 0u, 16u});
     // 4
-    listRaw[2] = Bit::SetSubPortion(listRaw[2], list[4]      , {16, 32});
-    listRaw[3] = Bit::SetSubPortion(listRaw[3], list[4] >> 16, { 0, 4});
+    listRaw[2] = Bit::SetSubPortion(listRaw[2], list[4]      , {16u, 32u});
+    listRaw[3] = Bit::SetSubPortion(listRaw[3], list[4] >> 16, { 0u, 4u});
     // 5
-    listRaw[3] = Bit::SetSubPortion(listRaw[3], list[5]      , { 4, 24});
+    listRaw[3] = Bit::SetSubPortion(listRaw[3], list[5]      , { 4u, 24u});
     // 6
-    listRaw[3] = Bit::SetSubPortion(listRaw[3], list[6]      , {24, 32});
-    listRaw[4] = Bit::SetSubPortion(listRaw[4], list[6] >>  8, { 0, 12});
+    listRaw[3] = Bit::SetSubPortion(listRaw[3], list[6]      , {24u, 32u});
+    listRaw[4] = Bit::SetSubPortion(listRaw[4], list[6] >>  8, { 0u, 12u});
     // 7
-    listRaw[4] = Bit::SetSubPortion(listRaw[4], list[7]      , {12, 32});
+    listRaw[4] = Bit::SetSubPortion(listRaw[4], list[7]      , {12u, 32u});
 }
 
 MR_PF_DEF_V
@@ -440,8 +440,8 @@ void MediaList::InsertVolToLoc(uint32_t i, uint32_t newVIndex)
     uint32_t t;
     if(i <= 0)
     {
-        t = Bit::FetchSubPortion(listRaw[0], {0, 20});
-        listRaw[0] = Bit::SetSubPortion(listRaw[0], L, {0, 20});
+        t = Bit::FetchSubPortion(listRaw[0], {0u, 20u});
+        listRaw[0] = Bit::SetSubPortion(listRaw[0], L, {0u, 20u});
         L = t;
     }
     if(L == MediaList::INVALID_VAL) return;
@@ -449,18 +449,18 @@ void MediaList::InsertVolToLoc(uint32_t i, uint32_t newVIndex)
     {
         t  = Bit::Compose<12, 8>
         (
-            Bit::FetchSubPortion(listRaw[0], {20, 32}),
-            Bit::FetchSubPortion(listRaw[1], {0 , 8})
+            Bit::FetchSubPortion(listRaw[0], {20u, 32u}),
+            Bit::FetchSubPortion(listRaw[1], {0u , 8u})
         );
-        listRaw[0] = Bit::SetSubPortion(listRaw[0], L      , {20, 32});
-        listRaw[1] = Bit::SetSubPortion(listRaw[1], L >> 12, { 0, 8});
+        listRaw[0] = Bit::SetSubPortion(listRaw[0], L      , {20u, 32u});
+        listRaw[1] = Bit::SetSubPortion(listRaw[1], L >> 12, { 0u, 8u});
         L = t;
     }
     if(L == MediaList::INVALID_VAL) return;
     if(i <= 2)
     {
-        t = Bit::FetchSubPortion(listRaw[1], {8, 28});
-        listRaw[1] = Bit::SetSubPortion(listRaw[1], L, {8, 28});
+        t = Bit::FetchSubPortion(listRaw[1], {8u, 28u});
+        listRaw[1] = Bit::SetSubPortion(listRaw[1], L, {8u, 28u});
         L = t;
     }
     if(L == MediaList::INVALID_VAL) return;
@@ -468,11 +468,11 @@ void MediaList::InsertVolToLoc(uint32_t i, uint32_t newVIndex)
     {
         t = Bit::Compose<4, 16>
         (
-            Bit::FetchSubPortion(listRaw[1], {28, 32}),
-            Bit::FetchSubPortion(listRaw[2], {0 , 16})
+            Bit::FetchSubPortion(listRaw[1], {28u, 32u}),
+            Bit::FetchSubPortion(listRaw[2], {0u , 16u})
         );
-        listRaw[1] = Bit::SetSubPortion(listRaw[1], L      , {28, 32});
-        listRaw[2] = Bit::SetSubPortion(listRaw[2], L >>  4, { 0, 16});
+        listRaw[1] = Bit::SetSubPortion(listRaw[1], L      , {28u, 32u});
+        listRaw[2] = Bit::SetSubPortion(listRaw[2], L >>  4, { 0u, 16u});
         L = t;
     }
     if(L == MediaList::INVALID_VAL) return;
@@ -480,18 +480,18 @@ void MediaList::InsertVolToLoc(uint32_t i, uint32_t newVIndex)
     {
         t = Bit::Compose<16, 4>
         (
-            Bit::FetchSubPortion(listRaw[2], {16, 32}),
-            Bit::FetchSubPortion(listRaw[3], {0 ,  4})
+            Bit::FetchSubPortion(listRaw[2], {16u, 32u}),
+            Bit::FetchSubPortion(listRaw[3], {0u ,  4u})
         );
-        listRaw[2] = Bit::SetSubPortion(listRaw[2], L      , {16, 32});
-        listRaw[3] = Bit::SetSubPortion(listRaw[3], L >> 16, { 0, 4});
+        listRaw[2] = Bit::SetSubPortion(listRaw[2], L      , {16u, 32u});
+        listRaw[3] = Bit::SetSubPortion(listRaw[3], L >> 16, { 0u, 4u});
         L = t;
     }
     if(L == MediaList::INVALID_VAL) return;
     if(i <= 5)
     {
-        t = Bit::FetchSubPortion(listRaw[3], {4, 24});
-        listRaw[3] = Bit::SetSubPortion(listRaw[3], L, {4, 24});
+        t = Bit::FetchSubPortion(listRaw[3], {4u, 24u});
+        listRaw[3] = Bit::SetSubPortion(listRaw[3], L, {4u, 24u});
         L = t;
     }
     if(L == MediaList::INVALID_VAL) return;
@@ -499,18 +499,18 @@ void MediaList::InsertVolToLoc(uint32_t i, uint32_t newVIndex)
     {
         t = Bit::Compose<8, 12>
         (
-            Bit::FetchSubPortion(listRaw[3], {24, 32}),
-            Bit::FetchSubPortion(listRaw[4], {0 ,  12})
+            Bit::FetchSubPortion(listRaw[3], {24u, 32u}),
+            Bit::FetchSubPortion(listRaw[4], {0u , 12u})
         );
-        listRaw[3] = Bit::SetSubPortion(listRaw[3], L      , {24, 32});
-        listRaw[4] = Bit::SetSubPortion(listRaw[4], L >>  8, { 0, 12});
+        listRaw[3] = Bit::SetSubPortion(listRaw[3], L      , {24u, 32u});
+        listRaw[4] = Bit::SetSubPortion(listRaw[4], L >>  8, { 0u, 12u});
         L = t;
     }
     if(L == MediaList::INVALID_VAL) return;
     if(i <= 7)
     {
-        t = Bit::FetchSubPortion(listRaw[4], {12, 32});
-        listRaw[4] = Bit::SetSubPortion(listRaw[4], L, {12, 32});
+        t = Bit::FetchSubPortion(listRaw[4], {12u, 32u});
+        listRaw[4] = Bit::SetSubPortion(listRaw[4], L, {12u, 32u});
     }
 }
 
@@ -652,7 +652,10 @@ void MediaTrackerView::InsertNewVolume(RayMediaListPack& rayMediaListIndex,
     if(!isFound) l.InsertVolToLoc(insertOrFoundLoc, newVIndex);
     //
     uint32_t nextVolInnerIndex = insertOrFoundLoc;
-    uint32_t curVolInnerIndex = (insertOrFoundLoc == 0) ? 1 : 0;
+    uint32_t curVolInnerIndex = 0;
+    if(!isFound && nextVolInnerIndex == 0)
+        curVolInnerIndex = 1;
+
     rayMediaListIndex.SetEntering(!isFound);
     rayMediaListIndex.SetCurMediaIndex(curVolInnerIndex);
     rayMediaListIndex.SetNextMediaIndex(nextVolInnerIndex);
@@ -661,7 +664,7 @@ void MediaTrackerView::InsertNewVolume(RayMediaListPack& rayMediaListIndex,
     // set the material id as passthrough mat.
     bool isPassthroughMat = (nextVolumeIndexPack.FetchFlagPortion() ==
                              IS_PASSTHROUGH_MAT_FLAG);
-        // Also add the fake intersection state
+    // Also add the fake intersection state
     bool isFakeIntersection = (curVolInnerIndex < nextVolInnerIndex);
     rayMediaListIndex.SetPassthrough(isPassthroughMat ||
                                      isFakeIntersection);

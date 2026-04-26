@@ -54,8 +54,25 @@ template <unsigned int N, ArithmeticC T>
 template<std::convertible_to<T> C>
 MR_PF_DEF_V
 Vector<N, T>::Vector(std::array<C, N>&& data)
-    : vector(data)
-{}
+{
+    MRAY_UNROLL_LOOP_N(N)
+    for(unsigned int i = 0; i < N; i++)
+    {
+        vector[i] = std::move(data[i]);
+    }
+}
+
+template <unsigned int N, ArithmeticC T>
+template<std::convertible_to<T> C>
+MR_PF_DEF_V
+Vector<N, T>::Vector(Array<C, N>&& data)
+{
+    MRAY_UNROLL_LOOP_N(N)
+    for(unsigned int i = 0; i < N; i++)
+    {
+        vector[i] = std::move(data[i]);
+    }
+}
 
 template <unsigned int N, ArithmeticC T>
 template<std::convertible_to<T> C>
@@ -129,15 +146,15 @@ MR_PF_DEF const T& Vector<N, T>::operator[](unsigned int i) const
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF const std::array<T, N>& Vector<N, T>::AsArray() const
+MR_PF_DEF Span<const T, N> Vector<N, T>::AsSpan() const
 {
-    return vector;
+    return Span<const T, N>(vector);
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF std::array<T, N>& Vector<N, T>::AsArray()
+MR_PF_DEF Span<T, N> Vector<N, T>::AsSpan()
 {
-    return vector;
+    return Span<T, N>(vector);
 }
 
 template <unsigned int N, ArithmeticC T>

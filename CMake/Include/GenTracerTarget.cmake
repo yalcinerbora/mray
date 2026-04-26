@@ -40,7 +40,9 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/TextureFilter.cu
         ${CURRENT_SOURCE_DIR}/TextureView.h
         ${CURRENT_SOURCE_DIR}/TextureView.hpp
-        ${CURRENT_SOURCE_DIR}/Texture.h)
+        ${CURRENT_SOURCE_DIR}/Texture.h
+        ${CURRENT_SOURCE_DIR}/StochasticTexFilter.h
+        ${CURRENT_SOURCE_DIR}/VolumetricSVO.h)
 
     set(SRC_PRIMITIVES
         ${CURRENT_SOURCE_DIR}/PrimitiveC.h

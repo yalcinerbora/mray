@@ -36,7 +36,7 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) UNorm
     using InnerType                     = T;
     static constexpr unsigned int Dims  = N;
     private:
-    std::array<T, N>                v;
+    T v[N];
 
     public:
     // Constructors & Destructor
@@ -53,8 +53,8 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) UNorm
     MR_PF_DECL static T Max() noexcept;
     MR_PF_DECL static T Min() noexcept;
 
-    MR_PF_DECL const std::array<T, N>&   AsArray() const noexcept;
-    MR_PF_DECL std::array<T, N>&         AsArray() noexcept;
+    MR_PF_DECL Span<const T, N> AsSpan() const noexcept;
+    MR_PF_DECL Span<T, N>       AsSpan() noexcept;
 };
 
 template <unsigned int N, std::signed_integral T>
@@ -67,7 +67,7 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) SNorm
     static constexpr unsigned int Dims  = N;
 
     private:
-    std::array<T, N> v;
+    T v[N];
 
     public:
     // Constructors & Destructor
@@ -84,8 +84,8 @@ class alignas(ChooseNormAlignment(N * sizeof(T))) SNorm
     MR_PF_DECL static T Max() noexcept;
     MR_PF_DECL static T Min() noexcept;
     //
-    MR_PF_DECL const std::array<T, N>&   AsArray() const noexcept;
-    MR_PF_DECL std::array<T, N>&         AsArray() noexcept;
+    MR_PF_DECL Span<const T, N>   AsSpan() const noexcept;
+    MR_PF_DECL Span<T, N>         AsSpan() noexcept;
 
 };
 
@@ -144,15 +144,15 @@ MR_PF_DEF T UNorm<N, T>::Max() noexcept
 }
 
 template <unsigned int N, std::unsigned_integral T>
-MR_PF_DEF const std::array<T, N>& UNorm<N, T>::AsArray() const noexcept
+MR_PF_DEF Span<const T, N> UNorm<N, T>::AsSpan() const noexcept
 {
     return v;
 }
 
 template <unsigned int N, std::unsigned_integral T>
-MR_PF_DEF std::array<T, N>& UNorm<N, T>::AsArray() noexcept
+MR_PF_DEF Span<T, N> UNorm<N, T>::AsSpan() noexcept
 {
-    return v;
+    return Span<T, N>(v);
 }
 
 // =======================================//
@@ -211,15 +211,15 @@ MR_PF_DEF T SNorm<N, T>::Max() noexcept
 }
 
 template <unsigned int N, std::signed_integral T>
-MR_PF_DEF const std::array<T, N>& SNorm<N, T>::AsArray() const noexcept
+MR_PF_DEF Span<const T, N> SNorm<N, T>::AsSpan() const noexcept
 {
-    return v;
+    return Span<const T, N>(v);
 }
 
 template <unsigned int N, std::signed_integral T>
-MR_PF_DEF std::array<T, N>& SNorm<N, T>::AsArray() noexcept
+MR_PF_DEF Span<T, N> SNorm<N, T>::AsSpan() noexcept
 {
-    return v;
+    return Span<T, N>(v);
 }
 
 // Word Types

@@ -18,38 +18,25 @@ class PathTracerRendererT final : public PathTracerRendererBase
 
     public:
     //
-    using MediaTrackerPtr       = std::unique_ptr<MediaTracker>;
     using UniformLightSampler   = DirectLightSamplerUniform<MetaLightList>;
     using AttribInfoList        = typename RendererBase::AttribInfoList;
     using SpectrumContext       = SpectrumContextT;
     using SpectrumConverter     = typename SpectrumContext::Converter;
     static constexpr bool IsSpectral = !std::is_same_v<SpectrumContext, SpectrumContextIdentity>;
-    //
-    using GlobalStateList = TypePack
-    <
-        PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>,
-        PathTraceRDetail::GlobalState<UniformLightSampler, SpectrumConverter>,
-        PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>
-    >;
-    using RayStateList = TypePack
-    <
-        PathTraceRDetail::RayState,
-        PathTraceRDetail::RayState,
-        PathTraceRDetail::RayState
-    >;
-
     // Work Functions
     template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     using WorkFunctions = TypePack
     <
         PathTraceRDetail::WorkFunction<PG, MG, TG, SpectrumContext>,
-        PathTraceRDetail::WorkFunctionNEE<PG, MG, TG, SpectrumContext, UniformLightSampler>
+        PathTraceRDetail::WorkFunctionNEE<PG, MG, TG, SpectrumContext, UniformLightSampler>,
+        PathTraceRDetail::WorkFunctionMedia<PG, MG, TG, SpectrumContext, UniformLightSampler>
     >;
     template<LightGroupC LG, TransformGroupC TG>
     using LightWorkFunctions = TypePack
     <
         PathTraceRDetail::LightWorkFunction<LG, TG, SpectrumContext>,
-        PathTraceRDetail::LightWorkFunctionWithNEE<LG, TG, SpectrumContext, UniformLightSampler>
+        PathTraceRDetail::LightWorkFunctionWithNEE<LG, TG, SpectrumContext, UniformLightSampler>,
+        PathTraceRDetail::LightWorkFunctionMedia<LG, TG, SpectrumContext, UniformLightSampler>
     >;
     template<CameraGroupC CG, TransformGroupC TG>
     using CamWorkFunctions = TypePack<>;
@@ -95,10 +82,14 @@ class PathTracerRendererT final : public PathTracerRendererBase
     //
     Span<Float>         dPrevMatPDF;
     //
+    Span<Spectrum>         dRPathPDF;
+    Span<Spectrum>         dRLightPDF;
+    Span<Spectrum>         dRPathPDFShadow;
+    Span<Spectrum>         dRLightPDFShadow;
+    Span<HitKeyPack>       dHitKeysShadow;
+    Span<RayMediaListPack> dShadowRayMediaListPacks;
+    //
     bool                saveImage  = false;
-    // Media Related
-    MediaTrackerPtr         mediaTracker;
-    Span<RayMediaListPack>  dRayMediaListPacks;
 
     // Helpers
     uint32_t            FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
@@ -109,6 +100,7 @@ class PathTracerRendererT final : public PathTracerRendererBase
     Span<RayIndex>      DoRenderPassWithMediaPure(Span<RayIndex>, Span<CommonKey>,
                                                   const GPUQueue&);
     Span<RayIndex>      DoRenderPassWithMediaNEE(Span<RayIndex>, Span<CommonKey>,
+                                                 Span<const RayIndex>,
                                                  const GPUQueue&);
     Span<RayIndex>      DoRenderPass(uint32_t sppLimit, const GPUQueue&);
     void                RecursiveShadowRayCast(Bitspan<uint32_t> isVisibleBitSpan,
@@ -183,6 +175,26 @@ using PathTracerRenderLightWork = RenderLightWork<R, LG, TG>;
 
 template<RendererC R, CameraGroupC CG, TransformGroupC TG>
 using PathTracerRenderCamWork = RenderCameraWork<R, CG, TG>;
+
+template<RendererC R, MediumGroupC MG, TransformGroupC TG>
+class PathTracerRenderMediumWork : public RenderMediumWork<R, MG, TG>
+{
+    using Base = RenderMediumWork<R, MG, TG>;
+
+    public:
+    using Base::Base;
+
+    RNRequestList SampleRNList(uint32_t workIndex) const override
+    {
+        static constexpr auto medSampleList = MG::template Medium<>::SampleScatteringRNList;
+        static constexpr auto rrSampleList = GenRNRequestList<1>();
+        static constexpr auto lightSampleList = R::UniformLightSampler::SampleLightRNList;
+        //
+             if(workIndex == 0) return medSampleList.Append(rrSampleList);
+        else if(workIndex == 1) return medSampleList.Append(rrSampleList);
+        else                    return RNRequestList();
+    }
+};
 
 template<SpectrumContextC SpectrumContext>
 template<class RenderWorkParams>

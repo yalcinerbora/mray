@@ -450,7 +450,7 @@ void KCIntersectBaseLBVH(// Output
                          MRAY_GRID_CONSTANT const Span<const LBVHAccelDetail::LBVHBoundingBox> dBoxes)
 {
     using Bit::FetchSubPortion;
-    using AU32 = std::array<uint32_t, 2>;
+    using AU32 =Array<uint32_t, 2>;
     static constexpr AU32 StackStateRange = {0u, BaseAcceleratorLBVH::StackBitCount};
     static constexpr AU32 DepthRange = {BaseAcceleratorLBVH::StackBitCount, 32u};
 

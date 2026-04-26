@@ -45,6 +45,8 @@ namespace HashGridRDetail
         MRAY_WORK_FUNCTOR_DEFINE_TYPES(PGType, MGType, TGType,
                                        SpectrumContextIdentity, 1u);
         using Params = RenderWorkParams<GlobalState, RayState, PG, MG, TG>;
+        using GlobalState = HashGridRDetail::GlobalState;
+        using RayState    = HashGridRDetail::RayState;
 
         MR_HF_DECL
         static void Call(const Primitive&, const Material&, const Surface&,
@@ -58,7 +60,9 @@ namespace HashGridRDetail
     {
         MRAY_LIGHT_WORK_FUNCTOR_DEFINE_TYPES(LGType, TGType,
                                              SpectrumContextIdentity, 1u);
-        using Params = RenderLightWorkParams<GlobalState, RayState, LG, TG>;
+        using Params      = RenderLightWorkParams<GlobalState, RayState, LG, TG>;
+        using GlobalState = HashGridRDetail::GlobalState;
+        using RayState    = HashGridRDetail::RayState;
 
         MR_HF_DECL
         static void Call(const Light&, RNGDispenser&,

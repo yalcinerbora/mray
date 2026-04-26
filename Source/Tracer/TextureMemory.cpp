@@ -806,6 +806,35 @@ MRayPixelTypeRT TextureMemory::GetPixelType(TextureId id) const
     return tex.PixelType();
 }
 
+TopologyId TextureMemory::CreateSparseTopology(MRayTopologyType, TopologyLayerSizeList)
+{
+    throw MRayError("Not yet implemented!");
+}
+
+void TextureMemory::CommitSparseTopologies()
+{
+    throw MRayError("Not yet implemented!");
+}
+
+void TextureMemory::PushSparseTopologyData(TopologyId, TransientData, size_t)
+{
+    throw MRayError("Not yet implemented!");
+}
+
+TextureId TextureMemory::CreateSparseTexture3D(TopologyId, const MRayTextureParameters&)
+{
+    throw MRayError("Not yet implemented!");
+}
+
+void TextureMemory::CommitSparseTextures()
+{
+    throw MRayError("Not yet implemented!");
+}
+void TextureMemory::PushSparseTextureData(TextureId, TransientData, size_t)
+{
+    throw MRayError("Not yet implemented!");
+}
+
 void TextureMemory::Finalize()
 {
     // Clear the clamp buffer

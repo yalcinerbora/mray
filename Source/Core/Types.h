@@ -57,3 +57,15 @@ struct IdentityFunctor
 {
     MR_PF_DECL T operator()(const T& t) const noexcept { return t; }
 };
+
+// Forward Declarations of Tuple / Variant etc..
+
+// Please see "Span.h" why dynamic extent marker is zero insteat of
+// "INT32_MAX".
+static constexpr uint32_t DynamicExtent = uint32_t(0);
+
+template <class T, uint32_t Extent = DynamicExtent> class Span;
+
+template<class... Ts> struct Tuple;
+
+template<class... Types> struct Variant;

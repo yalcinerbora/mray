@@ -17,10 +17,8 @@ class SurfaceRenderer final : public RendererBase
     //
     using SpectrumContext = SpectrumContextIdentity;
     // Work States
-    using GlobalStateList   = TypePack<SurfRDetail::GlobalState, SurfRDetail::GlobalState>;
-    using RayStateList      = TypePack<SurfRDetail::RayStateCommon, SurfRDetail::RayStateAO>;
-    using RayStateCommon    = TypePackElement<0, RayStateList>;
-    using RayStateAO        = TypePackElement<1, RayStateList>;
+    using RayStateCommon    = SurfRDetail::RayStateCommon;
+    using RayStateAO        = SurfRDetail::RayStateAO;
     // Work Functions
     template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     using WorkFunctions = TypePack
@@ -35,7 +33,7 @@ class SurfaceRenderer final : public RendererBase
         SurfRDetail::LightWorkFunctionCommon<LG, TG>
     >;
 
-    template<CameraC Camera, CameraGroupC CG, TransformGroupC TG>
+    template<CameraGroupC CG, TransformGroupC TG>
     using CamWorkFunctions = TypePack<>;
 
     template<MediumGroupC MG, TransformGroupC TG>

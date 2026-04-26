@@ -25,9 +25,6 @@ class GuidedPTRenderer final : public PathTracerRendererBase
     using SpectrumConverter     = typename SpectrumContext::Converter;
     static constexpr bool IsSpectral = !std::is_same_v<SpectrumContext, SpectrumContextIdentity>;
 
-    using GlobalStateList       = TypePack<GuidedPTRDetail::GlobalState>;
-    using RayStateList          = TypePack<GuidedPTRDetail::RayState>;
-
     // Work Functions
     template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
     using WorkFunctions = TypePack

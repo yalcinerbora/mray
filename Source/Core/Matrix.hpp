@@ -113,15 +113,15 @@ MR_PF_DEF const T& Matrix<N, T>::operator()(unsigned int row, unsigned int colum
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF const std::array<T, N*N>& Matrix<N, T>::AsArray() const noexcept
+MR_PF_DEF Span<const T, N*N> Matrix<N, T>::AsSpan() const noexcept
 {
-    return matrix;
+    return Span<const T, N*N>(matrix);
 }
 
 template <unsigned int N, ArithmeticC T>
-MR_PF_DEF std::array<T, N*N>& Matrix<N, T>::AsArray() noexcept
+MR_PF_DEF Span<T, N*N> Matrix<N, T>::AsSpan() noexcept
 {
-    return matrix;
+    return Span<T, N*N>(matrix);
 }
 
 template <unsigned int N, ArithmeticC T>
@@ -261,7 +261,7 @@ MR_PF_DEF Matrix<N, T> Matrix<N, T>::operator*(const Matrix& right) const noexce
         for(unsigned int j = 0; j < N; j++)
         {
             using Math::Dot;
-            auto leftRow = Vector<N, T>(Span<const T, N>(matrix.data() + j * N, N));
+            auto leftRow = Vector<N, T>(Span<const T, N>(matrix + j * N, N));
             m(j, i) = Dot(leftRow, col);
         }
     }
@@ -277,7 +277,7 @@ MR_PF_DEF Vector<M, T> Matrix<N, T>::operator*(const Vector<M, T>& right) const 
     for(unsigned int i = 0; i < M; i++)
     {
         using Math::Dot;
-        auto leftRow = Vector<M, T>(Span<const T, M>(matrix.data() + i * N, M));
+        auto leftRow = Vector<M, T>(Span<const T, M>(matrix + i * N, M));
         v[i] = Dot(leftRow, right);
     }
     return v;
@@ -677,16 +677,16 @@ const T& Matrix3x4T<T>::operator()(unsigned int row, unsigned int column) const 
 
 template <ArithmeticC T>
 MR_PF_DEF
-const std::array<T, 12>& Matrix3x4T<T>::AsArray() const noexcept
+Span<const T, 12> Matrix3x4T<T>::AsSpan() const noexcept
 {
-    return matrix;
+    return Span<const T, 12>(matrix);
 }
 
 template <ArithmeticC T>
 MR_PF_DEF
-std::array<T, 12>& Matrix3x4T<T>::AsArray() noexcept
+Span<T, 12> Matrix3x4T<T>::AsSpan() noexcept
 {
-    return matrix;
+    return Span<T, 12>(matrix);
 }
 
 template <ArithmeticC T>

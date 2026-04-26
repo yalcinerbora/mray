@@ -34,7 +34,7 @@ size_t TransformReduceTMSize(size_t elementCount)
     using namespace rocprim;
 
     auto TFunc = [] MRAY_HYBRID(InT) -> OutT{ return OutT{}; };
-    using TransIt = transform_iterator<OutT, decltype(TFunc), const InT*>;
+    using TransIt = transform_iterator<const InT*, decltype(TFunc), OutT>;
     TransIt dIn = TransIt(nullptr, TFunc);
     OutT* dOut = nullptr;
     void* dTM = nullptr;
@@ -52,7 +52,7 @@ size_t SegmentedTransformReduceTMSize(size_t numSegments)
 {
     using namespace rocprim;
     auto TFunc = [] MRAY_HYBRID(InT) -> OutT{ return OutT{}; };
-    using TransIt = transform_iterator<OutT, decltype(TFunc), const InT*>;
+    using TransIt = transform_iterator<const InT*, decltype(TFunc), OutT>;
     TransIt dIn = TransIt(nullptr, TFunc);
     uint32_t* dStartOffsets = nullptr;
     uint32_t* dEndOffsets = nullptr;
@@ -106,7 +106,7 @@ void TransformReduce(Span<OutT, 1> dReducedValue,
     static const auto annotation = queue.CreateAnnotation("KCTransformReduce"sv);
     const auto _ = annotation.AnnotateScope();
 
-    using TransIt = transform_iterator<OutT, TransformOp, const InT*>;
+    using TransIt = transform_iterator<const InT*, TransformOp, OutT>;
     TransIt dIn = TransIt(dValues.data(), std::forward<TransformOp>(transformOp));
 
     size_t size = dTempMemory.size();
@@ -132,7 +132,7 @@ void SegmentedTransformReduce(Span<OutT> dReducedValues,
     using namespace std::literals;
     static const auto annotation = queue.CreateAnnotation("KCSegmentedTransformReduce"sv);
     const auto _ = annotation.AnnotateScope();
-    using TransIt = transform_iterator<OutT, TransformOp, const InT*>;
+    using TransIt = transform_iterator<const InT*, TransformOp, OutT>;
     TransIt dIn = TransIt(dValues.data(), std::forward<TransformOp>(transformOp));
 
     int segmentCount = static_cast<int>(dSegmentRanges.size() - 1);

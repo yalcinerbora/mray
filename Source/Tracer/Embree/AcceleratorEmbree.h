@@ -126,7 +126,7 @@ class AcceleratorGroupEmbreeI
     virtual ~AcceleratorGroupEmbreeI() = default;
 
     virtual void AcquireIASConstructionParams(Span<RTCScene> hSceneHandles,
-                                              Span<Matrix4x4> hInstanceMatrices,
+                                              Span<Matrix3x4> hInstanceMatrices,
                                               Span<uint32_t> hInstanceHitRecordCounts,
                                               Span<const EmbreeHitRecord<>*> dHitRecordPtrs,
                                               const GPUQueue& queue) const = 0;
@@ -268,7 +268,7 @@ class AcceleratorGroupEmbree final
 
     // Embree Related
     void    AcquireIASConstructionParams(Span<RTCScene> hSceneHandles,
-                                         Span<Matrix4x4> hInstanceMatrices,
+                                         Span<Matrix3x4> hInstanceMatrices,
                                          Span<uint32_t> hInstanceHitRecordCounts,
                                          Span<const EmbreeHitRecord<>*> dHitRecordPtrs,
                                          const GPUQueue& queue) const override;
@@ -294,7 +294,7 @@ class BaseAcceleratorEmbree final : public BaseAcceleratorT<BaseAcceleratorEmbre
     Span<const EmbreeHitRecord<>*>  hAllHitRecordPtrs;
     // For local ray casting
     Span<size_t>    hInstanceBatchStartOffsets;
-    Span<Matrix4x4> hGlobalInstanceInvTransforms;
+    Span<Matrix3x4> hGlobalInstanceInvTransforms;
     Span<RTCScene>  hGlobalSceneHandles;
 
     protected:

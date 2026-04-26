@@ -500,7 +500,7 @@ void AcceleratorGroup::WriteInstanceKeysAndAABBsInternal(Span<AABB3> aabbWriteRe
         // But it is hard to recognize by the compiler maybe? Dunno
         // Do a sanity check at least...
         static_assert(sizeof(Vector2ui) == 2 * sizeof(typename Vector2ui::InnerType));
-        Span<const uint32_t> hConcreteLeafRangesInt(hConcreteLeafRanges.data()->AsArray().data(),
+        Span<const uint32_t> hConcreteLeafRangesInt(hConcreteLeafRanges.data()->AsSpan().data(),
                                                     hConcreteLeafRanges.size() * Vector2ui::Dims);
 
         // Memset the first element to zero

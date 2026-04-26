@@ -92,7 +92,7 @@ namespace Math
     template<FloatC T> MR_PF_DECL T ArcTan(T) noexcept;
     template<FloatC T> MR_PF_DECL T ArcTan2(T, T) noexcept;
     template<FloatC T> MR_PF_DECL T ArcTanH(T) noexcept;
-    template<FloatC T> MR_PF_DECL std::array<T, 2> SinCos(T) noexcept;
+    template<FloatC T> MR_PF_DECL Array<T, 2> SinCos(T) noexcept;
     // Common functions (math functions)
     template<FloatC T> MR_PF_DECL T ErrFunc(T) noexcept;
     template<FloatC T> MR_PF_DECL T InvErrFunc(T) noexcept;
@@ -136,7 +136,7 @@ namespace Math
     // Math-related
     template<FloatC T> MR_PF_DECL T FMA(T, T, T) noexcept;
     template<FloatC T> MR_PF_DECL T FMod(T, T) noexcept;
-    template<FloatC T> MR_PF_DECL auto ModF(T) noexcept -> std::array<T, 2>;
+    template<FloatC T> MR_PF_DECL auto ModF(T) noexcept -> Array<T, 2>;
     template<FloatC T> MR_PF_DECL auto ModFInt(T) noexcept -> Pair<IntegralSister<T>, T>;
     template<FloatC T> MR_PF_DECL T Pow(T, T) noexcept;
     // For vector types, we add as we needed in generic code,
@@ -253,16 +253,16 @@ MR_PF_DEF T PrevPowerOfTwo(T value) noexcept
 template<IntegralC T>
 MR_PF_DEF T NextPrime(T value) noexcept
 {
-    constexpr std::array<T, 64> FIRST_PRIMES =
+    constexpr Array<T, 64> FIRST_PRIMES =
     {
-          2,   3,   5,  7,   11,  13,  17,  19,
-         23,  29,  31,  37,  41,  43,  47,  53,
-         59,  61,  67,  71,  73,  79,  83,  89,
-         97, 101, 103, 107, 109, 113, 127, 131,
-        137, 139, 149, 151, 157, 163, 167, 173,
-        179, 181, 191, 193, 197, 199, 211, 223,
-        227, 229, 233, 239, 241, 251, 257, 263,
-        269, 271, 277, 281, 283, 293, 307, 311
+          2u,   3u,   5u,  7u,   11u,  13u,  17u,  19u,
+         23u,  29u,  31u,  37u,  41u,  43u,  47u,  53u,
+         59u,  61u,  67u,  71u,  73u,  79u,  83u,  89u,
+         97u, 101u, 103u, 107u, 109u, 113u, 127u, 131u,
+        137u, 139u, 149u, 151u, 157u, 163u, 167u, 173u,
+        179u, 181u, 191u, 193u, 197u, 199u, 211u, 223u,
+        227u, 229u, 233u, 239u, 241u, 251u, 257u, 263u,
+        269u, 271u, 277u, 281u, 283u, 293u, 307u, 311u
     };
 
     auto IsPrime = [&FIRST_PRIMES](T v)
@@ -738,7 +738,7 @@ MR_PF_DEF T ArcTanH(T x) noexcept
 }
 
 template<FloatC T>
-MR_PF_DEF std::array<T, 2> SinCos(T x) noexcept
+MR_PF_DEF Array<T, 2> SinCos(T x) noexcept
 {
     if(std::is_constant_evaluated())
     {
@@ -747,7 +747,7 @@ MR_PF_DEF std::array<T, 2> SinCos(T x) noexcept
     #ifndef MRAY_DEVICE_CODE_PATH
         return {Math::Sin(x), Math::Cos(x)};
     #else
-        std::array<T, 2> r;
+        Array<T, 2> r;
         if constexpr(std::is_same_v<T, float>)  sincosf(x, r.data() + 0, r.data() + 1);
         if constexpr(std::is_same_v<T, double>) sincos(x, r.data() + 0, r.data() + 1);
         return r;
@@ -1395,7 +1395,7 @@ MR_PF_DEF T FMod(T x, T y) noexcept
 }
 
 template<FloatC T>
-MR_PF_DEF auto ModF(T x) noexcept -> std::array<T, 2>
+MR_PF_DEF auto ModF(T x) noexcept -> Array<T, 2>
 {
     if(std::is_constant_evaluated())
     {

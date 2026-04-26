@@ -129,7 +129,7 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
 
     // Alias the memory here we will invert the matrices later
     Span<RTCScene> hSceneHandles = hGlobalSceneHandles;
-    Span<Matrix4x4> hInstanceMatrices = hGlobalInstanceInvTransforms;
+    Span<Matrix3x4> hInstanceMatrices = hGlobalInstanceInvTransforms;
     Span<uint32_t> hInstanceHRCounts = hInstanceHRStartOffsets.subspan(1);
     //
     embreeContext.scene = rtcNewScene(embreeContext.device);
@@ -164,7 +164,7 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
 
             // Maybe there is some optimizations on embree
             // lets not give identity matrix to embree.
-            if(localMatrices[i] != Matrix4x4::Identity())
+            if(localMatrices[i] != Matrix3x4::Identity())
                 rtcSetGeometryTransform(g, 0, RTC_FORMAT_FLOAT3X4_ROW_MAJOR,
                                         &localMatrices[i]);
             [[maybe_unused]]
@@ -184,7 +184,7 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
 
     // Inverse transform the matrices we will need it
     DeviceAlgorithms::InPlaceTransform(hGlobalInstanceInvTransforms, queue,
-                                       [](Matrix4x4& m)
+                                       [](Matrix3x4& m)
     {
         m = m.Inverse();
     });
@@ -450,7 +450,7 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
 
     size_t groupStart = hInstanceBatchStartOffsets[dAccelKeyBatchPortion];
     size_t groupEnd = hInstanceBatchStartOffsets[dAccelKeyBatchPortion + 1];
-    Span<const Matrix4x4> hLocalInvTransforms = hGlobalInstanceInvTransforms.subspan(groupStart, groupEnd - groupStart);
+    Span<const Matrix3x4> hLocalInvTransforms = hGlobalInstanceInvTransforms.subspan(groupStart, groupEnd - groupStart);
     Span<const RTCScene> hLocalScenes =  hGlobalSceneHandles.subspan(groupStart, groupEnd - groupStart);
 
     uint32_t rayCount = uint32_t(dRayIndices.size());
@@ -471,7 +471,7 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
             uint32_t rIndex = dRayIndices[i];
             CommonKey accIndex = dAccelKeys[rIndex].FetchIndexPortion();
 
-            const Matrix4x4& transform = hLocalInvTransforms[accIndex];
+            const Matrix3x4& transform = hLocalInvTransforms[accIndex];
             RTCScene t = hLocalScenes[accIndex];
 
             EmbreeRayQueryContext rqContext;

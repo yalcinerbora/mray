@@ -252,6 +252,19 @@ class TracerBase : public TracerI
     void            PushTextureData(TextureId, uint32_t mipLevel,
                                     TransientData data) override;
 
+    TopologyId   CreateSparseTopology(MRayTopologyType,
+                                      TopologyLayerSizeList) override;
+    void         CommitSparseTopologies() override;
+    void         PushSparseTopologyData(TopologyId, TransientData data,
+                                        size_t offset) override;
+
+    TextureId    CreateSparseTexture3D(TopologyId,
+                                       MRayTextureParameters) override;
+    void         CommitSparseTextures() override;
+    void         PushSparseTextureData(TextureId,
+                                       TransientData data,
+                                       size_t offset) override;
+
     TransGroupId    CreateTransformGroup(std::string typeName) override;
     TransformId     ReserveTransformation(TransGroupId, AttributeCountList) override;
     TransformIdList ReserveTransformations(TransGroupId, std::vector<AttributeCountList>) override;

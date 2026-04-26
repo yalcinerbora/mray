@@ -104,7 +104,7 @@ TransientData MeshViewAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
                   "precision mode change this later.");
 
     static const ProfilerAnnotation _("Assimp Load Prim Data");
-    auto annotation = _.AnnotateScope();
+    [[maybe_unused]] auto annotation = _.AnnotateScope();
 
     const auto& mesh = assimpFile.scene->mMeshes[innerIndex];
     if(attribLogic.e == PrimitiveAttributeLogic::INDEX)
@@ -181,7 +181,7 @@ MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
     , scene(nullptr)
 {
     static const ProfilerAnnotation _("Assimp Read File");
-    auto annotation = _.AnnotateScope();
+    [[maybe_unused]] auto annotation = _.AnnotateScope();
 
     // TODO: GCC warns redundant cast, but MSVC says default enum type is
     // int. so we obey MSVC's warning.

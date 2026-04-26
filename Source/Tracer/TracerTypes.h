@@ -131,8 +131,10 @@ using SpectrumWaves = SpectrumWavesT<SpectraPerSpectrum, Float>;
 
 // Visible spectrum definitions
 // TODO: Should we fetch this from the Color namespace?
-inline constexpr Vector2   VisibleSpectrumRange = Vector2(380, 700);
-inline constexpr Float     VisibleSpectrumMiddle = VisibleSpectrumRange.Sum() * Float(0.5);
+inline constexpr Vector2        VisibleSpectrumRange = Vector2(380, 700);
+inline constexpr Float          VisibleSpectrumMiddle = VisibleSpectrumRange.Sum() * Float(0.5);
+// These data form CIE Observer's peak values
+inline constexpr SpectrumWaves  VisibleSpectrumFakeWavelengths = SpectrumWaves(350, 550, 600, 0);
 
 // Invalid spectrum, this will be set when some form of numerical
 // error occurs (i.e. a NaN is found). It is specifically over-saturated

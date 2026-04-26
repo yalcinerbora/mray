@@ -1,12 +1,15 @@
 #pragma once
 
+#include "Types.h"
 #include "Tuple.h"
+#include "Array.h"
 #include "Definitions.h"
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
 #include <memory>
 #include <type_traits>
+#include <span>
 
 // We also implement our span. When checking -ftime-trace of
 // clang, a single span instantiation takes 33ms!
@@ -27,7 +30,6 @@
 // This is purely cosmetic, when compilation error / demangled
 // name is encountered std::numeric_limits<>::max() pollutes
 // the errors etc.
-static constexpr uint32_t DynamicExtent = uint32_t(0);
 //
 namespace SpanDetail
 {
@@ -64,7 +66,7 @@ template<class It>
 concept ConstSpanIt = std::contiguous_iterator<It> && SpanDetail::IsConstIterator<It>;
 
 //
-template <class T, uint32_t Extent = DynamicExtent>
+template <class T, uint32_t Extent>
 class Span : public std::conditional_t<Extent == DynamicExtent,
                                        SpanDetail::DSpan<T>,
                                        SpanDetail::SSpan<T, Extent>>
@@ -72,6 +74,10 @@ class Span : public std::conditional_t<Extent == DynamicExtent,
     public:
     using Type = T;
     using NonConstType = std::remove_const_t<T>;
+    // C++ Stuff
+    using value_type    = T;
+    using size_type     = uint32_t;
+
     //
     static constexpr bool IsConstPtr = std::is_const_v<Type>;
     static constexpr bool IsDynamic  = (Extent == DynamicExtent);
@@ -92,6 +98,10 @@ class Span : public std::conditional_t<Extent == DynamicExtent,
     constexpr           Span(std::array<T, N>&) noexcept;
     template<std::size_t N>
     constexpr           Span(const std::array<NonConstType, N>&) noexcept requires(IsConstPtr);
+    template<std::uint32_t N>
+    constexpr           Span(Array<T, N>&) noexcept;
+    template<std::uint32_t N>
+    constexpr           Span(const Array<NonConstType, N>&) noexcept;
     template<std::size_t N>
     constexpr           Span(T(&arr)[N]) noexcept;
     template<std::size_t N>
@@ -255,6 +265,24 @@ constexpr Span<T, E>::Span(const std::array<NonConstType, N>& arr) noexcept requ
 }
 
 template<class T, uint32_t E>
+template<std::uint32_t N>
+constexpr Span<T, E>::Span(Array<T, N>& arr) noexcept
+{
+    this->ptr = arr.data();
+    if constexpr(IsDynamic) this->count = uint32_t(N);
+    else                    static_assert(E <= N, "Cannot fit array to the static span");
+}
+
+template<class T, uint32_t E>
+template<std::uint32_t N>
+constexpr Span<T, E>::Span(const Array<NonConstType, N>& arr) noexcept
+{
+    this->ptr = arr.data();
+    if constexpr(IsDynamic) this->count = uint32_t(N);
+    else                    static_assert(E <= N, "Cannot fit array to the static span");
+}
+
+template<class T, uint32_t E>
 template<std::size_t N>
 constexpr Span<T, E>::Span(T(&arr)[N]) noexcept
 {
@@ -336,7 +364,7 @@ Span<T, E>::operator[](uint32_t index) const
     uint32_t C;
     if constexpr(IsDynamic) C = this->count;
     else                    C = E;
-    assert(index < C);
+    assert(index < C && "Out of bounds access on Span");
     //
     //
     return this->ptr[index];

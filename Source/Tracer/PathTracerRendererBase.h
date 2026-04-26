@@ -2,6 +2,8 @@
 
 #include "Tracer/RendererC.h"
 #include "Tracer/RayPartitioner.h"
+#include "Tracer/MediaTracker.h"
+
 #include "SpectrumC.h"
 
 #include "Core/NamedEnum.h"
@@ -138,6 +140,24 @@ class IsAliveFunctor
     }
 };
 
+class IsMediumTransmittedFunctor
+{
+    Span<const PathDataPack> dPathDataPack;
+
+    public:
+    IsMediumTransmittedFunctor(Span<const PathDataPack> dPathDataPackIn)
+        : dPathDataPack(dPathDataPackIn)
+    {}
+
+    MR_HF_DECL
+    bool operator()(RayIndex index) const noexcept
+    {
+        const PathStatus state = dPathDataPack[index].status;
+
+        return state[uint32_t(PathStatusEnum::MEDIUM_TRANSMITTED)];
+    }
+};
+
 struct PathTracerRendererBase : public RendererBase
 {
     public:
@@ -156,8 +176,9 @@ struct PathTracerRendererBase : public RendererBase
     using RenderImageSectionOpt = Optional<RenderImageSection>;
 
     protected:
-    using FilmFilterPtr = std::unique_ptr<TextureFilterI>;
+    using FilmFilterPtr      = std::unique_ptr<TextureFilterI>;
     using SpectrumContextPtr = std::unique_ptr<SpectrumContextI>;
+    using MediaTrackerPtr    = std::unique_ptr<MediaTracker>;
     // On throughput mode, we do this burst, on latency mode
     // burst is implicit and is 1
     static constexpr uint32_t BurstSize = 32u;
@@ -185,6 +206,9 @@ struct PathTracerRendererBase : public RendererBase
     SpectrumContextPtr          spectrumContext;
     Span<SpectrumWaves>         dPathWavelengths;
     Span<Spectrum>              dSpectrumWavePDFs;
+    // If media sampling is enabled these must be set.
+    MediaTrackerPtr             mediaTracker;
+    Span<RayMediaListPack>      dRayMediaListPacks;
     // ================================ //
     //  Common Data Allocated By Parent //
     // ================================ //
@@ -209,6 +233,9 @@ struct PathTracerRendererBase : public RendererBase
     ReloadPathOutput      ReloadPaths(Span<const RayIndex> dIndices,
                                       uint32_t sppLimit, const GPUQueue& processQueue);
     void                  ResetAllPaths(const GPUQueue& queue);
+    void                  MarkPathsTransmittedIndirect(Span<PathDataPack> dPathStates,
+                                                       Span<const RayIndex> dDeadRayIndices,
+                                                       const GPUQueue& queue);
     Span<RayIndex>        DoRenderPass(uint32_t sppLimit, const GPUQueue& queue);
     RenderImageSectionOpt AddRadianceToRenderBufferThroughput(Span<const RayIndex> dDeadRayIndices,
                                                               const GPUQueue& processQueue,

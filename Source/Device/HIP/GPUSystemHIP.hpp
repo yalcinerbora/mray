@@ -3,44 +3,59 @@
 #include "GPUSystemHIP.h"
 #include "../GPUSystem.h"
 
-#include <rocprim/rocprim.hpp>
-
 static constexpr uint32_t WarpSize()
 {
-    return rocprim::device_warp_size();
-}
-
-template<uint32_t LOGICAL_WARP_SIZE = WarpSize()>
-MRAY_GPU MRAY_GPU_INLINE
-static void WarpSynchronize()
-{
-    // Dirty fix to make host side happy
+    // Recent AMD GPUs have variable warp size
+    // To make the code portable we do not care variable
+    // warp size mode, and use highest amount of thread-per-warp (TPW)
+    // for each arch.
+    //
+    //
+    //
+    // This code must match with the w/e parameter AMD uses when launching /
+    // compiling the kernels.
+    //
+    // https://rocm.docs.amd.com/en/latest/reference/gpu-arch-specs.html
+    //
+    //
+    // I was going to do a big ifdef block here, but after checking the
+    // table above, we can get away with 64 for all supported archs.
+    //
+    // According to this HIP runtime does not support it?
+    // https://rocm.docs.amd.com/projects/HIP/en/latest/reference/hardware_features.html
+    //
+    // So for RDNA 1-2-3, it is 32, and for the rest it is 64
+    //
+    // All of our code should work, however; we may not get the best perf
+    // for each arch (fine-tune)
     #ifdef __HIP_DEVICE_COMPILE__
-    static_assert(LOGICAL_WARP_SIZE == 1 || LOGICAL_WARP_SIZE == 2 ||
-                  LOGICAL_WARP_SIZE == 4 || LOGICAL_WARP_SIZE == 8 ||
-                  LOGICAL_WARP_SIZE == 16 || LOGICAL_WARP_SIZE == 32,
-                  "Logical warps must be power of 2 and \"<32\"");
-
-    // Technically single-threaded logical warp is self synchronizing,
-    // so no need to do sync.
-    if constexpr(LOGICAL_WARP_SIZE != 1)
-    {
-        static constexpr uint32_t FULL_MASK = std::numeric_limits<uint32_t>::max();
-        // Creating all FF's is UB (when doing it via shift, is there any other way to do it)
-        // since we shift out of bounds so...
-        static constexpr uint32_t MASK = (LOGICAL_WARP_SIZE == 32)
-            ? FULL_MASK
-            : (1u << LOGICAL_WARP_SIZE) - 1u;
-        uint32_t localWarpId = threadIdx.x % WarpSize();
-        uint32_t logicalWarpId = localWarpId / LOGICAL_WARP_SIZE;
-        uint32_t localMask = MASK << (logicalWarpId * LOGICAL_WARP_SIZE);
-        // TODO: no "__syncwarp(...)" in AMD, should we need it?
-        // __syncwarp(localMask);
-    }
+        return 64;
+    // This may creep in .cpp files, so we return zero and hope for crash.
+    #else
+        return 0;
     #endif
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+template<uint32_t LOGICAL_WARP_SIZE = WarpSize()>
+MR_GF_DECL
+void WarpSynchronize()
+{
+    // https://rocm.docs.amd.com/projects/HIP/en/latest/understand/hardware_implementation.html
+    // After reading this to understand the generic architecture,
+    // AMD has SIMD units and custom scheduler to juggle these units.
+    // So we do not have sub warp and this can be a noop?
+    //
+    // (TODO: Check this after we at least compile and check the algorithms
+    // that uses sub-warps)
+    //
+    // So we just static assert if LOGICAL_WARP_SIZE is used besides WarpSize().
+    static_assert(LOGICAL_WARP_SIZE == WarpSize(),
+                  "On AMD, we can't sync warps at all at the moment and sub-warp"
+                  "algorithms should not be used");
+    // Noop
+}
+
+MR_GF_DECL
 static void BlockSynchronize()
 {
     // Dirty fix to make host side happy
@@ -49,7 +64,7 @@ static void BlockSynchronize()
     #endif
 }
 
-MRAY_GPU MRAY_GPU_INLINE
+MR_GF_DECL
 static void ThreadFenceGrid()
 {
     // Dirty fix to make host side happy
@@ -73,7 +88,7 @@ namespace HipKernelCalls
 namespace mray::hip
 {
 
-MRAY_GPU MRAY_CGPU_INLINE
+MR_GF_DEF
 KernelCallParamsHIP::KernelCallParamsHIP()
     : gridSize(gridDim.x)
     , blockSize(blockDim.x)
@@ -189,7 +204,8 @@ void GPUQueueHIP::DeviceIssueWorkKernel(std::string_view name,
                                         //
                                         Args&&... fArgs) const
 {
-    throw MRayError("Not yet Implemented (HIP does not support it maybe?)");
+    // TODO: Properly handle these
+    assert(false && "Not yet Implemented (HIP does not support it maybe?)");
 }
 
 template<class Lambda>
@@ -199,7 +215,8 @@ void GPUQueueHIP::DeviceIssueWorkLambda(std::string_view name,
                                         //
                                         Lambda&& func) const
 {
-    throw MRayError("Not yet Implemented (HIP does not support it maybe?)");
+    // TODO: Properly handle these
+    assert(false && "Not yet Implemented (HIP does not support it maybe?)");
 }
 
 template<auto Kernel, class... Args>
@@ -209,7 +226,8 @@ void GPUQueueHIP::DeviceIssueBlockKernel(std::string_view name,
                                          //
                                          Args&&... fArgs) const
 {
-    throw MRayError("Not yet Implemented (HIP does not support it maybe?)");
+    // TODO: Properly handle these
+    assert(false && "Not yet Implemented (HIP does not support it maybe?)");
 }
 
 template<class Lambda, uint32_t Bounds>
@@ -219,7 +237,8 @@ void GPUQueueHIP::DeviceIssueBlockLambda(std::string_view name,
                                          //
                                          Lambda&& func) const
 {
-    throw MRayError("Not yet Implemented (HIP does not support it maybe?)");
+    // TODO: Properly handle these
+    assert(false && "Not yet Implemented (HIP does not support it maybe?)");
 }
 
 }

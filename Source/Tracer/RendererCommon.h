@@ -39,6 +39,12 @@ void KCCopyRaysIndirect(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysOut,
                         MRAY_GRID_CONSTANT const Span<const RayGMem> dRaysIn,
                         MRAY_GRID_CONSTANT const Span<const RayCone> dRayDiffIn);
 
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCAdvanceRayIndirect(MRAY_GRID_CONSTANT const Span<RayGMem> dRaysInOut,
+                          MRAY_GRID_CONSTANT const Span<RayCone> dRayDiffInOut,
+                          MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices);
+
+
 template<class Renderer, class WorkF, class LightWorkF, class CamWorkF>
 void RendererBase::IssueSurfaceWorkKernelsToPartitions(const RenderSurfaceWorkHasher& workHasher,
                                                        const MultiPartitionOutput& p,
@@ -80,7 +86,7 @@ void RendererBase::IssueSurfaceWorkKernelsToPartitions(const RenderSurfaceWorkHa
             const auto& workPtr = UpcastRenderLightWork<Renderer>(lightWLoc->workPtr);
             LWF(workPtr, dLocalIndices, partitionStart);
         }
-        else throw MRayError("[{}]: Unkown work id is found ({}).",
+        else throw MRayError("[{}]: Unkown surface work id is found ({}).",
                              rendererName, key);
     }
 }
@@ -114,7 +120,7 @@ void RendererBase::IssueMediumWorkKernelsToPartitions(const RenderMediumWorkHash
             const auto& workPtr = UpcastRenderMediumWork<Renderer>(wLoc->workPtr);
             WF(workPtr, dLocalIndices, partitionStart);
         }
-        else throw MRayError("[{}]: Unkown work id is found ({}).",
+        else throw MRayError("[{}]: Unkown medium work id is found ({}).",
                              rendererName, key);
     }
 }

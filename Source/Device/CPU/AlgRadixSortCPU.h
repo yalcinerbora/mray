@@ -34,7 +34,7 @@ uint32_t RadixSortKVSingleThread(Span<Span<K>, 2> dKeyDoubleBuffer,
     uint32_t totalBits = bitRange[1] - bitRange[0];
     for(uint32_t pass = 0; pass < totalBits; pass += BIT_PER_PASS)
     {
-        std::array<UIntType<K>, 2> curBitRange =
+        Array<UIntType<K>, 2> curBitRange =
         {
             UIntType<K>(std::min(bitRange[0] + pass + 0           , bitRange[1])),
             UIntType<K>(std::min(bitRange[0] + pass + BIT_PER_PASS, bitRange[1]))
@@ -142,7 +142,7 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
     uint32_t totalBits = bitRange[1] - bitRange[0];
     for(uint32_t pass = 0; pass < totalBits; pass += BIT_PER_PASS)
     {
-        std::array<UIntType<K>, 2> curBitRange =
+        Array<UIntType<K>, 2> curBitRange =
         {
             UIntType<K>(std::min(bitRange[0] + pass + 0           , bitRange[1])),
             UIntType<K>(std::min(bitRange[0] + pass + BIT_PER_PASS, bitRange[1]))
