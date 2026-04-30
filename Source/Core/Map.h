@@ -6,6 +6,7 @@
 #include <mutex>
 
 #include "Types.h"
+#include "Optional.h"
 
 // Map class, wraps std::map and eliminates some quirks of the map
 // (operator[] being non-const for example and issues an insert if
@@ -48,11 +49,11 @@ class Map : private std::map<Key, T, Compare, Allocator>
 
     template<class KConv>
     requires std::convertible_to<KConv, Key>
-    Optional<std::reference_wrapper<T>>         at(const KConv&);
+    Optional<T&>         at(const KConv&);
 
     template<class KConv>
     requires std::convertible_to<KConv, Key>
-    Optional<std::reference_wrapper<const T>>   at(const KConv&) const;
+    Optional<const T&>   at(const KConv&) const;
 };
 
 // Simple thread safe map wrapper
@@ -72,13 +73,10 @@ class ThreadSafeMap
     [[nodiscard]] bool          remove_at(const K&);
     void                        clear();
 
-    Optional<std::reference_wrapper<const V>>
-    at(const K& k) const;
-    Optional<std::reference_wrapper<V>>
-    at(const K& k);
-
-    const MapType& GetMap() const;
-    MapType& GetMap();
+    Optional<const V&>  at(const K& k) const;
+    Optional<V&>        at(const K& k);
+    const MapType&      GetMap() const;
+    MapType&            GetMap();
 };
 
 // Simple thread safe vector wrapper
@@ -105,7 +103,7 @@ class ThreadSafeVector
 template<class K, class T, class C, class A>
 template<class KC>
 requires std::convertible_to<KC, K>
-inline Optional<std::reference_wrapper<T>> Map<K, T, C, A>::at(const KC& k)
+inline Optional<T&> Map<K, T, C, A>::at(const KC& k)
 {
     auto loc = find(k);
     if(loc == cend())
@@ -116,7 +114,7 @@ inline Optional<std::reference_wrapper<T>> Map<K, T, C, A>::at(const KC& k)
 template<class K, class T, class C, class A>
 template<class KC>
 requires std::convertible_to<KC, K>
-inline Optional<std::reference_wrapper<const T>> Map<K, T, C, A>::at(const KC& k) const
+inline Optional<const T&> Map<K, T, C, A>::at(const KC& k) const
 {
     auto loc = find(k);
     if(loc == cend())
@@ -134,7 +132,7 @@ ThreadSafeMap<K, V>::try_emplace(const K& k, Args&&... args)
 }
 
 template<class K, class V>
-Optional<std::reference_wrapper<const V>> ThreadSafeMap<K, V>::at(const K& k) const
+Optional<const V&> ThreadSafeMap<K, V>::at(const K& k) const
 {
     std::shared_lock<std::shared_mutex> l(mutex);
     auto loc = map.find(k);
@@ -144,7 +142,7 @@ Optional<std::reference_wrapper<const V>> ThreadSafeMap<K, V>::at(const K& k) co
 }
 
 template<class K, class V>
-Optional<std::reference_wrapper<V>> ThreadSafeMap<K, V>::at(const K& k)
+Optional<V&> ThreadSafeMap<K, V>::at(const K& k)
 {
     std::shared_lock<std::shared_mutex> l(mutex);
     auto loc = map.find(k);

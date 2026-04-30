@@ -16,7 +16,9 @@ class Array
 {
     static_assert(N != 0, "Zero-sized array is disallowed!");
 
-    private:
+    // We want Array to be passed as NTTP, so the value is not private
+    // https://en.cppreference.com/cpp/language/template_parameters
+    public:
     T v[N];
 
     public:
@@ -24,7 +26,6 @@ class Array
     template<class... Args>
     MR_PF_DECL_V Array(Args...);
     MR_PF_DECL_V Array(const std::array<T, N>& right);
-    constexpr    ~Array() = default;
 
     MR_PF_DECL T&       operator[](uint32_t);
     MR_PF_DECL const T& operator[](uint32_t) const;
@@ -51,7 +52,7 @@ class Array
     MR_PF_DECL uint32_t size() const;
     MR_PF_DECL uint32_t max_size() const;
 
-    MR_PF_DECL uint32_t fill(const T&);
+    MR_PF_DECL_V void   fill(const T&);
 };
 
 // https://cppreference.com/cpp/container/array/deduction_guides
@@ -235,8 +236,8 @@ uint32_t Array<T, N>::max_size() const
 }
 
 template<class T, uint32_t N>
-MR_PF_DEF
-uint32_t Array<T, N>::fill(const T& val)
+MR_PF_DEF_V
+void Array<T, N>::fill(const T& val)
 {
     for(uint32_t i = 0; i < N; i++)
         v[i] = val;

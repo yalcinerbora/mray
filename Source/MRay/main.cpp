@@ -65,8 +65,6 @@ InitializeCommands() noexcept
     return CommandList;
 };
 
-static constexpr auto WTF_IS_THIS = std::is_same_v<signed char, char>;
-
 int main(int argc, const char* const argv[])
 {
     ProcessTimer processTimer;
@@ -92,7 +90,7 @@ int main(int argc, const char* const argv[])
     app.set_help_all_flag("--help-all", "All args of sub-commands");
     app.require_subcommand();
     // Profiler (can be set via main app)
-    Optional<bool> enableProfiling;
+    std::optional<bool> enableProfiling;
     app.add_flag("--profile, -p", enableProfiling, "Enable Tracy Profiling");
 
     // Version information
@@ -134,7 +132,13 @@ int main(int argc, const char* const argv[])
     });
     assert(appIt != appList.cend());
 
-    ProfilerDLL profilerDLL(enableProfiling);
+    // When profiler is instantiated as a empty class
+    // (when MRay is compiled without "MRAY_ENABLE_TRACY")
+    // This will not have a side effect and compiler warns about
+    // unused variable. So we fix this as such.
+    // TODO: Probably macro this which I personally dislike.
+    [[maybe_unused]]
+    ProfilerDLL profilerDLL = ProfilerDLL(Optional<bool>(enableProfiling));
 
     processTimer.Display();
     MRayError e = appIt->first->Invoke();

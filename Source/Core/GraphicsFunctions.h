@@ -3,6 +3,7 @@
 #include "Vector.h"
 #include "Types.h"
 #include "BitFunctions.h"
+#include "Optional.h"
 
 namespace Graphics
 {

@@ -341,7 +341,7 @@ void CreateRefractMaterials(Span<MRayUSDMatAlphaPack> matIdsOut, TracerI& tracer
         Span<Vector3> iorFrontSpan = cauchyFrontBuffer.AccessAs<Vector3>();
         const auto& pair = matPairs[i];
         auto [ior, iorTex] = ReadUSDMatAttribute(pair.second->iorOrSpec, texLookup);
-        assert(!iorTex.has_value());
+        assert(!iorTex.HasValue());
 
         iorBackSpan[i] = Vector3(ior, 0, 0);
         attribCounts[i].push_back(1);
@@ -522,8 +522,8 @@ MaterialConverter::GetTexturedAttribute(const pxr::UsdShadeInput& input,
 
 MRayUSDMaterialProps MaterialConverter::ResolveMatPropsSingle(const MRayUSDBoundMaterial& m)
 {
-    static const ProfilerAnnotation _("Resolve Material Properties");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "Resolve Mat Properties");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     const auto& tokens = MRayUSDShadeTokens();
     if(std::holds_alternative<MRayUSDFallbackMaterial>(m))
@@ -617,8 +617,8 @@ MaterialConverter::ResolveMatProps(const MRayUSDMaterialMap& uniqueMaterials)
 FlatSet<Pair<pxr::UsdPrim, MRayUSDTexture>>
 MaterialConverter::ResolveTextures(const std::vector<MRayUSDMaterialProps>& props)
 {
-    static const ProfilerAnnotation _("Resolve Textures");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "Resolve Textures");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     FlatSet<Pair<pxr::UsdPrim, MRayUSDTexture>> textures;
     auto ReadAndEmplace = [this, &textures](const auto& t, bool isColor,
@@ -654,8 +654,8 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
                                           FlatSet<Pair<pxr::UsdPrim, MRayUSDTexture>>&& tex,
                                           TracerI& tracer, ThreadPool& threadPool)
 {
-    static const ProfilerAnnotation ldTexAnnot("Load Textures");
-    auto annotation = ldTexAnnot.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(ldTexAnnot, "Load Textures");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, ldTexAnnot);
 
     auto flatTextures = std::move(tex).extract();
     uint32_t textureCount = static_cast<uint32_t>(flatTextures.size());
@@ -688,8 +688,8 @@ MRayError MaterialConverter::LoadTextures(std::map<pxr::UsdPrim, TextureId>& res
     const auto THRD_ProcessTextures =
     [&, imgLoader](uint32_t start, uint32_t end) -> void
     {
-        static const ProfilerAnnotation ldTexTaskAnnot("Load Texture Task");
-        auto annotation = ldTexTaskAnnot.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(ldTexTaskAnnot, "Load Texture Task");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, ldTexTaskAnnot);
 
         MRayError err = MRayError::OK;
         // Subset the data to per core
@@ -823,8 +823,8 @@ MaterialConverter::CreateMaterials(TracerI& tracer,
                                    const std::vector<MRayUSDMaterialProps>& flatMatProps,
                                    const std::map<pxr::UsdPrim, TextureId>& texLookup)
 {
-    static const ProfilerAnnotation _("Create Materials");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "Create Materials");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     std::vector<MatKeyValPair> combinedMatKVPairs;
     combinedMatKVPairs.reserve(flatMatNames.size());
@@ -936,8 +936,8 @@ MRayError ProcessUniqueMaterials(std::map<pxr::UsdPrim, MRayUSDMatAlphaPack>& ou
                                  const MRayUSDMaterialMap& uniqueMaterials,
                                  const std::map<pxr::UsdPrim, MRayUSDTexture>& extraTextures)
 {
-    static const ProfilerAnnotation ldMatAnnot("Load Materials");
-    auto annotation = ldMatAnnot.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(ldMatAnnot, "Load Materials");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, ldMatAnnot);
 
     std::vector<pxr::UsdPrim> flatKeys;
     flatKeys.reserve(uniqueMaterials.size());

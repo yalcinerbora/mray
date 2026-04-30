@@ -15,6 +15,8 @@
 #endif
 
 #include "Types.h"
+#include "Optional.h"
+
 #include <string_view>
 #include <source_location>
 
@@ -57,7 +59,7 @@ class ProfilerDLL
     public:
                     ProfilerDLL(Optional<bool> v = std::nullopt)
                     {
-                        if(v && *v)
+                        if(v && v.Value())
                         MRAY_WARNING_LOG("[Prof]  : Profiling is requested "
                                          "but MRay is *not* compiled with \"MRAY_ENABLE_TRACY\". "
                                          "Profiling flag will be ignored!");
@@ -189,7 +191,7 @@ ProfilerDLL::ProfilerDLL(Optional<bool> activate)
 {
     // TODO: This function will be loaded from the DLL,
     // so it is fine for this function to be inline?
-    if(activate && *activate)
+    if(activate && activate.Value())
         ___tracy_startup_profiler();
 }
 
@@ -208,4 +210,21 @@ bool ProfilerDLL::IsActive()
     return ___tracy_profiler_started();
 }
 
+#endif
+
+// Due to unused variable warnings (when profiling is not compiled)
+// HIP-clang warns of creating an empty class (Profiler Scope) since
+// it does not have side effects. So we macro it.
+//
+// TODO: Later we may eliminate the "static const ProfilerAnnotation"
+// instantiation maybe but I do not like using many macros.
+#ifndef MRAY_ENABLE_TRACY
+    #define MRAY_PROFILER_GENERATE_ANNOTATION(stateName, CStr) ((void)0)
+
+    #define MRAY_PROFILER_ANNOTATE_SCOPE(varName, annotateStateName) ((void)0)
+#else
+    #define MRAY_PROFILER_GENERATE_ANNOTATION(stateName, CStr) \
+        static const auto stateName = ProfilerAnnotation(CStr)
+    #define MRAY_PROFILER_ANNOTATE_SCOPE(varName, annotateStateName) \
+        auto varName = annotateStateName.AnnotateScope()
 #endif

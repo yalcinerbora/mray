@@ -6,14 +6,15 @@
 
 class VisorCommand : public CommandI
 {
-    using OptionalRes = Optional<std::array<uint32_t, 2>>;
+    using OptionalRes = std::optional<std::array<uint32_t, 2>>;
+    using OptionalStr = std::optional<std::string>;
     private:
-    std::string             tracerConfigFile    = "";
-    std::string             visorConfigFile     = "";
-    Optional<std::string>   sceneFile           = std::nullopt;
-    Optional<std::string>   renderConfigFile    = std::nullopt;
-    OptionalRes             imgRes              = std::array<uint32_t, 2>{0, 0};
-    uint32_t                threadCount;
+    std::string   tracerConfigFile    = "";
+    std::string   visorConfigFile     = "";
+    OptionalStr   sceneFile           = std::nullopt;
+    OptionalStr   renderConfigFile    = std::nullopt;
+    OptionalRes   imgRes              = std::array<uint32_t, 2>{0, 0};
+    uint32_t      threadCount;
 
                         VisorCommand();
     public:

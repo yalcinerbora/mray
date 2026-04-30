@@ -24,7 +24,7 @@ namespace BlockCompressedIO
 {
     struct BC1
     {
-        using ColorPack = std::array<Vector3, 2>;
+        using ColorPack = Array<Vector3, 2>;
         using BlockType = Vector2ui;
 
         MR_HF_DECL
@@ -36,7 +36,7 @@ namespace BlockCompressedIO
 
     struct BC2
     {
-        using ColorPack = std::array<Vector3, 2>;
+        using ColorPack = Array<Vector3, 2>;
         using BlockType = Vector4ui;
 
         MR_HF_DECL
@@ -47,7 +47,7 @@ namespace BlockCompressedIO
 
     struct BC3
     {
-        using ColorPack = std::array<Vector3, 2>;
+        using ColorPack = Array<Vector3, 2>;
         using BlockType = Vector4ui;
 
         MR_HF_DECL
@@ -59,7 +59,7 @@ namespace BlockCompressedIO
     template<bool IsSigned>
     struct BC4
     {
-        using ColorPack = std::array<Vector3, 2>;
+        using ColorPack = Array<Vector3, 2>;
         using BlockType = Vector2ui;
 
         MR_HF_DECL
@@ -71,7 +71,7 @@ namespace BlockCompressedIO
     template<bool IsSigned>
     struct BC5
     {
-        using ColorPack = std::array<Vector3, 2>;
+        using ColorPack = Array<Vector3, 2>;
         using BlockType = Vector4ui;
 
         MR_HF_DECL
@@ -83,7 +83,7 @@ namespace BlockCompressedIO
     template<bool IsSigned>
     struct BC6H
     {
-        using ColorPack = std::array<Vector3, 4>;
+        using ColorPack = Array<Vector3, 4>;
         using BlockType = Vector4ui;
 
         MR_HF_DECL

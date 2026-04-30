@@ -486,8 +486,8 @@ ImageFileOIIO::ImageFileOIIO(const std::string& filePath,
 
 Expected<ImageHeader> ImageFileOIIO::ReadHeader()
 {
-    static const ProfilerAnnotation _("OIIO Read Header");
-    [[maybe_unused]] auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "OIIO Read Header");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     oiioFile = OIIO::ImageInput::open(filePath);
     if(!oiioFile) return MRayError("OIIO Error ({})", OIIO::geterror());
@@ -584,8 +584,8 @@ Expected<ImageHeader> ImageFileOIIO::ReadHeader()
 
 Expected<Image> ImageFileOIIO::ReadImage()
 {
-    static const ProfilerAnnotation _("OIIO Read Image");
-    [[maybe_unused]] auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "OIIO Read Image");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     Image result;
     result.header = header;

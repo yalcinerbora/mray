@@ -8,6 +8,7 @@
 #include "Core/Definitions.h"
 #include "Core/Matrix.h"        // IWYU pragma: keep
 #include "Core/Variant.h"
+#include "Core/Optional.h"
 
 struct MRayUSDPrimSurface
 {

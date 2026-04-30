@@ -190,7 +190,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
         throw MRayError("[{}]: Unknown film filter type {}.", TypeName(),
                         uint32_t(tracerView.tracerParams.filmFilter.type));
     Float radius = tracerView.tracerParams.filmFilter.radius;
-    filmFilter = FilterGen->get()(gpuSystem, Float(radius));
+    filmFilter = FilterGen.Value()(gpuSystem, Float(radius));
     // Change the mode according to the render logic
     using Math::Roll;
     int32_t modeIndex = (int32_t(anchorMode) +
@@ -347,10 +347,10 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     Vector2ui maxDeviceLocalRNGCount = this->imageTiler.ConservativeTileSize();
     uint64_t seed = tracerView.tracerParams.seed;
     uint32_t spp = currentOptions.totalSPP;
-    rnGenerator = RngGen->get()(rIP,
-                                std::move(maxDeviceLocalRNGCount),
-                                std::move(spp), std::move(seed),
-                                gpuSystem, globalThreadPool);
+    rnGenerator = RngGen.Value()(rIP,
+                                 std::move(maxDeviceLocalRNGCount),
+                                 std::move(spp), std::move(seed),
+                                 gpuSystem, globalThreadPool);
 
     auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
     return RenderBufferInfo
@@ -379,7 +379,7 @@ RendererOutput SurfaceRenderer::DoRender()
     const GPUDevice& device = gpuSystem.BestDevice();
     const GPUQueue& processQueue = device.GetComputeQueue(0);
 
-    if(cameraTransform.has_value())
+    if(cameraTransform.HasValue())
     {
         totalIterationCount = 0;
         curCamTransformOverride = cameraTransform;
@@ -715,10 +715,10 @@ RendererOutput SurfaceRenderer::DoRender()
     renderOut = imageTiler.TransferToHost(processQueue,
                                           transferQueue);
     // Semaphore is invalidated, visor is probably crashed
-    if(!renderOut.has_value())
+    if(!renderOut.HasValue())
         return RendererOutput{};
     // Actual global weight
-    renderOut->globalWeight = Float(1);
+    renderOut.Value().globalWeight = Float(1);
 
     // We do not need to wait here, but we time
     // from CPU side so we need to wait

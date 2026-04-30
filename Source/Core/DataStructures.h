@@ -2,6 +2,7 @@
 
 #include "Vector.h"
 #include "Core/Types.h"
+#include "Core/Optional.h"
 #include <bit>
 #include <type_traits>
 #include <algorithm>

@@ -2,6 +2,7 @@
 #pragma once
 
 #include <hip/hip_runtime.h>
+
 #include <vector>
 
 #include "Core/Types.h"
@@ -39,14 +40,155 @@ class TimelineSemaphore;
 
 #define MRAY_KERNEL __global__
 
+inline constexpr uint32_t WarpSize()
+{
+    // Recent AMD GPUs have variable warp size
+    // To make the code portable we do not care variable
+    // warp size mode, and use highest amount of thread-per-warp (TPW)
+    // for each arch.
+    //
+    //
+    //
+    // This code must match with the w/e parameter AMD uses when launching /
+    // compiling the kernels.
+    //
+    // https://rocm.docs.amd.com/en/latest/reference/gpu-arch-specs.html
+    //
+    //
+    // I was going to do a big ifdef block here, but after checking the
+    // table above, we can get away with 64 for all supported archs.
+    //
+    // According to this HIP runtime does not support it?
+    // https://rocm.docs.amd.com/projects/HIP/en/latest/reference/hardware_features.html
+    //
+    // So for RDNA 1-2-3, it is 32, and for the rest it is 64
+    //
+    // All of our code should work, however; we may not get the best perf
+    // for each arch (fine-tune)
+    // RDNA 4
+    #if (defined (__gfx1201__)) || (defined (__gfx1200__))
+        return 32;
+    // RDNA 3.5
+    #elif (defined (__gfx1151__)) || (defined (__gfx1150__))
+        return 32;
+    // RDNA 3
+    #elif (defined (__gfx1102__)) || (defined (__gfx1101__)) || (defined (__gfx1100__))
+        return 32;
+    // RDNA 2
+    #elif (defined (__gfx1032__)) || (defined (__gfx1031__)) || (defined (__gfx1030__))
+        return 32;
+    // RDNA 1 (Only Single GPU on the list)
+    #elif (defined (__gfx1032__))
+        return 32;
+    // GCN5.1 (Probably VEGA?)
+    #elif (defined (__gfx906__))
+        return 64;
+    // Server GPUS. These probably do not have texture unit so runtime
+    // will terminate the program anyway but here for future proofing
+    // (maybe we add basic software texturing etc. later).
+    // CDNA 4
+    #elif (defined (__gfx950__))
+        return 64;
+    // CDNA 3
+    #elif (defined (__gfx942__))
+        return 64;
+    // CDNA 2
+    #elif (defined (__gfx90a__))
+        return 64;
+    // CDNA 1
+    #elif (defined (__gfx908__))
+        return 64;
+    // GCN5.1 (It is already above)
+    // GCN5.0
+    #elif (defined (__gfx900__))
+        return 64;
+    // GCN3.0 and GCN4.0 ? (Bug on documentation maybe)
+    #elif (defined (__gfx803__))
+        return 64;
+    // For unknown arch, set the value to 64 and also warn
+    #elif (defined (__HIP_DEVICE_COMPILE__))
+        #warning "Unknown AMD GPU Arch while compiling. "
+                 "Compile-time Wavefront (Warp) size is set to 64!"
+        return 64;
+    // This may creep in .cpp files, so we return 1.
+    #else
+        return 1;
+    #endif
+}
+
+template<uint32_t LOGICAL_WARP_SIZE = WarpSize()>
+MR_GF_DECL
+void WarpSynchronize()
+{
+    // https://rocm.docs.amd.com/projects/HIP/en/latest/understand/hardware_implementation.html
+    // After reading this to understand the generic architecture,
+    // AMD has SIMD units and custom scheduler to juggle these units.
+    // So we do not have sub warp and this can be a noop?
+    //
+    // Couple of days later and 3-4 hours of internet crawling
+    // (God! AMD HIP docs are awful!)
+    // I did find out this:
+    // https://rocm.docs.amd.com/projects/HIP/en/latest/tutorial/reduction.html#utilize-upper-half-of-the-block
+    // "
+    //   Warps are known to execute in a strict lockstep fashion.
+    //   Therefore, once shared reduction reaches a point where only a single warp participates
+    //   meaningfully, you can cut short the loop and let the rest of the warps terminate.
+    //   Moreover, you can also unroll the loop without syncing the entire block.
+    // "
+    // Which is from the god damn tutorial of classic parallel reduction. (Btw this classic parallel
+    // reduction tutorial is always eye opening if you struggle for massively parallel archs it is always
+    // a good read)
+    //
+    // Moreover; since AMD is a proper hardware company, they have ISA specs (Yay!)
+    // https://docs.amd.com/v/u/en-US/rdna3-shader-instruction-set-architecture-feb-2023_0
+    // But it does not say anything about LDS memory coherency.
+
+    // Finally find this,
+    // https://rocm.docs.amd.com/projects/rocPRIM/en/latest/reference/intrinsics.html#_CPPv4N7rocprim12wave_barrierEv
+    // Docs says that it should not be needed but the source has some intrinsics
+    // (thread fences etc.) so we call these here.
+    //
+    // We can't use the function here since this header is .cpp-facing
+    // rocprim has many device-related data/intrinsics.
+    //
+    // This codebase is messy for that regard, so we just copy the internals
+    // Information can be found here:
+    // https://clang.llvm.org/docs/LanguageExtensions.html#builtin-amdgcn-fence
+    // and
+    // https://github.com/ROCm/rocm-libraries/blob/develop/projects/rocprim/rocprim/include/rocprim/intrinsics/thread.hpp#L220
+    #ifdef __HIP_DEVICE_COMPILE__
+        __builtin_amdgcn_fence(__ATOMIC_RELEASE, "wavefront");
+        __builtin_amdgcn_wave_barrier();
+        __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "wavefront");
+    #endif
+}
+
+MR_GF_DECL
+inline void BlockSynchronize()
+{
+    // Dirty fix to make host side happy
+    #ifdef __HIP_DEVICE_COMPILE__
+        __syncthreads();
+    #endif
+}
+
+MR_GF_DECL
+inline void ThreadFenceGrid()
+{
+    // Dirty fix to make host side happy
+    #ifdef __HIP_DEVICE_COMPILE__
+        __threadfence();
+    #endif
+}
+
 // A Good guess for TPB
-static constexpr uint32_t StaticThreadPerBlock1D()
+constexpr uint32_t StaticThreadPerBlock1D()
 {
     return 512u;
 }
 
 // TODO: This should not be compile time static
-static constexpr uint32_t TotalQueuePerDevice()
+constexpr uint32_t TotalQueuePerDevice()
 {
     return 4;
 }
@@ -71,7 +213,7 @@ struct KernelCallParamsHIP
     uint32_t blockId;
     uint32_t threadId;
 
-    MRAY_GPU            KernelCallParamsHIP();
+    MR_GF_DEF           KernelCallParamsHIP();
     MR_PF_DECL uint32_t GlobalId() const;
     MR_PF_DECL uint32_t TotalSize() const;
 };
@@ -559,13 +701,13 @@ void GPUQueueHIP::MemcpyAsync2D(Span<T> regionTo, size_t toStride,
     size_t outStrideBytes = fromStride * sizeof(T);
     size_t copyWidthBytes = copySize[0] * sizeof(T);
 
-    hipMemcpy2DAsync(regionTo.data(),
-                     inStrideBytes,
-                     regionFrom.data(),
-                     outStrideBytes,
-                     copyWidthBytes, copySize[1],
-                     hipMemcpyDefault,
-                     stream);
+    HIP_CHECK(hipMemcpy2DAsync(regionTo.data(),
+                               inStrideBytes,
+                               regionFrom.data(),
+                               outStrideBytes,
+                               copyWidthBytes, copySize[1],
+                               hipMemcpyDefault,
+                               stream));
 }
 
 template <class T>
@@ -578,16 +720,16 @@ void GPUQueueHIP::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
     size_t actualInStride = (inputByteStride == 0) ? sizeof(T) : inputByteStride;
     size_t actualOutStride = (outputByteStride == 0) ? sizeof(T) : outputByteStride;
 
-    size_t elemCountIn = Math::DivideUp(regionFrom.size_bytes(), actualInStride);
-    assert(elemCountIn == Math::DivideUp(regionTo.size_bytes(), actualOutStride));
+    size_t elemCountIn = Math::DivideUp(size_t(regionFrom.size_bytes()), actualInStride);
+    assert(elemCountIn == Math::DivideUp(size_t(regionTo.size_bytes()), actualOutStride));
 
-    hipMemcpy2DAsync(regionTo.data(),
-                     actualOutStride,
-                     regionFrom.data(),
-                     actualInStride,
-                     sizeof(T), elemCountIn,
-                     hipMemcpyDefault,
-                     stream);
+    HIP_CHECK(hipMemcpy2DAsync(regionTo.data(),
+                               actualOutStride,
+                               regionFrom.data(),
+                               actualInStride,
+                               sizeof(T), elemCountIn,
+                               hipMemcpyDefault,
+                               stream));
 }
 
 template <class T>

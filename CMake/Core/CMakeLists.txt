@@ -46,6 +46,7 @@ set(SRC_MATH
 
 set(SRC_TYPES
     ${CURRENT_SOURCE_DIR}/Array.h
+    ${CURRENT_SOURCE_DIR}/Optional.h
     ${CURRENT_SOURCE_DIR}/Types.h
     ${CURRENT_SOURCE_DIR}/TypePack.h
     ${CURRENT_SOURCE_DIR}/Tuple.h

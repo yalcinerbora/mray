@@ -20,7 +20,12 @@ function(gen_tracer_target)
     else()
         set(MRAY_TRACER_EMBREE OFF)
     endif()
-    # TODO: HIP RT Check (Backend: HIP, Enable HW Acceleration ON)
+    # HIP RT Check (Backend: HIP, Enable HW Acceleration ON)
+    if(MRAY_ENABLE_HW_ACCELERATION AND GEN_TRACER_TARGET_NAME STREQUAL "HIP")
+       set(MRAY_TRACER_HIP ON)
+    else()
+        set(MRAY_TRACER_HIP OFF)
+    endif()
 
     set(CURRENT_SOURCE_DIR ${MRAY_SOURCE_DIRECTORY}/Tracer)
     set(SRC_TEXTURE
@@ -42,7 +47,8 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/TextureView.hpp
         ${CURRENT_SOURCE_DIR}/Texture.h
         ${CURRENT_SOURCE_DIR}/StochasticTexFilter.h
-        ${CURRENT_SOURCE_DIR}/VolumetricSVO.h)
+        ${CURRENT_SOURCE_DIR}/VolumetricSVO.h
+        ${CURRENT_SOURCE_DIR}/SurfaceView.h)
 
     set(SRC_PRIMITIVES
         ${CURRENT_SOURCE_DIR}/PrimitiveC.h
@@ -85,7 +91,7 @@ function(gen_tracer_target)
         ${CURRENT_SOURCE_DIR}/MetaLight.h
         ${CURRENT_SOURCE_DIR}/MetaLight.hpp)
 
-    set(SRC_ACCELLERATORS
+    set(SRC_ACCELERATORS
         ${CURRENT_SOURCE_DIR}/AcceleratorC.h
         ${CURRENT_SOURCE_DIR}/AcceleratorCommon.cu
         ${CURRENT_SOURCE_DIR}/AcceleratorWork.h
@@ -174,7 +180,7 @@ function(gen_tracer_target)
         ${SRC_MEDIUMS}
         ${SRC_LIGHTS}
         ${SRC_TRANSFORMS}
-        ${SRC_ACCELLERATORS}
+        ${SRC_ACCELERATORS}
         ${SRC_RENDERERS}
         ${SRC_RENDERERS_TEX_VIEW}
         ${SRC_RENDERERS_SURFACE}
@@ -191,7 +197,7 @@ function(gen_tracer_target)
     source_group("Materials" FILES ${SRC_MATERIALS})
     source_group("Mediums" FILES ${SRC_MEDIUMS})
     source_group("Cameras" FILES ${SRC_CAMERAS})
-    source_group("Accelerators" FILES ${SRC_ACCELLERATORS})
+    source_group("Accelerators" FILES ${SRC_ACCELERATORS})
     source_group("Lights" FILES ${SRC_LIGHTS})
     source_group("Random" FILES ${SRC_RANDOM})
     source_group("Renderers" FILES ${SRC_RENDERERS})
@@ -270,6 +276,19 @@ function(gen_tracer_target)
                      ${SRC_ACCELLERATORS_HW})
     endif()
 
+    # Add sources for HIPRT (Backend: HIP, Enable HW Acceleration ON)
+    if(MRAY_TRACER_HIPRT)
+        set(SRC_ACCELLERATORS_HW
+            ${CURRENT_SOURCE_DIR}/HIPRT/AcceleratorHIPRT.cpp
+            ${CURRENT_SOURCE_DIR}/HIPRT/AcceleratorHIPRT.h
+            ${CURRENT_SOURCE_DIR}/HIPRT/AcceleratorHIPRT.hpp)
+
+        set(SRC_ALL ${SRC_ALL} ${SRC_ACCELLERATORS_HW})
+
+        source_group("Accelerators/HIPRT" FILES
+                     ${SRC_ACCELLERATORS_HW})
+    endif()
+
     # Finally Gen Library
     set(TARGET_FULL_NAME "Tracer${GEN_TRACER_TARGET_NAME}")
     set(DEVICE_TARGET_FULL_NAME "Device${GEN_TRACER_TARGET_NAME}")
@@ -287,8 +306,6 @@ function(gen_tracer_target)
                           POSITION_INDEPENDENT_CODE ON)
 
     add_precompiled_headers(TARGET ${TARGET_FULL_NAME})
-
-
 
     if(MRAY_ENABLE_HW_ACCELERATION)
         target_compile_definitions(${TARGET_FULL_NAME}

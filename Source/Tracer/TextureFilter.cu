@@ -14,7 +14,9 @@
 #include <numeric>
 
 #ifdef MRAY_GPU_BACKEND_CUDA
-    #include <cub/block/block_reduce.cuh>
+    #include <cub/warp/warp_reduce.cuh>
+#elif defined MRAY_GPU_BACKEND_HIP
+    #include <hipcub/warp/warp_reduce.hpp>
 #endif
 
 enum class FilterMode
@@ -114,10 +116,13 @@ Vector4 FilterPixel(const Vector2ui& pixelCoord,
 MR_GF_DECL
 Tuple<Vector3, Float> ConvertNaNsToColor(Spectrum value, Float weight)
 {
+    // Clang-HIP bug on CTAD maybe (or probably my bug on deduction guide)?
+    using RetT = Tuple<Vector3, Float>;
+
     if(!Math::IsFinite(value))
-        return Tuple(BIG_MAGENTA(), weight * Float(128.0));
+        return RetT(BIG_MAGENTA(), weight * Float(128.0));
     else
-        return Tuple(Vector3(value), weight);
+        return RetT(Vector3(value), weight);
 }
 
 // TODO: Should we dedicate a warp per pixel?
@@ -349,7 +354,7 @@ void KCExpandSamplesToPixels(// Outputs
     }
 }
 
-#ifdef MRAY_GPU_BACKEND_CUDA
+#if (defined MRAY_GPU_BACKEND_CUDA) || (defined MRAY_GPU_BACKEND_HIP)
 
 template <uint32_t TPB, uint32_t LOGICAL_WARP_SIZE, class Filter>
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
@@ -367,6 +372,12 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan img,
                           MRAY_GRID_CONSTANT const Float scalarWeightMultiplier,
                           MRAY_GRID_CONSTANT const Filter filter)
 {
+    #ifdef MRAY_GPU_BACKEND_CUDA
+        namespace cub_or_hip = cub;
+    #else
+        namespace cub_or_hip = hipcub;
+    #endif
+
     KernelCallParams kp;
     assert(dStartOffsets.size() == (dPixelIds.size() + 1));
     static_assert(TPB % LOGICAL_WARP_SIZE == 0);
@@ -378,7 +389,7 @@ void KCFilterToImgWarpRGB(MRAY_GRID_CONSTANT const ImageSpan img,
     const uint32_t localWarpId = kp.threadId / LOGICAL_WARP_SIZE;
     const uint32_t laneId = kp.GlobalId() % LOGICAL_WARP_SIZE;
 
-    using WarpReduceVec4 = cub::WarpReduce<Vector4, LOGICAL_WARP_SIZE>;
+    using WarpReduceVec4 = cub_or_hip::WarpReduce<Vector4, LOGICAL_WARP_SIZE>;
     using ReduceShMem = typename WarpReduceVec4::TempStorage;
     // Per-Warp Shared Memory
     MRAY_SHARED_MEMORY Vector2ui    sSegmentRange[WARP_PER_BLOCK];
@@ -1027,7 +1038,7 @@ void GenerateMipsGeneric(const std::vector<MipArray<TracerSurfRef>>& textures,
     for(const MipArray<TracerSurfRef>& surfRefs : textures)
     {
         MipArray<TracerSurfView> mipViews;
-        for(size_t i = 0; i < TracerConstants::MaxTextureMipCount; i++)
+        for(uint32_t i = 0; i < TracerConstants::MaxTextureMipCount; i++)
         {
             const TracerSurfRef& surf = surfRefs[i];
             mipViews[i] = std::visit([](auto&& v) -> TracerSurfView

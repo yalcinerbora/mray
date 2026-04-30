@@ -91,7 +91,7 @@ GPUAnnotationHIP::Scope::~Scope()
 }
 
 GPUAnnotationHIP::GPUAnnotationHIP(AnnotationHandle h,
-                                   std::string_view name)
+                                   std::string_view)
     : domainHandle(h)
     , stringHandle(nullptr)
 {
@@ -114,6 +114,7 @@ GPUAnnotationHIP::Scope GPUAnnotationHIP::AnnotateScope() const
 
     // nvtxDomainRangePushEx(nvtxDomain, &attrib);
     // return Scope(domainHandle);
+    return Scope(nullptr);
 }
 
 GPUSemaphoreViewHIP::GPUSemaphoreViewHIP(TimelineSemaphore* sem,
@@ -196,7 +197,20 @@ GPUDeviceHIP::GPUDeviceHIP(int deviceId, AnnotationHandle domain)
     if(vmmEnabled == 0)
     {
         throw MRayError("The device do not have virtual memory "
-                        "management support!  ({:s}:{})",
+                        "management support! ({:s}:{})",
+                        props.name, deviceId);
+    }
+
+    // Some AMD devices (CDNA maybe?) may not have image support
+    // check it
+    int hasImageSupport = 0;
+    HIP_DRIVER_CHECK(hipDeviceGetAttribute(&hasImageSupport,
+                                           hipDeviceAttributeImageSupport,
+                                           deviceId));
+    if(hasImageSupport == 0)
+    {
+        throw MRayError("The device do not have texture "
+                        "image support! ({:s}:{})",
                         props.name, deviceId);
     }
 
@@ -310,7 +324,7 @@ GPUSystemHIP::GPUSystemHIP(bool logBanner)
         memGiB /= 1024.0;
         memGiB /= 1204.0;
         banner += MRAY_FORMAT("Name      : {}\n"
-                              "CC        : {}\n"
+                              "ArchName  : {}\n"
                               "Memory    : {:.3f} GiB\n"
                               "---------------------\n",
                               gpu.Name(),

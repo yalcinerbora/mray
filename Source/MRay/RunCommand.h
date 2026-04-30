@@ -20,7 +20,7 @@ class RunCommand : public CommandI
     // but there is a bug in new CLI11 that does not
     // resolve std::array<...> which is a regression...
     // Change this later
-    using OptionalRes = Optional<std::array<uint32_t, 2>>;
+    using OptionalRes = std::optional<std::array<uint32_t, 2>>;
 
     private:
     std::string visorConfString;

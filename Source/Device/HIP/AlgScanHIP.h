@@ -4,9 +4,9 @@
 #include "Core/Types.h"
 #include "GPUSystemHIP.h"
 
-#include <rocprim/block/block_scan.hpp>
-#include <rocprim/block/block_load.hpp>
-#include <rocprim/block/block_store.hpp>
+#include <hipcub/block/block_scan.hpp>
+#include <hipcub/block/block_load.hpp>
+#include <hipcub/block/block_store.hpp>
 #include <rocprim/device/device_scan.hpp>
 
 namespace mray::hip::algorithms
@@ -28,9 +28,9 @@ void KCInclusiveSegmentedScan(Span<T> dOut,
     static constexpr uint32_t ITEMS_PER_THREAD = 4;
     static constexpr uint32_t DATA_PER_BLOCK = TPB * ITEMS_PER_THREAD;
 
-    using BlockLoad = rocprim::BlockLoad<T, TPB, ITEMS_PER_THREAD, cub::BLOCK_LOAD_VECTORIZE>;
-    using BlockStore = rocprim::BlockStore<T, TPB, ITEMS_PER_THREAD, cub::BLOCK_STORE_VECTORIZE>;
-    using BlockScan = rocprim::BlockScan<T, TPB>;
+    using BlockLoad = hipcub::BlockLoad<T, TPB, ITEMS_PER_THREAD, hipcub::BLOCK_LOAD_VECTORIZE>;
+    using BlockStore = hipcub::BlockStore<T, TPB, ITEMS_PER_THREAD, hipcub::BLOCK_STORE_VECTORIZE>;
+    using BlockScan = hipcub::BlockScan<T, TPB>;
 
     T aggregate = identityElement;
     auto PrefixLoader = [&](T iterationAggregate)
@@ -84,13 +84,13 @@ size_t ExclusiveScanTMSize(size_t elementCount, const GPUQueueHIP& q)
 {
     using namespace rocprim;
     T* dOut = nullptr;
-    T* dIn = nullptr;
+    const T* dIn = nullptr;
     void* dTM = nullptr;
     size_t result;
-    HIP_CHECK(DeviceScan::ExclusiveScan(dTM, result, dIn, dOut,
-                                         [] MRAY_HYBRID(T, T)->T{return T{};},
-                                         T{}, static_cast<int>(elementCount)),
-                                         ToHandleHIP(q));
+    HIP_CHECK(exclusive_scan(dTM, result, dIn, dOut,
+                             T{}, elementCount,
+                             [] MRAY_HYBRID(T, T)->T{return T{};},
+                             ToHandleHIP(q)));
     return result;
 }
 
@@ -136,15 +136,16 @@ void ExclusiveScan(Span<T> dScannedValues,
                    const GPUQueueHIP& queue,
                    BinaryOp&& op)
 {
-    using namespace cub;
+    using namespace rocprim;
     assert(dScannedValues.size() == 1 + dValues.size() ||
            dScannedValues.size() == dValues.size());
     size_t tmSize = dTempMem.size();
-    CUDA_CHECK(DeviceScan::ExclusiveScan(dTempMem.data(), tmSize,
-                                         dValues.data(), dScannedValues.data(),
-                                         std::forward<BinaryOp>(op), initialValue,
-                                         static_cast<int>(dScannedValues.size()),
-                                         ToHandleCUDA(queue)));
+    HIP_CHECK(exclusive_scan(dTempMem.data(), tmSize,
+                             dValues.data(), dScannedValues.data(),
+                             initialValue,
+                             dScannedValues.size(),
+                             std::forward<BinaryOp>(op),
+                             ToHandleHIP(queue)));
 }
 
 }

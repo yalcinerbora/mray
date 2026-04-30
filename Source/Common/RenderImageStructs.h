@@ -2,6 +2,8 @@
 
 #include "AnalyticStructs.h"
 
+#include "Core/Optional.h"
+
 struct RenderBufferInfo
 {
     // Buffer range

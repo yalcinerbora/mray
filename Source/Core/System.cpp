@@ -94,7 +94,7 @@ std::string GetCurrentThreadName()
         mbstate_t state = {};
         static constexpr size_t MAX_TASK_COMM_LEN = 15;
         std::string result(MAX_TASK_COMM_LEN + 1, '\0');
-        size_t inputSize = lstrlenW(desc);
+        size_t inputSize = size_t(lstrlenW(desc));
         size_t totalConv = 0;
         const wchar_t* constDesc = desc;
         wcsrtombs_s(&totalConv,

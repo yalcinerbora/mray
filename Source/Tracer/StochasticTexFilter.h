@@ -18,7 +18,7 @@
 
 namespace StochasticTF::Detail
 {
-    MR_PF_DECL std::array<Float, 4> BSplineWeights(Float t);
+    MR_PF_DECL Array<Float, 4> BSplineWeights(Float t);
 }
 
 namespace StochasticTF
@@ -33,13 +33,13 @@ namespace StochasticTF
 }
 
 MR_PF_DEF
-std::array<Float, 4>
+Array<Float, 4>
 StochasticTF::Detail::BSplineWeights(Float t)
 {
     Float t2 = t * t;
     Float t3 = t2 * t;
     constexpr Float FACTOR = Float(1) / Float(6);
-    std::array<Float, 4> weights;
+    Array<Float, 4> weights;
     weights[0] = FACTOR * (Float(-1) * t3 + Float(3) * t2 - Float(3) * t + Float(1));
     weights[1] = FACTOR * (Float( 3) * t3 + Float(6) * t2 + Float(4));
     weights[2] = FACTOR * (Float(-3) * t3 + Float(3) * t2 - Float(3) * t + Float(1));
@@ -65,8 +65,8 @@ Vector2 StochasticTF::Bicubic(Vector2 st, Float xi)
 {
     using Distribution::Common::BisectSample;
 
-    std::array<Float, 4> wU = Detail::BSplineWeights(st[0] - Math::Floor(st[0]));
-    std::array<Float, 4> wV = Detail::BSplineWeights(st[1] - Math::Floor(st[1]));
+    Array<Float, 4> wU = Detail::BSplineWeights(st[0] - Math::Floor(st[0]));
+    Array<Float, 4> wV = Detail::BSplineWeights(st[1] - Math::Floor(st[1]));
     //
     Vector2 bl = Math::Floor(st) - Float(1);
     auto [i0, xi0] = BisectSample<4>(xi , wU, true);

@@ -271,9 +271,9 @@ PathTracerRendererBase::AddRadianceToRenderBufferThroughput(Span<const RayIndex>
     // Issue a send of the FBO to Visor
     renderOut = imageTiler.TransferToHost(processQueue, transferQueue);
     // Semaphore is invalidated, visor is probably crashed
-    if(!renderOut.has_value()) return std::nullopt;
+    if(!renderOut.HasValue()) return std::nullopt;
     //
-    renderOut->globalWeight = Float(1);
+    renderOut.Value().globalWeight = Float(1);
     return renderOut;
 }
 
@@ -425,7 +425,7 @@ PathTracerRendererBase::InitializeForRender(CamSurfaceId camSurfId,
                         uint32_t(tracerView.tracerParams.filmFilter.type));
 
     Float radius = tracerView.tracerParams.filmFilter.radius;
-    filmFilter = FilterGen->get()(gpuSystem, Float(radius));
+    filmFilter = FilterGen.Value()(gpuSystem, Float(radius));
 
     // ========================= //
     //        Image Tiler        //
@@ -465,10 +465,10 @@ PathTracerRendererBase::InitializeForRender(CamSurfaceId camSurfId,
     //
     Vector2ui maxDeviceLocalRNGCount = imageTiler.ConservativeTileSize();
     uint64_t seed = tracerView.tracerParams.seed;
-    rnGenerator = RngGen->get()(renderImgParams,
-                                std::move(maxDeviceLocalRNGCount),
-                                std::move(sppLimit), std::move(seed),
-                                gpuSystem, globalThreadPool);
+    rnGenerator = RngGen.Value()(renderImgParams,
+                                 std::move(maxDeviceLocalRNGCount),
+                                 std::move(sppLimit), std::move(seed),
+                                 gpuSystem, globalThreadPool);
 
     // ========================= //
     //        SPP State          //
@@ -516,7 +516,7 @@ PathTracerRendererBase::DoRender()
     const GPUQueue& processQueue = device.GetComputeQueue(0);
 
     // Change camera if requested
-    if(cameraTransform.has_value())
+    if(cameraTransform.HasValue())
     {
         totalIterationCount = 0;
         curCamTransformOverride = cameraTransform;

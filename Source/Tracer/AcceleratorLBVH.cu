@@ -23,6 +23,8 @@
     namespace mray::host::algorithms
 #elif defined(MRAY_GPU_BACKEND_CUDA)
     namespace mray::cuda::algorithms
+#elif defined(MRAY_GPU_BACKEND_HIP)
+namespace mray::hip::algorithms
 #else
     #error "Add nested name specifier here for the new backend!"
 #endif
@@ -875,7 +877,7 @@ void BaseAcceleratorLBVH::CastRays(// Output
                 {
                     throw MRayError("BaseAccelerator: Unknown accelerator key {}", HexKeyT(key));
                 }
-                AcceleratorGroupI* accelGroup = accelGroupOpt.value().get();
+                AcceleratorGroupI* accelGroup = accelGroupOpt.Value();
                 accelGroup->CastLocalRays(// Output
                                           dVolumeIndices,
                                           dHitIds,
@@ -1017,7 +1019,7 @@ void BaseAcceleratorLBVH::CastVisibilityRays(// Output
                 {
                     throw MRayError("BaseAccelerator: Unknown accelerator key {}", HexKeyT(key));
                 }
-                AcceleratorGroupI* accelGroup = accelGroupOpt.value().get();
+                AcceleratorGroupI* accelGroup = accelGroupOpt.Value();
                 accelGroup->CastVisibilityRays(// Output
                                                dIsVisibleBuffer,
                                                // I-O
@@ -1063,7 +1065,7 @@ void BaseAcceleratorLBVH::CastLocalRays(// Output
         throw MRayError("BaseAccelerator: Unknown accelerator batch {}",
                         dAccelKeyBatchPortion);
     }
-    AcceleratorGroupI* accelGroup = accelGroupOpt.value().get();
+    AcceleratorGroupI* accelGroup = accelGroupOpt.Value();
     auto dAccelKeysCommon = MemAlloc::RepurposeAlloc<const CommonKey>(dAccelKeys);
 
     accelGroup->CastLocalRays(// Output

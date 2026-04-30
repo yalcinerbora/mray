@@ -2,10 +2,10 @@
 
 #include "Tracer/PathTracerRendererBase.h"
 #include "Tracer/MediaTracker.h"
+#include "Tracer/SpectrumContext.h"
 
 #include "RequestedTypes.h" // IWYU pragma: keep
 #include "PathTracerRendererShaders.h"
-#include "SpectrumContext.h"
 
 template<SpectrumContextC SpectrumContextT>
 class PathTracerRendererT final : public PathTracerRendererBase

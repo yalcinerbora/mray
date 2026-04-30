@@ -21,8 +21,8 @@ inline TransientData::TransientData(std::in_place_type_t<T>, size_t count)
     }
     Byte* ptr = (count == 0)
                     ? nullptr
-                    : static_cast<Byte*>(mainR.allocate(count * sizeof(T),
-                                                        alignof(T)));
+                    : static_cast<Byte*>(GetMainResource().allocate(count * sizeof(T),
+                                                                    alignof(T)));
     // TODO: add start_lifetime_as ?
     ownedMem = Span<Byte>(ptr, count * sizeof(T));
 }
@@ -40,7 +40,7 @@ inline TransientData& TransientData::operator=(TransientData&& other)
 {
     assert(this != &other);
     if(ownedMem.data() != nullptr)
-        mainR.deallocate(ownedMem.data(), ownedMem.size(), alignment);
+        GetMainResource().deallocate(ownedMem.data(), ownedMem.size(), alignment);
     ownedMem = other.ownedMem;
     typeHash = other.typeHash;
     usedBytes = other.usedBytes;
@@ -53,7 +53,7 @@ inline TransientData& TransientData::operator=(TransientData&& other)
 inline TransientData::~TransientData()
 {
     if(ownedMem.data() != nullptr)
-        mainR.deallocate(ownedMem.data(), ownedMem.size(), alignment);
+        GetMainResource().deallocate(ownedMem.data(), ownedMem.size(), alignment);
 }
 
 inline void TransientData::ReserveAll()
@@ -144,21 +144,6 @@ inline Span<Byte> TransientData::AccessAs()
 // =========================== //
 //    String Specialization    //
 // =========================== //
-
-// Strings are special, assume as char array
-// count should be the count of
-// template<>
-// inline TransientData::TransientData(std::in_place_type_t<std::string_view>,
-//                                     size_t charCount)
-//     : typeHash(typeid(std::string).hash_code())
-//     , usedBytes(0)
-//     , alignment(alignof(typename std::string::value_type))
-// {
-//     using CharType = typename std::string::value_type;
-//     Byte* ptr = reinterpret_cast<Byte*>(mainR.allocate(charCount * sizeof(CharType), alignof(CharType)));
-//     ownedMem = Span<Byte>(ptr, charCount * sizeof(CharType));
-// }
-
 template<>
 inline TransientData::TransientData(std::in_place_type_t<std::string_view>,
                                     size_t charCount)
@@ -167,7 +152,7 @@ inline TransientData::TransientData(std::in_place_type_t<std::string_view>,
     , alignment(alignof(typename std::string::value_type))
 {
     using CharType = typename std::string::value_type;
-    Byte* ptr = reinterpret_cast<Byte*>(mainR.allocate(charCount * sizeof(CharType), alignof(CharType)));
+    Byte* ptr = reinterpret_cast<Byte*>(GetMainResource().allocate(charCount * sizeof(CharType), alignof(CharType)));
     ownedMem = Span<Byte>(ptr, charCount * sizeof(CharType));
 }
 

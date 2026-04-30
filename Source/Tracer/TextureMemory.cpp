@@ -40,7 +40,7 @@ class Concept : public GenericTextureI
     const GPUDevice&    Device() const override;
     //
     TextureExtent<3>    Extents() const override;
-    uint32_t            DimensionCount() const override ;
+    uint32_t            DimensionCount() const override;
     void                CopyFromAsync(const GPUQueue& queue,
                                       uint32_t mipLevel,
                                       const TextureExtent<3>& offset,
@@ -643,13 +643,13 @@ TextureMemory::TextureMemory(const GPUSystem& sys,
 
     FilterType::E filterType = tracerParams.mipGenFilter.type;
     auto fGen = fGenMap.at(filterType);
-    if(!fGen.has_value())
+    if(!fGen.HasValue())
     {
         throw MRayError("Unable to find a filter for type {}",
                         FilterType::ToString(filterType));
     }
     Float radius = tracerParams.mipGenFilter.radius;
-    mipGenFilter = fGen.value().get()(gpuSystem, std::move(radius));
+    mipGenFilter = fGen.Value()(gpuSystem, std::move(radius));
 }
 
 TextureId TextureMemory::CreateTexture2D(const Vector2ui& size, uint32_t mipCount,
@@ -738,9 +738,9 @@ void TextureMemory::PushTextureData(TextureId id, uint32_t mipLevel,
         throw MRayError("Unable to find texture(id)",
                         static_cast<CommonKey>(id));
     }
-    GenericTexture& tex = texLoc.value().get();
+    GenericTexture& tex = texLoc.Value();
     auto clampLoc = texClampParams.at(id);
-    TexClampParameters& clampParams = clampLoc.value().get();
+    TexClampParameters& clampParams = clampLoc.Value();
 
     // TODO: Again multi-gpu/queue management
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
@@ -802,7 +802,7 @@ MRayPixelTypeRT TextureMemory::GetPixelType(TextureId id) const
         throw MRayError("Unable to find texture(id)",
                         static_cast<CommonKey>(id));
     }
-    const GenericTexture& tex = loc.value().get();
+    const GenericTexture& tex = loc.Value();
     return tex.PixelType();
 }
 

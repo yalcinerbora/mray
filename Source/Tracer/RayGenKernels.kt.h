@@ -20,8 +20,8 @@ void KCGenerateSubCamera(// Output
     if(kp.GlobalId() != 0) return;
     // Construction
     Camera cam = Camera(camSoA, camKey);
-    if(camTransform.has_value())
-        cam.OverrideTransform(camTransform.value());
+    if(camTransform.HasValue())
+        cam.OverrideTransform(camTransform.Value());
     // Generate sub camera for rendered regions
     *dCam = cam.GenerateSubCamera(stratumIndex,
                                   stratumCount);

@@ -23,7 +23,7 @@ struct BCColorConvParams
     Float               gamma;
     MRayColorSpaceEnum  fromColorSpace;
 };
-using BCColorConvParamList = std::array<BCColorConvParams, BC_TEX_PER_BATCH>;
+using BCColorConvParamList = Array<BCColorConvParams, BC_TEX_PER_BATCH>;
 
 // Order is important here, this must match the enum order of "MrayColorSpaceEnum"
 // which will be used as such: "get<static_cast<int>(MR_ACES2065_1)>"
@@ -879,7 +879,7 @@ void ColorConverter::ConvertColor(std::vector<MipArray<TracerSurfRef>> textures,
         for(const MipArray<TracerSurfRef>& surfRefs : textures)
         {
             MipArray<TracerSurfView> mipViews;
-            for(size_t i = 0; i < TracerConstants::MaxTextureMipCount; i++)
+            for(uint32_t i = 0; i < TracerConstants::MaxTextureMipCount; i++)
             {
                 const TracerSurfRef& surf = surfRefs[i];
                 mipViews[i] = std::visit([](auto&& v) -> TracerSurfView

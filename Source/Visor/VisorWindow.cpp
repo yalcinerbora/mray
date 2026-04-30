@@ -1060,8 +1060,8 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
     // Check the run state
     if(changes.statusBarState.runState)
     {
-        visorState.currentRendererState = changes.statusBarState.runState.value();
-        TracerRunState state = changes.statusBarState.runState.value();
+        visorState.currentRendererState = changes.statusBarState.runState.Value();
+        TracerRunState state = changes.statusBarState.runState.Value();
         switch(state)
         {
             case TracerRunState::RUNNING:
@@ -1106,7 +1106,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
     if(changes.statusBarState.cameraIndex)
     {
         int32_t camCount = static_cast<int32_t>(visorState.scene.cameraCount);
-        int32_t camOffset = changes.statusBarState.cameraIndex.value();
+        int32_t camOffset = changes.statusBarState.cameraIndex.Value();
         int32_t newCamIndex = visorState.currentCameraIndex + camOffset;
         newCamIndex = Math::Roll(newCamIndex, 0, camCount);
         visorState.currentCameraIndex = newCamIndex;
@@ -1128,7 +1128,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
     {
         // New transform should not mean new framebuffer.
         // However conservatively we do drop the memory
-        visorState.transform = changes.transform.value();
+        visorState.transform = changes.transform.Value();
         transferQueue->Enqueue(VisorAction
         (
             std::in_place_index<VisorAction::CHANGE_CAM_TRANSFORM>,
@@ -1142,7 +1142,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
         // so again prematurely drop the memory.
         accumulateStage.DropExternalHandles(imgWriteSem);
 
-        int32_t rIndex = changes.topBarChanges.rendererIndex.value();
+        int32_t rIndex = changes.topBarChanges.rendererIndex.Value();
         visorState.currentRenderIndex = rIndex;
         transferQueue->Enqueue(VisorAction
         (
@@ -1157,7 +1157,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
         // Conservatively we drop the memory.
         accumulateStage.DropExternalHandles(imgWriteSem);
 
-        int32_t lIndex = changes.topBarChanges.customLogicIndex0.value();
+        int32_t lIndex = changes.topBarChanges.customLogicIndex0.Value();
         visorState.currentRenderLogic0 = lIndex;
         transferQueue->Enqueue(VisorAction
         (
@@ -1171,7 +1171,7 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
         // Same as above
         accumulateStage.DropExternalHandles(imgWriteSem);
 
-        int32_t lIndex = changes.topBarChanges.customLogicIndex1.value();
+        int32_t lIndex = changes.topBarChanges.customLogicIndex1.Value();
         visorState.currentRenderLogic1 = lIndex;
         transferQueue->Enqueue(VisorAction
         (
@@ -1210,7 +1210,7 @@ void VisorWindow::DoInitialActions()
         transferQueue->Enqueue(VisorAction
         (
             std::in_place_index<VisorAction::LOAD_SCENE>,
-            initialSceneFile.value()
+            initialSceneFile.Value()
         ));
         initialSceneFile = std::nullopt;
     }
@@ -1224,7 +1224,7 @@ void VisorWindow::DoInitialActions()
         transferQueue->Enqueue(VisorAction
         (
             std::in_place_index<VisorAction::KICKSTART_RENDER>,
-            initialTracerRenderConfigPath.value()
+            initialTracerRenderConfigPath.Value()
         ));
 
         // Launch the renderer
@@ -1361,10 +1361,10 @@ bool VisorWindow::Render()
     {
         std::array<bool, 4> predicates =
         {
-            newRenderBuffer.has_value(),
-            newImageSection.has_value(),
-            newClearSignal.has_value(),
-            newSaveInfo.has_value()
+            newRenderBuffer.HasValue(),
+            newImageSection.HasValue(),
+            newClearSignal.HasValue(),
+            newSaveInfo.HasValue()
         };
         [[maybe_unused]]
         int i = std::transform_reduce(predicates.cbegin(), predicates.cend(),
@@ -1385,15 +1385,15 @@ bool VisorWindow::Render()
     }
 
     // Entire image reset + img format change (new alloc maybe)
-    if(newRenderBuffer && newRenderBuffer->data != nullptr)
+    if(newRenderBuffer && newRenderBuffer.Value().data != nullptr)
     {
         // Flush the device, we will need to reallocate
         vkDeviceWaitIdle(handlesVk.deviceVk);
 
-        visorState.currentRenderLogic0 = int32_t(newRenderBuffer->curRenderLogic0);
-        visorState.currentRenderLogic1 = int32_t(newRenderBuffer->curRenderLogic1);
+        visorState.currentRenderLogic0 = int32_t(newRenderBuffer.Value().curRenderLogic0);
+        visorState.currentRenderLogic1 = int32_t(newRenderBuffer.Value().curRenderLogic1);
 
-        const auto& newRB = newRenderBuffer.value();
+        const auto& newRB = newRenderBuffer.Value();
         RenderImageInitInfo renderImageInitParams =
         {
             newRB.resolution,
@@ -1422,7 +1422,7 @@ bool VisorWindow::Render()
         gui.ChangeTonemapperGUI(tonemapperGUI.value());
     }
     // Skip other operations if import render buffer is invalid
-    if(newRenderBuffer && newRenderBuffer->data == nullptr)
+    if(newRenderBuffer && newRenderBuffer.Value().data == nullptr)
         newRenderBuffer = std::nullopt;
 
     // After potential reallocation, check the GUI stuff.
@@ -1433,7 +1433,7 @@ bool VisorWindow::Render()
     if(newSaveInfo)
     {
         auto& rp = renderImagePool;
-        rp.SaveImage(gui, isHDRSave, newSaveInfo.value(),
+        rp.SaveImage(gui, isHDRSave, newSaveInfo.Value(),
                      imgWriteSem);
         imgWriteSem.ChangeNextWait(1);
     }
@@ -1442,7 +1442,7 @@ bool VisorWindow::Render()
     if(newImageSection)
     {
         auto& as = accumulateStage;
-        auto status = as.IssueAccumulation(newImageSection.value(),
+        auto status = as.IssueAccumulation(newImageSection.Value(),
                                            imgWriteSem);
         // 3 states can occur here
         // (1) Success       : All is fine, accumulation is issued via the

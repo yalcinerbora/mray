@@ -140,10 +140,10 @@ ImageTiler::TransferToHost(const GPUQueue& processQueue,
 {
     auto imageSection = renderBuffer->TransferToHost(processQueue,
                                                      transferQueue);
-    if(!imageSection.has_value()) return imageSection;
+    if(!imageSection.HasValue()) return imageSection;
 
-    imageSection->pixelMin = GlobalTileStart();
-    imageSection->pixelMax = GlobalTileEnd();
+    imageSection.Value().pixelMin = GlobalTileStart();
+    imageSection.Value().pixelMax = GlobalTileEnd();
     return imageSection;
 }
 

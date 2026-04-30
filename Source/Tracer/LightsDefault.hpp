@@ -54,7 +54,7 @@ Float LightPrim<P, SC>::PdfSolidAngle(const typename P::Hit& hit,
     // Project point to surface
     Optional<BasicSurface> surfaceOpt = primitive.SurfaceFromHit(hit);
     if(!surfaceOpt) return Float{0};
-    const BasicSurface& surface = surfaceOpt.value();
+    const BasicSurface& surface = surfaceOpt.Value();
 
     Float pdf = primitive.PdfSurface(hit);
     Float NdL = Math::Dot(surface.normal, -dir);
@@ -104,19 +104,19 @@ Float LightPrim<P, SC>::PdfRay(const Ray& ray) const
 
     const P& primitive = prim.get();
     Optional<Hit> hit = primitive.ProjectedHit(ray.pos);
-    if(!hit.has_value()) return Float(0);
+    if(!hit.HasValue()) return Float(0);
 
-    Optional<BasicSurface> surf = primitive.SurfaceFromHit(*hit);
-    if(!surf.has_value()) return Float(0);
+    Optional<BasicSurface> surf = primitive.SurfaceFromHit(hit.Value());
+    if(!surf.HasValue()) return Float(0);
 
-    Float NdL = Math::Dot((*surf).normal, ray.dir);
+    Float NdL = Math::Dot(surf.Value().normal, ray.dir);
     if(!isTwoSided && NdL <= Float(0))
         return Float(0);
 
     Float pdfDir = PDFUniformDirection();
     if(isTwoSided) pdfDir *= Float(2);
 
-    Float pdfSurface = primitive.PdfSurface(*hit);
+    Float pdfSurface = primitive.PdfSurface(hit.Value());
     return pdfDir * pdfSurface;
 }
 
@@ -133,9 +133,9 @@ Spectrum LightPrim<P, SC>::EmitViaHit(const Vector3& wO,
         : primitive.SurfaceParametrization(hit);
 
     Optional<BasicSurface> surf = primitive.SurfaceFromHit(hit);
-    if(!surf.has_value()) return Spectrum::Zero();
+    if(!surf.HasValue()) return Spectrum::Zero();
 
-    Float NdL = Math::Dot((*surf).normal, wO);
+    Float NdL = Math::Dot(surf.Value().normal, wO);
     if(!isTwoSided && NdL <= Float(0))
         return Spectrum::Zero();
 
@@ -155,12 +155,12 @@ Spectrum LightPrim<P, SC>::EmitViaSurfacePoint(const Vector3& wO,
     if(!hit) return Spectrum::Zero();
     Vector2 uv = radiance.IsConstant()
                 ? Vector2::Zero()
-                : primitive.SurfaceParametrization(*hit);
+                : primitive.SurfaceParametrization(hit.Value());
 
-    Optional<BasicSurface> surf = primitive.SurfaceFromHit(*hit);
-    if(!surf.has_value()) return Spectrum::Zero();
+    Optional<BasicSurface> surf = primitive.SurfaceFromHit(hit.Value());
+    if(!surf.HasValue()) return Spectrum::Zero();
 
-    Float NdL = Math::Dot((*surf).normal, wO);
+    Float NdL = Math::Dot(surf.Value().normal, wO);
     if(!isTwoSided && NdL <= Float(0))
         return Spectrum::Zero();
 
@@ -713,15 +713,15 @@ void LightGroupSkysphere<CC>::PushTexAttribute(LightKey idStart, LightKey idEnd,
     CommonKey i = std::bit_cast<CommonKey>(idStart.FetchIndexPortion());
     for(const auto& texId : texIds)
     {
-        if(!texId.has_value()) continue;
+        if(!texId.HasValue()) continue;
 
-        auto optTex = this->globalTextures.at(*texId);
+        auto optTex = this->globalTextures.at(texId.Value());
         if(!optTex)
         {
             throw MRayError("{:s}: Given texture({:d}) is not found",
-                            TypeName(), static_cast<CommonKey>(*texId));
+                            TypeName(), static_cast<CommonKey>(texId.Value()));
         }
-        const GenericTexture& tex = optTex.value();
+        const GenericTexture& tex = optTex.Value();
         radianceFieldTextures[i] = &tex;
         i++;
     }

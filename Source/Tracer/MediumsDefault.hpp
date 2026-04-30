@@ -246,7 +246,7 @@ template <class SC>
 MR_HF_DEF
 Float MediumHeterogeneous<SC>::PdfScattering(const Vector3& wI,
                                              const Vector3& wO,
-                                             const Vector3& p) const
+                                             const Vector3&) const
 {
     using namespace Distribution::Medium;
     Float cosTheta = Math::Dot(wI, wO);
@@ -284,7 +284,7 @@ MediumQuery MediumHeterogeneous<SC>::Query(const Vector3& p, Float xi) const
     if(tempatureMap && !isEmpty)
     {
         // This is [0, 1]
-        Float temp01 = (dataIndex != EMPTY) ? (*tempatureMap)(dataIndex) : Float(0);
+        Float temp01 = (dataIndex != EMPTY) ? tempatureMap.Value()(dataIndex) : Float(0);
         Float size = tempatureRange[1] - tempatureRange[0];
         // This Plank's Law-feedable value (in kelvins)
         Float tempature = temp01 * size + tempatureRange[0];

@@ -35,10 +35,10 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
     Span<Vector3> pSpan = positions.AccessAs<Vector3>();
 
     // We do not have normals, calculate
-    if(!normals.has_value())
+    if(!normals.HasValue())
     {
         normals = TransientData(std::in_place_type_t<Vector3>(), attribCount);
-        TransientData& data = normals.value();
+        TransientData& data = normals.Value();
         // Zero the data
         for(size_t i = 0; i < attribCount; i++)
         {
@@ -68,7 +68,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
         // And normalize it
         for(auto& n : nSpan) n = Math::Normalize(n);
     }
-    Span<Vector3> nSpan = normals.value().AccessAs<Vector3>();
+    Span<Vector3> nSpan = normals.Value().AccessAs<Vector3>();
 
     // We have to create tangents (due to quaternion thing)
     tangents = TransientData(std::in_place_type_t<Vector3>(), attribCount);
@@ -77,16 +77,16 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
     for(size_t i = 0; i < attribCount; i++)
     {
         Vector3 zero = Vector3::Zero();
-        tangents.value().Push(Span<const Vector3>(&zero, 1));
-        bitangents.value().Push(Span<const Vector3>(&zero, 1));
+        tangents.Value().Push(Span<const Vector3>(&zero, 1));
+        bitangents.Value().Push(Span<const Vector3>(&zero, 1));
     }
-    Span<Vector3> tSpan = tangents.value().AccessAs<Vector3>();
-    Span<Vector3> bSpan = bitangents.value().AccessAs<Vector3>();
+    Span<Vector3> tSpan = tangents.Value().AccessAs<Vector3>();
+    Span<Vector3> bSpan = bitangents.Value().AccessAs<Vector3>();
 
     // Utilize uvs (align the tangent to uv vectors)
-    if(uvs.has_value())
+    if(uvs.HasValue())
     {
-        Span<Vector2> uvSpan = uvs.value().AccessAs<Vector2>();
+        Span<Vector2> uvSpan = uvs.Value().AccessAs<Vector2>();
         for(uint32_t i = 0; i < primCount; i++)
         {
             Vector3ui index = iSpan[i];
@@ -134,7 +134,7 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
     {
         for(uint32_t i = 0; i < attribCount; i++)
         {
-            Vector3 n = normals.value().AccessAs<Vector3>()[i];
+            Vector3 n = normals.Value().AccessAs<Vector3>()[i];
             Vector3 t = Graphics::OrthogonalVector(n);
             Vector3 b = Math::Cross(n, t);
             tSpan[i] = t;
@@ -145,9 +145,9 @@ JsonTriangle::JsonTriangle(const JsonNode& jn, bool isIndexed)
 
     assert(positions.IsFull());
     assert(indices.IsFull());
-    assert(normals && normals->IsFull());
-    assert(tangents && tangents->IsFull());
-    assert(bitangents && bitangents->IsFull());
+    assert(normals && normals.Value().IsFull());
+    assert(tangents && tangents.Value().IsFull());
+    assert(bitangents && bitangents.Value().IsFull());
 }
 
 AABB3 JsonTriangle::AABB() const
@@ -221,10 +221,10 @@ TransientData JsonTriangle::GetAttribute(PrimitiveAttributeLogic attribLogic) co
     switch(attribLogic.e)
     {
         case POSITION:  return ExplicitCopy.operator()<Vector3>(positions);
-        case NORMAL:    return ExplicitCopy.operator()<Vector3>(normals.value());
-        case TANGENT:   return ExplicitCopy.operator()<Vector3>(tangents.value());
-        case BITANGENT: return ExplicitCopy.operator()<Vector3>(bitangents.value());
-        case UV0:       return ExplicitCopy.operator()<Vector2>(uvs.value());
+        case NORMAL:    return ExplicitCopy.operator()<Vector3>(normals.Value());
+        case TANGENT:   return ExplicitCopy.operator()<Vector3>(tangents.Value());
+        case BITANGENT: return ExplicitCopy.operator()<Vector3>(bitangents.Value());
+        case UV0:       return ExplicitCopy.operator()<Vector2>(uvs.Value());
         case INDEX:     return ExplicitCopy.operator()<Vector3ui>(indices);
         default:        throw MRayError("Unknown attribute logic!");
     }

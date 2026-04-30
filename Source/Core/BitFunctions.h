@@ -10,6 +10,13 @@
 #include "Tuple.h"
 #include "Array.h"
 
+// Bit manipulation functions, GPU/CPU/constexpr agnostic
+//
+// We were using c++20 bit functions on constexpr context, but
+// to make this compile for AMD (HIP support) we needed to implement our own
+// constexpr code (technically you can do preprocessor to make it work maybe
+// but need to understand the compilation pipeline work host/device etc. for both
+// nvcc and clang-amd, so we just implement it. Also it is fun)
 namespace Bit
 {
     template <class T>
@@ -374,11 +381,21 @@ MR_PF_DEF T Bit::CountLZero(T value) noexcept
 {
     if(std::is_constant_evaluated())
     {
-        return static_cast<T>(std::countl_zero<T>(value));
+        constexpr T BIT_COUNT = sizeof(T) * CHAR_BIT;
+        if(value == 0) return BIT_COUNT;
+
+        // At most we shift log(BIT_COUNT) times
+        T result = 0;
+        for(T i = (BIT_COUNT >> 1); i > T(0); i >>= T(1))
+        {
+            if((value >> i) == 0) result += i;
+            else                  value >>= i;
+        }
+        return result;
     }
     else
     {
-        #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+        #if (defined MRAY_DEVICE_CODE_PATH_CUDA) || (defined MRAY_DEVICE_CODE_PATH_HIP)
             if constexpr(std::is_same_v<T, uint64_t>)
                 return T(__clzll(std::bit_cast<long long int>(value)));
             else if constexpr(std::is_same_v<T, uint32_t>)
@@ -394,7 +411,7 @@ MR_PF_DEF T Bit::CountLZero(T value) noexcept
 template<std::unsigned_integral T>
 MR_PF_DEF T Bit::CountTZero(T value) noexcept
 {
-    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+    #if (defined MRAY_DEVICE_CODE_PATH_CUDA) || (defined MRAY_DEVICE_CODE_PATH_HIP)
         // This is intrinsic so its fine
         T vR = BitReverse(value);
         return CountLZero(vR);
@@ -406,7 +423,7 @@ MR_PF_DEF T Bit::CountTZero(T value) noexcept
 template<std::unsigned_integral T>
 MR_PF_DEF T Bit::CountLOne(T value) noexcept
 {
-    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+    #if (defined MRAY_DEVICE_CODE_PATH_CUDA) || (defined MRAY_DEVICE_CODE_PATH_HIP)
         T vR = ~value;
         return CountLZero(vR);
     #else
@@ -417,7 +434,7 @@ MR_PF_DEF T Bit::CountLOne(T value) noexcept
 template<std::unsigned_integral T>
 MR_PF_DEF T Bit::CountTOne(T value) noexcept
 {
-    #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+    #if (defined MRAY_DEVICE_CODE_PATH_CUDA) || (defined MRAY_DEVICE_CODE_PATH_HIP)
         T vR = ~value;
         return CountTZero(vR);
     #else
@@ -430,11 +447,29 @@ MR_PF_DEF T Bit::PopC(T value) noexcept
 {
     if(std::is_constant_evaluated())
     {
-        return T(std::popcount<T>(value));
+        // Of course there should be a code from this webpage
+        // https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
+        // Main idea here is to use native adder to add the bits
+        // but prevent carry over across bits. This version is quite a bit complex
+        // but it should do the same. Also it was written in a "cool" way
+        // (tests your operator precedence knowledge heavily)
+        // Made it little bit more readable.
+        constexpr T MAGIC_0 = T(T(~0) / 3);
+        constexpr T MAGIC_1 = T(T(~0) / 15 * 3);
+        constexpr T MAGIC_2 = T(T(~0) / 255 * 15);
+        constexpr T MAGIC_3 = T(T(~0) / 255);
+        constexpr T RESULT_LOC = T((sizeof(T) - 1) * CHAR_BIT);
+
+        T v = value;
+        v = v - ((v >> 1) & MAGIC_0);
+        v = (v & MAGIC_1) + ((v >> 2) & MAGIC_1);
+        v = (v + (v >> 4)) & MAGIC_2;
+        T c = T(v * (MAGIC_3)) >> RESULT_LOC;
+        return c;
     }
     else
     {
-        #ifdef MRAY_DEVICE_CODE_PATH_CUDA
+        #if (defined MRAY_DEVICE_CODE_PATH_CUDA) || (defined MRAY_DEVICE_CODE_PATH_HIP)
             if constexpr(std::is_same_v<T, uint64_t>)
                 return T(__popcll(value));
             else

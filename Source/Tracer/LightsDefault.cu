@@ -10,15 +10,15 @@ void GenericGroupLightT::WarnIfTexturesAreNotIlluminant(const std::vector<Option
         if(!tIdOpt) continue;
         // This will be callsed after actual attribute load,
         // so only assert instead of throw.
-        auto texOpt = globalTextures.at(*tIdOpt);
+        auto texOpt = globalTextures.at(tIdOpt.Value());
         assert(texOpt);
 
         using enum MRayTextureIsIlluminant;
-        if(texOpt->get().IsIlluminant() != IS_ILLUMINANT)
+        if(texOpt.Value().IsIlluminant() != IS_ILLUMINANT)
             MRAY_WARNING_LOG("{:s}:{:d}: Given texture({:d}) is not marked "
                              "as \"Illuminant\" but will be used as light. "
                              "Some renderers may use this information!",
-                             this->Name(), this->groupId, static_cast<CommonKey>(*tIdOpt));
+                             this->Name(), this->groupId, static_cast<CommonKey>(tIdOpt.Value()));
     }
 }
 

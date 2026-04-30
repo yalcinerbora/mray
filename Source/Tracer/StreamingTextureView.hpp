@@ -20,7 +20,7 @@ Vector4 TextureStreamingContext::FetchTextureGrad(VirtualTextureId tid, Vector2 
     // HT Lookup
     uint64_t key = GenerateVirtualTextureKey(virtTexIndex, virtMip, virtTile);
     Optional<PhysicalTileId> physicalTileOpt = tileLookup[packIndex].Search(key);
-    if(!physicalTileOpt.has_value())
+    if(!physicalTileOpt.HasValue())
     {
         uint32_t tileBitOffset = TileBitOffset(texInfo, virtMip, virtTile);
         // Request the tile by setting it bit to one
@@ -28,7 +28,7 @@ Vector4 TextureStreamingContext::FetchTextureGrad(VirtualTextureId tid, Vector2 
         return Vector4(BIG_CYAN(), 0);
     }
     // Calculate the fetch parameters
-    PhysicalTileId physicalTilePack = physicalTileOpt.value();
+    PhysicalTileId physicalTilePack = physicalTileOpt.Value();
     uint32_t physicalTexIndex = physicalTilePack.ArrayIndex();
 
     auto [uvP, dpdxP, dpdyP] = CalculatePhysicalUVsGrad(texInfo,
@@ -70,7 +70,7 @@ Vector4 TextureStreamingContext::FetchTextureLod(VirtualTextureId tid, Vector2 u
     // HT Lookup
     uint64_t key = GenerateVirtualTextureKey(virtTexIndex, virtMip, virtTile);
     Optional<PhysicalTileId> physicalTileOpt = tileLookup[packIndex].Search(key);
-    if(!physicalTileOpt.has_value())
+    if(!physicalTileOpt.HasValue())
     {
         uint32_t tileBitOffset = TileBitOffset(texInfo, virtMip, virtTile);
         // Request the tile by setting it bit to one
@@ -78,7 +78,7 @@ Vector4 TextureStreamingContext::FetchTextureLod(VirtualTextureId tid, Vector2 u
         return Vector4(BIG_CYAN(), 0);
     }
     // Calculate the fetch parameters
-    PhysicalTileId physicalTilePack = physicalTileOpt.value();
+    PhysicalTileId physicalTilePack = physicalTileOpt.Value();
     uint32_t physicalTexIndex = physicalTilePack.ArrayIndex();
 
     auto [uvP, lodP] = CalculatePhysicalUVsLod(texInfo,

@@ -141,8 +141,8 @@ MeshViewGFG::MeshViewGFG(uint32_t innerIndexIn,
     : innerIndex(innerIndexIn)
     , gfgFile(gfgFileIn)
 {
-    static const ProfilerAnnotation _("GFG Read Header");
-    [[maybe_unused]] auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "GFG Read Header");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     if(innerIndex >= gfgFile.loader.Header().meshes.size())
         throw MRayError("GFG: Inner index out of range  \"{}\"",
@@ -193,15 +193,15 @@ bool MeshViewGFG::HasAttribute(PrimitiveAttributeLogic logic) const
     // By definition, GFG is indexed.
     if(logic.e == PrimitiveAttributeLogic::INDEX)
         return true;
-    return FindComponent(logic).has_value();
+    return FindComponent(logic).HasValue();
 }
 
 TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
 {
     const auto& m = gfgFile.loader.Header().meshes[innerIndex];
 
-    static const ProfilerAnnotation _("GFG Load Prim Data");
-    [[maybe_unused]] auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "GFG Load Prim Data");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     if(logic.e == PrimitiveAttributeLogic::INDEX)
     {
@@ -243,11 +243,11 @@ TransientData MeshViewGFG::GetAttribute(PrimitiveAttributeLogic logic) const
     else
     {
         OptionalComponent c = FindComponent(logic);
-        if(!c.has_value())
+        if(!c)
             throw MRayError("GFG: File do not have attribute of {}, \"{}\"",
                             PrimitiveAttributeLogic::ToString(logic.e),
                             gfgFile.Name());
-        const auto& comp = c.value();
+        const auto& comp = c.Value();
         MRayDataTypeRT type = GFGDataTypeToMRayDataType(comp.dataType);
 
 
@@ -294,12 +294,12 @@ MRayDataTypeRT MeshViewGFG::AttributeLayout(PrimitiveAttributeLogic logic) const
     }
 
     OptionalComponent c = FindComponent(logic);
-    if(!c.has_value())
+    if(!c)
         throw MRayError("GFG: File do not have attribute of {}, \"{}\"",
                         PrimitiveAttributeLogic::ToString(logic.e),
                         gfgFile.Name());
 
-    const auto& comp = c.value();
+    const auto& comp = c.Value();
     return GFGDataTypeToMRayDataType(comp.dataType);
 }
 

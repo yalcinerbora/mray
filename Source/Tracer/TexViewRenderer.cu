@@ -301,7 +301,7 @@ TexViewRenderer::TexViewRenderer(const RenderImagePtr& rb,
         // Skip 1D/3D textures we can not render those
         if(tex.DimensionCount() != 2) continue;
         textures.push_back(&tex);
-        const auto& tView = tracerView.textureViews.at(texId).value().get();
+        const auto& tView = tracerView.textureViews.at(texId).Value();
         textureViews.push_back(&tView);
     }
 }
@@ -426,11 +426,11 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
                             uint32_t(tracerView.tracerParams.samplerType.e));
         uint64_t seed = this->tracerView.tracerParams.seed;
         Vector2ui maxDeviceLocalRNGCount = this->imageTiler.ConservativeTileSize();
-        rnGenerator = RngGen->get()(rIParams,
-                                    std::move(maxDeviceLocalRNGCount),
-                                    std::move(currentOptions.totalSPP),
-                                    std::move(seed), gpuSystem,
-                                    globalThreadPool);
+        rnGenerator = RngGen.Value()(rIParams,
+                                     std::move(maxDeviceLocalRNGCount),
+                                     std::move(currentOptions.totalSPP),
+                                     std::move(seed), gpuSystem,
+                                     globalThreadPool);
     }
 
     auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
@@ -498,11 +498,11 @@ RendererOutput TexViewRenderer::DoRender()
     renderOut = imageTiler.TransferToHost(processQueue,
                                           transferQueue);
     // Semaphore is invalidated, visor is probably crashed
-    if(!renderOut.has_value())
+    if(!renderOut.HasValue())
         return RendererOutput{};
 
     // Actually set the section parameters
-    renderOut->globalWeight = Float(1);
+    renderOut.Value().globalWeight = Float(1);
     // Now wait, and send the information about timing etc.
     processQueue.Barrier().Wait();
     timer.Split();

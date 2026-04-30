@@ -229,7 +229,7 @@ void ParseAccelLines(pmr::vector<AccelLine>& lines,
 }
 
 void ParseRendererLines(pmr::vector<RendererLine>& lines,
-                          std::string_view section)
+                        std::string_view section)
 {
     RendererLine result;
     int i = 0;
@@ -470,7 +470,7 @@ void FindAccelNames(std::array<std::string_view, 2>& linAccelNamePair,
                     std::array<std::string_view, 2>& bvhAccelNamePair,
                     std::array<std::string_view, 2>& hwAccelNamePair,
                     pmr::string& guardedInclude,
-                    std::string_view hwTag,
+                    std::optional<std::string_view> hwTag,
                     const LinePack& lp)
 {
     auto Find = [&](std::array<std::string_view, 2>& out,
@@ -501,7 +501,7 @@ void FindAccelNames(std::array<std::string_view, 2>& linAccelNamePair,
     using namespace std::string_view_literals;
     Find(linAccelNamePair, AccelLine::LIN, "LIN");
     Find(bvhAccelNamePair, AccelLine::BVH, "BVH");
-    Find(hwAccelNamePair, AccelLine::HW, hwTag);
+    if(hwTag) Find(hwAccelNamePair, AccelLine::HW, *hwTag);
 }
 
 void GenRenderWorkTemplates(pmr::string& works,
@@ -600,7 +600,7 @@ void GenRenderWorkList(pmr::string& workList, const LinePack& lp)
 void WriteRequestedTypesFiles(const LinePack& lp,
                               std::filesystem::path outDir,
                               std::string_view hwAccelHeaderGuard,
-                              std::string_view hwAccelTag)
+                              std::optional<std::string_view> hwAccelTag)
 {
     auto includes = pmr::string(&globalAllocator);
     auto guardedInclude = pmr::string(&globalAllocator);
@@ -1037,7 +1037,10 @@ int main(int argc, const char* argv[])
     ParseTypes(lp, data);
     //
     RemoveUnusedAccelTypes(lp.accels, hwAccelTag, skipHWAccelInstances);
-    WriteRequestedTypesFiles(lp, outDir, headerGuard, hwAccelTag);
+
+    std::optional<std::string_view> hwAccelTagIn;
+    if(!skipHWAccelInstances) hwAccelTagIn =  hwAccelTag;
+    WriteRequestedTypesFiles(lp, outDir, headerGuard, hwAccelTagIn);
 
     // We were unable to add instatiations of all
     // renderers since given

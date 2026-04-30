@@ -83,7 +83,7 @@ void KCWriteHashGridDataToImg(MRAY_GRID_CONSTANT const ImageSpan img,
         else
             code = hashGrid.GenCodeStochastic(pos, dir, rng);
         auto loc = hashGrid.Search(code);
-        if(!loc.has_value())
+        if(!loc.HasValue())
         {
             // Not having a 1st bounce cache is also an error
             // distinguish it with a cyan value
@@ -100,7 +100,7 @@ void KCWriteHashGridDataToImg(MRAY_GRID_CONSTANT const ImageSpan img,
 
         //
         Vector3 value;
-        uint32_t hgIndex = *loc;
+        uint32_t hgIndex = loc.Value();
         switch(displayMode)
         {
             using enum DisplayMode::E;
@@ -212,7 +212,7 @@ void KCBackpropagateHashGridPath(// Output
         //
         // TODO: Check if proper syncronization is good / bad etc.
         auto& dIrradHashGrid = globalState.dMCIrradiances;
-        Float irrad = dIrradHashGrid[*irradLoc].irrad;
+        Float irrad = dIrradHashGrid[irradLoc.Value()].irrad;
         Float refl = dPrevPathReflectance[rIndex];
         Float outRadiance = refl * irrad;
         //outRadiance = Math::Min(outRadiance, Float(100.0));
@@ -239,7 +239,7 @@ void KCBackpropagateHashGridPath(// Output
         Vector3 mcPos = ray.pos;
         Vector3 mcN = Graphics::ConcentricOctahedralToDirection(dPrevNormals[rIndex]);
         auto mcCode = hg.GenCodeStochastic(mcPos, mcN, rng);
-        uint32_t newIndex = hg.Search(mcCode).value_or(prevMCIndex);
+        uint32_t newIndex = hg.Search(mcCode).ValueOr(prevMCIndex);
         dLiftedMCIndices[rIndex] = newIndex;
 
         // ========================= //
@@ -609,9 +609,9 @@ GuidedPTRenderer::DisplayHashGrid(Span<const RayIndex> dDeadRayIndices,
     ImageSectionOpt renderOut = imageTiler.TransferToHost(processQueue,
                                                           transferQueue);
     // Semaphore is invalidated, visor is probably crashed
-    if(!renderOut.has_value()) return std::nullopt;
+    if(!renderOut.HasValue()) return std::nullopt;
     //
-    renderOut->globalWeight = Float(1);
+    renderOut.Value().globalWeight = Float(1);
     return renderOut;
 }
 
@@ -1055,9 +1055,9 @@ GuidedPTRenderer::DoLatencyRender(uint32_t passCount,
     Optional<RenderImageSection> renderOut;
     renderOut = imageTiler.TransferToHost(processQueue, transferQueue);
     // Semaphore is invalidated, visor is probably crashed
-    if(!renderOut.has_value()) return RendererOutput{};
+    if(!renderOut.HasValue()) return RendererOutput{};
     // Actual global weight
-    renderOut->globalWeight = Float(1);
+    renderOut.Value().globalWeight = Float(1);
 
     // We do not need to wait here, but we time
     // from CPU side so we need to wait

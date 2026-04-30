@@ -9,10 +9,10 @@
 #include "Tracer.h"
 #include "RequestedTypes.h"
 #include "RequestedRenderers.h"
-#include "SurfaceView.h"
 
 #include "Core/Variant.h"
 
+#include "Tracer/SurfaceView.h"
 #include "Tracer/TextureView.hpp"
 #include "Tracer/GenericGroup.hpp"
 

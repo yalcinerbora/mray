@@ -1,8 +1,12 @@
 #pragma once
 
 #include <string_view>
+
 #include "MeshLoader/EntryPoint.h"
+
 #include "TransientPool/TransientPool.h"
+
+#include "Core/Optional.h"
 
 class JsonNode;
 

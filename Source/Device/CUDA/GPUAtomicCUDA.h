@@ -113,7 +113,7 @@ double AtomicAdd(double& t, double v)
         #if __CUDA_ARCH__ >= 600
             return atomicAdd(&t, v);
         #else
-            return detail::EmulateAtomicOp(&t, [v](double r)
+            return EmulateAtomicOp(t, [v](double r)
             {
                 return r + v;
             });
@@ -224,7 +224,7 @@ T AtomicAdd(T& t, T v)
 }
 
 template<class T>
-    requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
 MR_GF_DEF
 T AtomicMax(T& t, T v)
 {

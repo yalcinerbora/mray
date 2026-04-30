@@ -112,7 +112,7 @@ namespace StreamingTexParams
         return result;
     }
 
-    static constexpr std::array TypeTileSizeList =
+    static constexpr Array TypeTileSizeList =
     {
         // UNORMS
         TilePixSize<MRayPixelEnum::MR_R8_UNORM>(),

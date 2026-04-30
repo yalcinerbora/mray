@@ -499,17 +499,21 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
     auto [a1, a2] = rayCone.Project(f, d);
     assert(Math::IsFinite(a1) && Math::IsFinite(a2));
     Matrix3x3 M = Matrix3x3(Normalize(a1), Normalize(a2), geoNormal);
-    assert(std::all_of(M.AsSpan().begin(), M.AsSpan().end(),
-                       [](const auto& a) { return Math::IsFinite(a); }));
+    assert([M]()
+    {
+        bool allFinite = true;
+        for(const auto& v : M.AsSpan()) allFinite &= Math::IsFinite(v);
+        return allFinite;
+    }());
 
     // Curvatures
-    std::array<Vector3, 3> edges =
+    Array<Vector3, 3> edges =
     {
         positions[1] - positions[0],
         positions[2] - positions[0],
         positions[2] - positions[1]
     };
-    std::array<Vector3, 3> normals =
+    Array<Vector3, 3> normals =
     {
         q0.OrthoBasisZ(),
         q1.OrthoBasisZ(),
@@ -570,7 +574,7 @@ void Triangle<T>::GenerateSurface(DefaultSurface& result,
 
     if(normalMap)
     {
-        Vector3 normal = Math::Normalize((*normalMap)(uv, dpdx, dpdy));
+        Vector3 normal = Math::Normalize(normalMap.Value()(uv, dpdx, dpdy));
         tbn = TransformGen::RotationBetweenZAxis(normal).Conjugate() * tbn;
     }
 

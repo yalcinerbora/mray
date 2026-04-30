@@ -120,19 +120,29 @@ void TransformGroupMulti::CommitReservations()
 
     uint32_t workCount = static_cast<uint32_t>(hFlattenedRanges.size());
     using namespace std::literals;
+    // AMD whines of using "this" which may result in host data access on GPU.
+    // which may be true (if only "this"  is copied, not the whole class).
+    // NVIDIA worked fine (because they do something non-standard or it is
+    // required to be copied, I don't know).
+    //
+    // We explicitly copy the required spans here.
+    auto dTransformSpanCpy    = dTransformSpan;
+    auto dInvTransformSpanCpy = dInvTransformSpan;
+    auto dTransformsCpy       = dTransforms;
+    auto dInvTransformsCpy    = dInvTransforms;
     queue.IssueWorkLambda
     (
         "MultiTransform Construct Spans"sv,
         DeviceWorkIssueParams{.workCount = workCount},
-        [=, this] MRAY_HYBRID(KernelCallParams kp)
+        [=] MRAY_HYBRID(KernelCallParams kp)
         {
             for(uint32_t i = 0; i < workCount; i += kp.TotalSize())
             {
                 Vector<2, size_t> range = dFlattenedRanges[i];
                 size_t size = range[1] - range[0];
 
-                dTransformSpan[i] = dTransforms.subspan(range[0], size);
-                dInvTransformSpan[i] = dInvTransforms.subspan(range[0], size);
+                dTransformSpanCpy[i] = dTransformsCpy.subspan(range[0], size);
+                dInvTransformSpanCpy[i] = dInvTransformsCpy.subspan(range[0], size);
             }
         }
     );

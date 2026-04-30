@@ -227,7 +227,7 @@ void KCLocalRayCast(// Output
         OptionalHitR<PG> hitOpt = acc.ClosestHit(rng, ray, tMM);
         if(!hitOpt) continue;
 
-        const auto& hit = hitOpt.value();
+        const auto& hit = hitOpt.Value();
         dHitIds[index] = HitKeyPack
         {
             .primKey = hit.primitiveKey,

@@ -34,7 +34,8 @@ void NestedKernel(uint32_t* dOutBuffer,
     }
 }
 
-#ifndef MRAY_GPU_BACKEND_CPU
+// Probably only cuda supports nested parallelism
+#ifdef MRAY_GPU_BACKEND_CUDA
 
 MRAY_KERNEL
 void ParentKernel(uint32_t* dOutBuffer,
@@ -200,7 +201,7 @@ void KernelCallLambdaTester(const GPUSystem& system)
     queue.Barrier().Wait();
 }
 
-#ifndef MRAY_GPU_BACKEND_CPU
+#ifdef MRAY_GPU_BACKEND_CUDA
 
     void KernelCallNestedTester(const GPUSystem& system)
     {
@@ -286,7 +287,7 @@ TEST(GPUKernelCalls, Lambda)
     KernelCallLambdaTester(system);
 }
 
-#ifndef MRAY_GPU_BACKEND_CPU
+#ifdef MRAY_GPU_BACKEND_CUDA
 
     TEST(GPUKernelCalls, Nested)
     {

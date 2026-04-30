@@ -4,7 +4,7 @@
 #include "Core/Types.h"
 #include "GPUSystemHIP.h"
 
-#include <rocprim/thread/thread_search.hpp>
+#include <rocprim/rocprim.hpp>
 
 namespace mray::hip::algorithms
 {

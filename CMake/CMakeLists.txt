@@ -81,7 +81,10 @@ elseif(MRAY_DEVICE_BACKEND STREQUAL "MRAY_GPU_BACKEND_HIP")
     set(CMAKE_HIP_PLATFORM "amd")
     mark_as_advanced(CMAKE_HIP_PLATFORM)
 
-    set(CMAKE_HIP_ARCHITECTURES "gfx1030;gfx1100;gfx1101;gfx1102")
+    set(CMAKE_HIP_ARCHITECTURES "native"
+        CACHE STRING "Architecture chosen by the user at CMake configure time")
+    set_property(CACHE CMAKE_HIP_ARCHITECTURES
+                 PROPERTY STRINGS native gfx1030 gfx1100 gfx1101 gfx1102 all)
 
     set(CMAKE_HIP_STANDARD 20)
     set(CMAKE_HIP_STANDARD_REQUIRED True)
@@ -265,7 +268,7 @@ add_subdirectory(SpectraLUTGen)
 # Thus, the parameter is inverted
 if(NOT MRAY_DISABLE_DEVICE_BACKEND)
     add_subdirectory(TracerCUDA)
-    #add_subdirectory(TracerHIP)
+    add_subdirectory(TracerHIP)
 endif()
 
 # Enable Host target if requested

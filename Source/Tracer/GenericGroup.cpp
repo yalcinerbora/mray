@@ -13,7 +13,7 @@ const AttributeRanges& GenericGroupT<ID, AI>::FindRange(IdInt id) const
         throw MRayError("{:s}:{:d}: Unkown key {}",
                         this->Name(), this->groupId, id);
     }
-    return range.value().get();
+    return range.Value();
 }
 
 
@@ -176,7 +176,7 @@ GenericTexturedGroupT<I, A>::ConvertToView(const std::vector<TextureId>& texIds,
                             this->Name(), this->groupId,
                             static_cast<CommonKey>(texId));
         }
-        const GenericTextureView& view = optView.value();
+        const GenericTextureView& view = optView.Value();
         if(!std::holds_alternative<ViewType>(view))
         {
             throw MRayError("{:s}:{:d}: Given texture({:d}) does not have "
@@ -206,20 +206,20 @@ GenericTexturedGroupT<I, A>::ConvertToView(const std::vector<Optional<TextureId>
             result.push_back(std::nullopt);
             continue;
         }
-        auto optView = globalTextureViews.at(texId.value());
+        auto optView = globalTextureViews.at(texId.Value());
         if(!optView)
         {
             throw MRayError("{:s}:{:d}: Given texture({:d}) is not found",
                             this->Name(), this->groupId,
-                            static_cast<CommonKey>(texId.value()));
+                            static_cast<CommonKey>(texId.Value()));
         }
-        const GenericTextureView& view = optView.value();
+        const GenericTextureView& view = optView.Value();
         if(!std::holds_alternative<ViewType>(view))
         {
             throw MRayError("{:s}:{:d}: Given texture({:d}) does not have "
                             "a correct type for, Attribute {:d}",
                             this->Name(), this->groupId,
-                            static_cast<CommonKey>(texId.value()),
+                            static_cast<CommonKey>(texId.Value()),
                             attributeIndex);
         }
         result.push_back(std::get<ViewType>(view));
@@ -274,8 +274,8 @@ void GenericTexturedGroupT<I, A>::GenericPushTexAttribute(Span<ParamVaryingData<
     Span<const T> hDataSpan = hData.AccessAs<T>();
     for(uint32_t i = 0; i < hOptTexViews.size(); i++)
     {
-        auto pvd = hOptTexViews[i].has_value()
-            ? ParamVaryingData<D, T>(hOptTexViews[i].value())
+        auto pvd = hOptTexViews[i].HasValue()
+            ? ParamVaryingData<D, T>(hOptTexViews[i].Value())
             : ParamVaryingData<D, T>(hDataSpan[i]);
         hParamVaryingData.push_back(pvd);
     }

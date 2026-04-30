@@ -124,7 +124,7 @@ bool LambertMaterial<SC>::IsAllTexturesAreResident(const Surface& s, const DataS
 
     bool allResident = albedoTex.IsResident(s.uv, s.dpdx, s.dpdy);
     if(normalTex)
-        allResident &= normalTex->IsResident(s.uv, s.dpdx, s.dpdy);
+        allResident &= normalTex.Value().IsResident(s.uv, s.dpdx, s.dpdy);
     return allResident;
 }
 
@@ -291,7 +291,7 @@ BxDFSample RefractMaterial<SC>::SampleBxDF(const Vector3& wO,
         ? Graphics::Reflect(nLocal, wO)
         // Since we refract via fresnel, total internal reflection
         // should not happen
-        : Graphics::Refract(nLocal, wO, fromEta, toEta).value();
+        : Graphics::Refract(nLocal, wO, fromEta, toEta).Value();
     //
     Float pdf = (doReflection) ? f : (Float(1) - f);
     //
@@ -355,7 +355,7 @@ MR_GF_DEF
 RayConeSurface RefractMaterial<SC>::RefractRayCone(const RayConeSurface& rayConeSurfIn,
                                                    const Vector3& wO) const
 {
-    auto Rotate2D_UL = [](Vector2 v, Float alpha) -> std::array<Vector2, 2>
+    auto Rotate2D_UL = [](Vector2 v, Float alpha) -> Array<Vector2, 2>
     {
         // Matrix
         // [cos, -sin]
@@ -382,8 +382,8 @@ RayConeSurface RefractMaterial<SC>::RefractRayCone(const RayConeSurface& rayCone
         // Pray compiler optimizes it (probably not since it is float)
         auto result = Graphics::Refract(Vector3(n, 0), Vector3(-v, 0),
                                         fromEta, toEta);
-        return (result.has_value())
-                ? Vector2(result.value())
+        return (result.HasValue())
+                ? Vector2(result.Value())
                 : Math::Normalize(v - n * Math::Dot(n, v));
     };
 
@@ -395,11 +395,11 @@ RayConeSurface RefractMaterial<SC>::RefractRayCone(const RayConeSurface& rayCone
     // Refract the wO
     auto wI = Graphics::Refract(surface.geoNormal, wO, fromEta, toEta);
     // No change if reflection occurs.
-    if(!wI.has_value()) return rayConeSurfIn;
+    if(!wI.HasValue()) return rayConeSurfIn;
 
     // From the RT Gems II Chapter 10 Figure 10-5.
     // This implementation follows the Falcor implementation.
-    Vector3 d3D = -wO, t3D = wI.value();
+    Vector3 d3D = -wO, t3D = wI.Value();
     // Define the 2D space
     Vector3 x = Graphics::GSOrthonormalize(d3D, surface.geoNormal);
     Vector3 y = surface.geoNormal;
@@ -554,7 +554,7 @@ BxDFSample UnrealMaterial<SC>::SampleBxDF(const Vector3& wO,
     // we just bisect the given samples
     // TODO: Is this correct?
     Float misRatio = MISRatio(avgAlbedo);
-    std::array<Float, 2> misWeights = {misRatio, Float(1) - misRatio};
+    Array<Float, 2> misWeights = {misRatio, Float(1) - misRatio};
     bool doDiffuseSample = (sXi < misRatio);
 
     // Microfacet dist functions are all in tangent space
@@ -562,7 +562,7 @@ BxDFSample UnrealMaterial<SC>::SampleBxDF(const Vector3& wO,
     // Bring wO all the way to the tangent space
     Vector3 V = toTangentSpace.ApplyRotation(wO);
     Vector3 L, H;
-    std::array<Float, 2> pdf;
+    Array<Float, 2> pdf;
     if(doDiffuseSample)
     {
         auto s = Common::SampleCosDirection(xi);
@@ -655,8 +655,8 @@ Float UnrealMaterial<SC>::Pdf(const Ray& wI, const Vector3& wO) const
     Vector3 H = Math::Normalize(L + V);
     //
     Float misRatio = MISRatio(avgAlbedo);
-    std::array<Float, 2> weights = {misRatio, Float(1) - misRatio};
-    std::array<Float, 2> pdf;
+    Array<Float, 2> weights = {misRatio, Float(1) - misRatio};
+    Array<Float, 2> pdf;
     // Diffuse pdf
     pdf[0] = Common::PDFCosDirection(L);
     // Specular pdf
@@ -776,7 +776,7 @@ bool UnrealMaterial<SC>::IsAllTexturesAreResident(const Surface& surface,
     allResident &= albedoTex.IsResident(surface.uv, surface.dpdx, surface.dpdy);
     if(normalMapTex)
     {
-        allResident &= normalMapTex->IsResident(surface.uv, surface.dpdx, surface.dpdy);
+        allResident &= normalMapTex.Value().IsResident(surface.uv, surface.dpdx, surface.dpdy);
     }
     return allResident;
 }

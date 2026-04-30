@@ -284,7 +284,7 @@ void Sphere<T>::GenerateSurface(DefaultSurface& result,
 
     if(normalMap)
     {
-        Vector3 n = Math::Normalize((*normalMap)(uv, dpdx, dpdy));
+        Vector3 n = Math::Normalize(normalMap.Value()(uv, dpdx, dpdy));
         tbn = TransformGen::RotationBetweenZAxis(n).Conjugate() * tbn;
     }
     result = DefaultSurface

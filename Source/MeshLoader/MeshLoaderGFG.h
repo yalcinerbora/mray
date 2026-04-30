@@ -4,6 +4,8 @@
 #include <gfg/GFGFileLoader.h>
 #include <iosfwd>
 
+#include "Core/Optional.h"
+
 class MeshFileGFG;
 class PrimitiveAttributeLogic;
 

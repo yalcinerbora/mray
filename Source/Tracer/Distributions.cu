@@ -11,6 +11,11 @@
     #include <cub/block/block_load.cuh>
     #include <cub/block/block_store.cuh>
     #include <cub/device/device_scan.cuh>
+#elif defined MRAY_GPU_BACKEND_HIP
+    #include <hipcub/block/block_scan.hpp>
+    #include <hipcub/block/block_load.hpp>
+    #include <hipcub/block/block_store.hpp>
+    #include <hipcub/device/device_scan.hpp>
 #endif
 
 namespace Distribution
@@ -18,13 +23,21 @@ namespace Distribution
 
 static constexpr uint32_t TPB = StaticThreadPerBlock1D();
 
-#ifdef MRAY_GPU_BACKEND_CUDA
+// We can get away with namespace aliasing for all the code here
+// TODO: Specialize these functions for AMD for performance later maybe?
+#if (defined (MRAY_GPU_BACKEND_CUDA)) || (defined(MRAY_GPU_BACKEND_HIP))
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
     void KCCopyScanY(MRAY_GRID_CONSTANT const Span<Float> dYCDFs,
                      // Input
                      MRAY_GRID_CONSTANT const Span<const Float> dXCDFs)
     {
+        #ifdef MRAY_GPU_BACKEND_CUDA
+            namespace cub_or_hip = cub;
+        #else
+            namespace cub_or_hip = hipcub;
+        #endif
+
         KernelCallParams kp;
         if(kp.blockId != 0) return;
 
@@ -43,13 +56,13 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
         uint32_t yCount = static_cast<uint32_t>(dYCDFs.size());
         uint32_t xCount = static_cast<uint32_t>(dXCDFs.size() / yCount);
 
-        using BlockStore = cub::BlockStore<Float, TPB, ITEMS_PER_THREAD, cub::BLOCK_STORE_VECTORIZE>;
-        using BlockScan = cub::BlockScan<Float, TPB>;
+        using BlockStore = cub_or_hip::BlockStore<Float, TPB, ITEMS_PER_THREAD, cub_or_hip::BLOCK_STORE_VECTORIZE>;
+        using BlockScan  = cub_or_hip::BlockScan<Float, TPB>;
 
         uint32_t processedItemsSoFar = Float(0);
         while(processedItemsSoFar != yCount)
         {
-            uint32_t validItems = min(DATA_PER_BLOCK, yCount - processedItemsSoFar);
+            uint32_t validItems = Math::Min(DATA_PER_BLOCK, yCount - processedItemsSoFar);
             auto dSubBlockOut = dYCDFs.subspan(processedItemsSoFar, validItems);
 
             // Awfully strided mem read
@@ -81,15 +94,21 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     };
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCNormalizeXY(MRAY_GRID_CONSTANT const Span<Float> dXCDFs, 
+    void KCNormalizeXY(MRAY_GRID_CONSTANT const Span<Float> dXCDFs,
                        MRAY_GRID_CONSTANT const Span<Float> dYCDFs)
     {
+        #ifdef MRAY_GPU_BACKEND_CUDA
+            namespace cub_or_hip = cub;
+        #else
+            namespace cub_or_hip = hipcub;
+        #endif
+
         KernelCallParams kp;
         static constexpr uint32_t ITEMS_PER_THREAD = 4;
         static constexpr uint32_t DATA_PER_BLOCK = TPB * ITEMS_PER_THREAD;
 
-        using BlockLoad = cub::BlockLoad<Float, TPB, ITEMS_PER_THREAD, cub::BLOCK_LOAD_VECTORIZE>;
-        using BlockStore = cub::BlockStore<Float, TPB, ITEMS_PER_THREAD, cub::BLOCK_STORE_VECTORIZE>;
+        using BlockLoad  = cub_or_hip::BlockLoad<Float, TPB, ITEMS_PER_THREAD, cub_or_hip::BLOCK_LOAD_VECTORIZE>;
+        using BlockStore = cub_or_hip::BlockStore<Float, TPB, ITEMS_PER_THREAD, cub_or_hip::BLOCK_STORE_VECTORIZE>;
 
         MRAY_SHARED_MEMORY Float sTotalRecip;
 
@@ -103,7 +122,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
             uint32_t processedItemsSoFar = 0;
             while(processedItemsSoFar != rowCount)
             {
-                uint32_t validItems = min(DATA_PER_BLOCK, rowCount - processedItemsSoFar);
+                uint32_t validItems = Math::Min(DATA_PER_BLOCK, rowCount - processedItemsSoFar);
                 auto dSubBlockInOut = rowData.subspan(processedItemsSoFar, validItems);
 
                 // Load
@@ -150,6 +169,12 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
                                 MRAY_GRID_CONSTANT const uint32_t segmentSize,
                                 MRAY_GRID_CONSTANT const uint32_t totalBlocks)
     {
+        #ifdef MRAY_GPU_BACKEND_CUDA
+            namespace cub_or_hip = cub;
+        #else
+            namespace cub_or_hip = hipcub;
+        #endif
+
         KernelCallParams kp;
 
         static constexpr uint32_t ITEMS_PER_THREAD = 4;
@@ -159,9 +184,9 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
         // We do not utilize single shared memory block since these routines
         // should not require occupancy-limiting shared memory.
         // We need to check this to be sure.
-        using BlockLoad = cub::BlockLoad<Float, TPB, ITEMS_PER_THREAD, cub::BLOCK_LOAD_VECTORIZE>;
-        using BlockStore = cub::BlockStore<Float, TPB, ITEMS_PER_THREAD, cub::BLOCK_STORE_VECTORIZE>;
-        using BlockScan = cub::BlockScan<double, TPB>;
+        using BlockLoad  = cub_or_hip::BlockLoad<Float, TPB, ITEMS_PER_THREAD, cub_or_hip::BLOCK_LOAD_VECTORIZE>;
+        using BlockStore = cub_or_hip::BlockStore<Float, TPB, ITEMS_PER_THREAD, cub_or_hip::BLOCK_STORE_VECTORIZE>;
+        using BlockScan  = cub_or_hip::BlockScan<double, TPB>;
 
         double aggregate = double(0);
         auto PrefixLoader = [&](double iterationAggregate) -> double
@@ -180,7 +205,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
             uint32_t processedItemsSoFar = 0;
             while(processedItemsSoFar != segmentSize)
             {
-                uint32_t validItems = min(DATA_PER_BLOCK, segmentSize - processedItemsSoFar);
+                uint32_t validItems = Math::Min(DATA_PER_BLOCK, segmentSize - processedItemsSoFar);
                 auto dSubBlockIn = dBlockIn.subspan(processedItemsSoFar, validItems);
                 auto dSubBlockOut = dBlockOut.subspan(processedItemsSoFar, validItems);
 
@@ -278,7 +303,7 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     }
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCNormalizeXY(MRAY_GRID_CONSTANT const Span<Float> dXCDFs, 
+    void KCNormalizeXY(MRAY_GRID_CONSTANT const Span<Float> dXCDFs,
                        MRAY_GRID_CONSTANT const Span<Float> dYCDFs)
     {
         KernelCallParams kp;
@@ -321,14 +346,14 @@ static constexpr uint32_t TPB = StaticThreadPerBlock1D();
     {}
 
     MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_CUSTOM(TPB)
-    void KCNormalizeXY(MRAY_GRID_CONSTANT const Span<Float> dXCDFs, 
+    void KCNormalizeXY(MRAY_GRID_CONSTANT const Span<Float> dXCDFs,
                        MRAY_GRID_CONSTANT const Span<Float> dYCDFs)
     {}
 
 #endif
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCValidateScan(MRAY_GRID_CONSTANT const Span<const Float> dXCDFs, 
+void KCValidateScan(MRAY_GRID_CONSTANT const Span<const Float> dXCDFs,
                     MRAY_GRID_CONSTANT const uint32_t segmentSize)
 {
     uint32_t totalElements = static_cast<uint32_t>(dXCDFs.size());

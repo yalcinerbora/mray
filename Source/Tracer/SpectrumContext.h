@@ -34,7 +34,7 @@ namespace Jakob2019Detail
         //
         // TODO: Rename these when we actually implement this functionality
         // after throughly reading the paper.
-        std::array<Table3D, 3>    lut;
+        Array<Table3D, 3>         lut;
         // Normalized SPD of Std. Observer and
         // Colorspace's Std. Illuminant
         TextureView<1, Vector3>   spdObserverXYZ;

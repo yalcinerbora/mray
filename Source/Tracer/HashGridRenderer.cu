@@ -231,9 +231,9 @@ RenderBufferInfo HashGridRenderer::StartRender(const RenderImageParams& rIP,
     Vector2ui maxDeviceLocalRNGCount = imageTiler.ConservativeTileSize();
     uint64_t seed = tracerView.tracerParams.seed;
     uint32_t spp = 512;
-    rnGenerator = RngGen->get()(rIP, std::move(maxDeviceLocalRNGCount),
-                                std::move(spp), std::move(seed),
-                                gpuSystem, globalThreadPool);
+    rnGenerator = RngGen.Value()(rIP, std::move(maxDeviceLocalRNGCount),
+                                 std::move(spp), std::move(seed),
+                                 gpuSystem, globalThreadPool);
 
     auto bufferPtrAndSize = renderBuffer->SharedDataPtrAndSize();
     return RenderBufferInfo
@@ -488,7 +488,7 @@ RendererOutput HashGridRenderer::DoRender()
     const GPUQueue& processQueue = device.GetComputeQueue(0);
 
     // Change camera and reset hash table
-    if(cameraTransform.has_value())
+    if(cameraTransform.HasValue())
     {
         totalIterationCount = 0;
         curCamTransformOverride = cameraTransform;
@@ -519,7 +519,7 @@ RendererOutput HashGridRenderer::DoRender()
     renderOut = imageTiler.TransferToHost(processQueue,
                                           transferQueue);
     // Semaphore is invalidated, visor is probably crashed
-    if(!renderOut.has_value())
+    if(!renderOut.HasValue())
         return RendererOutput{};
 
     if(totalIterationCount % 50 == 0 ||
@@ -534,7 +534,7 @@ RendererOutput HashGridRenderer::DoRender()
 
     }
     // Actually set the section parameters
-    renderOut->globalWeight = Float(1);
+    renderOut.Value().globalWeight = Float(1);
     // Now wait, and send the information about timing etc.
     processQueue.Barrier().Wait();
     timer.Split();

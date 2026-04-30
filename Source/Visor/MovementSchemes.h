@@ -5,6 +5,7 @@
 
 #include "Common/AnalyticStructs.h"
 #include "Core/Quaternion.h"
+#include "Core/Optional.h"
 
 #include "VisorI.h"
 #include "VisorState.h"
@@ -49,7 +50,7 @@ inline Optional<CameraTransform> MovementSchemeFPS::Update(const InputChecker& i
        diff != Vector2::Zero())
     {
         result = state.transform;
-        CameraTransform& transform = result.value();
+        CameraTransform& transform = result.Value();
         // X Rotation
         Vector3 lookDir = transform.gazePoint - transform.position;
         Quaternion rotateX(-diff[0] * Sensitivity, Vector3::YAxis());
@@ -95,7 +96,7 @@ inline Optional<CameraTransform> MovementSchemeFPS::Update(const InputChecker& i
             movementRatio *= MoveRatioModifier;
 
         if(!result) result = state.transform;
-        CameraTransform& transform = result.value();
+        CameraTransform& transform = result.Value();
 
         Vector3 lookDir = Math::Normalize(transform.gazePoint - transform.position);
         Vector3 side = Math::Normalize(Math::Cross(transform.up, lookDir));

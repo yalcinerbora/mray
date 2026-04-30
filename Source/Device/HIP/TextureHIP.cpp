@@ -125,6 +125,10 @@ TextureHIP_Normal<D, T>::TextureHIP_Normal(const GPUDeviceHIP& device,
 
     HIP_CHECK(hipCreateTextureObject(&tex, &rDesc, &tDesc, nullptr));
 
+    // Currently HIP does not support "cudaArrayDeferredMapping",
+    // Entire texture system uses it so we crash here.
+    // Check the TODO's above.
+    throw MRayError("\"cudaArrayDeferredMapping\" is not supported on HIP!");
 }
 
 template<uint32_t D, class T>

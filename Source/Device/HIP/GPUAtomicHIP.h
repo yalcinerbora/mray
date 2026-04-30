@@ -6,25 +6,33 @@ namespace mray::hip::atomic::detail
     template <class T> struct IntegralOf;
 
     template <class T>
-    requires (sizeof(T) == 8)
+    requires (sizeof(T) == 8 && alignof(T) >= alignof(uint64_t))
     struct IntegralOf<T> { using type = uint64_t; };
 
     template <class T>
-    requires (sizeof(T) == 4)
+    requires (sizeof(T) == 4 && alignof(T) >= alignof(uint32_t))
     struct IntegralOf<T> { using type = uint32_t; };
 
     template <class T>
-    requires (sizeof(T) == 2)
+    requires (sizeof(T) == 2 && alignof(T) >= alignof(uint16_t))
     struct IntegralOf<T> { using type = uint16_t; };
-
-    template<class T, class Func>
-    MRAY_GPU T EmulateAtomicOp(T*, T val, Func&& f);
 }
 
 namespace mray::hip::atomic
 {
+    template<class T, class Func>
+    MR_GF_DECL T EmulateAtomicOp(T&, Func&& f);
+
     template<class T>
     MR_GF_DECL T AtomicAdd(T& t, T v);
+
+    template<class T>
+    requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+    MR_GF_DECL T AtomicMax(T& t, T v);
+
+    template<class T>
+    requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+    MR_GF_DECL T AtomicMin(T& t, T v);
 
     template<class T>
     requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
@@ -51,47 +59,44 @@ namespace mray::hip::atomic
 // A dirty fix to host side to not whine about
 // undefined "atomicXXX" functions.
 #ifdef __HIP_DEVICE_COMPILE__
-namespace mray::hip::atomic::detail
+
+namespace mray::hip::atomic
 {
 
 template<class T, class Func>
 MR_GF_DEF
-T EmulateAtomicOp(T* address, T val, Func&& F)
+T EmulateAtomicOp(T& address, Func&& F)
 {
     // TODO:
     // __HIP_ARCH_HAS_GLOBAL_INT32_ATOMICS__
     // __HIP_ARCH_HAS_GLOBAL_INT64_ATOMICS__
     // Compile-time check these macros
 
-    using I = typename IntegralOf<T>::type;
+    using I = typename detail::template IntegralOf<T>::type;
     // Classic CAS wrapper for the operation
     // https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#atomic-functions
-    I* integralAddress = std::launder(reinterpret_cast<I*>(address));
-    I old = *integralAddress;
+    I* integralAddress = std::launder(reinterpret_cast<I*>(&address));
+    I old = Bit::BitCast<I>(integralAddress);
     I assumed;
     do
     {
         assumed = old;
-        T r = F(std::bit_cast<T>(assumed), val);
-        I rI = std::bit_cast<I>(r);
+        T r = F(Bit::BitCast<T>(assumed));
+        I rI = Bit::BitCast<I>(r);
         old = atomicCAS(integralAddress, assumed, rI);
     }
     while(assumed != old);
-    return std::bit_cast<T>(old);
+    return Bit::BitCast<T>(old);
 }
 
-}
-
-namespace mray::hip::atomic
-{
 
 template<>
 MR_GF_DEF
 double AtomicAdd(double& t, double v)
 {
-    return detail::EmulateAtomicOp(&t, v, [](double l, double r)
+    return EmulateAtomicOp(t, [v](double r)
     {
-        return l + r;
+        return r + v;
     });
 }
 
@@ -152,6 +157,22 @@ T AtomicAdd(T& t, T v)
                   "T must be an /float32/int32/uint32/uint64 "
                   "type!");
     return atomicAdd(&t, v);
+}
+
+template<class T>
+requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+MR_GF_DEF
+T AtomicMax(T& t, T v)
+{
+    return atomicMax(&t, v);
+}
+
+template<class T>
+requires(std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>)
+MR_GF_DEF
+T AtomicMin(T& t, T v)
+{
+    return atomicMin(&t, v);
 }
 
 template<class T>

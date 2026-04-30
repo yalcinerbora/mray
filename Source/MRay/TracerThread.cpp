@@ -286,11 +286,11 @@ void TracerThread::HandleRendering()
     RendererOutput renderOut = tracer->DoRenderWork();
     if(renderOut.analytics)
     {
-        currentWPP = renderOut.analytics->workPerPixel;
+        currentWPP = renderOut.analytics.Value().workPerPixel;
         transferQueue.Enqueue(TracerResponse
         (
             std::in_place_index<TracerResponse::RENDERER_ANALYTICS>,
-            renderOut.analytics.value()
+            renderOut.analytics.Value()
         ));
     }
     if(renderOut.imageOut)
@@ -298,7 +298,7 @@ void TracerThread::HandleRendering()
         transferQueue.Enqueue(TracerResponse
         (
             std::in_place_index<TracerResponse::IMAGE_SECTION>,
-            renderOut.imageOut.value()
+            renderOut.imageOut.Value()
         ));
     }
     if(renderOut.triggerSave)
@@ -627,8 +627,8 @@ void TracerThread::LoopWork()
         // Initial render config
         if(initialRenderConfig)
         {
-            MRAY_LOG("[Tracer]: Initial render config \"{}\"", initialRenderConfig.value());
-            if(MRayError e = CreateRendererFromConfig(initialRenderConfig.value()))
+            MRAY_LOG("[Tracer]: Initial render config \"{}\"", initialRenderConfig.Value());
+            if(MRayError e = CreateRendererFromConfig(initialRenderConfig.Value()))
             {
                 MRAY_ERROR_LOG("[Tracer]: Failed to Load Render Config\n"
                                "    {}", e.GetError());
@@ -639,8 +639,8 @@ void TracerThread::LoopWork()
         // New camera!
         if(cameraIndex)
         {
-            MRAY_LOG("[Tracer]: NewCamera {}", cameraIndex.value());
-            currentCamIndex = cameraIndex.value();
+            MRAY_LOG("[Tracer]: NewCamera {}", cameraIndex.Value());
+            currentCamIndex = cameraIndex.Value();
 
             CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex].second;
             currentCamTransform = tracer->GetCamTransform(camSurf);
@@ -657,7 +657,7 @@ void TracerThread::LoopWork()
         // New transform
         if(transform)
         {
-            currentCamTransform = transform.value();
+            currentCamTransform = transform.Value();
             // Transform change should be as real time as possible so
             tracer->SetCameraTransform(currentRenderer, currentCamTransform);
             transferQueue.Enqueue(TracerResponse
@@ -667,21 +667,21 @@ void TracerThread::LoopWork()
             ));
         }
         // New renderer
-        if(rendererName) HandleRendererChange(rendererName.value());
+        if(rendererName) HandleRendererChange(rendererName.Value());
         // New semaphore
         if(syncSem)
         {
             MRAY_LOG("[Tracer]: NewSem {:p} - {:d}",
-                     static_cast<void*>(syncSem.value().semaphore),
-                     syncSem.value().importMemAlignment);
-            currentSem = syncSem.value();
+                     static_cast<void*>(syncSem.Value().semaphore),
+                     syncSem.Value().importMemAlignment);
+            currentSem = syncSem.Value();
             tracer->SetupRenderEnv(currentSem.semaphore,
                                    currentSem.importMemAlignment, 0);
         }
         // New scene
-        if(scenePath) HandleSceneChange(scenePath.value());
+        if(scenePath) HandleSceneChange(scenePath.Value());
         // Start/Stop
-        if(startStop) HandleStartStop(startStop.value());
+        if(startStop) HandleStartStop(startStop.Value());
         // Pause/Continue
         if(pauseContinue) HandlePause();
         // TODO: Support scene time change
@@ -689,15 +689,15 @@ void TracerThread::LoopWork()
         // Render logic changes
         if(renderLogic0)
         {
-            MRAY_LOG("[Tracer]: NewRenderLogic0 {}", renderLogic0.value());
-            currentRenderLogic0 = renderLogic0.value();
+            MRAY_LOG("[Tracer]: NewRenderLogic0 {}", renderLogic0.Value());
+            currentRenderLogic0 = renderLogic0.Value();
             RestartRenderer();
 
         }
         if(renderLogic1)
         {
-            MRAY_LOG("[Tracer]: NewRenderLogic1 {}", renderLogic1.value());
-            currentRenderLogic1 = renderLogic1.value();
+            MRAY_LOG("[Tracer]: NewRenderLogic1 {}", renderLogic1.Value());
+            currentRenderLogic1 = renderLogic1.Value();
             RestartRenderer();
         }
 

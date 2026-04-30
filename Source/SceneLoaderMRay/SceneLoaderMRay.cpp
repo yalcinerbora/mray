@@ -41,7 +41,7 @@ DetermineTextureReadMode(MRayTextureReadMode imageReadMode,
     if(!userReadModeRequest) return imageReadMode;
 
     using enum MRayTextureReadMode;
-    const auto& userRM = *userReadModeRequest;
+    const auto& userRM = userReadModeRequest.Value();
     // User don't care return the image's read mode
     if(userRM == MR_PASSTHROUGH) return imageReadMode;
     //
@@ -141,8 +141,8 @@ std::vector<TransientData> GenericAttributeLoad(const AttributeCountList& totalC
                    optional != AttributeOptionality::MR_MANDATORY)
                 {
                     Optional<TransientData> data = node.AccessOptionalDataArray<T>(name);
-                    if(!data.has_value()) return;
-                    result[i].Push(ToSpan<const T>(data.value()));
+                    if(!data.HasValue()) return;
+                    result[i].Push(ToSpan<const T>(data.Value()));
                 }
                 else if(isArray == AttributeIsArray::IS_ARRAY &&
                         optional == AttributeOptionality::MR_MANDATORY)
@@ -154,8 +154,8 @@ std::vector<TransientData> GenericAttributeLoad(const AttributeCountList& totalC
                         optional != AttributeOptionality::MR_MANDATORY)
                 {
                     Optional<T> data = node.AccessOptionalData<T>(name);
-                    if(!data.has_value()) return;
-                    result[i].Push(Span<const T>(&data.value(), 1));
+                    if(!data.HasValue()) return;
+                    result[i].Push(Span<const T>(&data.Value(), 1));
                 }
                 else if(isArray != AttributeIsArray::IS_ARRAY &&
                         optional == AttributeOptionality::MR_MANDATORY)
@@ -239,8 +239,8 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                 else if(optional == AttributeOptionality::MR_OPTIONAL)
                 {
                     Optional<SceneTexId> texStruct = node.AccessOptionalTexture(name);
-                    Optional<TextureId> id = (texStruct.has_value())
-                                            ? Optional<TextureId>(texMappings.at(texStruct.value()))
+                    Optional<TextureId> id = (texStruct.HasValue())
+                                            ? Optional<TextureId>(texMappings.at(texStruct.Value()))
                                             : std::nullopt;
                     result[i].textures.push_back(id);
                 }
@@ -256,8 +256,8 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                        optional == AttributeOptionality::MR_OPTIONAL)
                     {
                         Optional<TransientData> data = node.AccessOptionalDataArray<T>(name);
-                        if(!data.has_value()) return;
-                        result[i].data.Push(ToSpan<const T>(data.value()));
+                        if(!data.HasValue()) return;
+                        result[i].data.Push(ToSpan<const T>(data.Value()));
                     }
                     else if(isArray == AttributeIsArray::IS_ARRAY &&
                             optional == AttributeOptionality::MR_MANDATORY)
@@ -269,8 +269,8 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                             optional == AttributeOptionality::MR_OPTIONAL)
                     {
                         Optional<T> data = node.AccessOptionalData<T>(name);
-                        if(!data.has_value()) return;
-                        result[i].data.Push(Span<const T>(&data.value(), 1));
+                        if(!data.HasValue()) return;
+                        result[i].data.Push(Span<const T>(&data.Value(), 1));
                     }
                     else if(isArray == AttributeIsArray::IS_SCALAR &&
                             optional == AttributeOptionality::MR_MANDATORY)
@@ -394,8 +394,8 @@ void LoadPrimitive(TracerI& tracer,
            meshFileView->AttributeLayout(BITANGENT).Name() == MRayDataEnum::MR_VECTOR_3 &&
            meshFileView->AttributeLayout(NORMAL).Name() == MRayDataEnum::MR_VECTOR_3)
         {
-            static const ProfilerAnnotation _("Prim Normal to Quat");
-            auto annotation = _.AnnotateScope();
+            MRAY_PROFILER_GENERATE_ANNOTATION(_, "Prim Normal to Quat");
+            MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
             size_t normalCount = meshFileView->MeshAttributeCount();
             TransientData quats(std::in_place_type_t<Quaternion>{}, normalCount);
@@ -522,14 +522,14 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
                 Optional<TransientData> rL = n.AccessOptionalDataArray<Vector3>(ROTATE);
                 Optional<TransientData> sL = n.AccessOptionalDataArray<Vector3>(SCALE);
 
-                Span<const Vector3> tSpan = (tL.has_value())
-                                                ? tL.value().AccessAs<Vector3>()
+                Span<const Vector3> tSpan = (tL.HasValue())
+                                                ? tL.Value().AccessAs<Vector3>()
                                                 : Span<const Vector3>();
-                Span<const Vector3> rSpan = (rL.has_value())
-                                                ? rL.value().AccessAs<Vector3>()
+                Span<const Vector3> rSpan = (rL.HasValue())
+                                                ? rL.Value().AccessAs<Vector3>()
                                                 : Span<const Vector3>();
-                Span<const Vector3> sSpan = (sL.has_value())
-                                                ? sL.value().AccessAs<Vector3>()
+                Span<const Vector3> sSpan = (sL.HasValue())
+                                                ? sL.Value().AccessAs<Vector3>()
                                                 : Span<const Vector3>();
 
                 for(uint32_t i = 0; i < tSpan.size(); i++)
@@ -544,9 +544,9 @@ std::vector<TransientData> TransformAttributeLoad(const AttributeCountList& tota
             }
             else
             {
-                Vector3 t = n.AccessOptionalData<Vector3>(TRANSLATE).value_or(Vector3::Zero());
-                Vector3 r = n.AccessOptionalData<Vector3>(ROTATE).value_or(Vector3::Zero());
-                Vector3 s = n.AccessOptionalData<Vector3>(SCALE).value_or(Vector3(1));
+                Vector3 t = n.AccessOptionalData<Vector3>(TRANSLATE).ValueOr(Vector3::Zero());
+                Vector3 r = n.AccessOptionalData<Vector3>(ROTATE).ValueOr(Vector3::Zero());
+                Vector3 s = n.AccessOptionalData<Vector3>(SCALE).ValueOr(Vector3(1));
 
                 Matrix3x4 transform = GenTransformFromTRS(t, r, s);
                 result[0].Push(Span<const Matrix3x4>(&transform, 1));
@@ -746,7 +746,7 @@ void SceneLoaderMRay::DryRunNodesForTex(std::vector<SceneTexId>& textureIds,
                 if(optional == AttributeOptionality::MR_OPTIONAL)
                 {
                     auto ts = node.AccessOptionalData<SceneTexId>(name);
-                    if(ts.has_value()) textureIds.push_back(ts.value());
+                    if(ts.HasValue()) textureIds.push_back(ts.Value());
                 }
                 else
                 {
@@ -850,8 +850,8 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
         const auto LoadTask = [&, loader, barrier = barrier,
                                groupEntityList](size_t start, size_t end)
         {
-            static const ProfilerAnnotation _(loader.Name());
-            auto annotation = _.AnnotateScope();
+            MRAY_PROFILER_GENERATE_ANNOTATION(_, loader.Name());
+            MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
             // Explicitly copy the loader
             // Doing this because lambda capture trick
@@ -926,8 +926,8 @@ void GenericLoadGroups(typename SceneLoaderMRay::MutexedMap<std::map<uint32_t, P
 
 void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
 {
-    static const ProfilerAnnotation _("LoadTextures");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "LoadTextures");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     using TextureIdList = std::vector<Pair<SceneTexId, TextureId>>;
 
@@ -971,8 +971,8 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
     // Copy the shared pointers, capture by reference the rest
     const auto TextureLoadTask = [&, texIdListPtr, imgLoader, barrier](size_t start, size_t end)
     {
-        static const ProfilerAnnotation ldTexAnnot("LoadTextures");
-        auto annotation = ldTexAnnot.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(ldTexAnnot, "LoadTextures");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, ldTexAnnot);
         // TODO: check if the twice opening is a bottleneck?
         // We are opening here to determining size/format
         // and on the other iteration we actual memcpy it
@@ -987,12 +987,12 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
                 const auto& [sceneTexId, jsonNode] = textureNodes[i];
                 auto fileName = jsonNode.AccessData<std::string>(TEX_NODE_FILE);
                 auto isColor = jsonNode.AccessOptionalData<bool>(TEX_NODE_IS_COLOR)
-                                .value_or(TEX_NODE_IS_COLOR_DEFAULT);
+                                .ValueOr(TEX_NODE_IS_COLOR_DEFAULT);
                 auto isIllum = jsonNode.AccessOptionalData<bool>(TEX_NODE_IS_ILLUM)
-                                .value_or(TEX_NODE_IS_ILLUM_DEFAULT);
+                                .ValueOr(TEX_NODE_IS_ILLUM_DEFAULT);
                 auto gamma = jsonNode.AccessOptionalData<Float>(TEX_NODE_GAMMA);
                 bool loadAsSigned = jsonNode.AccessOptionalData<bool>(NodeNames::TEX_NODE_AS_SIGNED)
-                                    .value_or(NodeNames::TEX_NODE_AS_SIGNED_DEFAULT);
+                                    .ValueOr(NodeNames::TEX_NODE_AS_SIGNED_DEFAULT);
                 auto edgeResolve = jsonNode.AccessOptionalData<MRayTextureEdgeResolveEnum>(TEX_NODE_EDGE_RESOLVE);
                 auto interp = jsonNode.AccessOptionalData<MRayTextureInterpEnum>(TEX_NODE_INTERPOLATION);
                 auto colorSpace= jsonNode.AccessOptionalData<MRayColorSpaceEnum>(TEX_NODE_COLOR_SPACE);
@@ -1000,9 +1000,9 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
                 //auto is3D = jsonNode.AccessOptionalData<bool>(TEX_NODE_IS_3D)
                 //            .value_or(TEX_NODE_IS_3D_DEFAULT);
                 auto channelLayout = jsonNode.AccessOptionalData<ImageSubChannelType>(TEX_NODE_CHANNELS)
-                                                .value_or(ImageSubChannelType::ALL);
+                                                .ValueOr(ImageSubChannelType::ALL);
                 auto ignoreResClamp = jsonNode.AccessOptionalData<bool>(TEX_NODE_IGNORE_CLAMP)
-                                .value_or(TEX_NODE_IGNORE_CLAMP_DEFAULT);
+                                .ValueOr(TEX_NODE_IGNORE_CLAMP_DEFAULT);
                 fileName = Filesystem::RelativePathToAbsolute(fileName, scenePath);
 
                 using enum ImageIOFlags::F;
@@ -1045,11 +1045,11 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
                                               : MRayTextureIsIlluminant::IS_ALBEDO
                 };
                 // Check and add user params
-                if(edgeResolve.has_value()) params.edgeResolve = *edgeResolve;
-                if(interp.has_value()) params.interpolation = *interp;
+                if(edgeResolve.HasValue()) params.edgeResolve = edgeResolve.Value();
+                if(interp.HasValue()) params.interpolation = interp.Value();
                 // Overwrite color space related info, user has precedence.
-                if(colorSpace.has_value()) params.colorSpace = *colorSpace;
-                if(gamma.has_value()) params.gamma = *gamma;
+                if(colorSpace.HasValue()) params.colorSpace = colorSpace.Value();
+                if(gamma.HasValue()) params.gamma = gamma.Value();
                 // Check user request of read mode
                 // and the loader returned read mode to find the readmode
                 auto readModeE = DetermineTextureReadMode(header.readMode, userReadMode,
@@ -1149,8 +1149,8 @@ void SceneLoaderMRay::LoadTextures(TracerI& tracer, ErrorList& exceptions)
 
 void SceneLoaderMRay::LoadMediums(TracerI& tracer, ErrorList& exceptions)
 {
-    static const ProfilerAnnotation _("LoadMedia");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "LoadMedia");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     struct MediumLoader
     {
@@ -1223,8 +1223,8 @@ void SceneLoaderMRay::LoadMediums(TracerI& tracer, ErrorList& exceptions)
 void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
                                     ErrorList& exceptions)
 {
-    static const ProfilerAnnotation _("LoadMaterials");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "LoadMaterials");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     struct MaterialLoader
     {
@@ -1298,8 +1298,9 @@ void SceneLoaderMRay::LoadMaterials(TracerI& tracer,
 
 void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ErrorList& exceptions)
 {
-    static const ProfilerAnnotation _("LoadTransforms");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "LoadTransforms");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
+
     struct TransformLoader
     {
         private:
@@ -1363,8 +1364,8 @@ void SceneLoaderMRay::LoadTransforms(TracerI& tracer, ErrorList& exceptions)
 
 void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ErrorList& exceptions)
 {
-    static const ProfilerAnnotation _("LoadPrimitives");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "LoadPrimitives");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     std::shared_ptr<const MeshLoaderPoolI> meshLoaderPool = CreateMeshLoaderPool();
 
@@ -1508,8 +1509,8 @@ void SceneLoaderMRay::LoadPrimitives(TracerI& tracer, ErrorList& exceptions)
 
 void SceneLoaderMRay::LoadCameras(TracerI& tracer, ErrorList& exceptions)
 {
-    static const ProfilerAnnotation _("LoadCameras");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "LoadCameras");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     struct CameraLoader
     {
@@ -1574,8 +1575,8 @@ void SceneLoaderMRay::LoadCameras(TracerI& tracer, ErrorList& exceptions)
 
 void SceneLoaderMRay::LoadLights(TracerI& tracer, ErrorList& exceptions)
 {
-    static const ProfilerAnnotation _("LoadLights");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "LoadLights");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     struct LightLoader
     {
@@ -1600,9 +1601,9 @@ void SceneLoaderMRay::LoadLights(TracerI& tracer, ErrorList& exceptions)
             gn = std::string(TracerConstants::LIGHT_PREFIX) + gn;
             using namespace NodeNames;
             auto primId = firstNode.AccessOptionalData<uint32_t>(PRIMITIVE);
-            if(primId.has_value())
+            if(primId.HasValue())
             {
-                PrimGroupId groupId = primMappings.at(primId.value()).first;
+                PrimGroupId groupId = primMappings.at(primId.Value()).first;
                 return tracer.CreateLightGroup(std::move(gn), groupId);
             }
             return tracer.CreateLightGroup(std::move(gn));
@@ -1627,7 +1628,7 @@ void SceneLoaderMRay::LoadLights(TracerI& tracer, ErrorList& exceptions)
             // Change this
             using namespace NodeNames;
             auto tempId = nodes[0].AccessOptionalData<uint32_t>(PRIMITIVE);
-            bool isPrimitiveBacked = tempId.has_value();
+            bool isPrimitiveBacked = tempId.HasValue();
 
             if(isPrimitiveBacked)
             {
@@ -1697,10 +1698,10 @@ void SceneLoaderMRay::LoadVolumes(TracerI& tracer, ErrorList&)
         auto p = jsonNode.AccessOptionalData<int32_t>(PRIORITY);
 
         TransformId tId = TracerConstants::IdentityTransformId;
-        if(t) tId = tIdMap.at(*t).second;
+        if(t) tId = tIdMap.at(t.Value()).second;
 
         MediumId mId = mIdMap.at(m).second;
-        int32_t priority = p.value_or(std::numeric_limits<int32_t>::min() + 1);
+        int32_t priority = p.ValueOr(std::numeric_limits<int32_t>::min() + 1);
         vols.push_back(VolumeParams
                        {
                            .mediumId = mId,
@@ -1723,8 +1724,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
                                         const SceneLightSurfList& lightSurfaces,
                                         const LightSurfaceStruct& boundary)
 {
-    static const ProfilerAnnotation ctmAnnot("GenTypeMapping");
-    auto annotation = ctmAnnot.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(ctmAnnot, "GenTypeMapping");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, ctmAnnot);
     // Given N definition items, and M references on those items
     // where M >= N, create a map of common definitions -> referred definition list.
 
@@ -1770,8 +1771,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> volumeHTReady = threadPool.SubmitTask(
         [&volumeHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        static const ProfilerAnnotation _("Volume HT Gen");
-        auto annotation = _.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_, "Volume HT Gen");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
         CreateHT(volumeHT, sceneJsonIn.at(NodeNames::VOLUME_LIST));
     });
     // Prims
@@ -1781,8 +1782,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> primHTReady = threadPool.SubmitTask(
     [&primHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        static const ProfilerAnnotation _("Prim HT Gen");
-        auto annotation = _.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_, "Prim HT Gen");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
         CreateHT(primHT, sceneJsonIn.at(NodeNames::PRIMITIVE_LIST));
     });
     // Materials
@@ -1791,8 +1792,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> matHTReady = threadPool.SubmitTask(
     [&matHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        static const ProfilerAnnotation _("Mat HT Gen");
-        auto annotation = _.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_, "Mat HT Gen");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
         CreateHT(matHT, sceneJsonIn.at(NodeNames::MATERIAL_LIST));
     });
     // Cameras
@@ -1801,8 +1802,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> camHTReady = threadPool.SubmitTask(
     [&camHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        static const ProfilerAnnotation _("Cam HT Gen");
-        auto annotation = _.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_, "Cam HT Gen");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
         CreateHT(camHT, sceneJsonIn.at(NodeNames::CAMERA_LIST));
     });
     // Lights
@@ -1812,8 +1813,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> lightHTReady = threadPool.SubmitTask(
     [&lightHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        static const ProfilerAnnotation _("Light HT Gen");
-        auto annotation = _.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_, "Light HT Gen");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
         CreateHT(lightHT, sceneJsonIn.at(NodeNames::LIGHT_LIST));
     });
     // Transforms
@@ -1824,8 +1825,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> transformHTReady = threadPool.SubmitTask(
     [&transformHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        static const ProfilerAnnotation _("Trans HT Gen");
-        auto annotation = _.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_, "Transform HT Gen");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
         CreateHT(transformHT, sceneJsonIn.at(NodeNames::TRANSFORM_LIST));
     });
 
@@ -1840,8 +1841,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> mediumHTReady = threadPool.SubmitTask(
     [&mediumHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        static const ProfilerAnnotation _("Media HT Gen");
-        auto annotation = _.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_, "Media HT Gen");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
         CreateHT(mediumHT, sceneJsonIn.at(NodeNames::MEDIUM_LIST));
     });
     // Textures
@@ -1855,8 +1856,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     std::future<void> textureHTReady = threadPool.SubmitTask(
     [&textureHT, CreateHT, &sceneJsonIn = this->sceneJson]()
     {
-        static const ProfilerAnnotation _("Texture HT Gen");
-        auto annotation = _.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_, "Texture HT Gen");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
         CreateHT(textureHT, sceneJsonIn.at(NodeNames::TEXTURE_LIST));
     });
 
@@ -1915,8 +1916,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
             }
 
 
-            if(s.alphaMaps[i].has_value())
-                textureIds.push_back(s.alphaMaps[i].value());
+            if(s.alphaMaps[i].HasValue())
+                textureIds.push_back(s.alphaMaps[i].Value());
         }
     }
     // Camera Surfaces
@@ -2006,7 +2007,7 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
 
         using namespace NodeNames;
         uint32_t mId = node.AccessData<uint32_t>(MEDIUM);
-        uint32_t tId = node.AccessOptionalData<uint32_t>(TRANSFORM).value_or(EMPTY_TRANSFORM);
+        uint32_t tId = node.AccessOptionalData<uint32_t>(TRANSFORM).ValueOr(EMPTY_TRANSFORM);
         PushToTypeMapping(mediumNodes, mediumHT,
                           mId, MEDIUM_LIST, false);
         PushToTypeMapping(transformNodes, transformHT,
@@ -2054,8 +2055,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     // Eliminate the duplicates
     auto EliminateDuplicates = [](std::vector<JsonNode>& nodes)
     {
-        static const ProfilerAnnotation _("EliminateDuplicates");
-        auto annotation = _.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_, "Eliminate Duplicates");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
         std::sort(nodes.begin(), nodes.end());
         auto endIt = std::unique(nodes.begin(), nodes.end(),
@@ -2097,8 +2098,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     });
     threadPool.SubmitDetachedTask([this]()
     {
-        static const ProfilerAnnotation _("EliminateTexDuplicates");
-        auto annotation = _.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_, "Eliminate Tex Duplicates");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
         auto LessThan = [](const auto& lhs, const auto& rhs)
         {
@@ -2114,8 +2115,8 @@ void SceneLoaderMRay::CreateTypeMapping(const TracerI& tracer,
     });
     threadPool.SubmitDetachedTask([this]()
     {
-        static const ProfilerAnnotation _("EliminateVolDuplicates");
-        auto annotation = _.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_, "Eliminate Volume Duplicates");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
         auto LessThan = [](const auto& lhs, const auto& rhs)
         {
@@ -2155,8 +2156,8 @@ void SceneLoaderMRay::CreateSurfaces(TracerI& tracer, const std::vector<SurfaceS
             PrimBatchId pId = primMappings.map.at(get<PI>(surf.matPrimBatchPairs[i])).second;
             MaterialId matId = matMappings.map.at(get<MI>(surf.matPrimBatchPairs[i])).second;
             Optional<TextureId> texId;
-            if(surf.alphaMaps[i].has_value())
-                texId = texMappings.at(surf.alphaMaps[i].value());
+            if(surf.alphaMaps[i].HasValue())
+                texId = texMappings.at(surf.alphaMaps[i].Value());
 
             primList.push_back(pId);
             matList.push_back(matId);
@@ -2259,7 +2260,8 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
     {
         const auto i = sceneJson.find(str);
         if(i == sceneJson.end()) return std::nullopt;
-        return &(*i);
+        const nlohmann::json* ptr = &(*i);
+        return ptr;
     };
     using namespace NodeNames;
 
@@ -2267,18 +2269,18 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
     Node camSurfJson    = FindNode(CAMERA_SURFACE_LIST);
     Node lightSurfJson  = FindNode(LIGHT_SURFACE_LIST);
     Node surfJson       = FindNode(SURFACE_LIST);
-    if(!camSurfJson.has_value())
+    if(!camSurfJson.HasValue())
         return MRayError("Scene file does not contain "
                          "\"{}\" array", CAMERA_SURFACE_LIST);
-    if(!lightSurfJson.has_value())
+    if(!lightSurfJson.HasValue())
         return MRayError("Scene file does not contain "
                          "\"{}\" array", LIGHT_SURFACE_LIST);
-    if(!surfJson.has_value())
+    if(!surfJson.HasValue())
         return MRayError("Scene file does not contain "
                          "\"{}\" array", SURFACE_LIST);
     // Check the boundary light
     Node boundaryJson = FindNode(BOUNDARY);
-    if(!boundaryJson.has_value())
+    if(!boundaryJson.HasValue())
         return MRayError("Scene file does not contain "
                          "\"{}\" object", BOUNDARY);
 
@@ -2287,10 +2289,10 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
     // TODO: Change this to std::expected maybe c++23?
     try
     {
-        LightSurfaceStruct boundary = LoadBoundary(*boundaryJson.value());
-        SceneSurfList surfaces = LoadSurfaces(*surfJson.value());
-        SceneCamSurfList camSurfs = LoadCamSurfaces(*camSurfJson.value());
-        SceneLightSurfList lightSurfs = LoadLightSurfaces(*lightSurfJson.value());
+        LightSurfaceStruct boundary = LoadBoundary(*boundaryJson.Value());
+        SceneSurfList surfaces = LoadSurfaces(*surfJson.Value());
+        SceneCamSurfList camSurfs = LoadCamSurfaces(*camSurfJson.Value());
+        SceneLightSurfList lightSurfs = LoadLightSurfaces(*lightSurfJson.Value());
         // Surfaces are loaded now create type/ node pairings
         // These are stored in the loader's state
         CreateTypeMapping(tracer, surfaces, camSurfs,
@@ -2357,8 +2359,8 @@ MRayError SceneLoaderMRay::LoadAll(TracerI& tracer)
         // Also this has a single bottleneck unlike tracer groups,
         // so it probably not worth it.
         {
-            static const ProfilerAnnotation _("Create Surfaces");
-            auto annotation = _.AnnotateScope();
+            MRAY_PROFILER_GENERATE_ANNOTATION(_, "Create Surfaces");
+            MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
             CreateSurfaces(tracer, surfaces);
             CreateLightSurfaces(tracer, lightSurfs, boundary);
@@ -2462,8 +2464,8 @@ SceneLoaderMRay::SceneLoaderMRay(ThreadPool& pool)
 Expected<TracerIdPack> SceneLoaderMRay::LoadScene(TracerI& tracer,
                                                   const std::string& filePath)
 {
-    static const ProfilerAnnotation _("Load Scene from File");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "Load Scene (File)");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     Timer t; t.Start();
     MRayError e = MRayError::OK;
@@ -2478,8 +2480,8 @@ Expected<TracerIdPack> SceneLoaderMRay::LoadScene(TracerI& tracer,
 Expected<TracerIdPack> SceneLoaderMRay::LoadScene(TracerI& tracer,
                                                   std::istream& sceneData)
 {
-    static const ProfilerAnnotation _("Load Scene from Stream");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "Load Scene (Stream)");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     Timer t; t.Start();
     MRayError e = MRayError::OK;

@@ -1,18 +1,8 @@
 #pragma once
 
-#include <span>
-#include <optional>
-#include <variant>
-#include <functional>
-
 #include "Definitions.h"
-
-// Rename the std::optional, gpu may not like it
-// most(all after c++20) of optional is constexpr
-// so the "relaxed-constexpr" flag of nvcc will be able to compile it
-// Just to be sure, aliasing here to ease refactoring
-template <class T>
-using Optional = std::optional<T>;
+#include <array>
+#include <string_view>
 
 // For some recent compilers (for examlpe, clang-18)
 // CTAD for alias templates (C++20 feature) is not implemented
@@ -69,3 +59,5 @@ template <class T, uint32_t Extent = DynamicExtent> class Span;
 template<class... Ts> struct Tuple;
 
 template<class... Types> struct Variant;
+
+template<class T> struct Optional;

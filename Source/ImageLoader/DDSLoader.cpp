@@ -5,6 +5,7 @@
 #include "Core/Expected.h"
 #include "Core/GraphicsFunctions.h"
 #include "Core/Profiling.h"
+#include "Core/Optional.h"
 
 #include <filesystem>
 
@@ -502,8 +503,8 @@ ImageFileDDS::ImageFileDDS(const std::string& filePath,
 
 Expected<ImageHeader> ImageFileDDS::ReadHeader()
 {
-    static const ProfilerAnnotation _("DDS Read Header");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "DDS Read Header");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     if(headerIsRead) return header;
 
@@ -540,27 +541,28 @@ Expected<ImageHeader> ImageFileDDS::ReadHeader()
                              "be a DX10-DDS file!", filePath);
 
         headerDX10 = HeaderExtended{};
-        char* headerPtrDX10 = reinterpret_cast<char*>(&headerDX10.value());
+        char* headerPtrDX10 = reinterpret_cast<char*>(&headerDX10.Value());
         if(!ddsFile.read(headerPtrDX10, sizeof(HeaderExtended)))
             return MRayError("File \"{}\" read error!", filePath);
     }
 
     if(headerDX10)
     {
-        if(headerDX10->arraySize != 1)
+        isDX10File = true;
+        if(headerDX10.Value().arraySize != 1)
         {
             return MRayError("File \"{}\" has array textures, it is not "
                              "supported yet!", filePath);
         }
 
-        if(headerDX10->resourceDimension != ResourceType::TEXTURE2D)
+        if(headerDX10.Value().resourceDimension != ResourceType::TEXTURE2D)
         {
             return MRayError("File \"{}\" has non-2D texture, it is not "
                              "supported yet!", filePath);
         }
 
         using enum MiscFlagsDX10::F;
-        MiscFlagsDX10 miscFlags = std::bit_cast<MiscFlagBitsDX10>(headerDX10->miscFlag);
+        MiscFlagsDX10 miscFlags = std::bit_cast<MiscFlagBitsDX10>(headerDX10.Value().miscFlag);
         if(miscFlags[TEXTURECUBE])
         {
             return MRayError("File \"{}\" has cube texture, it is not "
@@ -591,7 +593,7 @@ Expected<ImageHeader> ImageFileDDS::ReadHeader()
     // Calculate the color space and pixel
     using HeaderResult = Expected<Pair<ColorSpacePack, MRayPixelTypeRT>>;
     HeaderResult r = (headerDX10)
-                    ? ReadPixelTypeDDS_DX10(*headerDX10)
+                    ? ReadPixelTypeDDS_DX10(headerDX10.Value())
                     : ReadPixelTypeDDS_DX9(ddsHeader);
     // Delegate to the OIIO
     if(r.has_error()) return r.error();
@@ -618,8 +620,8 @@ Expected<ImageHeader> ImageFileDDS::ReadHeader()
 
 Expected<Image> ImageFileDDS::ReadImage()
 {
-    static const ProfilerAnnotation _("DDS Read Image");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "DDS Read Image");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     assert(header.dimensions[2] == 1);
 

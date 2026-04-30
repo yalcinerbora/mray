@@ -612,8 +612,8 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
                        const RenderImageSection& rIS,
                        const RenderBufferInfo& rBI)
 {
-    static const auto issueAnnot = ProfilerAnnotation("AccumPortion-Issue");
-    const auto issueScope = issueAnnot.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(issueAnnot, "AccumPortion-Issue");
+    MRAY_PROFILER_ANNOTATE_SCOPE(issueScope, issueAnnot);
 
     const Float* rStart = reinterpret_cast<const Float*>(rBI.data + rIS.pixStartOffsets[R]);
     const Float* gStart = reinterpret_cast<const Float*>(rBI.data + rIS.pixStartOffsets[G]);
@@ -633,8 +633,8 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
 
         auto WorkFuncBulk = [=](uint32_t start, uint32_t end) -> void
         {
-            static const auto _ = ProfilerAnnotation("AccumPortion-Bulk");
-            const auto scope = _.AnnotateScope();
+            MRAY_PROFILER_GENERATE_ANNOTATION(_, "AccumPortion-Bulk");
+            MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
             size_t offsetInOut = start * SIMD_WIDTH;
             size_t bulkEnd = std::min(end * SIMD_WIDTH, totalPixels);
@@ -665,8 +665,8 @@ Accum::AccumulateImage(RGBWeightSpan<double> output,
 
         auto WorkFuncScanline = [=](uint32_t start, uint32_t end) -> void
         {
-            static const auto _ = ProfilerAnnotation("AccumPortion-Scanline");
-            const auto scope = _.AnnotateScope();
+            MRAY_PROFILER_GENERATE_ANNOTATION(_, "AccumPortion-Scanline");
+            MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
             for(uint32_t i = start; i < end; i++)
             {
@@ -820,13 +820,13 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         if(accumulateFuture.AnyValid())
             accumulateFuture.WaitAll();
 
-        size_t pixelCount = newRenderBuffer->resolution.Multiply();
+        size_t pixelCount = newRenderBuffer.Value().resolution.Multiply();
         MemAlloc::AllocateMultiData(Tie(imageRData, imageGData,
                                         imageBData, imageSData),
                                     imageMem,
                                     {pixelCount, pixelCount,
                                     pixelCount, pixelCount});
-        renderBufferInfo = newRenderBuffer.value();
+        renderBufferInfo = newRenderBuffer.Value();
 
         std::fill(imageRData.begin(), imageRData.end(), 0.0);
         std::fill(imageGData.begin(), imageGData.end(), 0.0);
@@ -852,7 +852,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
         renderTimer.Split();
         lastReceiveMS = renderTimer.ElapsedIntMS();
 
-        const auto& section = newImageSection.value();
+        const auto& section = newImageSection.Value();
         // Tracer may abruptly terminated (crash probably),
         // so do not issue anything, return nullopt and
         // let the main render loop to terminate
@@ -873,7 +873,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
 
     if(newSaveInfo)
     {
-        const auto& saveInfo = newSaveInfo.value();
+        const auto& saveInfo = newSaveInfo.Value();
         if(accumulateFuture.AnyValid())
             accumulateFuture.WaitAll();
 
@@ -1027,10 +1027,10 @@ MRayError RunCommand::Invoke()
 
         // Set resolution
         assert(imgRes.has_value());
-        Vector2ui resolution((*imgRes)[0], (*imgRes)[1]);
+        Vector2ui resolution(imgRes.value()[0], imgRes.value()[1]);
         tracerThread.SetInitialResolution(resolution,
-                                        Vector2ui::Zero(),
-                                        resolution);
+                                          Vector2ui::Zero(),
+                                          resolution);
         // TODO: Cleanup this API (why SetInitResolution is a function
         // but these are queue events)
         MRAY_LOG("[Run]   : Sending sync semaphore...");

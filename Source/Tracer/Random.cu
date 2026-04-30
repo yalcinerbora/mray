@@ -54,7 +54,7 @@ namespace ZSobolDetail
 
     // From
     // https://github.com/lgruen/sobol/blob/main/single-precision/sobol.cpp
-    static constexpr std::array SOBOL_32_JOE_KUO_DIM_0 =
+    static constexpr Array SOBOL_32_JOE_KUO_DIM_0 =
     {
         0x80000000u, 0x40000000u, 0x20000000u, 0x10000000u, 0x08000000u, 0x04000000u,
         0x02000000u, 0x01000000u, 0x00800000u, 0x00400000u, 0x00200000u, 0x00100000u,
@@ -67,7 +67,7 @@ namespace ZSobolDetail
         0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u
     };
 
-    static constexpr std::array SOBOL_32_JOE_KUO_DIM_1 =
+    static constexpr Array SOBOL_32_JOE_KUO_DIM_1 =
     {
         0x80000000u, 0xC0000000u, 0xA0000000u, 0xF0000000u, 0x88000000u, 0xCC000000u,
         0xAA000000u, 0xFF000000u, 0x80800000u, 0xC0C00000u, 0xA0A00000u, 0xF0F00000u,
@@ -80,7 +80,7 @@ namespace ZSobolDetail
         0x80008000u, 0xC000C000u, 0xA000A000u, 0xF000F000u
     };
 
-    static constexpr std::array SOBOL_32_JOE_KUO_DIM_2 =
+    static constexpr Array SOBOL_32_JOE_KUO_DIM_2 =
     {
         0x80000000u, 0xC0000000u, 0x60000000u, 0x90000000u, 0xE8000000u, 0x5C000000u,
         0x8E000000u, 0xC5000000u, 0x68800000u, 0x9CC00000u, 0xEE600000u, 0x55900000u,
@@ -96,7 +96,7 @@ namespace ZSobolDetail
                   SOBOL_32_JOE_KUO_DIM_1.size() == SOBOL_MATRIX_WIDTH &&
                   SOBOL_32_JOE_KUO_DIM_2.size() == SOBOL_MATRIX_WIDTH);
 
-    template<std::array<uint32_t, SOBOL_MATRIX_WIDTH>>
+    template<Array<uint32_t, SOBOL_MATRIX_WIDTH>>
     MR_PF_DEF uint32_t BitwiseMatrixMult(uint64_t a);
 
     class ZSobol
@@ -246,7 +246,7 @@ Vector3ui SobolDetail::Sobol::Next3D(uint32_t dim) const
     return Vector3ui(s0, s1, s2);
 }
 
-template<std::array<uint32_t, ZSobolDetail::SOBOL_MATRIX_WIDTH> SobolArray>
+template<Array<uint32_t, ZSobolDetail::SOBOL_MATRIX_WIDTH> SobolArray>
 MR_PF_DEF
 uint32_t ZSobolDetail::BitwiseMatrixMult(uint64_t a)
 {
@@ -287,7 +287,7 @@ uint64_t ZSobolDetail::ZSobol::SampleIndex(uint32_t dimension) const
 
         // After multiple implementations, this seems to be the
         // fastest (althought slightly)
-        static constexpr std::array<uint64_t, 4> TABLE =
+        static constexpr Array<uint64_t, 4> TABLE =
         {
             COMPOSE_48x2(uint64_t(0ull), 0ull, 0ull, 0ull, 0ull, 0ull,
                          1ull, 1ull, 1ull, 1ull, 1ull, 1ull,

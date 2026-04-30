@@ -53,6 +53,7 @@ A LIN     BaseAcceleratorLinear   AcceleratorGroupLinear  "Tracer/AcceleratorLin
 A BVH     BaseAcceleratorLBVH     AcceleratorGroupLBVH    "Tracer/AcceleratorLBVH.h"
 A HW_CUDA BaseAcceleratorOptiX    AcceleratorGroupOptiX   "Tracer/OptiX/AcceleratorOptiX.h"
 A HW_CPU  BaseAcceleratorEmbree   AcceleratorGroupEmbree  "Tracer/Embree/AcceleratorEmbree.h"
+A HW_HIP  BaseAcceleratorHIPRT    AcceleratorGroupHIPRT   "Tracer/HIPRT/AcceleratorHIPRT.h"
 
 # Renderer can define multiple kernels ("works") to do multiple passes or switch to a different kernel
 # when renderer parameters are changed.

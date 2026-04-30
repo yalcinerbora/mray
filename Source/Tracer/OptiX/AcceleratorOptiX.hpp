@@ -574,7 +574,7 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
                                         alphaMaps.cbegin() + validCount,
                                         [](const Optional<AlphaMap>& a)
         {
-            return a.has_value();
+            return a.HasValue();
         });
         bool enableCull = (cfFlags.PopCount() == validMask);
 

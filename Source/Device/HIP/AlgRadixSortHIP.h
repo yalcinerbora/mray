@@ -23,7 +23,8 @@ namespace mray::hip::algorithms
 template <bool IsAscending, class K, class V>
 MRAY_HOST inline
 size_t SegmentedRadixSortTMSize(size_t totalElementCount,
-                                size_t totalSegments)
+                                size_t totalSegments,
+                                const GPUQueueHIP& q)
 {
     using namespace rocprim;
 
@@ -36,20 +37,27 @@ size_t SegmentedRadixSortTMSize(size_t totalElementCount,
     if constexpr(IsAscending)
         HIP_CHECK(segmented_radix_sort_pairs(dTM, result,
                                              keys, values,
-                                             static_cast<int>(totalElementCount),
-                                             static_cast<int>(totalSegments),
-                                             dStartOffsets, dEndOffsets));
+                                             static_cast<uint32_t>(totalElementCount),
+                                             static_cast<uint32_t>(totalSegments),
+                                             dStartOffsets, dEndOffsets,
+                                             static_cast<uint32_t>(0),
+                                             static_cast<uint32_t>(CHAR_BIT * sizeof(K)),
+                                             ToHandleHIP(q)));
     else
         HIP_CHECK(segmented_radix_sort_pairs_desc(dTM, result,
                                                   keys, values,
-                                                  totalElementCount, totalSegments,
-                                                  dStartOffsets, dEndOffsets));
+                                                  static_cast<uint32_t>(totalElementCount),
+                                                  static_cast<uint32_t>(totalSegments),
+                                                  dStartOffsets, dEndOffsets,
+                                                  static_cast<uint32_t>(0),
+                                                  static_cast<uint32_t>(CHAR_BIT * sizeof(K)),
+                                                  ToHandleHIP(q)));
     return result;
 }
 
 template <bool IsAscending, class K, class V>
 MRAY_HOST inline
-size_t RadixSortTMSize(size_t elementCount)
+size_t RadixSortTMSize(size_t elementCount, const GPUQueueHIP& q)
 {
     using namespace rocprim;
 
@@ -59,10 +67,16 @@ size_t RadixSortTMSize(size_t elementCount)
     size_t result;
     if constexpr(IsAscending)
         HIP_CHECK(radix_sort_pairs(dTM, result, keys,
-                                   values, elementCount));
+                                   values, elementCount,
+                                   static_cast<uint32_t>(0),
+                                   static_cast<uint32_t>(CHAR_BIT * sizeof(K)),
+                                   ToHandleHIP(q)));
     else
         HIP_CHECK(radix_sort_pairs_desc(dTM, result, keys,
-                                        values, elementCount));
+                                        values, elementCount,
+                                        static_cast<uint32_t>(0),
+                                        static_cast<uint32_t>(CHAR_BIT * sizeof(K)),
+                                        ToHandleHIP(q)));
     return result;
 }
 

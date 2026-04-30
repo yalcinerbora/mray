@@ -7,4 +7,4 @@
 using TexMipBitSet = Bitset<TracerConstants::MaxTextureMipCount>;
 
 template<class T>
-using MipArray = std::array<T, TracerConstants::MaxTextureMipCount>;
+using MipArray = Array<T, TracerConstants::MaxTextureMipCount>;

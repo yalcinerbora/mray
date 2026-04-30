@@ -103,8 +103,8 @@ TransientData MeshViewAssimp::GetAttribute(PrimitiveAttributeLogic attribLogic) 
                   "Currently \"MeshLoaderAssimp\" do not support double "
                   "precision mode change this later.");
 
-    static const ProfilerAnnotation _("Assimp Load Prim Data");
-    [[maybe_unused]] auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "Assimp Load Prim Data");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     const auto& mesh = assimpFile.scene->mMeshes[innerIndex];
     if(attribLogic.e == PrimitiveAttributeLogic::INDEX)
@@ -180,8 +180,8 @@ MeshFileAssimp::MeshFileAssimp(Assimp::Importer& imp,
     , importer(imp)
     , scene(nullptr)
 {
-    static const ProfilerAnnotation _("Assimp Read File");
-    [[maybe_unused]] auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "Assimp Read File");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     // TODO: GCC warns redundant cast, but MSVC says default enum type is
     // int. so we obey MSVC's warning.

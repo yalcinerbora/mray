@@ -941,7 +941,7 @@ CommonKey RenderSurfaceWorkHasher::HashWorkDataPortion(HitKeyPack p, RayIndex i)
         uint32_t start = currentBit;
         uint32_t end = currentBit + bitsForItem;
         assert(end <= sizeof(CommonKey) * CHAR_BIT);
-        Array range = {CommonKey(start), CommonKey(end)};
+        Array<CommonKey, 2> range = {CommonKey(start), CommonKey(end)};
         result = Bit::SetSubPortion(result, item, range);
         remainingBits -= bitsForItem;
         currentBit += bitsForItem;
@@ -1066,7 +1066,7 @@ RenderMediumWorkHasher::HashWorkDataPortion(VolumeKeyPack p, RayIndex i) const
         uint32_t start = currentBit;
         uint32_t end = currentBit + bitsForItem;
         assert(end <= sizeof(CommonKey) * CHAR_BIT);
-        Array range = {CommonKey(start), CommonKey(end)};
+        Array<CommonKey, 2> range = {CommonKey(start), CommonKey(end)};
         result = Bit::SetSubPortion(result, item, range);
         remainingBits -= bitsForItem;
         currentBit += bitsForItem;

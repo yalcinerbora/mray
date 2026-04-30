@@ -27,7 +27,7 @@ void SingleSampleSpectrumWavelength(// Output
     static constexpr auto SAMPLE_SPACE_OFFSETS = []()
     {
         constexpr auto DELTA = Float(1) / Float(SpectraPerSpectrum);
-        std::array<Float, SpectraPerSpectrum> result = {};
+        Array<Float, SpectraPerSpectrum> result = {};
         constexpr int32_t mid = int32_t(SpectraPerSpectrum / 2);
         for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
         {
@@ -47,7 +47,7 @@ void SingleSampleSpectrumWavelength(// Output
 
     // Sample expansion
     Float xi0 = rng.NextFloat<0>();
-    std::array<Float, SpectraPerSpectrum> xi;
+    Array<Float, SpectraPerSpectrum> xi;
     MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
     for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
     {
@@ -96,8 +96,8 @@ void SingleSampleSpectrumWavelength(// Output
                 SampleT<Float> sample = SampleGaussian(localXi, SIGMA[sampleI], MU[sampleI]);
                 Float otherPDF = PDFGaussian(sample.value, SIGMA[otherI], MU[otherI]);
 
-                auto pdfs = std::array{sample.pdf, otherPDF};
-                auto weights = std::array{MIS[sampleI], MIS[otherI]};
+                auto pdfs = Array<Float, 2>{sample.pdf, otherPDF};
+                auto weights = Array<Float, 2>{MIS[sampleI], MIS[otherI]};
                 auto pdf = MIS::BalanceCancelled<2>(pdfs, weights);
                 // Gaussian can be funky, check the values
                 assert(Math::IsFinite(pdf));

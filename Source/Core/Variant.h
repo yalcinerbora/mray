@@ -36,7 +36,9 @@
 //    -- We do not utilize move/copy assignment         //
 //    -- We destroy object then construct via move/copy //
 //       construct.                                     //
-//    --                                                //
+//    -- All constructors are noexcept                  //
+//    -- Did not bother with the comparison lifting.    //
+//       You can not compare two variants.              //
 // ==================================================== //
 
 #include <utility>
@@ -152,8 +154,8 @@ namespace VariantDetail
         // Lifetime and logistics will be handled by the "Variant" class.
         constexpr               UnionStorage() noexcept requires(TC) = default;
         constexpr               UnionStorage() noexcept requires(!TC) {}
-        constexpr              ~UnionStorage() noexcept requires(TD) = default;
-        constexpr              ~UnionStorage() noexcept requires(!TD) {}
+        constexpr               ~UnionStorage() noexcept requires(TD) = default;
+        constexpr               ~UnionStorage() noexcept requires(!TD) {}
         // These can be defaulted since actual variant will manually move etc.
         // Even we state it is default, it may be deleted by the compiler.
         constexpr               UnionStorage(const UnionStorage& other) = default;
@@ -207,10 +209,17 @@ namespace VariantDetail
         using TP = TypePack<Types...>;
         static constexpr bool TC  = AllTrait<std::is_trivially_constructible>(TP{});
         static constexpr bool TD  = AllTrait<std::is_trivially_destructible >(TP{});
-        static constexpr bool TCC = AllTrait<std::is_trivially_copy_constructible>(TP{});
-        static constexpr bool TMC = AllTrait<std::is_trivially_move_constructible>(TP{});
-        static constexpr bool TCA = AllTrait<std::is_trivially_copy_assignable>(TP{});
-        static constexpr bool TMA = AllTrait<std::is_trivially_move_assignable>(TP{});
+        // Here things are bit different, we only create a constructor/assignment operator
+        // if and only if all types have that, if not we default the constructors
+        // and compiler will delete/make it trivial
+        static constexpr bool CC = (AllTrait<std::is_copy_constructible>(TP{}) &&
+                                    !AllTrait<std::is_trivially_copy_constructible>(TP{}));
+        static constexpr bool MC = (AllTrait<std::is_move_constructible>(TP{}) &&
+                                    !AllTrait<std::is_trivially_move_constructible>(TP{}));
+        static constexpr bool CA = (AllTrait<std::is_copy_assignable>(TP{}) &&
+                                    !AllTrait<std::is_trivially_copy_assignable>(TP{}));
+        static constexpr bool MA = (AllTrait<std::is_move_assignable>(TP{}) &&
+                                    !AllTrait<std::is_trivially_copy_assignable>(TP{}));
         // Is first type default constructible ?
         using FirstType = TypePackElement<0, TP>;
         static constexpr bool FIRST_DC = std::is_default_constructible_v<FirstType>;
@@ -270,16 +279,16 @@ namespace VariantDetail
         template<class T>
         constexpr VariantImpl& operator=(T&&) noexcept requires(TypeIsInPack<T>);
         // Logistics
-        constexpr              VariantImpl(const VariantImpl& other) noexcept requires(!TCC);
-        constexpr              VariantImpl(VariantImpl&& other) noexcept      requires(!TMC);
-        constexpr VariantImpl& operator=(const VariantImpl& other) noexcept   requires(!TCA);
-        constexpr VariantImpl& operator=(VariantImpl&& other) noexcept        requires(!TMA);
+        constexpr              VariantImpl(const VariantImpl& other) noexcept requires(CC);
+        constexpr              VariantImpl(VariantImpl&& other) noexcept      requires(MC);
+        constexpr VariantImpl& operator=(const VariantImpl& other) noexcept   requires(CA);
+        constexpr VariantImpl& operator=(VariantImpl&& other) noexcept        requires(MA);
         //
         constexpr              VariantImpl() noexcept                         requires(!FIRST_DC) = delete;
-        constexpr              VariantImpl(const VariantImpl& other) noexcept requires(TCC) = default;
-        constexpr              VariantImpl(VariantImpl&& other) noexcept      requires(TMC) = default;
-        constexpr VariantImpl& operator=(const VariantImpl& other) noexcept   requires(TCA) = default;
-        constexpr VariantImpl& operator=(VariantImpl&& other) noexcept        requires(TMA) = default;
+        constexpr              VariantImpl(const VariantImpl& other) noexcept requires(!CC) = default;
+        constexpr              VariantImpl(VariantImpl&& other) noexcept      requires(!MC) = default;
+        constexpr VariantImpl& operator=(const VariantImpl& other) noexcept   requires(!CA) = default;
+        constexpr VariantImpl& operator=(VariantImpl&& other) noexcept        requires(!MA) = default;
         constexpr              ~VariantImpl() noexcept                        requires(TD)  = default;
         //
         constexpr VariantIndex Index() const { return tag; };
@@ -648,7 +657,7 @@ VariantDetail::VariantImpl<Types...>::operator=(T&& t) noexcept requires(TypeIsI
 template<class ... Types>
 constexpr
 VariantDetail::VariantImpl<Types...>::VariantImpl(const VariantImpl& other) noexcept
-requires(!TCC)
+requires(CC)
 {
     tag = other.tag;
     //
@@ -664,7 +673,7 @@ requires(!TCC)
 template<class ... Types>
 constexpr
 VariantDetail::VariantImpl<Types...>::VariantImpl(VariantImpl&& other) noexcept
-requires(!TMC)
+requires(MC)
 {
     tag = other.tag;
     if(tag != INVALID_INDEX)
@@ -682,7 +691,7 @@ requires(!TMC)
 template<class ... Types>
 constexpr VariantDetail::VariantImpl<Types...>&
 VariantDetail::VariantImpl<Types...>::operator=(const VariantImpl& other) noexcept
-requires(!TCA)
+requires(CA)
 {
     assert(this != &other);
     if(tag != INVALID_INDEX) DestroyAlternative();
@@ -701,7 +710,7 @@ requires(!TCA)
 template<class ... Types>
 constexpr VariantDetail::VariantImpl<Types...>&
 VariantDetail::VariantImpl<Types...>::operator=(VariantImpl&& other) noexcept
-requires(!TMA)
+requires(MA)
 {
     assert(this != &other);
     if(tag != INVALID_INDEX) DestroyAlternative();

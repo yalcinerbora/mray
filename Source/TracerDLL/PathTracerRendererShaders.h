@@ -321,8 +321,8 @@ void WorkFunction<P, M, T, SC>::Call(const Primitive&, const Material& mat, cons
         Float rrXi = rng.NextFloat<Material::SampleRNList.TotalRNCount()>();
         Float rrFactor = throughput.Sum() * ChannelCountInv;
         auto result = RussianRoulette(throughput, rrFactor, rrXi);
-        isPathDead = !result.has_value();
-        throughput = result.value_or(throughput);
+        isPathDead = !result.HasValue();
+        throughput = result.ValueOr(throughput);
     }
 
     // Change the ray type, if mat is highly specular
@@ -456,8 +456,8 @@ void WorkFunctionNEE<P, M, T, SC, LS>::Call(const Primitive&, const Material& ma
     {
         using Distribution::MIS::BalanceCancelled;
         Float bxdfPdf = mat.Pdf(wI, wO);
-        std::array<Float, 2> pdfs = {bxdfPdf, lightSample.pdf};
-        std::array<Float, 2> weights = {1, 1};
+        Array<Float, 2> pdfs = {bxdfPdf, lightSample.pdf};
+        Array<Float, 2> weights = {Float(1), Float(1)};
         pdf = BalanceCancelled<2>(pdfs, weights);
     }
     else pdf = lightSample.pdf;
@@ -541,8 +541,8 @@ void LightWorkFunctionWithNEE<L, T, SC, LS>::Call(const Light& l, RNGDispenser&,
         using Distribution::MIS::BalanceCancelled;
         using Distribution::Common::DivideByPDF;
         //
-        std::array<Float, 2> weights = {1, 1};
-        std::array<Float, 2> pdfs;
+        Array<Float, 2> weights = {Float(1), Float(1)};
+        Array<Float, 2> pdfs;
         pdfs[0] = params.rayState.dPrevMatPDF[rayIndex];
         // We need to find the index of this specific light
         // Light sampler will handle it
@@ -662,8 +662,8 @@ void WorkFunctionMedia<P, M, T, SC, LS>::Call(const Primitive&, const Material& 
         Float rrXi = rng.NextFloat<Material::SampleRNList.TotalRNCount()>();
         Float rrFactor = pathThroughput.Sum() * ChannelCountInv;
         auto result = RussianRoulette(pathThroughput, rrFactor, rrXi);
-        isPathDead = !result.has_value();
-        pathThroughput = result.value_or(pathThroughput);
+        isPathDead = !result.HasValue();
+        pathThroughput = result.ValueOr(pathThroughput);
     }
 
     // Change the ray type, if mat is highly specular
@@ -787,8 +787,8 @@ void LightWorkFunctionMedia<L, T, SC, LS>::Call(const Light&, RNGDispenser&, con
     //    using Distribution::MIS::BalanceCancelled;
     //    using Distribution::Common::DivideByPDF;
     //    //
-    //    std::array<Float, 2> weights = {1, 1};
-    //    std::array<Float, 2> pdfs;
+    //    Array<Float, 2> weights = {Float(1), Float(1)};
+    //    Array<Float, 2> pdfs;
     //    pdfs[0] = params.rayState.dPrevMatPDF[rayIndex];
     //    // We need to find the index of this specific light
     //    // Light sampler will handle it
@@ -908,7 +908,7 @@ void MediumWorkFunction <M, T, SC>::Call(const Medium& medium, const TContext& t
         if(mQuery.emission && (pathState.depth + 1u) < rrRange[1])
         {
             emissionAccumulated = true;
-            Spectrum emission = *mQuery.emission;
+            Spectrum emission = mQuery.emission.Value();
 
             Spectrum factor = tMaj * sMaj;
             Float pdfBalance = ColorChannelMIS(factor);
@@ -921,7 +921,7 @@ void MediumWorkFunction <M, T, SC>::Call(const Medium& medium, const TContext& t
         Float probA = mQuery.sigmaA[sampleChannelIndex] * wFactor;
         Float probS = mQuery.sigmaS[sampleChannelIndex] * wFactor;
         Float probN = Float(1) - probA - probS;
-        std::array<Float, 3> dist = {probA, probS, probN};
+        Array<Float, 3> dist = {probA, probS, probN};
         auto [statusInt, localXi] = BisectSample<3>(rngBackup.NextFloat(), dist, true);
         status = MediumEvent(statusInt);
         if(status == ABSORBED)
@@ -952,8 +952,8 @@ void MediumWorkFunction <M, T, SC>::Call(const Medium& medium, const TContext& t
                 Float rrXi = rng.NextFloat<Medium::SampleScatteringRNList.TotalRNCount()>();
                 Float rrFactor = throughput.Sum() * COLOR_CHANNELS_INV;
                 auto result = RussianRoulette(throughput, rrFactor, rrXi);
-                isPathDead = !result.has_value();
-                throughput = result.value_or(throughput);
+                isPathDead = !result.HasValue();
+                throughput = result.ValueOr(throughput);
 
                 if(isPathDead)
                     pathState.status.Set(uint32_t(PathStatusEnum::DEAD));
@@ -1050,11 +1050,10 @@ void MediumWorkFunctionWithNEE<M, T, SC, LS>::Call(const Medium& medium, const T
         // ============ //
         //   Emission   //
         // ============ //
-        if(mQuery.emission &&
-           (pathState.depth + 1u) < rrRange[1])
+        if(mQuery.emission && (pathState.depth + 1u) < rrRange[1])
         {
             emissionAccumulated = true;
-            Spectrum emission = *mQuery.emission;
+            Spectrum emission = mQuery.emission.Value();
             Float pdf = tMaj[0] * sMaj[0];
             Spectrum factor = DivideByPDF(tMaj, pdf);
             Spectrum tpEmit = throughput * factor;
@@ -1071,7 +1070,7 @@ void MediumWorkFunctionWithNEE<M, T, SC, LS>::Call(const Medium& medium, const T
         Float probA = mQuery.sigmaA[0] * wFactor;
         Float probS = mQuery.sigmaS[0] * wFactor;
         Float probN = Float(1) - probA - probS;
-        std::array<Float, 3> dist = {probA, probS, probN};
+        Array<Float, 3> dist = {probA, probS, probN};
         auto [statusInt, localXi] = BisectSample<3>(rngBackup.NextFloat(), dist, true);
         status = MediumEvent(statusInt);
         if(status == ABSORBED)
@@ -1161,8 +1160,8 @@ void MediumWorkFunctionWithNEE<M, T, SC, LS>::Call(const Medium& medium, const T
                 Float rrXi = rng.NextFloat<Medium::SampleScatteringRNList.TotalRNCount()>();
                 Float rrFactor = throughput.Sum() * ChannelCountInv;
                 auto result = RussianRoulette(throughput, rrFactor, rrXi);
-                isPathDead = !result.has_value();
-                throughput = result.value_or(throughput);
+                isPathDead = !result.HasValue();
+                throughput = result.ValueOr(throughput);
 
                 if(isPathDead)
                     pathState.status.Set(uint32_t(PathStatusEnum::DEAD));

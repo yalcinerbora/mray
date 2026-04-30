@@ -112,8 +112,8 @@ Float DirectLightSamplerUniform<ML>::PdfLight(const HitKeyPack& hitPack,
         .pK = std::bit_cast<CommonKey>(hitPack.primKey)
     };
     auto lightIndexOpt = dLightIndexTable.Search(keyPack);
-    if(lightIndexOpt.has_value())
-        return PdfLight(lightIndexOpt.value(), hit, r);
+    if(lightIndexOpt.HasValue())
+        return PdfLight(lightIndexOpt.Value(), hit, r);
 
     return Float(0);
 }

@@ -1761,8 +1761,8 @@ inline SurfaceId TracerMock::CreateSurface(SurfaceParams p)
         primIdString += MRAY_FORMAT("{}, ", static_cast<CommonId>(p.primBatches[i]));
         matIdString += MRAY_FORMAT("{}, ", static_cast<CommonId>(p.materials[i]));
         cullFaceString += MRAY_FORMAT("{}, ", p.cullFaceFlags[i]);
-        alphaMapString += (p.alphaMaps[i].has_value())
-                            ? MRAY_FORMAT("{}, ", static_cast<CommonId>(p.alphaMaps[i].value()))
+        alphaMapString += (p.alphaMaps[i].HasValue())
+                            ? MRAY_FORMAT("{}, ", static_cast<CommonId>(p.alphaMaps[i].Value()))
                             : "None, ";
 
         interfaceString += (p.volumes[i] == TracerConstants::InvalidVolume)

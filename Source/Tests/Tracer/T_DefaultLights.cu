@@ -190,16 +190,16 @@ TEST(DefaultLights, MetaLight)
                        PrimGroupPtr(std::make_unique<PrimGroupEmpty>(0u, system)));
     primGroups.emplace(PrimGroupId(1),
                        PrimGroupPtr(std::make_unique<PrimGroupTriangle>(1u, system)));
-    auto& emptyPrimGroup = *primGroups.at(PrimGroupId(0)).value().get().get();
-    auto& triangleGroup = *primGroups.at(PrimGroupId(1)).value().get().get();
+    auto& emptyPrimGroup = *primGroups.at(PrimGroupId(0)).Value().get();
+    auto& triangleGroup = *primGroups.at(PrimGroupId(1)).Value().get();
     // TGs
     Map<TransGroupId, TransformGroupPtr> transformGroups;
     transformGroups.emplace(TransGroupId(0),
                             TransformGroupPtr(std::make_unique<TransformGroupIdentity>(0u, system)));
     transformGroups.emplace(TransGroupId(1),
                             TransformGroupPtr(std::make_unique<TransformGroupSingle >(1u, system)));
-    auto& identityTG = *transformGroups.at(TransGroupId(0)).value().get().get();
-    auto& singleTG = *transformGroups.at(TransGroupId(1)).value().get().get();
+    auto& identityTG = *transformGroups.at(TransGroupId(0)).Value().get();
+    auto& singleTG = *transformGroups.at(TransGroupId(1)).Value().get();
     // LGs
     Map<LightGroupId, LightGroupPtr> lightGroups;
     lightGroups.emplace
@@ -220,8 +220,8 @@ TEST(DefaultLights, MetaLight)
             (1u, system, TextureViewMap{}, TextureMap{}, emptyPrimGroup)
         )
     );
-    auto& triangleLightGroup = *lightGroups.at(LightGroupId(0)).value().get().get();
-    auto& skysphereCOLightGroup = *lightGroups.at(LightGroupId(1)).value().get().get();
+    auto& triangleLightGroup = *lightGroups.at(LightGroupId(0)).Value().get();
+    auto& skysphereCOLightGroup = *lightGroups.at(LightGroupId(1)).Value().get();
     //
     //auto hEmptyPrimBatchIds = emptyPrimGroup.Reserve({{1, 1}});
     auto hTriBatchIds = triangleGroup.Reserve({{2, 4}});
@@ -381,9 +381,9 @@ TEST(DefaultLights, PrimLight_Triangle)
         Ray r0 = Ray(Normalize(sample0.value), Vector3::Zero());
         Ray r1 = Ray(Normalize(sample1.value), Vector3::Zero());
 
-        Float pdf0 = l0.PdfSolidAngle(tri0.Intersects(r0, false).value().hit,
+        Float pdf0 = l0.PdfSolidAngle(tri0.Intersects(r0, false).Value().hit,
                                       r0.pos, r0.dir);
-        Float pdf1 = l1.PdfSolidAngle(tri1.Intersects(r1, false).value().hit,
+        Float pdf1 = l1.PdfSolidAngle(tri1.Intersects(r1, false).Value().hit,
                                       r1.pos, r1.dir);
 
         EXPECT_FLOAT_EQ(pdf0, sample0.pdf);

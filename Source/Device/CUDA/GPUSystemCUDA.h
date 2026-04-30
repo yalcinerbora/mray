@@ -619,13 +619,13 @@ void GPUQueueCUDA::MemcpyAsync2D(Span<T> regionTo, size_t toStride,
     size_t outStrideBytes = fromStride * sizeof(T);
     size_t copyWidthBytes = copySize[0] * sizeof(T);
 
-    cudaMemcpy2DAsync(regionTo.data(),
-                      inStrideBytes,
-                      regionFrom.data(),
-                      outStrideBytes,
-                      copyWidthBytes, copySize[1],
-                      cudaMemcpyDefault,
-                      stream);
+    CUDA_CHECK(cudaMemcpy2DAsync(regionTo.data(),
+                                 inStrideBytes,
+                                 regionFrom.data(),
+                                 outStrideBytes,
+                                 copyWidthBytes, copySize[1],
+                                 cudaMemcpyDefault,
+                                 stream));
 }
 
 template <class T>
@@ -641,13 +641,13 @@ void GPUQueueCUDA::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
     size_t elemCountIn = Math::DivideUp(size_t(regionFrom.size_bytes()), actualInStride);
     assert(elemCountIn == Math::DivideUp(size_t(regionTo.size_bytes()), actualOutStride));
 
-    cudaMemcpy2DAsync(regionTo.data(),
-                      actualOutStride,
-                      regionFrom.data(),
-                      actualInStride,
-                      sizeof(T), elemCountIn,
-                      cudaMemcpyDefault,
-                      stream);
+    CUDA_CHECK(cudaMemcpy2DAsync(regionTo.data(),
+                                 actualOutStride,
+                                 regionFrom.data(),
+                                 actualInStride,
+                                 sizeof(T), elemCountIn,
+                                 cudaMemcpyDefault,
+                                 stream));
 }
 
 template <class T>

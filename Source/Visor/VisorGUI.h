@@ -4,6 +4,7 @@
 #include "Core/MathForward.h"
 #include "Core/Vector.h"
 #include "Core/Types.h"
+#include "Core/Optional.h"
 
 #include "VisorI.h"
 #include "MovementSchemes.h"

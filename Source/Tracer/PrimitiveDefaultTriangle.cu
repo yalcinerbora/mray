@@ -337,8 +337,8 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
     for(PrimBatchKey batchKey : primBatches)
     {
         auto rangeOpt = this->itemRanges.at(batchKey.FetchIndexPortion());
-        assert(rangeOpt.has_value());
-        const AttributeRanges& ranges = rangeOpt.value().get();
+        assert(rangeOpt.HasValue());
+        const AttributeRanges& ranges = rangeOpt.Value();
         assert(ranges[POSITION_ATTRIB_INDEX] == ranges[NORMAL_ATTRIB_INDEX]);
         hVertexRanges.push_back(ranges[POSITION_ATTRIB_INDEX]);
     }

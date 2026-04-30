@@ -181,8 +181,8 @@ namespace GuidedPTRDetail
         static constexpr uint32_t LobeCount     = N;
         static constexpr auto     SampleRNList = GenRNRequestList<2>();
 
-        std::array<GaussianLobe, N> lobes;
-        std::array<Float, N>        weights;
+        Array<GaussianLobe, N>      lobes;
+        Array<Float, N>             weights;
         uint32_t                    sampleIndex = UINT32_MAX;
         Float                       sumWeight   = 0;
         // Functionality
@@ -194,7 +194,7 @@ namespace GuidedPTRDetail
                                                    BackupRNG& rng,
                                                    //
                                                    const GlobalState& gs);
-        MR_GF_DECL void             Product(const std::array<GaussianLobe, 2>& matLobes);
+        MR_GF_DECL void             Product(const Array<GaussianLobe, 2>& matLobes);
     };
 
     template<uint32_t N>
@@ -227,7 +227,7 @@ namespace GuidedPTRDetail
                                                    BackupRNG& rng,
                                                    //
                                                    const GlobalState& gs);
-        MR_GF_DECL void             Product(const std::array<GaussianLobe, 2>& matLobes);
+        MR_GF_DECL void             Product(const Array<GaussianLobe, 2>& matLobes);
     };
 
     //static constexpr uint32_t MC_LOBE_COUNT = 5;
@@ -455,7 +455,7 @@ uint32_t GaussLobeMixtureT<N>::LoadStochastic(const Vector3& position,
 }
 
 template<uint32_t N>
-MR_GF_DEF void GaussLobeMixtureT<N>::Product(const std::array<GaussianLobe, 2>& matLobes)
+MR_GF_DEF void GaussLobeMixtureT<N>::Product(const Array<GaussianLobe, 2>& matLobes)
 {
     for(uint32_t i = 0; i < N; i++)
         lobes[i] = lobes[i].Product(matLobes[0]).Product(matLobes[1]);
@@ -566,7 +566,7 @@ uint32_t GaussLobeMixtureSharedT<N>::LoadStochastic(const Vector3& position,
 }
 
 template<uint32_t N>
-MR_GF_DEF void GaussLobeMixtureSharedT<N>::Product(const std::array<GaussianLobe, 2>& matLobes)
+MR_GF_DEF void GaussLobeMixtureSharedT<N>::Product(const Array<GaussianLobe, 2>& matLobes)
 {
     for(uint32_t i = 0; i < N; i++)
     {
@@ -629,7 +629,7 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
                                                     gs);
     Vector2 cooctaN = Graphics::DirectionToConcentricOctahedral(wOWorld);
     // TODO: Product sampling
-    //std::array<GaussianLobe, 2> materialLobes =
+    //Array<GaussianLobe, 2> materialLobes =
     //{
     //    GaussianLobe(surf.geoNormal, Float(0.1)),
     //    GaussianLobe(Graphics::Reflect(surf.geoNormal, wOWorld), Float(specularity) * Float(100))
@@ -639,8 +639,8 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     // ====================== //
     // Sample Material or vMF //
     // ====================== //
-    std::array<Float, 2> misPDFs = {};
-    std::array<Float, 2> misWeights = {};
+    Array<Float, 2> misPDFs = {};
+    Array<Float, 2> misWeights = {};
     bool isLobeSampled = false;
     if(!isSpecular)
     {
@@ -696,8 +696,8 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
         Float rrXi = rng.NextFloat<RRSampleStart>();
         Float rrFactor = throughput.Sum() * ChannelCountInv;
         auto result = RussianRoulette(throughput, rrFactor, rrXi);
-        isPathDead = !result.has_value();
-        throughput = result.value_or(throughput);
+        isPathDead = !result.HasValue();
+        throughput = result.ValueOr(throughput);
     }
 
     // ================== //
@@ -871,8 +871,8 @@ void LightWorkFunction<L, T>::Call(const Light& l, RNGDispenser&,
         using Distribution::MIS::BalanceCancelled;
         using Distribution::Common::DivideByPDF;
         //
-        std::array<Float, 2> weights = {1, 1};
-        std::array<Float, 2> pdfs;
+        Array<Float, 2> weights = {Float(1), Float(1)};
+        Array<Float, 2> pdfs;
         pdfs[0] = params.rayState.dPrevPDF[rayIndex];
         // We need to find the index of this specific light
         // Light sampler will handle it

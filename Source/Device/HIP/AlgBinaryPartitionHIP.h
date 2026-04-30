@@ -12,7 +12,7 @@ namespace mray::hip::algorithms
 
 template <class T>
 MRAY_HOST inline
-size_t BinPartitionTMSize(size_t elementCount)
+size_t BinPartitionTMSize(size_t elementCount, const GPUQueueHIP& q)
 {
     using namespace rocprim;
 
@@ -23,7 +23,8 @@ size_t BinPartitionTMSize(size_t elementCount)
     size_t result;
     HIP_CHECK(partition(dTM, result, dIn, dOut, dEndOffset,
                         static_cast<int>(elementCount),
-                        [] MRAY_HYBRID(T)->bool{ return false; }));
+                        [] MRAY_HYBRID(T)->bool{ return false; },
+                        ToHandleHIP(q)));
 
     return result;
 }

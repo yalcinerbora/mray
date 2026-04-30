@@ -179,8 +179,14 @@ MRayError VisorCommand::Invoke()
     tracerThread.Start("TracerThread");
 
     // Initially send the kickstart parameters to tracer (if avail)
-    visorSystem->MTInitiallyStartRender(renderConfigFile,
-                                        sceneFile);
+    static const auto ConvertOptStringView = [](const std::optional<std::string>& opt)
+        -> Optional<std::string_view>
+    {
+        if(opt.has_value()) return Optional<std::string_view>(std::string_view(*opt));
+        else                return std::nullopt;
+    };
+    visorSystem->MTInitiallyStartRender(ConvertOptStringView(renderConfigFile),
+                                        ConvertOptStringView(sceneFile));
 
     // ====================== //
     //     Real-time Loop     //

@@ -101,8 +101,8 @@ inline constexpr CommonKey INVALID_VOLUME_INDEX = VolumeIndex::InvalidKey().Fetc
 
 struct MediaList
 {
-    using IndexList = std::array<uint32_t, MAX_NESTED_MEDIA>;
-    using PackedList = std::array<uint32_t, MEDIA_LIST_WORDS>;
+    using IndexList  = Array<uint32_t, MAX_NESTED_MEDIA>;
+    using PackedList = Array<uint32_t, MEDIA_LIST_WORDS>;
 
     static constexpr uint32_t INVALID_VAL = (1 << MAX_MEDIA_BITS) - 1;
 

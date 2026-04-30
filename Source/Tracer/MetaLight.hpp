@@ -479,7 +479,7 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
                 LightKey lKey = std::bit_cast<LightKey>(surf.second.lightId);
                 TransformKey tKey = std::bit_cast<TransformKey>(surf.second.transformId);
                 //
-                const auto& lg = *params.lightGroups.at(lgId).value().get().get();
+                const auto& lg = *params.lightGroups.at(lgId).Value().get();
                 if(lg.IsPrimitiveBacked())
                 {
                     PrimBatchKey primBatchKey = lg.LightPrimBatch(lKey);
@@ -556,8 +556,8 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
     {
         LightGroupId lgId = LightGroupId(hLKList[range[0]].FetchBatchPortion());
         TransGroupId tgId = TransGroupId(hTKList[range[0]].FetchBatchPortion());
-        const auto& lg = *params.lightGroups.at(lgId).value().get().get();
-        const auto& tg = *params.transformGroups.at(tgId).value().get().get();
+        const auto& lg = *params.lightGroups.at(lgId).Value().get();
+        const auto& tg = *params.transformGroups.at(tgId).Value().get();
 
         AddBatchGeneric(lg, tg,
                         dPKList.subspan(range[0], range[1] - range[0]),
@@ -600,8 +600,8 @@ void MetaLightArrayT<TLT...>::Construct(MetaLightListConstructionParams params,
             };
             [[maybe_unused]]
             auto loc = lt.Search(kp);
-            assert(loc.has_value());
-            assert(loc.value() == i);
+            assert(loc.HasValue());
+            assert(loc.Value() == i);
         }
     }
 

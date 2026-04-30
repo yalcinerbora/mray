@@ -111,8 +111,16 @@ class FreeList
 
 using PoolMemResource = std::pmr::synchronized_pool_resource;
 
-MRAY_TRANSIENT_POOL_ENTRYPOINT extern PoolMemResource   mainR;
-MRAY_TRANSIENT_POOL_ENTRYPOINT extern FreeList          freeList;
+// Due to ldd-link on HIP could not resolve mainR
+// (although it should be proper) The code below is changed to
+// functions. Single translation unit (namely "TransientPool.cpp")
+// will define these (and it will be on a DLL).
+//
+//MRAY_TRANSIENT_POOL_ENTRYPOINT extern PoolMemResource   mainR;
+//MRAY_TRANSIENT_POOL_ENTRYPOINT extern FreeList          freeList;
+//
+MRAY_TRANSIENT_POOL_ENTRYPOINT PoolMemResource& GetMainResource();
+MRAY_TRANSIENT_POOL_ENTRYPOINT FreeList&        GetFreeList();
 
 }
 

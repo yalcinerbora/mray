@@ -226,7 +226,7 @@ void KCAnyHit()
     if(record.alphaMap)
     {
         // This has alpha map check it
-        const auto& alphaMap = record.alphaMap.value();
+        const auto& alphaMap = record.alphaMap.Value();
         const uint32_t leafId = optixGetPrimitiveIndex();
         PrimitiveKey pKey = record.dPrimKeys[leafId];
         // Get the current hit
@@ -294,7 +294,7 @@ void KCIntersect()
     // identity transform context
     Primitive prim(TransformContextIdentity{}, *record.primSoA, pKey);
     Intersection result = prim.Intersects(ray, record.cullBackFaceNonTri);
-    if(result) ReportIntersection(*result, 0);
+    if(result) ReportIntersection(result.Value(), 0);
 }
 
 MR_GF_DECL

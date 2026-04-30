@@ -294,11 +294,11 @@ SampleT<Vector2> MitchellNetravaliFilter::Sample(const Vector2& xi) const
     auto SampleDim = [this](Float xi)
     {
         using namespace Distribution::Common;
-        std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
+        Array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
         auto [index, localXi] = BisectSample<3>(xi, Span<Float, 3>(weights.data(), 3), true);
 
         Float sampleVal = Float(0);
-        std::array<Float, 3> pdfs;
+        Array<Float, 3> pdfs;
         assert(index <= 2);
         switch(index)
         {
@@ -357,14 +357,14 @@ MR_HF_DEF
 Float MitchellNetravaliFilter::Pdf(const Vector2& duv) const
 {
     using namespace Distribution;
-    std::array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
-    std::array<Float, 3> pdfs0
+    Array<Float, 3> weights{MIS_SIDES, MIS_MID, MIS_SIDES};
+    Array<Float, 3> pdfs0
     {
         Common::PDFGaussian(duv[0], sideSigma, -sideMean),
         Common::PDFGaussian(duv[0], midSigma),
         Common::PDFGaussian(duv[0], sideSigma, sideMean)
     };
-    std::array<Float, 3> pdfs1
+    Array<Float, 3> pdfs1
     {
         Common::PDFGaussian(duv[1], sideSigma, -sideMean),
         Common::PDFGaussian(duv[1], midSigma),

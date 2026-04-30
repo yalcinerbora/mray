@@ -122,7 +122,7 @@ void PrintPrims(const CollapsedPrims& meshMatPrims,
     //
     MRAY_LOG(HEADER, "Dome Light");
     if(domeLight)
-        MRAY_LOG("{}", domeLight->surfacePrim.GetPath().GetString());
+        MRAY_LOG("{}", domeLight.Value().surfacePrim.GetPath().GetString());
     //
     MRAY_LOG(HEADER, "Cameras");
     for(const auto& cam : cameras)
@@ -358,7 +358,7 @@ MRayError ProcessCameras(CameraGroupId& camGroupId,
         auto camPrim = pxr::UsdGeomCamera(cam.surfacePrim);
         //
         using TransformGen::ZUpToYUpMat, TransformGen::YUpToZUpMat;
-        Matrix4x4 transform = *cam.surfaceTransform;
+        Matrix4x4 transform = cam.surfaceTransform.Value();
         bool zUp = pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z;
         if(zUp)
             transform = ZUpToYUpMat<Float>() * transform * YUpToZUpMat<Float>();
@@ -412,7 +412,7 @@ MRayError FindLightTextures(std::map<pxr::UsdPrim, MRayUSDTexture>& extraTexture
 {
     if(domeLight)
     {
-        pxr::UsdLuxDomeLight lightPrim(domeLight->uniquePrim);
+        pxr::UsdLuxDomeLight lightPrim(domeLight.Value().uniquePrim);
         pxr::UsdAttribute fileA = lightPrim.GetTextureFileAttr();
         pxr::SdfAssetPath path; fileA.Get(&path);
         std::string filePath = path.GetResolvedPath();
@@ -420,7 +420,7 @@ MRayError FindLightTextures(std::map<pxr::UsdPrim, MRayUSDTexture>& extraTexture
             return MRayError("[MRayUSD]: Unable to resolve texture path \"{}\". "
                              "Node \"{}\"",
                              path.GetAuthoredPath(),
-                             domeLight->uniquePrim.GetPrimPath().GetAsString());
+                             domeLight.Value().uniquePrim.GetPrimPath().GetAsString());
         MRayUSDTexture tex =
         {
             .absoluteFilePath = filePath,
@@ -442,7 +442,7 @@ MRayError FindLightTextures(std::map<pxr::UsdPrim, MRayUSDTexture>& extraTexture
                 .isIlluminant = MRayTextureIsIlluminant::IS_ILLUMINANT
             }
         };
-        extraTextures.emplace(domeLight->uniquePrim, tex);
+        extraTextures.emplace(domeLight.Value().uniquePrim, tex);
     }
     // TODO: Do the rest
 
@@ -476,8 +476,8 @@ MRayError ProcessLights(std::vector<Pair<LightGroupId, LightId>>&,
     }
     else
     {
-        pxr::UsdLuxDomeLight lightPrim(domeLight->uniquePrim);
-        TextureId texId = uniqueTextureIds.at(domeLight->uniquePrim);
+        pxr::UsdLuxDomeLight lightPrim(domeLight.Value().uniquePrim);
+        TextureId texId = uniqueTextureIds.at(domeLight.Value().uniquePrim);
         lightTexture[0] = texId;
     }
     tracer.CommitLightReservations(domeLightGroupId);
@@ -504,8 +504,8 @@ SceneLoaderUSD::SceneLoaderUSD(ThreadPool& tp)
 Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                                                  const std::string& filePath)
 {
-    static const ProfilerAnnotation _("LoadScene USD");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "USD Load Scene (File)");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     Timer t; t.Start();
     Timer tLocal; tLocal.Start();
@@ -773,7 +773,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                                                  surface.uniquePrim);
             if(std::distance(end, start) > 1) continue;
 
-            Matrix4x4 transform = *surface.surfaceTransform;
+            Matrix4x4 transform = surface.surfaceTransform.Value();
             if(pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z)
                 transform = TransformGen::ZUpToYUpMat<Float>() * transform;
 
@@ -802,7 +802,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
         std::plus<uint32_t>{},
         [](const MRayUSDPrimSurface& s) ->uint32_t
         {
-            return s.surfaceTransform.has_value() ? 1u : 0u;
+            return s.surfaceTransform.HasValue() ? 1u : 0u;
         }
     );
 
@@ -814,7 +814,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     allSizes[3] = sphereMatPrims.surfaces.size();
     allSizes[4] = sphereMatPrims.geomLightSurfaces.size();
     allSizes[5] = 0; // cameras.size();
-    allSizes[6] = domeLight.has_value() ? 1 : 0;
+    allSizes[6] = domeLight.HasValue() ? 1 : 0;
     std::inclusive_scan(allSizes.cbegin(), allSizes.cend(), allSizes.begin());
     size_t totalSurfSize = allSizes.back();
     //
@@ -831,20 +831,20 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     for(size_t i = 0; i < meshSurfMats.size(); i++)
     {
         const auto& s = meshMatPrims.surfaces[i];
-        if(!s.surfaceTransform.has_value()) continue;
+        if(!s.surfaceTransform.HasValue()) continue;
 
-        meshSurfMats[meshTransformOffsets[i]] = *meshMatPrims.surfaces[i].surfaceTransform;
+        meshSurfMats[meshTransformOffsets[i]] = meshMatPrims.surfaces[i].surfaceTransform.Value();
     }
     for(uint32_t i = 0; i < meshLightSurfMats.size(); i++)
-        meshLightSurfMats[i] = *meshMatPrims.geomLightSurfaces[i].surfaceTransform;
+        meshLightSurfMats[i] = meshMatPrims.geomLightSurfaces[i].surfaceTransform.Value();
     for(uint32_t i = 0; i < sphereSurfMats.size(); i++)
-        sphereSurfMats[i] = *sphereMatPrims.surfaces[i].surfaceTransform;
+        sphereSurfMats[i] = sphereMatPrims.surfaces[i].surfaceTransform.Value();
     for(uint32_t i = 0; i < sphereLightSurfMats.size(); i++)
-        sphereLightSurfMats[i] = *sphereMatPrims.geomLightSurfaces[i].surfaceTransform;
+        sphereLightSurfMats[i] = sphereMatPrims.geomLightSurfaces[i].surfaceTransform.Value();
     for(uint32_t i = 0; i < cameraSurfMats.size(); i++)
-        cameraSurfMats[i] = *cameras[i].surfaceTransform;
-    if(domeLight.has_value())
-        domeLightSurfMats[0] = *domeLight->surfaceTransform;
+        cameraSurfMats[i] = cameras[i].surfaceTransform.Value();
+    if(domeLight.HasValue())
+        domeLightSurfMats[0] = domeLight.Value().surfaceTransform.Value();
 
     // Convert to Y up if required
     if(pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z)
@@ -892,7 +892,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             //
             SurfaceParams surface;
             surface.transformId = TracerConstants::IdentityTransformId;
-            if(prim.surfaceTransform.has_value())
+            if(prim.surfaceTransform.HasValue())
                 surface.transformId = meshSurfTIds[meshTransformOffsets[i]];
             for(size_t j = start; j < end; j++)
             {
@@ -934,7 +934,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                 const auto& primBatchId = uniqueSpherePrimBatches.at(primName)[geomIndex];
                 surface.materials.push_back(mat.materialId);
                 surface.primBatches.push_back(primBatchId);
-                surface.cullFaceFlags.push_back(!mat.alphaMap.has_value());
+                surface.cullFaceFlags.push_back(!mat.alphaMap.HasValue());
                 surface.alphaMaps.push_back(mat.alphaMap);
             }
             SurfaceId sId = tracer.CreateSurface(surface);
@@ -1038,7 +1038,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     }
     // Lights
     {
-        std::string s = (domeLight) ? domeLight->surfacePrim.GetPath().GetString()
+        std::string s = (domeLight) ? domeLight.Value().surfacePrim.GetPath().GetString()
                                     : "GENERATED";
         auto loc = stringConcat.insert(stringConcat.end(),
                                        s.cbegin(), s.cend());

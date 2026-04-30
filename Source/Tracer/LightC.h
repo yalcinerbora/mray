@@ -349,7 +349,7 @@ inline PrimBatchKey GenericGroupLightT::LightPrimBatch(LightKey lKey) const
                         this->Name(), this->groupId,
                         lKey.FetchIndexPortion());
     }
-    return pBatchId.value();
+    return pBatchId.Value();
 }
 
 template <class C>

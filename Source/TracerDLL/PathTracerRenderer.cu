@@ -1250,9 +1250,9 @@ PathTracerRendererT<SC>::DoLatencyRender(uint32_t passCount,
     Optional<RenderImageSection> renderOut;
     renderOut = imageTiler.TransferToHost(processQueue, transferQueue);
     // Semaphore is invalidated, visor is probably crashed
-    if(!renderOut.has_value()) return RendererOutput{};
+    if(!renderOut.HasValue()) return RendererOutput{};
     // Actual global weight
-    renderOut->globalWeight = Float(1);
+    renderOut.Value().globalWeight = Float(1);
 
     // We do not need to wait here, but we time
     // from CPU side so we need to wait

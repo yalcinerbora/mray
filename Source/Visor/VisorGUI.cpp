@@ -395,7 +395,7 @@ StatusBarChanges MainStatusBar::Render(const VisorState& visorState,
         ? Optional<TracerRunState>(newRunState)
         : std::nullopt;
     auto camIndexResult = (camChange != 0)
-        ? Optional<uint32_t>(camChange)
+        ? Optional<int32_t>(camChange)
         : std::nullopt;
     return StatusBarChanges
     {
@@ -517,9 +517,9 @@ Optional<int32_t> VisorGUI::ShowRendererComboBox(const VisorState& visorState)
         rIndex = Math::Roll(rIndex, 0, right);
         result = rIndex;
     }
-    const int32_t& curRIndex = (result.has_value())
-                                    ? result.value()
-                                    : visorState.currentRenderIndex;
+    const int32_t& curRIndex = (result.HasValue())
+                                ? result.Value()
+                                : visorState.currentRenderIndex;
 
     using namespace std::string_literals;
     static const std::string RENDERER_DASHED = "Renderer-"s;
@@ -553,9 +553,9 @@ TopBarChanges VisorGUI::ShowTopMenu(const VisorState& visorState)
 {
     auto CheckLogic = [&](int32_t index, uint32_t size,
                           VisorUserAction nextAction,
-                          VisorUserAction prevAction) -> Optional<uint32_t>
+                          VisorUserAction prevAction) -> Optional<int32_t>
     {
-        Optional<uint32_t> result;
+        Optional<int32_t> result;
         if(size == 0) return result;
 
         int32_t count = static_cast<int32_t>(size);
@@ -764,7 +764,7 @@ GUIChanges VisorGUI::Render(ImFont* windowScaledFont, const VisorState& visorSta
     //
     {
         std::lock_guard _(imgSaveMutex);
-        if(imgSaveProgress) imgSaveProgress->Render();
+        if(imgSaveProgress) imgSaveProgress.Value().Render();
     }
 
     ImGui::PopFont();
@@ -790,9 +790,9 @@ void VisorGUI::ChangeTonemapperGUI(GUITonemapperI* newTonemapperGUI)
 ImageSaveProgress& VisorGUI::CreateSaveProgressWindow(std::string&& fileName)
 {
     std::lock_guard _(imgSaveMutex);
-    assert(!imgSaveProgress.has_value());
+    assert(!imgSaveProgress.HasValue());
     imgSaveProgress = ImageSaveProgress(std::move(fileName));
-    return *imgSaveProgress;
+    return imgSaveProgress.Value();
 }
 
 void VisorGUI::RemoveSaveProgressWindow()

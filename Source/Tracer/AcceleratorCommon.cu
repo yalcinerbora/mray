@@ -19,7 +19,7 @@ class KeyGeneratorFunctor
         , dLocalKeyWriteRegion(dWriteRegions)
     {}
 
-    MR_PF_DECL_V
+    MR_GF_DECL
     void operator()(KernelCallParams kp) const noexcept
     {
         uint32_t keyCount = static_cast<uint32_t>(dLocalKeyWriteRegion.size());
@@ -292,19 +292,19 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
         assert(surf.materials.size() == surf.primBatches.size());
         for(uint32_t i = 0; i < static_cast<uint32_t>(surf.alphaMaps.size()); i++)
         {
-            if(surf.alphaMaps[i].has_value())
+            if(surf.alphaMaps[i].HasValue())
             {
-                auto optView = p.textureViews->at(surf.alphaMaps[i].value());
+                auto optView = p.textureViews->at(surf.alphaMaps[i].Value());
                 if(!optView)
                 {
                     throw MRayError("{:s}: Alpha map texture({:d}) is not found",
-                                    typeName, static_cast<CommonKey>(surf.alphaMaps[i].value()));
+                                    typeName, static_cast<CommonKey>(surf.alphaMaps[i].Value()));
                 }
-                const GenericTextureView& view = optView.value();
+                const GenericTextureView& view = optView.Value();
                 if(!std::holds_alternative<AlphaMap>(view))
                 {
                     throw MRayError("{:s}: Alpha map texture({:d}) is not a single channel texture!",
-                                    typeName, static_cast<CommonKey>(surf.alphaMaps[i].value()));
+                                    typeName, static_cast<CommonKey>(surf.alphaMaps[i].Value()));
                 }
                 result.alphaMaps.back()[i] = std::get<AlphaMap>(view);
             }
@@ -428,7 +428,7 @@ AcceleratorGroup::PreprocessConstructionParams(const AccelGroupConstructParams& 
                             this->Name(), accelGroupId,
                             static_cast<CommonKey>(indices.tId));
         }
-        const GenericGroupTransformT& tGroup = *tGroupOpt.value().get().get();
+        const GenericGroupTransformT& tGroup = *tGroupOpt.Value().get();
 
         using namespace TypeNameGen::CompTime;
         std::string workTypeName = AccelWorkTypeName(this->Name(), tGroup.Name());
@@ -438,7 +438,7 @@ AcceleratorGroup::PreprocessConstructionParams(const AccelGroupConstructParams& 
             throw MRayError("{:s}:{:d}: Unable to find generator for work \"{:s}\"",
                             this->Name(), accelGroupId, workTypeName);
         }
-        const auto& workGen = workGenOpt.value().get();
+        const auto& workGen = workGenOpt.Value();
         workInstances.try_emplace(i, workGen(*this, tGroup));
         i++;
     }
@@ -601,7 +601,7 @@ void BaseAccelerator::PartitionSurfaces(std::vector<AccelGroupConstructParams>& 
             throw MRayError("{:s}: Unable to find primitive group()",
                             Name(), pGroupId);
         };
-        partitions.back().primGroup = pGroupOpt.value().get().get();
+        partitions.back().primGroup = pGroupOpt.Value().get();
         partitions.back().textureViews = &cParams.texViewMap;
         partitions.back().globalVolumeList = &cParams.globalVolumeList;
         partitions.back().transformGroups = &cParams.transformGroups;
@@ -653,7 +653,7 @@ void BaseAccelerator::AddLightSurfacesToPartitions(std::vector<AccelGroupConstru
             throw MRayError("{:s}: Unable to find light group()",
                             Name(), lGroupId);
         }
-        const GenericGroupLightT* lGroup = lGroupOpt.value().get().get();
+        const GenericGroupLightT* lGroup = lGroupOpt.Value().get();
 
         // Skip if not primitive backed
         if(!lGroup->IsPrimitiveBacked())
@@ -729,7 +729,7 @@ void BaseAccelerator::Construct(BaseAccelConstructParams p)
             throw MRayError("{:s}: Unable to find generator for accelerator group \"{:s}\"",
                             Name(), accelTypeName);
         }
-        auto GenerateAccelGroup = accelGenerator.value().get();
+        auto GenerateAccelGroup = accelGenerator.Value();
         auto accelPtr = GenerateAccelGroup(std::move(aGroupId),
                                            threadPool, gpuSystem,
                                            *partition.primGroup,

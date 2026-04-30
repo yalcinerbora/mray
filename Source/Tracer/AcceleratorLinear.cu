@@ -306,7 +306,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                 {
                     throw MRayError("BaseAccelerator: Unknown accelerator key {}", HexKeyT(key));
                 }
-                AcceleratorGroupI* accelGroup = accelGroupOpt.value().get();
+                AcceleratorGroupI* accelGroup = accelGroupOpt.Value();
                 accelGroup->CastLocalRays(// Output
                                           dVolumeIndices,
                                           dHitIds,
@@ -438,7 +438,7 @@ void BaseAcceleratorLinear::CastVisibilityRays(// Output
                 {
                     throw MRayError("BaseAccelerator: Unknown accelerator key {}", HexKeyT(key));
                 }
-                AcceleratorGroupI* accelGroup = accelGroupOpt.value().get();
+                AcceleratorGroupI* accelGroup = accelGroupOpt.Value();
                 accelGroup->CastVisibilityRays(// Output
                                                dIsVisibleBuffer,
                                                // I-O
@@ -484,7 +484,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
         throw MRayError("BaseAccelerator: Unknown accelerator batch {}",
                         dAccelKeyBatchPortion);
     }
-    AcceleratorGroupI* accelGroup = accelGroupOpt.value().get();
+    AcceleratorGroupI* accelGroup = accelGroupOpt.Value();
     auto dAccelKeysCommon = MemAlloc::RepurposeAlloc<const CommonKey>(dAccelKeys);
 
     accelGroup->CastLocalRays(// Output

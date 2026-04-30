@@ -189,8 +189,8 @@ MRayError MeshProcessorThread::AllocateTransientBuffers(Span<Vector3ui>& indexBu
                                                         SubGeomTransientData& transientDataList,
                                                         uint32_t primCount, uint32_t attributeCount)
 {
-    static const ProfilerAnnotation _("Alloc Transient Buffers");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "Alloc Transient Buffers");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     uint32_t indexAttribI = std::numeric_limits<uint32_t>::max();
     uint32_t posAttribI = std::numeric_limits<uint32_t>::max();
@@ -248,8 +248,8 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
                                                                const pxr::VtArray<pxr::GfVec3f>& normals,
                                                                const pxr::VtArray<pxr::GfVec2f>& uvs)
 {
-    static const ProfilerAnnotation _0("Triangulate and Find Tangents");
-    auto a0 = _0.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_0, "Triangulate and Find Tangents");
+    MRAY_PROFILER_ANNOTATE_SCOPE(a0, _0);
 
     uint32_t indexCounter = 0;
     for(int faceIndex : faceIndices.AsConst())
@@ -436,8 +436,8 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
 
     // Copy and generate quaternions
     {
-        static const ProfilerAnnotation _1("Copy And Quat Normal Gen");
-        auto a1 = _1.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_1, "Copy And Quat Normal Gen");
+        MRAY_PROFILER_ANNOTATE_SCOPE(a1, _1);
 
         // Indirect copy the uv and positions
         uint32_t attribCounter = 0;
@@ -484,8 +484,8 @@ MRayError MeshProcessorThread::TriangulateAndCalculateTangents(uint32_t subgeomI
 
 MRayError MeshProcessorThread::PreprocessIndicesSingle(uint32_t index)
 {
-    static const ProfilerAnnotation _("Mesh Preprocessing");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "Mesh Preprocessing");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     primTransientData.emplace_back();
 
@@ -673,8 +673,8 @@ MRayError ProcessUniqueMeshes(// Output
                               // Input
                               const std::set<pxr::UsdPrim>& uniquePrims)
 {
-    static const ProfilerAnnotation procMeshAnnot("Process Meshes");
-    auto annotation = procMeshAnnot.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(procMeshAnnot, "Process Meshes");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, procMeshAnnot);
 
     size_t uniquePrimCount = uint32_t(uniquePrims.size());
     std::vector<std::vector<PrimBatchId>> outPrimBatchesFlat;
@@ -715,8 +715,8 @@ MRayError ProcessUniqueMeshes(// Output
 
     const auto THRD_ProcessMeshes = [&](uint32_t start, uint32_t end) -> void
     {
-        static const ProfilerAnnotation _("Process Mesh Task");
-        auto annotation = _.AnnotateScope();
+        MRAY_PROFILER_GENERATE_ANNOTATION(_, "Process Mesh Task");
+        MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
         // Subset the data to per core
         Span myPrimRange(flatUniques.data() + start, end - start);
@@ -811,8 +811,8 @@ MRayError  ProcessUniqueSpheres(// Output
                                 // Input
                                 const std::set<pxr::UsdPrim>&)
 {
-    static const ProfilerAnnotation _("Process Spheres");
-    auto annotation = _.AnnotateScope();
+    MRAY_PROFILER_GENERATE_ANNOTATION(_, "Process Spheres");
+    MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
     // TODO: ...
     return MRayError::OK;
 }

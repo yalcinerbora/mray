@@ -204,15 +204,15 @@ class AcceleratorGroupI
 };
 
 using AccelGroupPtr         = std::unique_ptr<AcceleratorGroupI>;
-using PrimRangeArray        = std::array<Vector2ui, TracerConstants::MaxPrimBatchPerSurface>;
-using LightOrMatKeyArray    = std::array<LightOrMatKey, TracerConstants::MaxPrimBatchPerSurface>;
+using PrimRangeArray        = Array<Vector2ui, TracerConstants::MaxPrimBatchPerSurface>;
+using LightOrMatKeyArray    = Array<LightOrMatKey, TracerConstants::MaxPrimBatchPerSurface>;
 // TODO: std::bitset is CPU oriented class holds the data in (at least i checked MSVC std lib) 32/64-bit integer
 // For CUDA, it can be 8/16-bit, properly packed data (since MaxPrimBatchPerSurface
 // is 8 in the current impl.) This should not be a memory concern until
 // this codebase becomes production level renderer (doubt)
 using CullFaceFlagArray     = Bitset<TracerConstants::MaxPrimBatchPerSurface>;
-using AlphaMapArray         = std::array<Optional<AlphaMap>, TracerConstants::MaxPrimBatchPerSurface>;
-using VolumeIndexArray      = std::array<VolumeIndex, TracerConstants::MaxPrimBatchPerSurface>;
+using AlphaMapArray         = Array<Optional<AlphaMap>, TracerConstants::MaxPrimBatchPerSurface>;
+using VolumeIndexArray      = Array<VolumeIndex, TracerConstants::MaxPrimBatchPerSurface>;
 
 struct AccelLeafResult
 {

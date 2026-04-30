@@ -13,7 +13,7 @@ namespace mray::hip::algorithms
 
 template <class T>
 MRAY_HOST inline
-size_t ReduceTMSize(size_t elementCount)
+size_t ReduceTMSize(size_t elementCount, const GPUQueueHIP& q)
 {
     using namespace rocprim;
 
@@ -23,13 +23,14 @@ size_t ReduceTMSize(size_t elementCount)
     size_t result;
     HIP_CHECK(reduce(dTM, result, dIn, dOut,
                      T{}, static_cast<int>(elementCount),
-                     [] MRAY_HYBRID(T, T)->T{ return T{}; }));
+                     [] MRAY_HYBRID(T, T)->T{ return T{}; },
+                     ToHandleHIP(q)));
     return result;
 }
 
 template <class OutT, class InT>
 MRAY_HOST inline
-size_t TransformReduceTMSize(size_t elementCount)
+size_t TransformReduceTMSize(size_t elementCount, const GPUQueueHIP& q)
 {
     using namespace rocprim;
 
@@ -42,13 +43,14 @@ size_t TransformReduceTMSize(size_t elementCount)
     HIP_CHECK(reduce(dTM, result, dIn, dOut,
                      static_cast<int>(elementCount),
                      [] MRAY_HYBRID(OutT, OutT)-> OutT { return OutT{}; },
-                     OutT{}));
+                     OutT{},
+                     ToHandleHIP(q)));
     return result;
 }
 
 template <class OutT, class InT>
 MRAY_HOST inline
-size_t SegmentedTransformReduceTMSize(size_t numSegments)
+size_t SegmentedTransformReduceTMSize(size_t numSegments, const GPUQueueHIP& q)
 {
     using namespace rocprim;
     auto TFunc = [] MRAY_HYBRID(InT) -> OutT{ return OutT{}; };
@@ -64,7 +66,8 @@ size_t SegmentedTransformReduceTMSize(size_t numSegments)
                                static_cast<int>(numSegments),
                                dStartOffsets, dEndOffsets,
                                [] MRAY_HYBRID(OutT, OutT)-> OutT { return OutT{}; },
-                               OutT{}));
+                               OutT{},
+                               ToHandleHIP(q)));
     return result;
 }
 

@@ -41,15 +41,29 @@ FreeList::FreeList()
 // so in a translation unit the init order is top down?
 // Then destruction order is bottom-up?
 // Guarantee that this is true
-MRAY_TRANSIENT_POOL_ENTRYPOINT PoolMemResource mainR = PoolMemResource(POOL_OPTIONS, std::pmr::new_delete_resource());
-MRAY_TRANSIENT_POOL_ENTRYPOINT FreeList freeList;
+PoolMemResource mainR = PoolMemResource(POOL_OPTIONS, std::pmr::new_delete_resource());
+FreeList freeList     = FreeList();
 
+}
+
+MRAY_TRANSIENT_POOL_ENTRYPOINT
+TransientPoolDetail::PoolMemResource&
+TransientPoolDetail::GetMainResource()
+{
+    return mainR;
+}
+
+MRAY_TRANSIENT_POOL_ENTRYPOINT
+TransientPoolDetail::FreeList&
+TransientPoolDetail::GetFreeList()
+{
+    return freeList;
 }
 
 MRAY_TRANSIENT_POOL_ENTRYPOINT void* TransientPoolIssueBufferForDestruction(TransientPoolDetail::TransientData buffer)
 {
     using namespace TransientPoolDetail;
-    return reinterpret_cast<void*>(freeList.GetALocation(std::move(buffer)));
+    return reinterpret_cast<void*>(GetFreeList().GetALocation(std::move(buffer)));
 }
 
 MRAY_TRANSIENT_POOL_ENTRYPOINT void TransientPoolDestroyCallback(void* ptr)
@@ -61,7 +75,7 @@ MRAY_TRANSIENT_POOL_ENTRYPOINT void TransientPoolDestroyCallback(void* ptr)
     // (maybe?) since TransientData uses synchronized_pool_resource
     // and it may have a mutex
     nodePtr->input = TransientData();
-    freeList.GiveTheLocation(nodePtr);
+    GetFreeList().GiveTheLocation(nodePtr);
 }
 
 MRAY_TRANSIENT_POOL_ENTRYPOINT

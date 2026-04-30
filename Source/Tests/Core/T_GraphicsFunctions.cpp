@@ -44,7 +44,7 @@ TEST(GraphicsFunctionsTest, Refract)
         // Assuming Core/Quaternion Tests are passed.
         Quaternion q(-Angle, Vector3::ZAxis());
 
-        Vector3 result = Refract(normal, v, eta0, eta1).value();
+        Vector3 result = Refract(normal, v, eta0, eta1).Value();
         EXPECT_FLOAT_EQ(Length(result), Float{1.0});
         EXPECT_NEAR(Dot(result, -normal), Math::Cos(Angle), LargeEpsilon<Float>());
         EXPECT_EQUAL_MRAY(result, q.ApplyRotation(-normal), VeryLargeEpsilon<Float>());
@@ -57,7 +57,7 @@ TEST(GraphicsFunctionsTest, Refract)
         Float eta0 = Float(2.419);
         Float eta1 = Float(1.0);
         Optional<Vector3> result = Refract(normal, v, eta0, eta1);
-        EXPECT_THROW((void) result.value(), std::bad_optional_access);
+        EXPECT_FALSE(result.HasValue());
     }
 }
 

@@ -160,9 +160,9 @@ RenderSurfaceWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
         hBatchIds.push_back(work.workGroupId);
 
         // Might as well check the data amount here
-        uint32_t primCount = uint32_t(tracerView.primGroups.at(primGroupId)->get()->TotalPrimCount());
-        uint32_t matCount = uint32_t(tracerView.matGroups.at(matGroupId)->get()->TotalItemCount());
-        uint32_t transformCount = uint32_t(tracerView.transGroups.at(transGroupId)->get()->TotalItemCount());
+        uint32_t primCount = uint32_t(tracerView.primGroups.at(primGroupId).Value()->TotalPrimCount());
+        uint32_t matCount = uint32_t(tracerView.matGroups.at(matGroupId).Value()->TotalItemCount());
+        uint32_t transformCount = uint32_t(tracerView.transGroups.at(transGroupId).Value()->TotalItemCount());
         primMaxCount = Math::Max(primMaxCount, primCount);
         lmMaxCount = Math::Max(lmMaxCount, matCount);
         transMaxCount = Math::Max(transMaxCount, transformCount);
@@ -172,8 +172,8 @@ RenderSurfaceWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
     {
         LightGroupId lightGroupId = work.lgId;
         TransGroupId transGroupId = work.tgId;
-        const auto& lightGroup = tracerView.lightGroups.at(lightGroupId)->get();
-        const auto& transformGroup = tracerView.transGroups.at(transGroupId)->get();
+        const auto& lightGroup = tracerView.lightGroups.at(lightGroupId).Value();
+        const auto& transformGroup = tracerView.transGroups.at(transGroupId).Value();
         CommonKey primGroupId = lightGroup->GenericPrimGroup().GroupId();
 
         auto lK = LightOrMatKey::CombinedKey(IS_LIGHT_KEY_FLAG, static_cast<CommonKey>(lightGroupId), 0u);
@@ -244,8 +244,8 @@ RenderMediumWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
         hBatchIds.push_back(work.workGroupId);
 
         // Might as well check the data amount here
-        uint32_t mediaCount = uint32_t(tracerView.mediumGroups.at(mediumGroupId)->get()->TotalItemCount());
-        uint32_t transformCount = uint32_t(tracerView.transGroups.at(transGroupId)->get()->TotalItemCount());
+        uint32_t mediaCount = uint32_t(tracerView.mediumGroups.at(mediumGroupId).Value()->TotalItemCount());
+        uint32_t transformCount = uint32_t(tracerView.transGroups.at(transGroupId).Value()->TotalItemCount());
         medMaxCount = Math::Max(medMaxCount, mediaCount);
         transMaxCount = Math::Max(transMaxCount, transformCount);
     }
@@ -276,9 +276,9 @@ uint32_t RendererBase::GenerateWorkMappings(uint32_t workStart)
         TransGroupId tgId{std::bit_cast<TransformKey>(flatSurfs[i].tId).FetchBatchPortion()};
         // These should be checked beforehand, while actually creating
         // the surface
-        const MaterialGroupPtr& mg = tracerView.matGroups.at(mgId).value();
-        const PrimGroupPtr& pg = tracerView.primGroups.at(pgId).value();
-        const TransformGroupPtr& tg = tracerView.transGroups.at(tgId).value();
+        const MaterialGroupPtr& mg = tracerView.matGroups.at(mgId).Value();
+        const PrimGroupPtr& pg = tracerView.primGroups.at(pgId).Value();
+        const TransformGroupPtr& tg = tracerView.transGroups.at(tgId).Value();
         std::string_view mgName = mg->Name();
         std::string_view pgName = pg->Name();
         std::string_view tgName = tg->Name();
@@ -287,13 +287,13 @@ uint32_t RendererBase::GenerateWorkMappings(uint32_t workStart)
         std::string workName = CreateRenderWorkType(mgName, pgName, tgName);
 
         auto loc = workPack.workMap.at(workName);
-        if(!loc.has_value())
+        if(!loc.HasValue())
         {
             throw MRayError("[{}]: Could not find a renderer \"work\" for Mat/Prim/Transform "
                             "triplet of \"{}/{}/{}\"",
                             rendererName, mgName, pgName, tgName);
         }
-        RenderWorkGenerator generator = loc->get();
+        RenderWorkGenerator generator = loc.Value();
         RenderWorkPtr ptr = generator(*mg.get(), *pg.get(), *tg.get(), gpuSystem);
         // Put this ptr somewhere... safe
         currentWorks.emplace_back
@@ -342,8 +342,8 @@ uint32_t RendererBase::GenerateLightWorkMappings(uint32_t workStart)
         TransGroupId tgId{std::bit_cast<TransformKey>(lSurf.transformId).FetchBatchPortion()};
         // These should be checked beforehand, while actually creating
         // the surface
-        const LightGroupPtr& lg = tracerView.lightGroups.at(lgId).value();
-        const TransformGroupPtr& tg = tracerView.transGroups.at(tgId).value();
+        const LightGroupPtr& lg = tracerView.lightGroups.at(lgId).Value();
+        const TransformGroupPtr& tg = tracerView.transGroups.at(tgId).Value();
         std::string_view lgName = lg->Name();
         std::string_view tgName = tg->Name();
 
@@ -351,7 +351,7 @@ uint32_t RendererBase::GenerateLightWorkMappings(uint32_t workStart)
         std::string workName = CreateRenderLightWorkType(lgName, tgName);
 
         auto loc = workPack.lightWorkMap.at(workName);
-        if(!loc.has_value())
+        if(!loc.HasValue())
         {
             throw MRayError("[{}]: Could not find a renderer \"work\" for Light/Transform "
                             "pair of \"{}/{}\"",
@@ -384,7 +384,7 @@ uint32_t RendererBase::GenerateLightWorkMappings(uint32_t workStart)
             };
         }
 
-        RenderLightWorkGenerator generator = loc->get();
+        RenderLightWorkGenerator generator = loc.Value();
         RenderLightWorkPtr ptr = generator(*lg.get(), *tg.get(), gpuSystem);
         // Put this ptr somewhere... safe
         currentLightWorks.emplace_back
@@ -439,8 +439,8 @@ uint32_t RendererBase::GenerateCameraWorkMappings(uint32_t workStart)
         TransGroupId tgId{std::bit_cast<TransformKey>(camSurfs[i].second.transformId).FetchBatchPortion()};
         // These should be checked beforehand, while actually creating
         // the surface
-        const CameraGroupPtr& cg = tracerView.camGroups.at(cgId).value();
-        const TransformGroupPtr& tg = tracerView.transGroups.at(tgId).value();
+        const CameraGroupPtr& cg = tracerView.camGroups.at(cgId).Value();
+        const TransformGroupPtr& tg = tracerView.transGroups.at(tgId).Value();
         std::string_view cgName = cg->Name();
         std::string_view tgName = tg->Name();
 
@@ -448,13 +448,13 @@ uint32_t RendererBase::GenerateCameraWorkMappings(uint32_t workStart)
         std::string workName = CreateRenderCameraWorkType(cgName, tgName);
 
         auto loc = workPack.camWorkMap.at(workName);
-        if(!loc.has_value())
+        if(!loc.HasValue())
         {
             throw MRayError("[{}]: Could not find a renderer \"work\" for Camera/Transform "
                             "pair of \"{}/{}\"",
                             rendererName, cgName, tgName);
         }
-        RenderCameraWorkGenerator generator = loc->get();
+        RenderCameraWorkGenerator generator = loc.Value();
         RenderCameraWorkPtr ptr = generator(*cg.get(), *tg.get(), gpuSystem);
 
         // Put this ptr somewhere... safe
@@ -494,21 +494,21 @@ uint32_t RendererBase::GenerateMediumWorkMappings(uint32_t workStart)
 
         // These should be checked beforehand, while actually creating
         // the surface
-        const MediumGroupPtr& mg = tracerView.mediumGroups.at(mgId).value();
-        const TransformGroupPtr& tg = tracerView.transGroups.at(tgId).value();
+        const MediumGroupPtr& mg = tracerView.mediumGroups.at(mgId).Value();
+        const TransformGroupPtr& tg = tracerView.transGroups.at(tgId).Value();
         std::string_view mgName = mg->Name();
         std::string_view tgName = tg->Name();
 
         using TypeNameGen::Runtime::CreateRenderMediumWorkType;
         std::string workName = CreateRenderMediumWorkType(mgName, tgName);
         auto workGenLoc = workPack.mediumWorkMap.at(workName);
-        if(!workGenLoc.has_value())
+        if(!workGenLoc.HasValue())
         {
             throw MRayError("[{}]: Could not find a renderer \"work\" for Medium/Transform "
                             "pair of \"{}/{}\"",
                             rendererName, mgName, tgName);
         }
-        RenderMediumWorkGenerator generator = workGenLoc->get();
+        RenderMediumWorkGenerator generator = workGenLoc.Value();
         RenderMediumWorkPtr ptr = generator(*mg.get(), *tg.get(), gpuSystem);
         // Put this ptr somewhere... safe
         currentMediumWorks.emplace_back

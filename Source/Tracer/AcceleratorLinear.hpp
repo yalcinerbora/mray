@@ -51,20 +51,20 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
                                                           cullFaceFlags[index]);
     // Intersection decisions
     if(!intersection) return std::nullopt;
-    if(!IsInRange(intersection->t)) return std::nullopt;
+    if(!IsInRange(intersection.Value().t)) return std::nullopt;
 
     Optional<AlphaMap> alphaMap = alphaMaps[index];
     if(alphaMap)
     {
-        const auto& alphaMapV = alphaMap.value();
+        const auto& alphaMapV = alphaMap.Value();
         // This has alpha map check it
-        Vector2 uv = prim.SurfaceParametrization(intersection.value().hit);
+        Vector2 uv = prim.SurfaceParametrization(intersection.Value().hit);
         Float alpha = alphaMapV(uv);
         // Stochastic alpha culling
         if(xi >= alpha) return std::nullopt;
     }
 
-    CommonKey isBackFace = (intersection.value().backFace)
+    CommonKey isBackFace = (intersection.Value().backFace)
             ? IS_BACKFACE_KEY_FLAG
             : IS_FRONTFACE_KEY_FLAG;
     CommonKey vI = volumeIndices[index].FetchIndexPortion();
@@ -72,8 +72,8 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
     // It is a hit! Update
     return HitResult
     {
-        .hit            = intersection.value().hit,
-        .t              = intersection.value().t,
+        .hit            = intersection.Value().hit,
+        .t              = intersection.Value().t,
         .primitiveKey   = primKey,
         .lmKey          = lmKeys[index],
         .volumeIndex    = VolumeIndex::CombinedKey(vPassthrough, isBackFace, vI)
@@ -116,10 +116,10 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::ClosestHit(BackupRNG& rng,
     for(const PrimitiveKey pKeys : leafs)
     {
         auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), pKeys);
-        if(check.has_value() && check->t < tMM[1])
+        if(check.HasValue() && check.Value().t < tMM[1])
         {
             result = check;
-            tMM[1] = check->t;
+            tMM[1] = check.Value().t;
         }
     }
     return result;
@@ -312,7 +312,7 @@ void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
         throw MRayError("{:s}:{:d}: Unable to find work for {:d}",
                         TypeName(), this->accelGroupId, workId);
 
-    const auto& work = workOpt.value().get();
+    const auto& work = workOpt.Value();
     work->CastLocalRays(// Output
                         dVolumeIndices,
                         dHitIds,
@@ -348,7 +348,7 @@ void AcceleratorGroupLinear<PG>::CastVisibilityRays(// Output
         throw MRayError("{:s}:{:d}: Unable to find work for {:d}",
                         TypeName(), this->accelGroupId, workId);
 
-    const auto& work = workOpt.value().get();
+    const auto& work = workOpt.Value();
     work->CastVisibilityRays(// Output
                              dIsVisibleBuffer,
                              // I-O
