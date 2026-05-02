@@ -13,6 +13,17 @@
 #define MR_STAMP_PRAGMA_(X)     _Pragma(#X)
 #define MR_STAMP_PRAGMA(X)      MR_STAMP_PRAGMA_(X)
 
+// From macro space to language space (for "if constexpr" usage)
+#ifdef MRAY_WINDOWS
+    static constexpr bool MRAY_IS_ON_WINDOWS = true;
+    static constexpr bool MRAY_IS_ON_LINUX = false;
+#elif defined(MRAY_LINUX)
+    static constexpr bool MRAY_IS_ON_WINDOWS = false;
+    static constexpr bool MRAY_IS_ON_LINUX = true;
+#else
+    #error "Platform Definition is not Defined! (MRAY_WINDOWS or MRAY_LINUX)"
+#endif
+
 #ifdef MRAY_MSVC
     #define MRAY_FORCE_INLINE_DECL  [[msvc::forceinline]] inline
     #define MRAY_FORCE_INLINE_DEF   inline
@@ -21,18 +32,12 @@
     #define MRAY_DEBUG_BREAK        __debugbreak()
     #define MRAY_RESTRICT           __restrict
 
-    static constexpr bool MRAY_IS_ON_WINDOWS    = true;
-    static constexpr bool MRAY_IS_ON_LINUX      = false;
-
 #elif defined(MRAY_CLANG) || defined(MRAY_GCC)
     #define MRAY_FORCE_INLINE_DECL  [[gnu::always_inline]] inline
     #define MRAY_FORCE_INLINE_DEF   inline
     #define MRAY_FLATTEN            [[gnu::flatten]]
     #define MRAY_ATTRIB_PURE        [[gnu::pure]]
     #define MRAY_RESTRICT           __restrict
-
-    static constexpr bool MRAY_IS_ON_WINDOWS    = false;
-    static constexpr bool MRAY_IS_ON_LINUX      = true;
 
 #endif
 

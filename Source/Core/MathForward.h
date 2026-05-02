@@ -5,25 +5,12 @@
 #include "Definitions.h"
 #include "Types.h"
 #include "Span.h"
+#include "Half.h"
 
-#ifdef MRAY_HETEROGENEOUS
-    #include <cuda/half.h>
-#endif
+// TODO: Inject Half when it is available
+template<typename T>
+concept FloatC = std::floating_point<T> || std::same_as<T, Half>;
 
-// Floating point type extension for half precision if available
-#ifdef MRAY_HETEROGENEOUS
-
-    template<typename T>
-    concept FloatC = std::floating_point<T> || std::same_as<T, half>;
-
-#else
-
-    template<typename T>
-    concept FloatC = std::floating_point<T>;
-
-#endif
-
-// We do not need this but, for consistency we define it
 template<typename T>
 concept IntegralC = std::integral<T>;
 

@@ -10,6 +10,20 @@
 #include "Tuple.h"
 #include "Array.h"
 
+// When code compiles for device, we need __half
+// for the BitCast.
+//
+// We can't directly convert to "Half" here since half
+// used the BitCast.
+//
+// We can probably get away with std::bit_cast, but
+// it did give some obsure compile errors in the past.
+#ifdef MRAY_DEVICE_CODE_PATH_CUDA
+    #include <cuda_fp16.h>
+#elif defined MRAY_DEVICE_CODE_PATH_HIP
+    #include <hip/hip_fp16.h>
+#endif // DEBUG
+
 // Bit manipulation functions, GPU/CPU/constexpr agnostic
 //
 // We were using c++20 bit functions on constexpr context, but
@@ -70,6 +84,16 @@ namespace Bit
 
     MR_PF_DECL uint32_t GenerateFourCC(char byte0, char byte1,
                                        char byte2, char byte3) noexcept;
+}
+
+namespace Bit::Detail
+{
+    template<class R, class T>
+    struct BitCastHelper
+    {
+        template<class C0, class C1>
+        static constexpr auto TypeEq = (std::is_same_v<R, C0> && std::is_same_v<T, C1>);
+    };
 }
 
 // Bitset is constexpr in c++23, we should not rely on it on CUDA
@@ -159,35 +183,39 @@ template<class R, class T>
 MR_PF_DEF R Bit::BitCast(const T& value) noexcept
 {
     if(std::is_constant_evaluated())
+    {
         return std::bit_cast<R>(value);
+    }
     // This was failed once on CUDA (OptixIR compilation)
     // So wrapping it around
-    #ifndef MRAY_GPU_CODE_PATH
+    #ifndef MRAY_DEVICE_CODE_PATH
         return std::bit_cast<R>(value);
     #else
-        template<class A, class B>
-        static constexpr TypeEq = std::is_same_v<R, A> && std::is_same_v<T, B>)
-
-        if constexpr(TypeEq<float, uint32_t>) return __uint_as_float(value);
-        if constexpr(TypeEq<uint32_t, float>) return __float_as_uint(value);
-        if constexpr(TypeEq<float, int32_t>)  return __int_as_float(value);
-        if constexpr(TypeEq<int32_t, float>)  return __float_as_int(value);
+        using X = Detail::BitCastHelper<R, T>;
+        // 16-bit float
+        if constexpr(X::template TypeEq<__half, uint16_t>) return __ushort_as_half(value);
+        if constexpr(X::template TypeEq<uint16_t, __half>) return __half_as_ushort(value);
+        if constexpr(X::template TypeEq<__half, int16_t>)  return __short_as_half(value);
+        if constexpr(X::template TypeEq<int16_t, __half>)  return __half_as_short(value);
+        // 32-bit Float
+        if constexpr(X::template TypeEq<float, uint32_t>) return __uint_as_float(value);
+        if constexpr(X::template TypeEq<uint32_t, float>) return __float_as_uint(value);
+        if constexpr(X::template TypeEq<float, int32_t>)  return __int_as_float(value);
+        if constexpr(X::template TypeEq<int32_t, float>)  return __float_as_int(value);
         //
-        if constexpr(TypeEq<double, uint64_t>)
+        if constexpr(X::template TypeEq<double, uint64_t>)
         {
-            int64_t r;
-            memcpy(&r, &v, sizeof(int64_t));
+            int64_t r; memcpy(&r, &value, sizeof(int64_t));
             return __longlong_as_double(T(r));
         }
-        if constexpr(TypeEq<uint64_t, double>)
+        if constexpr(X::template TypeEq<uint64_t, double>)
         {
             int64_t v = __double_as_longlong(value);
-            uint64_t r;
-            memcpy(&r, &v, sizeof(uint64_t));
+            uint64_t r; memcpy(&r, &v, sizeof(uint64_t));
             return r;
         }
-        if constexpr(TypeEq<double, int64_t>)  return __longlong_as_double(value);
-        if constexpr(TypeEq<int64_t, double>)  return __double_as_longlong(value);
+        if constexpr(X::template TypeEq<double, int64_t>)  return __longlong_as_double(value);
+        if constexpr(X::template TypeEq<int64_t, double>)  return __double_as_longlong(value);
         // Rely on c++ bit_cast for the rest
         return std::bit_cast<R>(value);
     #endif

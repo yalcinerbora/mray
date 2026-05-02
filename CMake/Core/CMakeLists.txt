@@ -42,7 +42,7 @@ set(SRC_MATH
     ${CURRENT_SOURCE_DIR}/MathForward.h
     ${CURRENT_SOURCE_DIR}/Math.h
     ${CURRENT_SOURCE_DIR}/MathConstants.h
-)
+    ${CURRENT_SOURCE_DIR}/Half.h)
 
 set(SRC_TYPES
     ${CURRENT_SOURCE_DIR}/Array.h

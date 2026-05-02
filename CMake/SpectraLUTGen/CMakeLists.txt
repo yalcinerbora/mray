@@ -42,18 +42,25 @@ if(MSVC)
         /Zc:__cplusplus
         /permissive-
         /MD /O2 /Oi /Zi /Ob3 /DNDEBUG
-        /EHsc
-        /DMRAY_MSVC)
+        /EHsc)
 else()
     set(COMPILE_OPTIONS -O3 -g -fno-math-errno)
 endif()
 
+# Compiler
 if(MSVC)
     target_compile_definitions(SpectraLUTGen PRIVATE MRAY_MSVC)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
     target_compile_definitions(SpectraLUTGen PRIVATE MRAY_CLANG)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES ".*GNU")
     target_compile_definitions(SpectraLUTGen PRIVATE MRAY_GCC)
+endif()
+
+# OS
+if(WIN32)
+    target_compile_definitions(SpectraLUTGen PRIVATE MRAY_WINDOWS)
+else()
+    target_compile_definitions(SpectraLUTGen PRIVATE MRAY_LINUX)
 endif()
 
 target_include_directories(SpectraLUTGen
