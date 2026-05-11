@@ -36,7 +36,7 @@ void KCSampleDataAsSpectrum(// I-O
         static constexpr Float OFFSET = Float(0.5) - Float(Color::CIE_1931_RANGE[0]);
         MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
         for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
-            s[i] *= data.spdIlluminant(waves[i] + OFFSET);
+            s[i] *= data.spdIlluminant(waves.GetWl(i) + OFFSET);
 
         dThroughput[tId] = s;
     }

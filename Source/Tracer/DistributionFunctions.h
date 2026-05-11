@@ -983,6 +983,8 @@ Float Medium::WavelengthToIoRCauchy(Float wavelength, const Vector3& coeffs)
     return ior;
 }
 
+static constexpr auto XXX = MathConstants::Inv4Pi<Float>();
+
 MR_PF_DEF
 Float Medium::HenyeyGreensteinPhase(Float cosTheta, Float g)
 {

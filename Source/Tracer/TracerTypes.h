@@ -106,23 +106,41 @@ struct alignas(8) ImageCoordinate
 template <unsigned int SPS, std::floating_point T>
 using SpectrumT = Vector<SPS, T>;
 
-// TODO: CRTP
+// Package of floats more or less like Vector<SPS, Float>
+// but it may store wavelength values postive or negative
+// negative means it is dispersed. Sometimes we need the
+// wavelength value of the dispersed spectrum for MIS etc.
+//
+// Use "GetWavelength(uint32_t)" function to access the wavelength
+// which returns the absolute value.
 template <unsigned int SPS, std::floating_point T>
-struct SpectrumWavesT : private Vector<SPS, T>
+class SpectrumWavesT
 {
-    using Base = Vector<SPS, T>;
-    static constexpr auto DISPERSED_WAVE = Float(-1);
+    private:
+    static constexpr auto DISPERSED_WAVE_FACTOR = Float(-1);
+    Array<T, SPS> v;
 
-    // Imported Members
-    using Base::Base;
-    using Base::operator[];
-    using Base::operator=;
-    using Base::operator==;
-    using Base::operator!=;
+    public:
+                    SpectrumWavesT() = default;
+                    template<std::convertible_to<T>... Args>
+    MR_PF_DECL_V    SpectrumWavesT(Args...);
+                    SpectrumWavesT(const SpectrumWavesT&) = default;
+                    SpectrumWavesT(SpectrumWavesT&&) = default;
+    SpectrumWavesT& operator=(const SpectrumWavesT&) = default;
+    SpectrumWavesT& operator=(SpectrumWavesT&&) = default;
 
-    MR_PF_DECL_V void DisperseSecondaryWaves();
-    MR_PF_DECL   bool IsDispersed() const;
+    MR_PF_DECL_V void     SetWl(uint32_t i, T wave);
+    MR_PF_DECL   T        GetWl(uint32_t i) const;
+    MR_PF_DECL_V void     DisperseSecondaryWaves();
+    MR_PF_DECL   bool     IsDispersed() const;
 };
+
+template <unsigned int SPS, std::floating_point T>
+template<std::convertible_to<T>... Args>
+MR_PF_DEF_V
+SpectrumWavesT<SPS, T>::SpectrumWavesT(Args... vals)
+    : v{static_cast<T>(vals)...}
+{}
 
 // Actual spectrum for this compilation
 // For RGB values this should at least be 3
@@ -385,11 +403,25 @@ std::array<Vector3, 2> RayCone::Project(Vector3 f, Vector3 d) const noexcept
 
 template <unsigned int SPS, std::floating_point T>
 MR_PF_DEF_V
+void SpectrumWavesT<SPS, T>::SetWl(uint32_t i, T wave)
+{
+    v[i] = wave;
+}
+
+template <unsigned int SPS, std::floating_point T>
+MR_PF_DEF
+T SpectrumWavesT<SPS, T>::GetWl(uint32_t i) const
+{
+    return Math::Abs(v[i]);
+}
+
+template <unsigned int SPS, std::floating_point T>
+MR_PF_DEF_V
 void SpectrumWavesT<SPS, T>::DisperseSecondaryWaves()
 {
     MRAY_UNROLL_LOOP_N(SPS)
     for(uint32_t i = 1; i < SPS; i++)
-        this->operator[](i) = DISPERSED_WAVE;
+        v[i] *= DISPERSED_WAVE_FACTOR;
 }
 
 template <unsigned int SPS, std::floating_point T>
@@ -399,5 +431,5 @@ bool SpectrumWavesT<SPS, T>::IsDispersed() const
     if constexpr(SPS == 1) return false;
     // Don't bother checking the rest if the second one is gone,
     // all gone
-    else return this->operator[](1) == DISPERSED_WAVE;
+    else return v[1] < Float(0);
 }

@@ -159,7 +159,7 @@ void KCSampleTextureSpectral(// I-O
         static constexpr Float OFFSET = Float(0.5) - Float(Color::CIE_1931_RANGE[0]);
         MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
         for(uint32_t j = 0; j < SpectraPerSpectrum; j++)
-            t[j] *= data.spdIlluminant(waves[j] + OFFSET);
+            t[j] *= data.spdIlluminant(waves.GetWl(j) + OFFSET);
 
         dThroughput[i] = t;
     }

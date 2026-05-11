@@ -121,7 +121,7 @@ Spectrum Converter::ConvertAlbedo(const Vector3& rgb) const noexcept
     Spectrum result;
     MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
     for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
-        result[i] = EvalPolynomial(coeffs, wavelengths[i]);
+        result[i] = EvalPolynomial(coeffs, wavelengths.GetWl(i));
 
     return result;
 }
@@ -142,7 +142,7 @@ Spectrum Converter::ConvertRadiance(const Vector3& radiance) const noexcept
     static constexpr Float OFFSET = Float(0.5) - Float(Color::CIE_1931_RANGE[0]);
     MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
     for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
-        s[i] *= data.spdIlluminant(wavelengths[i] + OFFSET);
+        s[i] *= data.spdIlluminant(wavelengths.GetWl(i) + OFFSET);
 
     // Rescale back up
     s *= scale;

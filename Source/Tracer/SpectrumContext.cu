@@ -72,7 +72,7 @@ void SingleSampleSpectrumWavelength(// Output
             {
                 using Distribution::Common::SampleUniformRange;
                 SampleT<Float> sample = SampleUniformRange(xi[i], START, END);
-                wavelengths[i] = sample.value;
+                wavelengths.SetWl(i, sample.value);
                 if(i == 0) pdf = sample.pdf;
             }
             pdfOut = Spectrum(pdf);
@@ -103,7 +103,7 @@ void SingleSampleSpectrumWavelength(// Output
                 assert(Math::IsFinite(pdf));
                 assert(Math::IsFinite(sample.value));
 
-                wavelengths[i] = sample.value;
+                wavelengths.SetWl(i, sample.value);
                 pdfOut[i] = pdf;
             }
             break;
@@ -125,8 +125,8 @@ void SingleSampleSpectrumWavelength(// Output
             MRAY_UNROLL_LOOP_N(SpectraPerSpectrum)
             for(uint32_t i = 0; i < SpectraPerSpectrum; i++)
             {
-                wavelengths[i] = Sample(xi[i]);
-                pdfOut[i] = PDF(wavelengths[i]);
+                wavelengths.SetWl(i, Sample(xi[i]));
+                pdfOut[i] = PDF(wavelengths.GetWl(i));
             }
             break;
         }
@@ -159,7 +159,7 @@ Spectrum ConvertSpectraToRGBSingle(const Spectrum& value, const SpectrumWaves& w
     for(uint32_t i = 0; i < waveCount; i++)
     {
         static constexpr auto OFFSET = Float(0.5) - Float(Color::CIE_1931_RANGE[0]);
-        Vector3 factors = observerResponseXYZ(waves[i] + OFFSET);
+        Vector3 factors = observerResponseXYZ(waves.GetWl(i) + OFFSET);
         Float val = Distribution::Common::DivideByPDF(value[i], pdf[i]);
         xyzTotal += factors * val;
 

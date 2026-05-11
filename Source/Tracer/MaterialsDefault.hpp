@@ -250,7 +250,7 @@ RefractMaterial<SC>::RefractMaterial(const SpectrumConverter& sTransContext,
     auto CoeffsToIoR = [&](Vector3 coeffs)
     {
         using namespace Distribution::Medium;
-        return WavelengthToIoRCauchy(sTransContext.Wavelengths()[0], coeffs);
+        return WavelengthToIoRCauchy(sTransContext.Wavelengths().GetWl(0), coeffs);
     };
 
     if constexpr(!SpectrumConverter::IsRGB)

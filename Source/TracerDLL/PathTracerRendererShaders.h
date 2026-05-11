@@ -630,6 +630,8 @@ void WorkFunctionMedia<P, M, T, SC, LS>::Call(const Primitive&, const Material& 
     BxDFSample pathRaySample = mat.SampleBxDF(wO, rng);
     pathRaySample.wI.dir = Math::Normalize(tContext.ApplyV(pathRaySample.wI.dir));
     Spectrum pathThroughput = throughput * pathRaySample.eval.reflectance;
+    pathThroughput = DivideByPDF(pathThroughput, pathRaySample.pdf);
+    Spectrum rPathOut = DivideByPDF(pathThroughput, pathRaySample.pdf);
     RayCone pathRayConeOut = rConeRefract.ConeAfterScatter(pathRaySample.wI.dir,
                                                            surf.geoNormal);
     // ================ //
@@ -685,8 +687,8 @@ void WorkFunctionMedia<P, M, T, SC, LS>::Call(const Primitive&, const Material& 
         pathRaySample.wI = pathRaySample.wI.Nudge(nudgeNormal);
         RayToGMem(cS.dRays, rayIndex, pathRaySample.wI, Vector2(0, FLT_MAX));
         cS.dRayCones[rayIndex]   = pathRayConeOut;
-        rS.dRPathPDF[rayIndex]   = rPath;
-        rS.dRLightPDF[rayIndex]  = rLight;
+        rS.dRPathPDF[rayIndex]   = rPathOut;
+        rS.dRLightPDF[rayIndex]  = rPathOut;
         rS.dThroughput[rayIndex] = pathThroughput;
     }
 

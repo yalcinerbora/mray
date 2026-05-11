@@ -192,10 +192,10 @@ Half::operator float() const
     return HalfDetail::HalfToFloat(val);
 }
 
-constexpr Half Half::NaN() { return Half(uint16_t(0x7FFF)); }
-constexpr Half Half::Inf() { return Half(uint16_t(0x7C00)); }
-constexpr Half Half::Max() { return Half(uint16_t(0x7BFF)); }
-constexpr Half Half::Min() { return Half(uint16_t(0x0400)); }
+constexpr Half Half::NaN()     { return Half(uint16_t(0x7FFF)); }
+constexpr Half Half::Inf()     { return Half(uint16_t(0x7C00)); }
+constexpr Half Half::Max()     { return Half(uint16_t(0x7BFF)); }
+constexpr Half Half::Min()     { return Half(uint16_t(0x0400)); }
 constexpr Half Half::Epsilon() { return Half(uint16_t(0x1400)); }
 
 // ============================== //

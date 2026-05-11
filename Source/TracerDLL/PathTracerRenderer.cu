@@ -32,33 +32,51 @@ void KCAccumulateShadowRaysPT(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceO
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
-void KCAccumulateShadowRaysPTMedia(MRAY_GRID_CONSTANT const Span<Spectrum>,
-                                   MRAY_GRID_CONSTANT const Span<const Spectrum>,
-                                   MRAY_GRID_CONSTANT const Span<const Spectrum>,
-                                   MRAY_GRID_CONSTANT const Span<const Spectrum>,
-                                   MRAY_GRID_CONSTANT const Bitspan<const uint32_t>,
-                                   MRAY_GRID_CONSTANT const Span<const PathDataPack>,
-                                   MRAY_GRID_CONSTANT const Vector2ui)
+static
+void KCAccumulateShadowRaysMediaPT(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,
+                                   MRAY_GRID_CONSTANT const Span<const Spectrum> dShadowRayRadiance,
+                                   MRAY_GRID_CONSTANT const Span<const Spectrum> dRPathPDFShadow,
+                                   MRAY_GRID_CONSTANT const Span<const Spectrum> dRLightPDFShadow,
+                                   MRAY_GRID_CONSTANT const Bitspan<const uint32_t> dIsVisibleBuffer,
+                                   MRAY_GRID_CONSTANT const Span<const PathDataPack> dPathDataPack,
+                                   MRAY_GRID_CONSTANT const Vector2ui rrRange,
+                                   MRAY_GRID_CONSTANT const bool isRGB)
 {
-    // TODO:
-    assert(false);
-    //KernelCallParams kp;
-    //uint32_t shadowRayCount = static_cast<uint32_t>(dShadowRayRadiance.size());
-    //for(uint32_t i = kp.GlobalId(); i < shadowRayCount; i += kp.TotalSize())
-    //{
-    //    PathDataPack dataPack = dPathDataPack[i];
+    const uint32_t channelCount = isRGB ? 3 : SpectraPerSpectrum;
+    const Float invChannelCount = Float(1) / Float(channelCount);
 
-    //    using enum RayType;
-    //    bool isShadowRay = (dataPack.type == SHADOW_RAY);
-    //    // +2 is correct here, we did not increment the depth yet
-    //    bool inDepthLimit = ((dataPack.depth + 2u) <= rrRange[1]);
-    //    if(inDepthLimit && isShadowRay && dIsVisibleBuffer[i])
-    //    {
-    //        // Unlike simple PT, radiance does not hold the
-    //        //
-    //        dRadianceOut[i] += dShadowRayRadiance[i];
-    //    }
-    //}
+    KernelCallParams kp;
+    uint32_t shadowRayCount = static_cast<uint32_t>(dShadowRayRadiance.size());
+    for(uint32_t i = kp.GlobalId(); i < shadowRayCount; i += kp.TotalSize())
+    {
+        PathDataPack dataPack = dPathDataPack[i];
+
+        using enum RayType;
+        bool isShadowRay = (dataPack.type == SHADOW_RAY);
+        bool inDepthLimit = ((dataPack.depth + 1u) <= rrRange[1]);
+        if(inDepthLimit && isShadowRay && dIsVisibleBuffer[i])
+        {
+            Float rPathMIS = Float(0);
+            Float rLightMIS = Float(0);
+            Spectrum rPath = dRPathPDFShadow[i];
+            Spectrum rLight = dRPathPDFShadow[i];
+            for(uint32_t c = 0; c < channelCount; c++)
+            {
+                rPathMIS += rPath[c];
+                rLightMIS += rLight[c];
+            }
+            rPathMIS *= invChannelCount;
+            rLightMIS *= invChannelCount;
+
+            Float combinedMIS = rPathMIS + rLightMIS;
+
+            using Distribution::Common::DivideByPDF;
+            Spectrum radiance = dShadowRayRadiance[i];
+            radiance = DivideByPDF(dShadowRayRadiance[i], combinedMIS);
+
+            dRadianceOut[i] += radiance;
+        }
+    }
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
@@ -158,6 +176,20 @@ void PathTracerRendererT<SC>::PushAttribute(uint32_t attributeIndex,
         default:
             throw MRayError("{} Unknown attribute index {}", TypeName(), attributeIndex);
     }
+}
+
+template<SpectrumContextC SC>
+uint32_t
+PathTracerRendererT<SC>::FindMaxWorkCount() const
+{
+    uint32_t matWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
+
+    if(currentOptions.sampleMedia)
+    {
+        uint32_t mediaWorkCount = uint32_t(currentMediumWorks.size());
+        return std::max(matWorkCount, mediaWorkCount);
+    }
+    else return matWorkCount;
 }
 
 template<SpectrumContextC SC>
@@ -728,7 +760,7 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaPure(Span<RayIndex> dIndices,
     // Caller can do this but non-media path tracer do not need this iota
     // since all the indices are in a single buffer anyway.
     uint32_t rayCount = imageTiler.CurrentTileSize().Multiply();
-    uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
+    uint32_t maxWorkCount = FindMaxWorkCount();
     auto [dIndicesOut, _] = rp.Start(rayCount, maxWorkCount, processQueue, true);
     DeviceAlgorithms::Iota(dIndicesOut, uint32_t(0), processQueue);
 
@@ -747,14 +779,21 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
     // Execution diagram. (simplified and hopefully it does clarify instead of
     // confuse)
     //
-    // Rays     Media Resolve                     SR Cast      Mat. Scatter
-    //  |            |                           (Recursive)        |        |
-    //  |            |                 |              |             |        |
-    //  |            |  [Transmitted]  |   -[Prt]->   | ----------> | -----> |
-    //  |  -[Prt]->  |_________________|______________|_____________|        | -->  NEXT
-    //  |            |                                |                      |
-    //  |            |     --[Media Scattered]-->     |         ----->       |
-    //  |            |                                |                      |
+    // Med. = Media
+    // Mat. = Material
+    //
+    // Rays   Media Resolve          Mat. Partition &             Recursive
+    //  |          |                      Scatter              Shadow Ray Cast
+    //  |          |                         |                       |
+    //  |          | --[Med. Transmitted]--> | --[Mat. Scattered]--> |
+    //  | -[Prt]-> |_________________________|_______________________|   ----->  NEXT
+    //  |          |                                                 |
+    //  |          |               --[Med. Scattered]-->             |
+    //  |          |                                                 |
+    //
+    // All Media will cast shadow rays, but not all materials may cast shadow rays
+    // such as perfectly specular materials (mirror) or "Passthrough" material.
+    //
     const SpectrumContext& typedSpectrumContext = *static_cast<const SpectrumContext*>(spectrumContext.get());
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
     RayState dRayState =
@@ -970,20 +1009,47 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
     // ================================== //
     //     Shadow Ray Visibility Check    //
     // ================================== //
+    // Here we need all the rays that are media scattered and material
+    // scattered. We partitition multiple times (one for media, and we sub partition
+    // the scattered ones wrt. material), so index buffer is kinda mess. These index buffers
+    // may reside on different buffers so we restart the indexing.
+    //
+    // Recursive ray cast will initially filter the shadow ray-requested paths etc.
+    // Also it should filter invalid rays, these occur when we are about to reach
+    // the spp limit.
+    uint32_t maxRayCount = imageTiler.CurrentTileSize().Multiply();
+    auto p = rayPartitioner.Start(maxRayCount, FindMaxWorkCount(),
+                                  processQueue, true);
+    DeviceAlgorithms::Iota(p.dIndices, RayIndex(0), processQueue);
+    dIndices = p.dIndices;
+    //
     Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
     RecursiveShadowRayCast(dIsVisibleBitSpan, dBackupRNGStates,
-                           dTransmittedIndices, processQueue);
+                           dIndices, processQueue);
 
+    // Accumulate the pre-calculated radiance selectively
+    processQueue.IssueWorkKernel<KCAccumulateShadowRaysMediaPT>
+    (
+        "KCAccumulateShadowRaysMedia",
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dShadowRayRadiance.size())},
+        //
+        dPathRadiance,
+        ToConstSpan(dShadowRayRadiance),
+        ToConstSpan(dRPathPDFShadow),
+        ToConstSpan(dRLightPDFShadow),
+        ToConstSpan(dIsVisibleBitSpan),
+        ToConstSpan(dPathDataPack),
+        currentOptions.russianRouletteRange,
+        std::is_same_v<SC, SpectrumContextIdentity>
+    );
 
     // So we "restart" the partitioner and get fresh dIndices array.
     // We need to be careful since fresh array will have
     // invalid rays (due to "we are about to reach spp limit and we did not
     // reload all paths that can fill the buffer" case).
     //
-    uint32_t rayCount = imageTiler.CurrentTileSize().Multiply();
-    uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
-    auto p = rayPartitioner.Start(rayCount, maxWorkCount,
-                                  processQueue, true);
+    p = rayPartitioner.Start(maxRayCount, FindMaxWorkCount(),
+                             processQueue, true);
     DeviceAlgorithms::Iota(p.dIndices, RayIndex(0), processQueue);
     dIndices = p.dIndices;
 
@@ -1000,7 +1066,7 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit, const GPUQueue& process
     uint32_t rayCount = imageTiler.CurrentTileSize().Multiply();
     // Start the partitioner, again worst case work count
     // Get the K/V pair buffer
-    uint32_t maxWorkCount = uint32_t(currentWorks.size() + currentLightWorks.size());
+    uint32_t maxWorkCount = FindMaxWorkCount();
     auto [dIndices, dKeys] = rayPartitioner.Start(rayCount, maxWorkCount,
                                                   processQueue, true);
 

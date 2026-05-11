@@ -296,7 +296,7 @@ MediumQuery MediumHeterogeneous<SC>::Query(const Vector3& p, Float xi) const
                                             : SpectraPerSpectrum;
         SpectrumWaves waves = sc->Wavelengths();
         for(uint32_t i = 0; i < WAVE_COUNT; i++)
-            emission[i] = BlackbodySPD::PlancksLaw(waves[i], tempature);
+            emission[i] = BlackbodySPD::PlancksLaw(waves.GetWl(i), tempature);
 
         result.emission = emission;
     }
