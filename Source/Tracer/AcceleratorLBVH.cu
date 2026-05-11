@@ -24,9 +24,9 @@
 #elif defined(MRAY_GPU_BACKEND_CUDA)
     namespace mray::cuda::algorithms
 #elif defined(MRAY_GPU_BACKEND_HIP)
-namespace mray::hip::algorithms
+    namespace mray::hip::algorithms
 #else
-    #error "Add nested name specifier here for the new backend!"
+    #error "Add nested namespace specifier here for the new backend!"
 #endif
 {
     template size_t
@@ -49,7 +49,8 @@ namespace mray::hip::algorithms
         IdentityFunctor<AABB3>&&
     );
 
-    template uint32_t SegmentedRadixSort<true, uint64_t, uint32_t>
+    template uint32_t
+    SegmentedRadixSort<true, uint64_t, uint32_t>
     (
         Span<Span<uint64_t>, 2>,
         Span<Span<uint32_t>, 2>,

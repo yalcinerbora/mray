@@ -8,6 +8,16 @@
 
 #include <numeric>
 
+class HasValidShadowRayFunctor
+{
+    public:
+    MR_HF_DECL
+    bool operator()(RayIndex) const noexcept
+    {
+        return true;
+    }
+};
+
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static
 void KCAccumulateShadowRaysPT(MRAY_GRID_CONSTANT const Span<Spectrum> dRadianceOut,
@@ -59,7 +69,7 @@ void KCAccumulateShadowRaysMediaPT(MRAY_GRID_CONSTANT const Span<Spectrum> dRadi
             Float rPathMIS = Float(0);
             Float rLightMIS = Float(0);
             Spectrum rPath = dRPathPDFShadow[i];
-            Spectrum rLight = dRPathPDFShadow[i];
+            Spectrum rLight = dRLightPDFShadow[i];
             for(uint32_t c = 0; c < channelCount; c++)
             {
                 rPathMIS += rPath[c];
@@ -331,8 +341,7 @@ PathTracerRendererT<SC>::DoRenderPassPure(Span<RayIndex> dIndices,
     // =================== //
     // Work_0           = BxDF sample
     // BoundaryWork_0   = Accumulate light radiance value to the path
-    using GlobalState = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
-    GlobalState globalState
+    GlobalStatePure globalState
     {
         .russianRouletteRange = currentOptions.russianRouletteRange,
         .sampleMode = currentOptions.sampleMode,
@@ -455,8 +464,7 @@ PathTracerRendererT<SC>::DoRenderPassNEE(Span<RayIndex> dIndices,
     UniformLightSampler lightSampler(metaLightArray.Array(),
                                      metaLightArray.IndexHashTable());
 
-    using GlobalState = PathTraceRDetail::GlobalState<UniformLightSampler, SpectrumConverter>;
-    GlobalState globalState
+    GlobalStateNEE globalState
     {
         .russianRouletteRange = currentOptions.russianRouletteRange,
         .sampleMode = currentOptions.sampleMode,
@@ -521,8 +529,7 @@ PathTracerRendererT<SC>::DoRenderPassNEE(Span<RayIndex> dIndices,
     // ================================== //
     //     Scatter Rays via Material      //
     // ================================== //
-    using GlobalStateE = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
-    GlobalStateE globalStateE
+    GlobalStatePure globalStateE
     {
         .russianRouletteRange   = currentOptions.russianRouletteRange,
         .sampleMode             = currentOptions.sampleMode,
@@ -580,8 +587,7 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaPure(Span<RayIndex> dIndices,
         .dMediaListPack     = dRayMediaListPacks
 
     };
-    using GlobalState = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
-    GlobalState globalState
+    GlobalStatePure globalState
     {
         .russianRouletteRange = currentOptions.russianRouletteRange,
         .sampleMode = currentOptions.sampleMode,
@@ -818,8 +824,7 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
 
     UniformLightSampler lightSampler(metaLightArray.Array(),
                                      metaLightArray.IndexHashTable());
-    using GlobalState = PathTraceRDetail::GlobalState<UniformLightSampler, SpectrumConverter>;
-    GlobalState globalState
+    GlobalStateNEE globalState
     {
         .russianRouletteRange = currentOptions.russianRouletteRange,
         .sampleMode           = currentOptions.sampleMode,
@@ -1022,10 +1027,20 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
                                   processQueue, true);
     DeviceAlgorithms::Iota(p.dIndices, RayIndex(0), processQueue);
     dIndices = p.dIndices;
+    dKeys = p.dKeys;
     //
+    GlobalStatePure globalStateE
+    {
+        .russianRouletteRange = currentOptions.russianRouletteRange,
+        .sampleMode           = currentOptions.sampleMode,
+        .lightSampler         = EmptyType{},
+        .specContextData      = typedSpectrumContext.GetData(),
+        .sampleMedia          = currentOptions.sampleMedia
+    };
     Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
     RecursiveShadowRayCast(dIsVisibleBitSpan, dBackupRNGStates,
-                           dIndices, processQueue);
+                           dIndices, dKeys, dRayState, globalStateE,
+                           processQueue);
 
     // Accumulate the pre-calculated radiance selectively
     processQueue.IssueWorkKernel<KCAccumulateShadowRaysMediaPT>
@@ -1120,58 +1135,88 @@ void
 PathTracerRendererT<SC>::RecursiveShadowRayCast(// Output
                                                 Bitspan<uint32_t> dIsVisibleBuffer,
                                                 // I-O
-                                                Span<BackupRNGState> dPackupRNGStates,
-                                                // Input
-                                                Span<const RayIndex> dTransmittedIndices,
-                                                const GPUQueue& queue)
+                                                Span<BackupRNGState> dBackupRNGStates,
+                                                Span<RayIndex> dIndices,
+                                                Span<CommonKey> dKeys,
+                                                const RayState& dRayState,
+                                                const GlobalStatePure& globalState,
+                                                // Constants
+                                                const GPUQueue& processQueue)
 {
     assert(false);
-    auto& rp = rayPartitioner;
+    //auto& rp = rayPartitioner;
 
-    // TODO: How to check if done or not done?
+    // Here we have raw paths, some of which can be invalid (we are near spp limit)
+    // and some did not launch shadow rays (since they are highly specular)
+    while(!dIndices.empty())
+    {
+        auto bpOut = rayPartitioner.BinaryPartition(dIndices, processQueue,
+                                                    HasValidShadowRayFunctor());
+        processQueue.Barrier().Wait();
+        dIndices = bpOut.Spanify()[0];
+        dKeys = dKeys.subspan(0, dIndices.size());
+        if(dIndices.empty()) continue;
 
-    // Do:
-    //    Binary partition alive shadow rays
-    //    1. Do closest hit
-    //    2. N-way partition wrt. current media
-    //    3. Calculate next media
-    //    While doing these, update isVisible bit set and decay shadow ray radiance
-    //
-    // While: All rays reached/occluded
+        // Cast rays
+        // Similar to actual ray casting of the path portion.
+        // TODO: We currently waste writing HitKeys, Hit Values (barycentrics),
+        // we should change it later.
+        Span<VolumeIndex> dVolumeIndices = MemAlloc::RepurposeAlloc<VolumeIndex>(dRandomNumBuffer);
+        processQueue.MemsetAsync(dVolumeIndices, 0xFF);
+        tracerView.baseAccelerator.CastRays
+        (
+            dVolumeIndices,
+            dHitKeys, dHits, dBackupRNGStates,
+            dShadowRays, dIndices, true,
+            processQueue
+        );
 
-    //Span<const RayIndex> dCurrentIndices = dTransmittedIndices;
-    //do
-    //{
-    //   auto binPartitionOutput = rp.BinaryPartition
-    //   (
-    //       dCurrentIndices, queue, []()
-    //        {
-    //            ...
-    //        }
-    //   );
+        mediaTracker->AddNewVolumeToRaysIndirect(dShadowRayMediaListPacks,
+                                                 dVolumeIndices,
+                                                 dIndices,
+                                                 processQueue);
+        // Generate work keys from hit packs
+        processQueue.IssueWorkKernel<KCGenerateMediumWorkKeysIndirect>
+        (
+            "KCGenerateMediumWorkKeysIndirect",
+            DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
+            dKeys,
+            ToConstSpan(dIndices),
+            ToConstSpan(dShadowRayMediaListPacks),
+            mediaTracker->View(),
+            mediumWorkHasher
+        );
 
-    //   dPartitionIndices = ;
-    //}
-    //while(....);
+        // N-way Partition wrt. medium/transform pair
+        auto& rp = rayPartitioner;
+        auto partitionOutput = rp.MultiPartition(dKeys, dIndices,
+                                                 mediumWorkHasher.WorkBatchDataRange(),
+                                                 mediumWorkHasher.WorkBatchBitRange(),
+                                                 processQueue, false);
+        processQueue.Barrier().Wait();
 
+        // Calculate transmittance ratio
+        IssueMediumWorkKernelsToPartitions<This>
+        (
+            mediumWorkHasher, partitionOutput,
+            [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
+            {
+                FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
+                                 dLocalIndices, workI.SampleRNList(1),
+                                 rnGenerator, processQueue);
+                workI.DoWork_2(dRayState, dShadowRays,
+                               dShadowRayCones, dLocalIndices,
+                               dShadowRayMediaListPacks,
+                               dRandomNumBuffer,
+                               mediaTracker->View(),
+                               globalState,
+                               processQueue);
+            }
+        );
 
-    //// TODO: Accumulate shadow ray radiance
-    //// We will evaluate transmittance
-    //// TODO: Copy all of the rays
-    //
-    //processQueue.MemsetAsync(dShadowRayVisibilities, 0x00);
-    //Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
-    //// Again rn buffer to the rescue. Use it as a temporary buffer
-    //// for shadow rays' media pack.
-    //using MemAlloc::RepurposeAlloc;
-    //auto dShadowRayMediaListPack = RepurposeAlloc<RayMediaListPack>(dRandomNumBuffer);
-    //
-    //Span<RayGMem> dShadowRays,
-    //Span<RayCone> dShadowRayCones,
-
-    // We need to hold shadow ray's media indices
-    // We also need storage for volume indices
-    //
+        dIndices = partitionOutput.dPartitionIndices;
+        dKeys = partitionOutput.dPartitionKeys;
+    }
 }
 
 template<SpectrumContextC SC>

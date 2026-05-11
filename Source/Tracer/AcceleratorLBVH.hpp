@@ -342,10 +342,10 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::ClosestHit(BackupRNG& rng,
             {
                 PrimitiveKey primKey = leafs[leafIndex];
                 auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
-                if(check.has_value() && check->t < tMM[1])
+                if(check.HasValue() && check.Value().t < tMM[1])
                 {
                     result = check;
-                    tMM[1] = check->t;
+                    tMM[1] = check.Value().t;
                 }
                 // Never terminate
                 return false;
@@ -390,7 +390,7 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::FirstHit(BackupRNG& rng,
             {
                 PrimitiveKey primKey = leafs[leafIndex];
                 result = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
-                return result.has_value();
+                return result.HasValue();
             }
         );
     #else

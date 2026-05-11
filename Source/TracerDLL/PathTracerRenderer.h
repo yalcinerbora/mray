@@ -22,6 +22,8 @@ class PathTracerRendererT final : public PathTracerRendererBase
     using AttribInfoList        = typename RendererBase::AttribInfoList;
     using SpectrumContext       = SpectrumContextT;
     using SpectrumConverter     = typename SpectrumContext::Converter;
+    using GlobalStateNEE        = PathTraceRDetail::GlobalState<UniformLightSampler, SpectrumConverter>;
+    using GlobalStatePure       = PathTraceRDetail::GlobalState<EmptyType, SpectrumConverter>;
     static constexpr bool IsSpectral = !std::is_same_v<SpectrumContext, SpectrumContextIdentity>;
     // Work Functions
     template<PrimitiveGroupC PG, MaterialGroupC MG, TransformGroupC TG>
@@ -107,7 +109,10 @@ class PathTracerRendererT final : public PathTracerRendererBase
     void                RecursiveShadowRayCast(Bitspan<uint32_t> isVisibleBitSpan,
                                                // I-O
                                                Span<BackupRNGState> dBackupRNGStates,
-                                               Span<const RayIndex> dRayIndices,
+                                               Span<RayIndex> dRayIndices,
+                                               Span<CommonKey> dKeys,
+                                               const RayState& dRayState,
+                                               const GlobalStatePure& globalState,
                                                const GPUQueue& queue);
     // Implementations
     RendererOutput      DoThroughputSingleTileRender(const GPUDevice&, const GPUQueue&) override;

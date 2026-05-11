@@ -170,16 +170,6 @@ void KCClosestHit()
         dHitKeys = params.nParams.dHitKeys;
         dHits = params.nParams.dHits;
         dRays = params.nParams.dRays;
-
-        dHitKeys[rIndex] = HitKeyPack
-        {
-            .primKey = pKey,
-            .lightOrMatKey = lmKey,
-            .transKey = tKey,
-            .accelKey = aKey
-        };
-        dHits[rIndex] = hit;
-        dRays[rIndex].tMax = optixGetRayTmax();
         resolveMedia = params.nParams.resolveMedia;
         dVolumeIndices = params.nParams.dVolumeIndices;
     }
@@ -191,6 +181,17 @@ void KCClosestHit()
         resolveMedia = params.lParams.resolveMedia;
         dVolumeIndices = params.lParams.dVolumeIndices;
     }
+
+    // Common Write Operations
+    dHitKeys[rIndex] = HitKeyPack
+    {
+        .primKey = pKey,
+        .lightOrMatKey = lmKey,
+        .transKey = tKey,
+        .accelKey = aKey
+    };
+    dHits[rIndex] = hit;
+    dRays[rIndex].tMax = optixGetRayTmax();
 
     // Interface Index
     if(resolveMedia)

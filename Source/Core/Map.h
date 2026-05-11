@@ -4,6 +4,7 @@
 #include <map>
 #include <shared_mutex>
 #include <mutex>
+#include <vector>
 
 #include "Types.h"
 #include "Optional.h"

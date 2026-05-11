@@ -112,18 +112,18 @@ void IntersectFuncEmbree(const RTCIntersectFunctionNArguments* args)
             Ray r = Ray(dir, pos);
 
             auto hitResult = prim.Intersects(r, record.cullFace);
-            if(hitResult && (hitResult->t < rh.ray.tfar[i]))
+            if(hitResult && (hitResult.Value().t < rh.ray.tfar[i]))
             {
                 isValid[i] = EMBREE_VALID_RAY;
-                potentialHits.u[i] = hitResult->hit[0];
-                potentialHits.v[i] = hitResult->hit[1];
+                potentialHits.u[i] = hitResult.Value().hit[0];
+                potentialHits.v[i] = hitResult.Value().hit[1];
                 potentialHits.geomID[i] = args->geomID;
                 potentialHits.primID[i] = args->primID;
                 potentialHits.instID[0][i] = args->context->instID[0];
                 potentialHits.instPrimID[0][i] = args->context->instPrimID[0];
-                newTs[i] = hitResult->t;
+                newTs[i] = hitResult.Value().t;
                 //
-                auto vBackfacePart = (hitResult->backFace)
+                auto vBackfacePart = (hitResult.Value().backFace)
                                         ? IS_BACKFACE_KEY_FLAG
                                         : IS_FRONTFACE_KEY_FLAG;
                 auto vIndexPart = record.volumeIndex.FetchIndexPortion();
@@ -132,7 +132,7 @@ void IntersectFuncEmbree(const RTCIntersectFunctionNArguments* args)
                                                                                      vBackfacePart,
                                                                                      vIndexPart);
                 //
-                someHasAlphaMaps |= record.alphaMap.has_value();
+                someHasAlphaMaps |= record.alphaMap.HasValue();
             }
         }
         // Invoke alpha map if any rays requires it
@@ -233,15 +233,15 @@ void OccludedFuncEmbree(const RTCOccludedFunctionNArguments* args)
             if(hitResult)
             {
                 isValid[i] = EMBREE_VALID_RAY;
-                potentialHits.u[i] = hitResult->hit[0];
-                potentialHits.v[i] = hitResult->hit[1];
+                potentialHits.u[i] = hitResult.Value().hit[0];
+                potentialHits.v[i] = hitResult.Value().hit[1];
                 //
                 potentialHits.geomID[i] = args->geomID;
                 potentialHits.primID[i] = args->primID;
                 potentialHits.instID[0][i] = args->context->instID[0];
                 potentialHits.instPrimID[0][i] = args->context->instPrimID[0];
 
-                someHasAlphaMaps |= record.alphaMap.has_value();
+                someHasAlphaMaps |= record.alphaMap.HasValue();
             }
         }
 
@@ -340,7 +340,7 @@ void FilterFuncEmbree(const RTCFilterFunctionNArguments* args)
                 baryCoords = EmbreeBaryToMRay(baryCoords);
             }
             // Actual transparency
-            if(!record.alphaMap.has_value()) continue;
+            if(!record.alphaMap.HasValue()) continue;
             //
             const auto& tgData = *record.tgData;
             const auto& pgData = *record.pgData;
@@ -348,7 +348,7 @@ void FilterFuncEmbree(const RTCFilterFunctionNArguments* args)
             TransformKey tKey = record.transformKey;
             PrimitiveKey pKey = record.dPrimKeys[primIndex];
             //
-            const auto& aMap = *record.alphaMap;
+            const auto& aMap = record.alphaMap.Value();
             TransContext tContext = GenerateTransformContext(tgData, pgData, tKey, pKey);
             Prim prim = Prim(tContext, pgData, pKey);
             Vector2 uv = prim.SurfaceParametrization(baryCoords);
