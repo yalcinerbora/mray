@@ -85,7 +85,7 @@ void KCLocalRayCast(// Output
                     MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA,
                     MRAY_GRID_CONSTANT const typename AG::DataSoA aSoA,
                     MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA,
-                    MRAY_GRID_CONSTANT const bool resolveMedia);
+                    MRAY_GRID_CONSTANT const AccelResultWriteMode writeMode);
 
 template<AccelGroupC AG, TransformGroupC TG,
          auto GenerateTransformContext = MRAY_ACCEL_TGEN_FUNCTION(AG, TG)>
@@ -138,7 +138,7 @@ class AcceleratorWork : public BaseType
                        Span<const RayIndex> dRayIndices,
                        Span<const CommonKey> dAcceleratorKeys,
                        // Constants
-                       bool resolveMedia,
+                       AccelResultWriteMode,
                        const GPUQueue& queue) const override;
 
     void CastVisibilityRays(// Output
@@ -202,7 +202,7 @@ void AcceleratorWork<AG, TG, BT>::CastLocalRays(// Output
                                                 Span<const RayIndex> dRayIndices,
                                                 Span<const CommonKey> dAcceleratorKeys,
                                                 // Constants
-                                                bool resolveMedia,
+                                                AccelResultWriteMode writeMode,
                                                 const GPUQueue& queue) const
 {
     assert(dHitIds.size() == dHitParams.size());
@@ -227,7 +227,7 @@ void AcceleratorWork<AG, TG, BT>::CastLocalRays(// Output
         transGroup.SoA(),
         accelGroup.SoA(),
         primGroup.SoA(),
-        resolveMedia
+        writeMode
     );
 }
 

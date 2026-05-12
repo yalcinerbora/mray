@@ -309,7 +309,9 @@ PathTracerRendererT<SC>::DoRenderPassPure(Span<RayIndex> dIndices,
     (
         Span<VolumeIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
-        dRays, dIndices, false, processQueue
+        dRays, dIndices,
+        AccelResultWriteMode::HIT_KEY_AND_HIT_ONLY,
+        processQueue
     );
 
     // Generate work keys from hit packs
@@ -424,7 +426,9 @@ PathTracerRendererT<SC>::DoRenderPassNEE(Span<RayIndex> dIndices,
     (
         Span<VolumeIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
-        dRays, dIndices, false, processQueue
+        dRays, dIndices,
+        AccelResultWriteMode::HIT_KEY_AND_HIT_ONLY,
+        processQueue
     );
     // Generate work keys from hit packs
     processQueue.IssueWorkKernel<KCGenerateSurfaceWorkKeysIndirect>
@@ -615,7 +619,7 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaPure(Span<RayIndex> dIndices,
     tracerView.baseAccelerator.CastRays
     (
         dVolumeIndices, dHitKeys, dHits, dBackupRNGStates,
-        dRays, dIndices, true,
+        dRays, dIndices, AccelResultWriteMode::BOTH,
         processQueue
     );
     mediaTracker->AddNewVolumeToRaysIndirect(dRayMediaListPacks,
@@ -832,6 +836,14 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
         .specContextData      = typedSpectrumContext.GetData(),
         .sampleMedia          = currentOptions.sampleMedia
     };
+    GlobalStatePure globalStateE
+    {
+        .russianRouletteRange = currentOptions.russianRouletteRange,
+        .sampleMode           = currentOptions.sampleMode,
+        .lightSampler         = EmptyType{},
+        .specContextData      = typedSpectrumContext.GetData(),
+        .sampleMedia          = currentOptions.sampleMedia
+    };
 
     // Fill the PDF ratios for new rays/paths.
     using namespace std::string_view_literals;
@@ -861,7 +873,7 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
     (
         dVolumeIndices,
         dHitKeys, dHits, dBackupRNGStates,
-        dRays, dIndices, true,
+        dRays, dIndices, AccelResultWriteMode::BOTH,
         processQueue
     );
 
@@ -897,6 +909,14 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
         mediumWorkHasher, partitionOutput,
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
         {
+            // Do not do the complex work function for these
+            if(workI.IsVacuumMedia())
+            {
+                MarkPathsTransmittedIndirect(dPathDataPack, dLocalIndices,
+                                             processQueue);
+                return;
+            }
+
             FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
                              dLocalIndices, workI.SampleRNList(1),
                              rnGenerator, processQueue);
@@ -1029,14 +1049,6 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
     dIndices = p.dIndices;
     dKeys = p.dKeys;
     //
-    GlobalStatePure globalStateE
-    {
-        .russianRouletteRange = currentOptions.russianRouletteRange,
-        .sampleMode           = currentOptions.sampleMode,
-        .lightSampler         = EmptyType{},
-        .specContextData      = typedSpectrumContext.GetData(),
-        .sampleMedia          = currentOptions.sampleMedia
-    };
     Bitspan<uint32_t> dIsVisibleBitSpan(dShadowRayVisibilities);
     RecursiveShadowRayCast(dIsVisibleBitSpan, dBackupRNGStates,
                            dIndices, dKeys, dRayState, globalStateE,
@@ -1163,11 +1175,15 @@ PathTracerRendererT<SC>::RecursiveShadowRayCast(// Output
         // we should change it later.
         Span<VolumeIndex> dVolumeIndices = MemAlloc::RepurposeAlloc<VolumeIndex>(dRandomNumBuffer);
         processQueue.MemsetAsync(dVolumeIndices, 0xFF);
+
+        // Here we will update the tMax so we need to store the tMax
+        //...
         tracerView.baseAccelerator.CastRays
         (
             dVolumeIndices,
             dHitKeys, dHits, dBackupRNGStates,
-            dShadowRays, dIndices, true,
+            dShadowRays, dIndices,
+            AccelResultWriteMode::VOLUME_INDEX_ONLY,
             processQueue
         );
 
@@ -1201,6 +1217,9 @@ PathTracerRendererT<SC>::RecursiveShadowRayCast(// Output
             mediumWorkHasher, partitionOutput,
             [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
             {
+                // Do not shed radiance if media is vacuum
+                if(workI.IsVacuumMedia()) return;
+
                 FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
                                  dLocalIndices, workI.SampleRNList(1),
                                  rnGenerator, processQueue);
@@ -1213,6 +1232,9 @@ PathTracerRendererT<SC>::RecursiveShadowRayCast(// Output
                                processQueue);
             }
         );
+
+        // TODO: For all rays, advance the ray to the hit location
+        // (
 
         dIndices = partitionOutput.dPartitionIndices;
         dKeys = partitionOutput.dPartitionKeys;

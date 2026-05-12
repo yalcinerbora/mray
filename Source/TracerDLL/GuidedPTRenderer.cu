@@ -580,7 +580,9 @@ GuidedPTRenderer::DisplayHashGrid(Span<const RayIndex> dDeadRayIndices,
     (
         Span<VolumeIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
-        dShadowRays, dDeadRayIndices, false, processQueue
+        dShadowRays, dDeadRayIndices,
+        AccelResultWriteMode::HIT_KEY_AND_HIT_ONLY,
+        processQueue
     );
 
     processQueue.IssueWait(renderBuffer->PrevCopyCompleteFence());
@@ -698,7 +700,9 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     (
         Span<VolumeIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
-        dRays, dIndices, false, processQueue
+        dRays, dIndices,
+        AccelResultWriteMode::HIT_KEY_AND_HIT_ONLY,
+        processQueue
     );
     // Generate work keys from hit packs
     // for partitioning

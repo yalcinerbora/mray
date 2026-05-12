@@ -483,18 +483,20 @@ RendererOutput SurfaceRenderer::DoRender()
     processQueue.MemsetAsync(dVolumeIndices, 0xFF);
 
     SurfRDetail::Mode::E curMode = currentOptions.mode;
-    bool showVolumeMode = curMode == SurfRDetail::Mode::VOL_INTERFACE;
+    bool showVolume = (curMode == SurfRDetail::Mode::VOL_INTERFACE);
+    auto accelWriteMode = showVolume ? AccelResultWriteMode::BOTH
+                                     : AccelResultWriteMode::HIT_KEY_AND_HIT_ONLY;
     tracerView.baseAccelerator.CastRays
     (
         dVolumeIndices,
         dHitKeysLocal, dHits, dBackupRNGStates,
         dRays, dIndices,
-        showVolumeMode,
+        accelWriteMode,
         processQueue
     );
 
     // Resolve the VolumeIndices to
-    if(showVolumeMode)
+    if(showVolume)
     {
         mediaTracker->AddNewVolumeToRaysIndirect(dRayStateCommon.dRayMediaPacks,
                                                  dVolumeIndices,

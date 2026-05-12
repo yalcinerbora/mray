@@ -171,7 +171,7 @@ class AcceleratorGroupI
                                       Span<const CommonKey> dAccelKeys,
                                       // Constants
                                       CommonKey instanceId,
-                                      bool resolveMedia,
+                                      AccelResultWriteMode,
                                       const GPUQueue& queue) = 0;
     virtual void        CastVisibilityRays(// Output
                                            Bitspan<uint32_t> dIsVisibleBuffer,
@@ -389,7 +389,7 @@ class BaseAcceleratorI
                              // Input
                              Span<const RayIndex> dRayIndices,
                              //
-                             bool resolveMedia,
+                             AccelResultWriteMode,
                              const GPUQueue& queue) = 0;
     // Fully cast rays to entire scene return true/false
     // If it hits to a surface, (this should be faster
@@ -416,7 +416,7 @@ class BaseAcceleratorI
                                   Span<const AcceleratorKey> dAccelKeys,
                                   //
                                   CommonKey dAccelKeyBatchPortion,
-                                  bool resolveMedia,
+                                  AccelResultWriteMode,
                                   const GPUQueue& queue) = 0;
 
     // Construction

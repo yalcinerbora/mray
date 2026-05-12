@@ -208,7 +208,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                                      // Input
                                      Span<const RayIndex> dRayIndices,
                                      //
-                                     bool resolveMedia,
+                                     AccelResultWriteMode writeMode,
                                      const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -319,7 +319,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                                           dLocalKeys,
                                           //
                                           key.FetchBatchPortion(),
-                                          resolveMedia,
+                                          writeMode,
                                           queue);
             }
         }
@@ -467,7 +467,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                                           Span<const AcceleratorKey> dAccelKeys,
                                           //
                                           CommonKey dAccelKeyBatchPortion,
-                                          bool resolveMedia,
+                                          AccelResultWriteMode writeMode,
                                           const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -499,7 +499,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                               dAccelKeysCommon,
                               //
                               dAccelKeyBatchPortion,
-                              resolveMedia,
+                              writeMode,
                               queue);
 }
 

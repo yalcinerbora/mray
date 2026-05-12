@@ -137,7 +137,7 @@ class AcceleratorGroupLinear final
                           Span<const CommonKey> dAccelKeys,
                           // Constants
                           CommonKey workId,
-                          bool resolveMedia,
+                          AccelResultWriteMode,
                           const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -191,7 +191,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
                      // Input
                      Span<const RayIndex> dRayIndices,
                      //
-                     bool resolveMedia,
+                     AccelResultWriteMode,
                      const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -215,7 +215,7 @@ class BaseAcceleratorLinear final : public BaseAcceleratorT<BaseAcceleratorLinea
                           Span<const AcceleratorKey> dAccelKeys,
                           //
                           CommonKey dAccelKeyBatchPortion,
-                          bool resolveMedia,
+                          AccelResultWriteMode,
                           const GPUQueue& queue) override;
 
     void    AllocateForTraversal(size_t maxRayCount) override;

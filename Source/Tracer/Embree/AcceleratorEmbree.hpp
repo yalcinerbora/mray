@@ -793,7 +793,7 @@ void AcceleratorGroupEmbree<PG>::CastLocalRays(// Output
                                                Span<const CommonKey>,
                                                // Constants
                                                CommonKey,
-                                               bool,
+                                               AccelResultWriteMode,
                                                const GPUQueue&)
 {
     throw MRayError("For Embree, this function should not be called");

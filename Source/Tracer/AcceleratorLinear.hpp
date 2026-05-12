@@ -302,7 +302,7 @@ void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
                                                Span<const CommonKey> dAccelKeys,
                                                // Constants
                                                CommonKey workId,
-                                               bool resolveMedia,
+                                               AccelResultWriteMode writeMode,
                                                const GPUQueue& queue)
 {
     CommonKey localWorkId = workId - this->globalWorkIdToLocalOffset;
@@ -324,7 +324,7 @@ void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
                         dRayIndices,
                         dAccelKeys,
                         // Constants
-                        resolveMedia,
+                        writeMode,
                         queue);
 }
 

@@ -190,7 +190,7 @@ void KCLocalRayCast(// Output
                     MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA,
                     MRAY_GRID_CONSTANT const typename AG::DataSoA aSoA,
                     MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA,
-                    MRAY_GRID_CONSTANT const bool resolveMedia)
+                    MRAY_GRID_CONSTANT const AccelResultWriteMode writeMode)
 {
     using PG = typename AG::PrimitiveGroup;
     using Accelerator = typename AG:: template Accelerator<TG>;
@@ -227,19 +227,25 @@ void KCLocalRayCast(// Output
         OptionalHitR<PG> hitOpt = acc.ClosestHit(rng, ray, tMM);
         if(!hitOpt) continue;
 
+        using enum AccelResultWriteMode;
         const auto& hit = hitOpt.Value();
-        dHitIds[index] = HitKeyPack
+        if(writeMode == BOTH || writeMode == HIT_KEY_AND_HIT_ONLY)
         {
-            .primKey = hit.primitiveKey,
-            .lightOrMatKey = hit.lmKey,
-            .transKey = acc.GetTransformKey(),
-            .accelKey = aId
-        };
-        UpdateTMax(dRays, index, hit.t);
-        dHitParams[index] = hit.hit;
+            dHitIds[index] = HitKeyPack
+            {
+                .primKey = hit.primitiveKey,
+                .lightOrMatKey = hit.lmKey,
+                .transKey = acc.GetTransformKey(),
+                .accelKey = aId
+            };
+            dHitParams[index] = hit.hit;
+        }
 
-        if(resolveMedia)
+        if(writeMode == BOTH || writeMode == VOLUME_INDEX_ONLY)
             dVolumeIndices[index] = hit.volumeIndex;
+
+        // We always update tMax
+        UpdateTMax(dRays, index, hit.t);
     }
 };
 

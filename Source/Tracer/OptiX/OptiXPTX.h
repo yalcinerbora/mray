@@ -27,7 +27,7 @@ struct NormalRayCastArgPackOptiX
     Span<RayGMem>           dRays;
     // Inputs
     Span<const RayIndex>    dRayIndices;
-    bool                    resolveMedia;
+    AccelResultWriteMode    writeMode;
 };
 
 struct VisibilityCastArgPackOptiX
@@ -58,7 +58,7 @@ struct LocalRayCastArgPackOptiX
     Span<const OptixTraversableHandle>  dGlobalInstanceTraversables;
     Span<const Matrix3x4>               dGlobalInstanceInvTransforms;
     uint32_t                            batchStartOffset;
-    bool                                resolveMedia;
+    AccelResultWriteMode                writeMode;
 };
 
 struct ArgumentPackOptiX

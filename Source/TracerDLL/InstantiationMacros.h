@@ -155,7 +155,7 @@ using GetMWF = GetMWFT<R, MG, TG, I>::Type;
                                                                     MRAY_GRID_CONSTANT const typename T::DataSoA,           \
                                                                     MRAY_GRID_CONSTANT const typename A<P>::DataSoA,        \
                                                                     MRAY_GRID_CONSTANT const typename P::DataSoA,           \
-                                                                    MRAY_GRID_CONSTANT const bool)
+                                                                    MRAY_GRID_CONSTANT const AccelResultWriteMode)
 
 #define MRAY_ACCEL_VISIBILITY_RAY_CAST_KERNEL_INSTANTIATE(A, P, T)                                                          \
     template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT                                                                  \

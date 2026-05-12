@@ -216,7 +216,7 @@ void BaseAcceleratorEmbree::CastRays(// Output
                                      // Input
                                      Span<const RayIndex> dRayIndices,
                                      //
-                                     bool resolveMedia,
+                                     AccelResultWriteMode writeMode,
                                      const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -314,24 +314,31 @@ void BaseAcceleratorEmbree::CastRays(// Output
                 uint32_t iOffset = hInstanceHRStartOffsets[instanceIndex];
                 uint32_t globalRecordIndex = iOffset + primBatchIndex;
                 const auto& record = *hAllHitRecordPtrs[globalRecordIndex];
-                dHitIds[rIndex] = HitKeyPack
+
+                using enum AccelResultWriteMode;
+                if(writeMode == BOTH || writeMode == HIT_KEY_AND_HIT_ONLY)
                 {
-                    .primKey = record.dPrimKeys[primIndex],
-                    .lightOrMatKey = record.lmKey,
-                    .transKey = record.transformKey,
-                    .accelKey = record.acceleratorKey
-                };
+                    dHitIds[rIndex] = HitKeyPack
+                    {
+                        .primKey = record.dPrimKeys[primIndex],
+                        .lightOrMatKey = record.lmKey,
+                        .transKey = record.transformKey,
+                        .accelKey = record.acceleratorKey
+                    };
 
-                // Embree-MRay barycentric coordinate mismatch
-                Vector2 ab = Vector2(rh.hit.u[i], rh.hit.v[i]);
-                if(record.isTriangle)
-                    ab = EmbreeBaryToMRay(ab);
+                    // Embree-MRay barycentric coordinate mismatch
+                    Vector2 ab = Vector2(rh.hit.u[i], rh.hit.v[i]);
+                    if(record.isTriangle)
+                        ab = EmbreeBaryToMRay(ab);
 
-                dHitParams[rIndex] = MetaHit(ab);
-                UpdateTMax(dRays, rIndex, rh.ray.tfar[i]);
+                    dHitParams[rIndex] = MetaHit(ab);
+                }
 
-                if(resolveMedia)
+                if(writeMode == BOTH || writeMode == VOLUME_INDEX_ONLY)
                     dVolumeIndices[rIndex] = rqContext.volumeIndices[i];
+
+                // We always write tMax
+                UpdateTMax(dRays, rIndex, rh.ray.tfar[i]);
             }
         }
     );
@@ -441,7 +448,7 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
                                           Span<const AcceleratorKey> dAccelKeys,
                                           //
                                           CommonKey dAccelKeyBatchPortion,
-                                          bool resolveMedia,
+                                          AccelResultWriteMode writeMode,
                                           const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -529,18 +536,30 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
             uint32_t iOffset = hInstanceHRStartOffsets[instanceIndex];
             uint32_t globalRecordIndex = iOffset + primBatchIndex;
             const auto& record = *hAllHitRecordPtrs[globalRecordIndex];
-            dHitIds[rIndex] = HitKeyPack
-            {
-                .primKey        = record.dPrimKeys[primIndex],
-                .lightOrMatKey  = record.lmKey,
-                .transKey       = record.transformKey,
-                .accelKey       = record.acceleratorKey
-            };
-            dHitParams[rIndex] = MetaHit(Vector2(rh.hit.u, rh.hit.v));
-            UpdateTMax(dRays, rIndex, rh.ray.tfar);
 
-            if(resolveMedia)
+            using enum AccelResultWriteMode;
+            if(writeMode == BOTH || writeMode == HIT_KEY_AND_HIT_ONLY)
+            {
+                dHitIds[rIndex] = HitKeyPack
+                {
+                    .primKey        = record.dPrimKeys[primIndex],
+                    .lightOrMatKey  = record.lmKey,
+                    .transKey       = record.transformKey,
+                    .accelKey       = record.acceleratorKey
+                };
+
+                Vector2 ab = Vector2(rh.hit.u, rh.hit.v);
+                if(record.isTriangle)
+                    ab = EmbreeBaryToMRay(ab);
+
+                dHitParams[rIndex] = MetaHit(ab);
+            }
+
+            if(writeMode == BOTH || writeMode == VOLUME_INDEX_ONLY)
                 dVolumeIndices[rIndex] = rqContext.volumeIndices[i];
+
+            // We always write tMax
+            UpdateTMax(dRays, rIndex, rh.ray.tfar);
         }
     );
 }

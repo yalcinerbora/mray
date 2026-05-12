@@ -8,6 +8,27 @@
 
 #include "Device/GPUSystemForward.h"
 
+// Accelerator can write volumes,
+// surface key tuples and hit parameters (i.e., barycentric coords)
+// and volume indices (which volume this surface splits)
+//
+// Some code may need only one or both:
+//   - Path tracing *without* media will need surface hit keys only
+//   - Volume renderer that traces shadow rays needs only volume index
+//     (volume index holds if the surface is "passthrough" so we can recursively
+//      shed radiance by using volume index only)
+//   - Path tracer *with* media will require both when evaluating path rays
+//
+// We use this to prevent writing to certain buffers so that algorithms
+// may repurpose that memory. (i.e, volume shadow ray casting will repurpose
+// hit key buffers)
+enum class AccelResultWriteMode : uint32_t
+{
+    HIT_KEY_AND_HIT_ONLY = 0b01,
+    VOLUME_INDEX_ONLY    = 0b10,
+    BOTH                 = 0b11
+};
+
 class AcceleratorWorkI
 {
     public:
@@ -24,7 +45,7 @@ class AcceleratorWorkI
                                   Span<const RayIndex> dRayIndices,
                                   Span<const CommonKey> dAccelIdPacks,
                                   // Constants
-                                  bool resolveMedia,
+                                  AccelResultWriteMode,
                                   const GPUQueue& queue) const = 0;
 
     virtual void    CastVisibilityRays(// Output

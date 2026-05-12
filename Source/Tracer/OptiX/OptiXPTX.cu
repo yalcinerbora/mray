@@ -160,41 +160,44 @@ void KCClosestHit()
     MetaHit hit = ReadHitFromAttributes<Hit, TrianglePrimGroupC<PGroup>>();
 
     // Write to the global memory
-    bool resolveMedia = false;
     Span<VolumeIndex> dVolumeIndices;
     Span<HitKeyPack> dHitKeys;
     Span<MetaHit> dHits;
     Span<RayGMem> dRays;
+    AccelResultWriteMode writeMode;
     if(params.mode == NORMAL)
     {
         dHitKeys = params.nParams.dHitKeys;
         dHits = params.nParams.dHits;
         dRays = params.nParams.dRays;
-        resolveMedia = params.nParams.resolveMedia;
         dVolumeIndices = params.nParams.dVolumeIndices;
+        writeMode = params.nParams.writeMode;
     }
     else
     {
         dHitKeys = params.lParams.dHitKeys;
         dHits = params.lParams.dHits;
         dRays = params.lParams.dRays;
-        resolveMedia = params.lParams.resolveMedia;
         dVolumeIndices = params.lParams.dVolumeIndices;
+        writeMode = params.lParams.writeMode;
     }
 
     // Common Write Operations
-    dHitKeys[rIndex] = HitKeyPack
+    using enum AccelResultWriteMode;
+    if(writeMode == BOTH || writeMode == HIT_KEY_AND_HIT_ONLY)
     {
-        .primKey = pKey,
-        .lightOrMatKey = lmKey,
-        .transKey = tKey,
-        .accelKey = aKey
-    };
-    dHits[rIndex] = hit;
-    dRays[rIndex].tMax = optixGetRayTmax();
+        dHitKeys[rIndex] = HitKeyPack
+        {
+            .primKey = pKey,
+            .lightOrMatKey = lmKey,
+            .transKey = tKey,
+            .accelKey = aKey
+        };
+        dHits[rIndex] = hit;
+    }
 
     // Interface Index
-    if(resolveMedia)
+    if(writeMode == BOTH || writeMode == VOLUME_INDEX_ONLY)
     {
         bool isBackFace = false;
         unsigned int hk = optixGetHitKind();
@@ -212,6 +215,9 @@ void KCClosestHit()
         auto vI = VolumeIndex::CombinedKey(vPassthrough, orientation, vIndex);
         dVolumeIndices[rIndex] = vI;
     }
+
+    // We always update tMax
+    dRays[rIndex].tMax = optixGetRayTmax();
 }
 
 // Meta Any Hit Shader

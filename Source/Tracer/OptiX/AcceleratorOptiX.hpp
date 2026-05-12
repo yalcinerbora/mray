@@ -757,7 +757,7 @@ void AcceleratorGroupOptiX<PG>::CastLocalRays(// Output
                                               Span<const CommonKey>,
                                               // Constants
                                               CommonKey,
-                                              bool,
+                                              AccelResultWriteMode,
                                               const GPUQueue&)
 {
     throw MRayError("For OptiX, this function should not be called");

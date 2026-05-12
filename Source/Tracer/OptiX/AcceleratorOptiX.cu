@@ -680,7 +680,7 @@ void BaseAcceleratorOptiX::CastRays(// Output
                                     // Input
                                     Span<const RayIndex> dRayIndices,
                                     //
-                                    bool resolveMedia,
+                                    AccelResultWriteMode writeMode,
                                     const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -713,7 +713,7 @@ void BaseAcceleratorOptiX::CastRays(// Output
             .dRNGStates          = dRNGStates,
             .dRays               = dRays,
             .dRayIndices         = dRayIndices,
-            .resolveMedia        = resolveMedia
+            .writeMode           = writeMode
         }
     };
     queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOptiX>(&argPack, 1));
@@ -785,7 +785,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
                                          Span<const AcceleratorKey> dAccelKeys,
                                          //
                                          CommonKey dAccelKeyBatchPortion,
-                                         bool resolveMedia,
+                                         AccelResultWriteMode writeMode,
                                          const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -823,7 +823,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
             .dGlobalInstanceTraversables  = dGlobalTraversableHandles,
             .dGlobalInstanceInvTransforms = dGlobalInstanceInvTransforms,
             .batchStartOffset    = batchStartOffset,
-            .resolveMedia        = resolveMedia
+            .writeMode           = writeMode
         }
     };
     queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOptiX>(&argPack, 1));
