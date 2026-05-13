@@ -571,6 +571,22 @@ void AcceleratorGroup::WriteInstanceKeysAndAABBsInternal(Span<AABB3> aabbWriteRe
     }
 }
 
+void AcceleratorGroup::WriteInstanceMasksInternal(Span<AccelInstanceMask> dMaskWriteRegion,
+                                                  Span<const LightOrMatKeyArray> dLightOrMatKeys,
+                                                  const GPUQueue& queue) const
+{
+    assert(dMaskWriteRegion.size() == dLightOrMatKeys.size());
+
+    queue.IssueWorkKernel<KCGenerateInstanceMasks>
+    (
+        "KCGenerateInstanceMasks",
+        DeviceWorkIssueParams{.workCount = uint32_t(dMaskWriteRegion.size())},
+        //
+        dMaskWriteRegion,
+        dLightOrMatKeys
+    );
+}
+
 
 void BaseAccelerator::PartitionSurfaces(std::vector<AccelGroupConstructParams>& partitions,
                                         const BaseAccelConstructParams& cParams)

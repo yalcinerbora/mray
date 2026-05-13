@@ -260,7 +260,6 @@ function(gen_tracer_target)
                      ${SRC_ACCELLERATORS_HW})
         source_group("Accelerators/OptiX/IR" FILES
                      ${SRC_ACCELLERATORS_PTX})
-        source_group("" FILES ${SRC_ACCELLERATORS_PTX})
     endif()
 
     # Add sources for Embree (Backend: CPU, Enable HW Acceleration ON)

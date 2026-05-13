@@ -25,7 +25,8 @@ namespace TransformDetail
 
 class TransformContextSingle
 {
-    private:
+    //private:
+    public:
     Ref<const Matrix3x4>    transform;
     Ref<const Matrix3x4>    invTransform;
 

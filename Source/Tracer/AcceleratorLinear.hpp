@@ -12,7 +12,8 @@ MR_GF_DEF
 OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
                                                               const Vector2f& tMinMax,
                                                               Float xi,
-                                                              const PrimitiveKey& primKey) const
+                                                              const PrimitiveKey& primKey,
+                                                              const typename RayCastOptions::TraceMode& tMode) const
 {
     auto IsInRange = [tMinMax](Float newT) -> bool
     {
@@ -46,6 +47,11 @@ OptionalHitR<PG> AcceleratorLinear<PG, TG>::IntersectionCheck(const Ray& ray,
     Primitive prim = Primitive(TransformContextIdentity{}, primitiveSoA, primKey);
     // Find the batch index for flags, alpha maps
     uint32_t index = FindPrimBatchIndex(primRanges, primKey);
+
+    // Skip if trace mode does not match the material being passthrough or not
+    if(!IsTraceModeMatches(tMode, lmKeys[index]))
+       return std::nullopt;
+
     // Actual intersection finally!
     Optional<Intersection> intersection = prim.Intersects(transformedRay,
                                                           cullFaceFlags[index]);
@@ -108,14 +114,15 @@ template<PrimitiveGroupC PG, TransformGroupC TG>
 MR_GF_DEF
 OptionalHitR<PG> AcceleratorLinear<PG, TG>::ClosestHit(BackupRNG& rng,
                                                        const Ray& ray,
-                                                       const Vector2& tMinMax) const
+                                                       const Vector2& tMinMax,
+                                                       const typename RayCastOptions::TraceMode& tMode) const
 {
     Vector2 tMM = tMinMax;
     // Linear search over the array
     OptionalHitR<PG> result = std::nullopt;
     for(const PrimitiveKey pKeys : leafs)
     {
-        auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), pKeys);
+        auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), pKeys, tMode);
         if(check.HasValue() && check.Value().t < tMM[1])
         {
             result = check;
@@ -129,13 +136,14 @@ template<PrimitiveGroupC PG, TransformGroupC TG>
 MR_GF_DEF
 OptionalHitR<PG> AcceleratorLinear<PG, TG>::FirstHit(BackupRNG& rng,
                                                      const Ray& ray,
-                                                     const Vector2f& tMinMax) const
+                                                     const Vector2f& tMinMax,
+                                                     const typename RayCastOptions::TraceMode& tMode) const
 {
     // Linear search over the array
     OptionalHitR<PG> result = std::nullopt;
     for(const PrimitiveKey pKeys : leafs)
     {
-        result = IntersectionCheck(ray, tMinMax, rng.NextFloat(), pKeys);
+        result = IntersectionCheck(ray, tMinMax, rng.NextFloat(), pKeys, tMode);
         if(result) break;
     }
     return result;
@@ -290,6 +298,13 @@ void AcceleratorGroupLinear<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWrit
 }
 
 template<PrimitiveGroupC PG>
+void AcceleratorGroupLinear<PG>::WriteInstanceMasks(Span<AccelInstanceMask> dMaskWriteRegion,
+                                                    const GPUQueue& queue) const
+{
+    this->WriteInstanceMasksInternal(dMaskWriteRegion, dLightOrMatKeys, queue);
+}
+
+template<PrimitiveGroupC PG>
 void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
                                                Span<VolumeIndex> dVolumeIndices,
                                                Span<HitKeyPack> dHitIds,
@@ -302,7 +317,7 @@ void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
                                                Span<const CommonKey> dAccelKeys,
                                                // Constants
                                                CommonKey workId,
-                                               AccelResultWriteMode writeMode,
+                                               RayCastOptions options,
                                                const GPUQueue& queue)
 {
     CommonKey localWorkId = workId - this->globalWorkIdToLocalOffset;
@@ -324,7 +339,7 @@ void AcceleratorGroupLinear<PG>::CastLocalRays(// Output
                         dRayIndices,
                         dAccelKeys,
                         // Constants
-                        writeMode,
+                        options,
                         queue);
 }
 
@@ -339,6 +354,7 @@ void AcceleratorGroupLinear<PG>::CastVisibilityRays(// Output
                                                     Span<const CommonKey> dAccelKeys,
                                                     // Constants
                                                     CommonKey workId,
+                                                    RayCastOptions options,
                                                     const GPUQueue& queue)
 {
     CommonKey localWorkId = workId - this->globalWorkIdToLocalOffset;
@@ -358,5 +374,6 @@ void AcceleratorGroupLinear<PG>::CastVisibilityRays(// Output
                              dRayIndices,
                              dAccelKeys,
                              // Constants
+                             options,
                              queue);
 }

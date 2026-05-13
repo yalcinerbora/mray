@@ -484,14 +484,14 @@ RendererOutput SurfaceRenderer::DoRender()
 
     SurfRDetail::Mode::E curMode = currentOptions.mode;
     bool showVolume = (curMode == SurfRDetail::Mode::VOL_INTERFACE);
-    auto accelWriteMode = showVolume ? AccelResultWriteMode::BOTH
-                                     : AccelResultWriteMode::HIT_KEY_AND_HIT_ONLY;
+    auto accelWriteMode = showVolume ? RayCastOptions::WRITE_ALL
+                                     : RayCastOptions::WRITE_HIT_KEY_AND_HIT;
     tracerView.baseAccelerator.CastRays
     (
         dVolumeIndices,
         dHitKeysLocal, dHits, dBackupRNGStates,
         dRays, dIndices,
-        accelWriteMode,
+        {accelWriteMode},
         processQueue
     );
 
@@ -657,7 +657,9 @@ RendererOutput SurfaceRenderer::DoRender()
             tracerView.baseAccelerator.CastVisibilityRays
             (
                 dIsVisibleBitSpan, dBackupRNGStates,
-                dVisibilityRays, dValidIndices, processQueue
+                dVisibilityRays, dValidIndices,
+                {.traceMode = RayCastOptions::TRACE_ALL},
+                processQueue
             );
 
             // Write either one or zero

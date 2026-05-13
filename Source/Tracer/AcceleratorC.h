@@ -43,10 +43,12 @@ concept AccelC = requires(AccelType acc,
     typename AccelType::TransDataSoA;
 
     // Closest hit and any hit
-    {acc.ClosestHit(rng, Ray{}, Vector2f{})
+    {acc.ClosestHit(rng, Ray{}, Vector2f{},
+                    typename RayCastOptions::TraceMode{})
     } -> std::same_as<Optional<typename AccelType::HitResult>>;
 
-    {acc.FirstHit(rng, Ray{}, Vector2f{})
+    {acc.FirstHit(rng, Ray{}, Vector2f{},
+                  typename RayCastOptions::TraceMode{})
     }-> std::same_as<Optional<typename AccelType::HitResult>>;
 
     {acc.GetTransformKey()
@@ -171,7 +173,7 @@ class AcceleratorGroupI
                                       Span<const CommonKey> dAccelKeys,
                                       // Constants
                                       CommonKey instanceId,
-                                      AccelResultWriteMode,
+                                      RayCastOptions,
                                       const GPUQueue& queue) = 0;
     virtual void        CastVisibilityRays(// Output
                                            Bitspan<uint32_t> dIsVisibleBuffer,
@@ -183,6 +185,7 @@ class AcceleratorGroupI
                                            Span<const CommonKey> dAccelKeys,
                                            // Constants
                                            CommonKey workId,
+                                           RayCastOptions,
                                            const GPUQueue& queue) = 0;
 
     virtual void        PreConstruct(const BaseAcceleratorI*) = 0;
@@ -196,6 +199,8 @@ class AcceleratorGroupI
     virtual void        WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
                                                   Span<AcceleratorKey> dKeyWriteRegion,
                                                   const GPUQueue& queue) const = 0;
+    virtual void        WriteInstanceMasks(Span<AccelInstanceMask> dMaskWriteRegion,
+                                           const GPUQueue& queue) const = 0;
     virtual void                SetKeyOffset(uint32_t) = 0;
     virtual size_t              GPUMemoryUsage() const = 0;
     virtual std::string_view    Name() const = 0;
@@ -343,6 +348,9 @@ class AcceleratorGroup : public AcceleratorGroupI
                                                                   Span<const TransformKey> dTransformKeys,
                                                                   // Constants
                                                                   const GPUQueue& queue) const;
+    void                        WriteInstanceMasksInternal(Span<AccelInstanceMask> dMaskWriteRegion,
+                                                           Span<const LightOrMatKeyArray> dLightOrMatKeys,
+                                                           const GPUQueue& queue) const;
 
     public:
     // Constructors & Destructor
@@ -389,7 +397,7 @@ class BaseAcceleratorI
                              // Input
                              Span<const RayIndex> dRayIndices,
                              //
-                             AccelResultWriteMode,
+                             RayCastOptions,
                              const GPUQueue& queue) = 0;
     // Fully cast rays to entire scene return true/false
     // If it hits to a surface, (this should be faster
@@ -401,6 +409,8 @@ class BaseAcceleratorI
                                        // Input
                                        Span<const RayGMem> dRays,
                                        Span<const RayIndex> dRayIndices,
+                                       //
+                                       RayCastOptions,
                                        const GPUQueue& queue) = 0;
     // Locally cast rays to a accelerator instances
     // This is multi-ray multi-accelerator instance
@@ -416,7 +426,7 @@ class BaseAcceleratorI
                                   Span<const AcceleratorKey> dAccelKeys,
                                   //
                                   CommonKey dAccelKeyBatchPortion,
-                                  AccelResultWriteMode,
+                                  RayCastOptions,
                                   const GPUQueue& queue) = 0;
 
     // Construction
@@ -593,3 +603,33 @@ MRAY_KERNEL
 void KCSetIsVisibleIndirect(MRAY_GRID_CONSTANT const Bitspan<uint32_t> dIsVisibleBuffer,
                             //
                             MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices);
+
+MRAY_KERNEL
+void KCGenerateInstanceMasks(MRAY_GRID_CONSTANT const Span<AccelInstanceMask> dInstanceMasks,
+                             //
+                             MRAY_GRID_CONSTANT const Span<const LightOrMatKeyArray> dLightOrMatKeys);
+
+// TODO: Move this somewhere proper later
+// Optix calculates this over the CPU, so the kernel above
+// is not used.
+MR_PF_DECL
+AccelInstanceMask GenerateAccelInstanceMask(const LightOrMatKeyArray& lmKeyArray)
+{
+    using enum AccelInstanceMask::Mask;
+    using T = std::underlying_type_t<typename AccelInstanceMask::Mask>;
+    T result = T(0);
+    // If any internal material is passthrough or not
+    // mark it as such
+    for(const LightOrMatKey& lmKey : lmKeyArray)
+    {
+        if(lmKey == LightOrMatKey::InvalidKey()) break;
+
+        bool isMat = (lmKey.FetchFlagPortion() == IS_MAT_KEY_FLAG);
+        bool isPassthrough = (CommonKey(lmKey.FetchBatchPortion()) ==
+                                CommonKey(TracerConstants::PassthroughMatGroupId));
+        result |= ( isMat &&  isPassthrough) ? T(HAS_PASSTHROUGH) : T(0);
+        result |= ( isMat && !isPassthrough) ? T(HAS_OPAQUE)      : T(0);
+        result |= (!isMat                  ) ? T(HAS_OPAQUE)      : T(0);
+    }
+    return AccelInstanceMask{.mask = typename AccelInstanceMask::Mask(result)};
+}

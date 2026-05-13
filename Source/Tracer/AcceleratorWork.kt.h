@@ -190,7 +190,7 @@ void KCLocalRayCast(// Output
                     MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA,
                     MRAY_GRID_CONSTANT const typename AG::DataSoA aSoA,
                     MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA,
-                    MRAY_GRID_CONSTANT const AccelResultWriteMode writeMode)
+                    MRAY_GRID_CONSTANT const RayCastOptions options)
 {
     using PG = typename AG::PrimitiveGroup;
     using Accelerator = typename AG:: template Accelerator<TG>;
@@ -224,12 +224,13 @@ void KCLocalRayCast(// Output
         }
 
         // Actual ray cast!
-        OptionalHitR<PG> hitOpt = acc.ClosestHit(rng, ray, tMM);
+        OptionalHitR<PG> hitOpt = acc.ClosestHit(rng, ray, tMM, options.traceMode);
         if(!hitOpt) continue;
 
-        using enum AccelResultWriteMode;
+        using enum RayCastOptions::WriteMode;
         const auto& hit = hitOpt.Value();
-        if(writeMode == BOTH || writeMode == HIT_KEY_AND_HIT_ONLY)
+        if(options.writeMode == WRITE_ALL ||
+           options.writeMode == WRITE_HIT_KEY_AND_HIT)
         {
             dHitIds[index] = HitKeyPack
             {
@@ -241,7 +242,8 @@ void KCLocalRayCast(// Output
             dHitParams[index] = hit.hit;
         }
 
-        if(writeMode == BOTH || writeMode == VOLUME_INDEX_ONLY)
+        if(options.writeMode == WRITE_ALL ||
+           options.writeMode == WRITE_VOLUME_INDEX)
             dVolumeIndices[index] = hit.volumeIndex;
 
         // We always update tMax
@@ -262,7 +264,8 @@ void KCVisibilityRayCast(// Output
                          // Constant
                          MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA,
                          MRAY_GRID_CONSTANT const typename AG::DataSoA aSoA,
-                         MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA)
+                         MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA,
+                         MRAY_GRID_CONSTANT const RayCastOptions options)
 {
     using PG = typename AG::PrimitiveGroup;
     using Accelerator = typename AG:: template Accelerator<TG>;
@@ -296,7 +299,7 @@ void KCVisibilityRayCast(// Output
         }
 
         // Actual ray cast!
-        OptionalHitR<PG> hitOpt = acc.FirstHit(rng, ray, tMM);
+        OptionalHitR<PG> hitOpt = acc.FirstHit(rng, ray, tMM, options.traceMode);
         if(hitOpt) dIsVisibleBuffer.SetBitParallel(index, false);
     }
 };

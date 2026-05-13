@@ -99,12 +99,14 @@ namespace OptiXAccelDetail
 
         MR_PF_DECL
         Optional<HitResult>
-        ClosestHit(BackupRNG& rng, const Ray&, const Vector2&) const
+        ClosestHit(BackupRNG& rng, const Ray&, const Vector2&,
+                   const typename RayCastOptions::TraceMode&) const
         { return std::nullopt; }
 
         MR_PF_DECL
         Optional<HitResult>
-        FirstHit(BackupRNG& rng, const Ray&, const Vector2&) const
+        FirstHit(BackupRNG& rng, const Ray&, const Vector2&,
+                 const typename RayCastOptions::TraceMode&) const
         { return std::nullopt; }
 
         MR_PF_DECL
@@ -162,6 +164,7 @@ class AcceleratorGroupOptixI
                                               Span<Matrix3x4> dInstanceMatrices,
                                               Span<uint32_t> dSBTCounts,
                                               Span<uint32_t> dFlags,
+                                              Span<AccelInstanceMask> dInstanceMasks,
                                               const GPUQueue& queue) const = 0;
     //
     virtual std::vector<OptiXAccelDetail::ShaderTypeNames>
@@ -211,6 +214,7 @@ class AcceleratorGroupOptiX final
     std::vector<OptixTraversableHandle> hInstanceAccelHandles;
     std::vector<uint32_t>               hInstanceHitRecordCounts;
     std::vector<uint32_t>               hInstanceCommonFlags;
+    std::vector<AccelInstanceMask>      hInstanceMasks;
 
     std::vector<OptixTraversableHandle>
     MultiBuildTriangle_CLT(const PreprocessResult& ppResult,
@@ -244,10 +248,13 @@ class AcceleratorGroupOptiX final
     void    WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
                                       Span<AcceleratorKey> dKeyWriteRegion,
                                       const GPUQueue&) const override;
+    void    WriteInstanceMasks(Span<AccelInstanceMask> dMaskWriteRegion,
+                               const GPUQueue& queue) const override;
     void    AcquireIASConstructionParams(Span<OptixTraversableHandle> dTraversableHandles,
                                          Span<Matrix3x4> dInstanceMatrices,
                                          Span<uint32_t> dSBTCounts,
                                          Span<uint32_t> dFlags,
+                                         Span<AccelInstanceMask> dInstanceMasks,
                                          const GPUQueue& queue) const override;
     std::vector<OptiXAccelDetail::ShaderTypeNames>
             GetShaderTypeNames() const override;
@@ -271,7 +278,7 @@ class AcceleratorGroupOptiX final
                           Span<const CommonKey> dAccelKeys,
                           // Constants
                           CommonKey workId,
-                          AccelResultWriteMode,
+                          RayCastOptions,
                           const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -284,6 +291,7 @@ class AcceleratorGroupOptiX final
                                Span<const CommonKey> dAccelKeys,
                                // Constants
                                CommonKey workId,
+                               RayCastOptions,
                                const GPUQueue& queue) override;
 
     DataSoA SoA() const;
@@ -344,7 +352,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
                      Span<RayGMem> dRays,
                      // Input
                      Span<const RayIndex> dRayIndices,
-                     AccelResultWriteMode,
+                     RayCastOptions,
                      const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -354,6 +362,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
                                // Input
                                Span<const RayGMem> dRays,
                                Span<const RayIndex> dRayIndices,
+                               RayCastOptions,
                                const GPUQueue& queue) override;
 
     void    CastLocalRays(// Output
@@ -367,7 +376,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
                           Span<const RayIndex> dRayIndices,
                           Span<const AcceleratorKey> dAccelKeys,
                           CommonKey dAccelKeyBatchPortion,
-                          AccelResultWriteMode,
+                          RayCastOptions,
                           const GPUQueue& queue) override;
 
     void    AllocateForTraversal(size_t maxRayCount) override;

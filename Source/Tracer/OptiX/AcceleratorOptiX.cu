@@ -28,7 +28,8 @@ void KCCopyToOptixInstance(// Output
                            MRAY_GRID_CONSTANT const Span<const Matrix3x4> dMatrices,
                            MRAY_GRID_CONSTANT const Span<const uint32_t> dInstanceFlags,
                            MRAY_GRID_CONSTANT const Span<const OptixTraversableHandle> dHandles,
-                           MRAY_GRID_CONSTANT const Span<const uint32_t> dGlobalSBTOffsets)
+                           MRAY_GRID_CONSTANT const Span<const uint32_t> dGlobalSBTOffsets,
+                           MRAY_GRID_CONSTANT const Span<const AccelInstanceMask> dInstanceMasks)
 {
     uint32_t totalInstanceCount = static_cast<uint32_t>(dInstances.size());
 
@@ -45,7 +46,7 @@ void KCCopyToOptixInstance(// Output
             },
             .instanceId = i,
             .sbtOffset = dGlobalSBTOffsets[i],
-            .visibilityMask = 0xFF,
+            .visibilityMask = static_cast<unsigned int>(dInstanceMasks[i].mask),
             .flags = dInstanceFlags[i],
             .traversableHandle = dHandles[i]
         };
@@ -273,16 +274,18 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     Span<uint32_t> dSBTOffsets;
     Span<Byte> dScanOrReduceTempMem;
     Span<AABB3> dReducedAABB;
+    Span<AccelInstanceMask> dInstanceMasks;
 
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     size_t algoTempMemSize = std::max(DeviceAlgorithms::ExclusiveScanTMSize<uint32_t>(totalInstanceCount + 1, queue),
                                       DeviceAlgorithms::ReduceTMSize<AABB3>(totalInstanceCount, queue));
-    MemAlloc::AllocateMultiData(Tie(dLeafAABBs,  dTraversableHandles,
-                                         dInstanceMatrices, dSBTCounts, dFlags,
-                                         dInstanceBuildData, dSBTOffsets,
-                                         dScanOrReduceTempMem, dReducedAABB),
+    MemAlloc::AllocateMultiData(Tie(dLeafAABBs, dTraversableHandles,
+                                    dInstanceMatrices, dSBTCounts, dFlags,
+                                    dInstanceMasks, dInstanceBuildData,
+                                    dSBTOffsets, dScanOrReduceTempMem,
+                                    dReducedAABB),
                                 tempMem,
-                                {totalInstanceCount, totalInstanceCount,
+                                {totalInstanceCount, totalInstanceCount, totalInstanceCount,
                                  totalInstanceCount, totalInstanceCount, totalInstanceCount,
                                  totalInstanceCount, totalInstanceCount + 1, algoTempMemSize,
                                  1});
@@ -306,9 +309,10 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
         auto dSBTCountRegion = dSBTCounts.subspan(offset, localCount);
         auto dMatrixRegion = dInstanceMatrices.subspan(offset, localCount);
         auto dFlagRegion = dFlags.subspan(offset, localCount);
+        auto dMaskRegion = dInstanceMasks.subspan(offset, localCount);
         aGroup->AcquireIASConstructionParams(dHandleRegion, dMatrixRegion,
                                              dSBTCountRegion, dFlagRegion,
-                                             qIt.Queue());
+                                             dMaskRegion, qIt.Queue());
         aGroup->OffsetAccelKeyInRecords();
         i++;
         qIt.Next();
@@ -335,7 +339,8 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
         dInstanceMatrices,
         dFlags,
         dTraversableHandles,
-        dSBTOffsets
+        dSBTOffsets,
+        dInstanceMasks
     );
 
     // Actually Construct to a temp mem to find out the compact size
@@ -680,7 +685,7 @@ void BaseAcceleratorOptiX::CastRays(// Output
                                     // Input
                                     Span<const RayIndex> dRayIndices,
                                     //
-                                    AccelResultWriteMode writeMode,
+                                    RayCastOptions options,
                                     const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -703,17 +708,17 @@ void BaseAcceleratorOptiX::CastRays(// Output
     // Copy args
     ArgumentPackOptiX argPack =
     {
-        .mode = RenderModeOptiX::NORMAL,
-        .nParams = NormalRayCastArgPackOptiX
+        .rayCastOptions = options,
+        .mode           = RenderModeOptiX::NORMAL,
+        .nParams        = NormalRayCastArgPackOptiX
         {
-            .baseAccelerator     = baseAccelerator,
-            .dVolumeIndices      = dVolumeIndices,
-            .dHitKeys            = dHitIds,
-            .dHits               = dHitParams,
-            .dRNGStates          = dRNGStates,
-            .dRays               = dRays,
-            .dRayIndices         = dRayIndices,
-            .writeMode           = writeMode
+            .baseAccelerator = baseAccelerator,
+            .dVolumeIndices  = dVolumeIndices,
+            .dHitKeys        = dHitIds,
+            .dHits           = dHitParams,
+            .dRNGStates      = dRNGStates,
+            .dRays           = dRays,
+            .dRayIndices     = dRayIndices
         }
     };
     queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOptiX>(&argPack, 1));
@@ -732,6 +737,7 @@ void BaseAcceleratorOptiX::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffer
                                               // Input
                                               Span<const RayGMem> dRays,
                                               Span<const RayIndex> dRayIndices,
+                                              RayCastOptions options,
                                               const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -753,8 +759,9 @@ void BaseAcceleratorOptiX::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffer
     // Copy args
     ArgumentPackOptiX argPack =
     {
-        .mode = RenderModeOptiX::VISIBILITY,
-        .vParams = VisibilityCastArgPackOptiX
+        .rayCastOptions = options,
+        .mode           = RenderModeOptiX::VISIBILITY,
+        .vParams        = VisibilityCastArgPackOptiX
         {
             .baseAccelerator    = baseAccelerator,
             .dIsVisibleBuffer   = dIsVisibleBuffer,
@@ -785,7 +792,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
                                          Span<const AcceleratorKey> dAccelKeys,
                                          //
                                          CommonKey dAccelKeyBatchPortion,
-                                         AccelResultWriteMode writeMode,
+                                         RayCastOptions options,
                                          const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -810,8 +817,9 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
     // Copy args
     ArgumentPackOptiX argPack =
     {
-        .mode = RenderModeOptiX::LOCAL,
-        .lParams = LocalRayCastArgPackOptiX
+        .rayCastOptions = options,
+        .mode           = RenderModeOptiX::LOCAL,
+        .lParams        = LocalRayCastArgPackOptiX
         {
             .dVolumeIndices      = dVolumeIndices,
             .dHitKeys            = dHitIds,
@@ -822,8 +830,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
             .dAcceleratorKeys    = dAccelKeys,
             .dGlobalInstanceTraversables  = dGlobalTraversableHandles,
             .dGlobalInstanceInvTransforms = dGlobalInstanceInvTransforms,
-            .batchStartOffset    = batchStartOffset,
-            .writeMode           = writeMode
+            .batchStartOffset    = batchStartOffset
         }
     };
     queue.MemcpyAsync(dLaunchArgPack, Span<const ArgumentPackOptiX>(&argPack, 1));

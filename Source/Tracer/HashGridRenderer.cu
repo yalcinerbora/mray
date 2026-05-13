@@ -401,13 +401,13 @@ void HashGridRenderer::PathTraceAndQuery()
             ToConstSpan(dIndices),
             boundaryLightKeyPack
         );
-        // Actual Ray Casting        
+        // Actual Ray Casting
         tracerView.baseAccelerator.CastRays
         (
             Span<VolumeIndex>(),
             dHitKeys, dHits, dBackupRNGStates,
-            dRays, dIndices, 
-            AccelResultWriteMode::HIT_KEY_AND_HIT_ONLY, 
+            dRays, dIndices,
+            {RayCastOptions::WRITE_HIT_KEY_AND_HIT},
             processQueue
         );
 

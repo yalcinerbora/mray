@@ -450,10 +450,12 @@ void KCIntersectBaseLBVH(// Output
                          MRAY_GRID_CONSTANT const Span<const AcceleratorKey> dLeafKeys,
                          MRAY_GRID_CONSTANT const Span<const AABB3> dLeafAABBs,
                          MRAY_GRID_CONSTANT const Span<const LBVHAccelDetail::LBVHNode> dNodes,
-                         MRAY_GRID_CONSTANT const Span<const LBVHAccelDetail::LBVHBoundingBox> dBoxes)
+                         MRAY_GRID_CONSTANT const Span<const LBVHAccelDetail::LBVHBoundingBox> dBoxes,
+                         MRAY_GRID_CONSTANT const Span<const AccelInstanceMask> dInstanceMasks,
+                         MRAY_GRID_CONSTANT const RayCastOptions options)
 {
     using Bit::FetchSubPortion;
-    using AU32 =Array<uint32_t, 2>;
+    using AU32 = Array<uint32_t, 2>;
     static constexpr AU32 StackStateRange = {0u, BaseAcceleratorLBVH::StackBitCount};
     static constexpr AU32 DepthRange = {BaseAcceleratorLBVH::StackBitCount, 32u};
 
@@ -479,11 +481,12 @@ void KCIntersectBaseLBVH(// Output
             [&](Vector2& tMM, uint32_t leafIndex)
             {
                 AABB3 aabb = dLeafAABBs[leafIndex];
+                bool correctMask = dInstanceMasks[leafIndex].AcceptTraversal(options.traceMode);
                 bool doIntersect = ray.IntersectsAABB(aabb.Min(), aabb.Max(), tMM).intersected;
-                if(doIntersect)
+                if(correctMask && doIntersect)
                     foundKey = dLeafKeys[leafIndex];
                 // Stop traversal delegate to the inner accelerator
-                return doIntersect;
+                return correctMask && doIntersect;
             }
         );
 
@@ -547,10 +550,12 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
     size_t nodeCount = Math::Max(instanceCount - 1u, size_t(1));
 
     MemAlloc::AllocateMultiData(Tie(dLeafKeys, dLeafAABBs,
+                                    dInstanceMasks,
                                     dNodes, dBoundingBoxes),
                                 accelMem,
                                 {instanceCount, instanceCount,
-                                nodeCount, nodeCount});
+                                 instanceCount,
+                                 nodeCount, nodeCount});
 
     // Write leafs and transformed aabbs to the array
     size_t i = 0;
@@ -562,7 +567,9 @@ AABB3 BaseAcceleratorLBVH::InternalConstruct(const std::vector<size_t>& instance
         auto dAABBRegion = dLeafAABBs.subspan(instanceOffsets[i],
                                               localCount);
         auto dLeafRegion = dLeafKeys.subspan(instanceOffsets[i], localCount);
+        auto dMaskRegion = dInstanceMasks.subspan(instanceOffsets[i], localCount);
         aGroup->WriteInstanceKeysAndAABBs(dAABBRegion, dLeafRegion, qIt.Queue());
+        aGroup->WriteInstanceMasks(dMaskRegion, qIt.Queue());
         i++;
         qIt.Next();
     }
@@ -770,7 +777,7 @@ void BaseAcceleratorLBVH::CastRays(// Output
                                    // Input
                                    Span<const RayIndex> dRayIndices,
                                    //
-                                   AccelResultWriteMode writeMode,
+                                   RayCastOptions options,
                                    const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -824,7 +831,9 @@ void BaseAcceleratorLBVH::CastRays(// Output
             ToConstSpan(dLeafKeys),
             ToConstSpan(dLeafAABBs),
             ToConstSpan(dNodes),
-            ToConstSpan(dBoundingBoxes)
+            ToConstSpan(dBoundingBoxes),
+            ToConstSpan(dInstanceMasks),
+            options
         );
 
         static constexpr CommonKey IdBits = AcceleratorKey::IdBits;
@@ -891,7 +900,7 @@ void BaseAcceleratorLBVH::CastRays(// Output
                                           dLocalKeys,
                                           //
                                           key.FetchBatchPortion(),
-                                          writeMode,
+                                          options,
                                           queue);
             }
         }
@@ -905,6 +914,7 @@ void BaseAcceleratorLBVH::CastVisibilityRays(// Output
                                              // Input
                                              Span<const RayGMem> dRays,
                                              Span<const RayIndex> dRayIndices,
+                                             RayCastOptions options,
                                              const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -967,7 +977,9 @@ void BaseAcceleratorLBVH::CastVisibilityRays(// Output
             ToConstSpan(dLeafKeys),
             ToConstSpan(dLeafAABBs),
             ToConstSpan(dNodes),
-            ToConstSpan(dBoundingBoxes)
+            ToConstSpan(dBoundingBoxes),
+            ToConstSpan(dInstanceMasks),
+            options
         );
         static constexpr CommonKey IdBits = AcceleratorKey::IdBits;
         auto batchRange = Vector2ui(IdBits, IdBits + maxBitsUsedOnKey[0]);
@@ -1031,6 +1043,7 @@ void BaseAcceleratorLBVH::CastVisibilityRays(// Output
                                                dLocalKeys,
                                                //
                                                key.FetchBatchPortion(),
+                                               options,
                                                queue);
             }
         }
@@ -1049,7 +1062,7 @@ void BaseAcceleratorLBVH::CastLocalRays(// Output
                                         Span<const AcceleratorKey> dAccelKeys,
                                         //
                                         CommonKey dAccelKeyBatchPortion,
-                                        AccelResultWriteMode writeMode,
+                                        RayCastOptions options,
                                         const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -1081,7 +1094,7 @@ void BaseAcceleratorLBVH::CastLocalRays(// Output
                               dAccelKeysCommon,
                               //
                               dAccelKeyBatchPortion,
-                              writeMode,
+                              options,
                               queue);
 }
 

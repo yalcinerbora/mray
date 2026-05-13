@@ -85,6 +85,22 @@ void KCSetIsVisibleIndirect(MRAY_GRID_CONSTANT const Bitspan<uint32_t> dIsVisibl
 }
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCGenerateInstanceMasks(MRAY_GRID_CONSTANT const Span<AccelInstanceMask> dInstanceMasks,
+                             //
+                             MRAY_GRID_CONSTANT const Span<const LightOrMatKeyArray> dLightOrMatKeys)
+{
+    KernelCallParams kp;
+    uint32_t instanceCount = static_cast<uint32_t>(dInstanceMasks.size());
+
+    // Grid-stride Loop
+    for(uint32_t i = kp.GlobalId(); i < instanceCount; i += kp.TotalSize())
+    {
+        const auto& lmKeyArray = dLightOrMatKeys[i];
+        dInstanceMasks[i] = GenerateAccelInstanceMask(lmKeyArray);
+    }
+}
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCIntersectBaseLinear(// Output
                            MRAY_GRID_CONSTANT const Span<CommonKey> dAccelKeys,
                            // I-O
@@ -94,7 +110,9 @@ void KCIntersectBaseLinear(// Output
                            MRAY_GRID_CONSTANT const Span<const RayIndex> dRayIndices,
                            // Constants
                            MRAY_GRID_CONSTANT const Span<const AcceleratorKey> dLeafs,
-                           MRAY_GRID_CONSTANT const Span<const AABB3> dAABBs)
+                           MRAY_GRID_CONSTANT const Span<const AABB3> dAABBs,
+                           MRAY_GRID_CONSTANT const Span<const AccelInstanceMask> dInstanceMasks,
+                           MRAY_GRID_CONSTANT const RayCastOptions options)
 {
     assert(dAABBs.size() == dLeafs.size());
     KernelCallParams kp;
@@ -111,7 +129,8 @@ void KCIntersectBaseLinear(// Output
         for(uint32_t j = startIndex; j < instanceCount; j++)
         {
             AABB3 aabb = dAABBs[j];
-            if(ray.IntersectsAABB(aabb.Min(), aabb.Max(), tMM).intersected)
+            if(dInstanceMasks[j].AcceptTraversal(options.traceMode) &&
+               ray.IntersectsAABB(aabb.Min(), aabb.Max(), tMM).intersected)
             {
                 // Stop traversal delegate to the inner accelerator
                 foundKey = dLeafs[j];
@@ -138,9 +157,9 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
 
     // Allocate
     size_t instanceCount = instanceOffsets.back();
-    MemAlloc::AllocateMultiData(Tie(dLeafs, dAABBs),
+    MemAlloc::AllocateMultiData(Tie(dLeafs, dAABBs, dInstanceMasks),
                                 accelMem,
-                                {instanceCount, instanceCount});
+                                {instanceCount, instanceCount, instanceCount});
     // Write leafs and transformed aabbs to the array
     size_t i = 0;
     GPUQueueIteratorRoundRobin qIt(gpuSystem);
@@ -148,11 +167,11 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
     {
         AcceleratorGroupI* aGroup = accGroup.second.get();
         size_t localCount = instanceOffsets[i + 1] - instanceOffsets[i];
-        auto dAABBRegion = dAABBs.subspan(instanceOffsets[i],
-                                         localCount);
+        auto dAABBRegion = dAABBs.subspan(instanceOffsets[i], localCount);
         auto dLeafRegion = dLeafs.subspan(instanceOffsets[i], localCount);
+        auto dMaskRegion = dInstanceMasks.subspan(instanceOffsets[i], localCount);
         aGroup->WriteInstanceKeysAndAABBs(dAABBRegion, dLeafRegion, qIt.Queue());
-
+        aGroup->WriteInstanceMasks(dMaskRegion, qIt.Queue());
         i++;
         qIt.Next();
     }
@@ -163,6 +182,7 @@ AABB3 BaseAcceleratorLinear::InternalConstruct(const std::vector<size_t>& instan
     // Cheekily utilize stack mem as temp mem
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     size_t tempMemSize = DeviceAlgorithms::ReduceTMSize<AABB3>(dAABBs.size(), queue);
+
     Span<AABB3> dReducedAABB;
     Span<Byte> dTemp;
     MemAlloc::AllocateMultiData(Tie(dTemp, dReducedAABB),
@@ -208,7 +228,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                                      // Input
                                      Span<const RayIndex> dRayIndices,
                                      //
-                                     AccelResultWriteMode writeMode,
+                                     RayCastOptions options,
                                      const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -252,7 +272,9 @@ void BaseAcceleratorLinear::CastRays(// Output
             dCurrentIndices,
             // Constants
             ToConstSpan(dLeafs),
-            ToConstSpan(dAABBs)
+            ToConstSpan(dAABBs),
+            ToConstSpan(dInstanceMasks),
+            options
         );
 
         static constexpr CommonKey IdBits = AcceleratorKey::IdBits;
@@ -319,7 +341,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                                           dLocalKeys,
                                           //
                                           key.FetchBatchPortion(),
-                                          writeMode,
+                                          options,
                                           queue);
             }
         }
@@ -333,6 +355,7 @@ void BaseAcceleratorLinear::CastVisibilityRays(// Output
                                                // Input
                                                Span<const RayGMem> dRays,
                                                Span<const RayIndex> dRayIndices,
+                                               RayCastOptions options,
                                                const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -384,7 +407,9 @@ void BaseAcceleratorLinear::CastVisibilityRays(// Output
             dCurrentIndices,
             // Constants
             ToConstSpan(dLeafs),
-            ToConstSpan(dAABBs)
+            ToConstSpan(dAABBs),
+            ToConstSpan(dInstanceMasks),
+            options
         );
 
         static constexpr CommonKey IdBits = AcceleratorKey::IdBits;
@@ -449,6 +474,7 @@ void BaseAcceleratorLinear::CastVisibilityRays(// Output
                                                dLocalKeys,
                                                //
                                                key.FetchBatchPortion(),
+                                               options,
                                                queue);
             }
         }
@@ -467,7 +493,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                                           Span<const AcceleratorKey> dAccelKeys,
                                           //
                                           CommonKey dAccelKeyBatchPortion,
-                                          AccelResultWriteMode writeMode,
+                                          RayCastOptions options,
                                           const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -499,7 +525,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                               dAccelKeysCommon,
                               //
                               dAccelKeyBatchPortion,
-                              writeMode,
+                              options,
                               queue);
 }
 

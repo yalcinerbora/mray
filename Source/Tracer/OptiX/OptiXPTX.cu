@@ -164,14 +164,12 @@ void KCClosestHit()
     Span<HitKeyPack> dHitKeys;
     Span<MetaHit> dHits;
     Span<RayGMem> dRays;
-    AccelResultWriteMode writeMode;
     if(params.mode == NORMAL)
     {
         dHitKeys = params.nParams.dHitKeys;
         dHits = params.nParams.dHits;
         dRays = params.nParams.dRays;
         dVolumeIndices = params.nParams.dVolumeIndices;
-        writeMode = params.nParams.writeMode;
     }
     else
     {
@@ -179,12 +177,13 @@ void KCClosestHit()
         dHits = params.lParams.dHits;
         dRays = params.lParams.dRays;
         dVolumeIndices = params.lParams.dVolumeIndices;
-        writeMode = params.lParams.writeMode;
     }
 
     // Common Write Operations
-    using enum AccelResultWriteMode;
-    if(writeMode == BOTH || writeMode == HIT_KEY_AND_HIT_ONLY)
+    auto writeMode = params.rayCastOptions.writeMode;
+    using enum RayCastOptions::WriteMode;
+    if(writeMode == WRITE_ALL ||
+       writeMode == WRITE_HIT_KEY_AND_HIT)
     {
         dHitKeys[rIndex] = HitKeyPack
         {
@@ -197,7 +196,8 @@ void KCClosestHit()
     }
 
     // Interface Index
-    if(writeMode == BOTH || writeMode == VOLUME_INDEX_ONLY)
+    if(writeMode == WRITE_ALL ||
+       writeMode == WRITE_VOLUME_INDEX)
     {
         bool isBackFace = false;
         unsigned int hk = optixGetHitKind();
@@ -229,6 +229,9 @@ void KCAnyHit()
     using Hit = typename PGroup::Hit;
     using HitRecord = GenericHitRecordData<typename PGroup::DataSoA>;
     const auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
+
+    if(!IsTraceModeMatches(params.rayCastOptions.traceMode, record.lightOrMatKey))
+        return;
 
     if(record.alphaMap)
     {
@@ -342,6 +345,7 @@ void KCRayGenOptix()
     BackupRNGState rngState = (params.mode == VISIBILITY)
                         ? params.vParams.dRNGStates[rIndex]
                         : params.nParams.dRNGStates[rIndex];
+    auto traceMode = params.rayCastOptions.traceMode;
 
     // Set the ray index (indirection) as payload as well
     // so we do not hit GMem for this.
@@ -358,7 +362,7 @@ void KCRayGenOptix()
                tMM[0], tMM[1],
                0.0f,
                //
-               OptixVisibilityMask(0xFF),
+               OptixVisibilityMask(traceMode),
                // Flags
                flags,
                // SBT
@@ -389,6 +393,7 @@ void KCLocalRayGenOptix()
     AcceleratorKey aKey = params.lParams.dAcceleratorKeys[launchIndex];
     uint32_t globalIndex = params.lParams.batchStartOffset + aKey.FetchIndexPortion();
     OptixTraversableHandle traversable = params.lParams.dGlobalInstanceTraversables[globalIndex];
+    auto traceMode = params.rayCastOptions.traceMode;
 
     Matrix3x4 invTransform = params.lParams.dGlobalInstanceInvTransforms[globalIndex];
     Vector3 dir = invTransform * ray.dir;
@@ -410,7 +415,7 @@ void KCLocalRayGenOptix()
               tMM[0], tMM[1],
               0.0f,
               //
-              OptixVisibilityMask(0xFF),
+              OptixVisibilityMask(traceMode),
               // Flags
               flags,
               // SBT

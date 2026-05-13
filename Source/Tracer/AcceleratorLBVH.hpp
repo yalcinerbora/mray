@@ -228,7 +228,8 @@ MR_GF_DEF
 OptionalHitR<PG> AcceleratorLBVH<PG, TG>::IntersectionCheck(const Ray& ray,
                                                             const Vector2f& tMinMax,
                                                             Float xi,
-                                                            const PrimitiveKey& primKey) const
+                                                            const PrimitiveKey& primKey,
+                                                            const typename RayCastOptions::TraceMode& tMode) const
 {
     auto IsInRange = [tMinMax](Float newT) -> bool
     {
@@ -262,6 +263,10 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::IntersectionCheck(const Ray& ray,
     Primitive prim = Primitive(TransformContextIdentity{}, primitiveSoA, primKey);
     // Find the batch index for flags, alpha maps
     uint32_t index = FindPrimBatchIndex(primRanges, primKey);
+
+    // Skip if trace mode does not match the material being passthrough or not
+    if(!IsTraceModeMatches(tMode, lmKeys[index]))
+       return std::nullopt;
 
     // Actual intersection finally!
     Optional<Intersection> intersection = prim.Intersects(transformedRay,
@@ -328,7 +333,8 @@ template<PrimitiveGroupC PG, TransformGroupC TG>
 MR_GF_DEF
 OptionalHitR<PG> AcceleratorLBVH<PG, TG>::ClosestHit(BackupRNG& rng,
                                                      const Ray& ray,
-                                                     const Vector2& tMinMax) const
+                                                     const Vector2& tMinMax,
+                                                     const typename RayCastOptions::TraceMode& tMode) const
 {
     BitStack bitStack;
     OptionalHitR<PG> result = std::nullopt;
@@ -341,7 +347,7 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::ClosestHit(BackupRNG& rng,
             [&](Vector2& tMM, uint32_t leafIndex)
             {
                 PrimitiveKey primKey = leafs[leafIndex];
-                auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
+                auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey, tMode);
                 if(check.HasValue() && check.Value().t < tMM[1])
                 {
                     result = check;
@@ -359,7 +365,7 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::ClosestHit(BackupRNG& rng,
             [&](Vector2& tMM, uint32_t leafIndex)
             {
                 PrimitiveKey primKey = leafs[leafIndex];
-                auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
+                auto check = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey, tMode);
                 if(check.HasValue() && check.Value().t < tMM[1])
                 {
                     result = check;
@@ -377,7 +383,8 @@ template<PrimitiveGroupC PG, TransformGroupC TG>
 MR_GF_DEF
 OptionalHitR<PG> AcceleratorLBVH<PG, TG>::FirstHit(BackupRNG& rng,
                                                    const Ray& ray,
-                                                   const Vector2& tMinMax) const
+                                                   const Vector2& tMinMax,
+                                                   const typename RayCastOptions::TraceMode& tMode) const
 {
     BitStack bitStack;
     OptionalHitR<PG> result = std::nullopt;
@@ -389,7 +396,7 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::FirstHit(BackupRNG& rng,
             [&](Vector2& tMM, uint32_t leafIndex)
             {
                 PrimitiveKey primKey = leafs[leafIndex];
-                result = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
+                result = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey, tMode);
                 return result.HasValue();
             }
         );
@@ -401,7 +408,7 @@ OptionalHitR<PG> AcceleratorLBVH<PG, TG>::FirstHit(BackupRNG& rng,
             [&](Vector2& tMM, uint32_t leafIndex)
             {
                 PrimitiveKey primKey = leafs[leafIndex];
-                result = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey);
+                result = IntersectionCheck(ray, tMM, rng.NextFloat(), primKey, tMode);
                 return result.HasValue();
             }
         );
@@ -928,6 +935,13 @@ void AcceleratorGroupLBVH<PG>::WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteR
 }
 
 template<PrimitiveGroupC PG>
+void AcceleratorGroupLBVH<PG>::WriteInstanceMasks(Span<AccelInstanceMask> dMaskWriteRegion,
+                                                  const GPUQueue& queue) const
+{
+    this->WriteInstanceMasksInternal(dMaskWriteRegion, dLightOrMatKeys, queue);
+}
+
+template<PrimitiveGroupC PG>
 void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
                                              Span<VolumeIndex> dVolumeIndices,
                                              Span<HitKeyPack> dHitIds,
@@ -940,7 +954,7 @@ void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
                                              Span<const CommonKey> dAccelKeys,
                                              // Constants
                                              CommonKey workId,
-                                             AccelResultWriteMode writeMode,
+                                             RayCastOptions options,
                                              const GPUQueue& queue)
 {
     CommonKey localWorkId = workId - this->globalWorkIdToLocalOffset;
@@ -962,7 +976,7 @@ void AcceleratorGroupLBVH<PG>::CastLocalRays(// Output
                         dRayIndices,
                         dAccelKeys,
                         // Constants
-                        writeMode,
+                        options,
                         queue);
 }
 
@@ -977,6 +991,7 @@ void AcceleratorGroupLBVH<PG>::CastVisibilityRays(// Output
                                                   Span<const CommonKey> dAccelKeys,
                                                   // Constants
                                                   CommonKey workId,
+                                                  RayCastOptions options,
                                                   const GPUQueue& queue)
 {
     CommonKey localWorkId = workId - this->globalWorkIdToLocalOffset;
@@ -996,5 +1011,6 @@ void AcceleratorGroupLBVH<PG>::CastVisibilityRays(// Output
                              dRayIndices,
                              dAccelKeys,
                              // Constants
+                             options,
                              queue);
 }

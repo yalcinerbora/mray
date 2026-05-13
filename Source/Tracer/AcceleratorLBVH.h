@@ -128,7 +128,8 @@ namespace LBVHAccelDetail
         Optional<HitResult>     IntersectionCheck(const Ray& ray,
                                                   const Vector2& tMinMax,
                                                   Float xi,
-                                                  const PrimitiveKey& primKey) const;
+                                                  const PrimitiveKey& primKey,
+                                                  const typename RayCastOptions::TraceMode&) const;
         public:
         // Constructors & Destructor
         MR_GF_DECL              AcceleratorLBVH(const TransDataSoA& tSoA,
@@ -138,9 +139,11 @@ namespace LBVHAccelDetail
         MR_GF_DECL
         TransformKey            GetTransformKey() const;
         MR_GF_DECL
-        Optional<HitResult>     ClosestHit(BackupRNG& rng, const Ray&, const Vector2&) const;
+        Optional<HitResult>     ClosestHit(BackupRNG& rng, const Ray&, const Vector2&,
+                                           const typename RayCastOptions::TraceMode&) const;
         MR_GF_DECL
-        Optional<HitResult>     FirstHit(BackupRNG& rng, const Ray&, const Vector2&) const;
+        Optional<HitResult>     FirstHit(BackupRNG& rng, const Ray&, const Vector2&,
+                                         const typename RayCastOptions::TraceMode&) const;
     };
 }
 
@@ -201,6 +204,8 @@ class AcceleratorGroupLBVH final
     void    WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
                                       Span<AcceleratorKey> dKeyWriteRegion,
                                       const GPUQueue&) const override;
+    void    WriteInstanceMasks(Span<AccelInstanceMask> dMaskWriteRegion,
+                               const GPUQueue&) const override;
 
     // Functionality
     void    CastLocalRays(// Output
@@ -215,7 +220,7 @@ class AcceleratorGroupLBVH final
                           Span<const CommonKey> dAccelKeys,
                           // Constants
                           CommonKey workId,
-                          AccelResultWriteMode,
+                          RayCastOptions,
                           const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -228,6 +233,7 @@ class AcceleratorGroupLBVH final
                                Span<const CommonKey> dAccelKeys,
                                // Constants
                                CommonKey workId,
+                               RayCastOptions,
                                const GPUQueue& queue) override;
 
 
@@ -251,6 +257,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
     Span<AABB3>             dLeafAABBs;
     Span<LBVHNode>          dNodes;
     Span<LBVHBoundingBox>   dBoundingBoxes;
+    Span<AccelInstanceMask> dInstanceMasks;
     //
     DeviceMemory            stackMem;
     Span<uint32_t>          dBitStacks;
@@ -278,7 +285,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                      // Input
                      Span<const RayIndex> dRayIndices,
                      //
-                     AccelResultWriteMode,
+                     RayCastOptions,
                      const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -288,6 +295,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                                // Input
                                Span<const RayGMem> dRays,
                                Span<const RayIndex> dRayIndices,
+                               RayCastOptions options,
                                const GPUQueue& queue) override;
 
     void    CastLocalRays(// Output
@@ -302,7 +310,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                           Span<const AcceleratorKey> dAccelKeys,
                           //
                           CommonKey dAccelKeyBatchPortion,
-                          AccelResultWriteMode,
+                          RayCastOptions,
                           const GPUQueue& queue) override;
 
     void    AllocateForTraversal(size_t maxRayCount) override;

@@ -569,13 +569,25 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
 
         const auto& alphaMaps = ppResult.surfData.alphaMaps[i];
         const auto& cfFlags = ppResult.surfData.cullFaceFlags[i];
+        const auto& lmKeys = ppResult.surfData.lightOrMatKeys[i];
 
-        bool enableAnyHit = std::any_of(alphaMaps.cbegin(),
-                                        alphaMaps.cbegin() + validCount,
-                                        [](const Optional<AlphaMap>& a)
+        bool hasAlphaMap = std::any_of(alphaMaps.cbegin(),
+                                       alphaMaps.cbegin() + validCount,
+                                       [](const Optional<AlphaMap>& a)
         {
             return a.HasValue();
         });
+        bool hasPassthroughMat = std::any_of(lmKeys.cbegin(),
+                                             lmKeys.cbegin() + validCount,
+                                             [](LightOrMatKey lmKey)
+        {
+            bool isMat = (lmKey.FetchFlagPortion() == IS_MAT_KEY_FLAG);
+            bool isPassthroughMat = (CommonKey(lmKey.FetchBatchPortion()) ==
+                                     CommonKey(TracerConstants::PassthroughMatId));
+            return isMat && isPassthroughMat;
+        });
+        bool enableAnyHit = hasAlphaMap || hasPassthroughMat;
+
         bool enableCull = (cfFlags.PopCount() == validMask);
 
         uint32_t flag = OPTIX_INSTANCE_FLAG_NONE;
@@ -591,6 +603,9 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
                 flag |= OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT;
         }
         hInstanceCommonFlags.push_back(flag);
+
+        // Set the instance masks
+        hInstanceMasks.push_back(GenerateAccelInstanceMask(lmKeys));
     }
 
     // Calculate hit records for each instance
@@ -649,6 +664,13 @@ void AcceleratorGroupOptiX<PG>::WriteInstanceKeysAndAABBs(Span<AABB3>,
 }
 
 template<PrimitiveGroupC PG>
+void AcceleratorGroupOptiX<PG>::WriteInstanceMasks(Span<AccelInstanceMask>,
+                                                   const GPUQueue&) const
+{
+    throw MRayError("For OptiX, this function should not be called");
+}
+
+template<PrimitiveGroupC PG>
 void AcceleratorGroupOptiX<PG>::OffsetAccelKeyInRecords()
 {
     assert(this->globalWorkIdToLocalOffset != std::numeric_limits<uint32_t>::max());
@@ -668,15 +690,18 @@ void AcceleratorGroupOptiX<PG>::AcquireIASConstructionParams(Span<OptixTraversab
                                                              Span<Matrix3x4> dInstanceMatrices,
                                                              Span<uint32_t> dSBTCounts,
                                                              Span<uint32_t> dFlags,
+                                                             Span<AccelInstanceMask> dInstanceMasks,
                                                              const GPUQueue& queue) const
 {
     Span<const OptixTraversableHandle> hHandleSpan(hInstanceAccelHandles);
     Span<const uint32_t> hHitRecordCountSpan(hInstanceHitRecordCounts);
     Span<const uint32_t> hFlagSpan(hInstanceCommonFlags);
+    Span<const AccelInstanceMask> hInstanceSpan(hInstanceMasks);
 
     queue.MemcpyAsync(dTraversableHandles, hHandleSpan);
     queue.MemcpyAsync(dSBTCounts, hHitRecordCountSpan);
     queue.MemcpyAsync(dFlags, hFlagSpan);
+    queue.MemcpyAsync(dInstanceMasks, hInstanceSpan);
 
     // The hard part
     for(const auto& work : this->workInstances)
@@ -757,7 +782,7 @@ void AcceleratorGroupOptiX<PG>::CastLocalRays(// Output
                                               Span<const CommonKey>,
                                               // Constants
                                               CommonKey,
-                                              AccelResultWriteMode,
+                                              RayCastOptions,
                                               const GPUQueue&)
 {
     throw MRayError("For OptiX, this function should not be called");
@@ -774,6 +799,7 @@ void AcceleratorGroupOptiX<PG>::CastVisibilityRays(// Output
                                                    Span<const CommonKey>,
                                                    // Constants
                                                    CommonKey,
+                                                   RayCastOptions,
                                                    const GPUQueue&)
 {
     throw MRayError("For OptiX, this function should not be called");

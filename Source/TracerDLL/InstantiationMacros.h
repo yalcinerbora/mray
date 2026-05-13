@@ -155,7 +155,7 @@ using GetMWF = GetMWFT<R, MG, TG, I>::Type;
                                                                     MRAY_GRID_CONSTANT const typename T::DataSoA,           \
                                                                     MRAY_GRID_CONSTANT const typename A<P>::DataSoA,        \
                                                                     MRAY_GRID_CONSTANT const typename P::DataSoA,           \
-                                                                    MRAY_GRID_CONSTANT const AccelResultWriteMode)
+                                                                    MRAY_GRID_CONSTANT const RayCastOptions)
 
 #define MRAY_ACCEL_VISIBILITY_RAY_CAST_KERNEL_INSTANTIATE(A, P, T)                                                          \
     template MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT                                                                  \
@@ -166,7 +166,8 @@ using GetMWF = GetMWFT<R, MG, TG, I>::Type;
                                                                          MRAY_GRID_CONSTANT const Span<const CommonKey>,    \
                                                                          MRAY_GRID_CONSTANT const typename T::DataSoA,      \
                                                                          MRAY_GRID_CONSTANT const typename A<P>::DataSoA,   \
-                                                                         MRAY_GRID_CONSTANT const typename P::DataSoA)
+                                                                         MRAY_GRID_CONSTANT const typename P::DataSoA,      \
+                                                                         MRAY_GRID_CONSTANT const RayCastOptions)
 // Camera Related
 #define MRAY_RAYGEN_SUBCAMERA_KERNEL_INSTANTIATE(C, T)                                  \
     template MRAY_KERNEL                                                                \

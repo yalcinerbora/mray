@@ -581,7 +581,7 @@ GuidedPTRenderer::DisplayHashGrid(Span<const RayIndex> dDeadRayIndices,
         Span<VolumeIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
         dShadowRays, dDeadRayIndices,
-        AccelResultWriteMode::HIT_KEY_AND_HIT_ONLY,
+        {RayCastOptions::WRITE_HIT_KEY_AND_HIT},
         processQueue
     );
 
@@ -701,7 +701,7 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
         Span<VolumeIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
         dRays, dIndices,
-        AccelResultWriteMode::HIT_KEY_AND_HIT_ONLY,
+        {RayCastOptions::WRITE_HIT_KEY_AND_HIT},
         processQueue
     );
     // Generate work keys from hit packs
@@ -814,7 +814,9 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     tracerView.baseAccelerator.CastVisibilityRays
     (
         dIsVisibleBitSpan, dBackupRNGStates,
-        dShadowRays, dIndices, processQueue
+        dShadowRays, dIndices, 
+        {.traceMode = RayCastOptions::TRACE_ALL},
+        processQueue
     );
 
     // Accumulate the pre-calculated radiance selectively

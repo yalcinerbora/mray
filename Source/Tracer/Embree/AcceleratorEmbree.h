@@ -26,12 +26,14 @@ namespace EmbreeAccelDetail
 
         MR_GF_DECL
         Optional<HitResult>
-        ClosestHit(BackupRNG&, const Ray&, const Vector2&) const
+        ClosestHit(BackupRNG&, const Ray&, const Vector2&,
+                   const typename RayCastOptions::TraceMode&) const
         { return std::nullopt; }
 
         MR_GF_DECL
         Optional<HitResult>
-        FirstHit(BackupRNG&, const Ray&, const Vector2&) const
+        FirstHit(BackupRNG&, const Ray&, const Vector2&,
+                 const typename RayCastOptions::TraceMode&) const
         { return std::nullopt; }
 
         MR_GF_DECL
@@ -128,6 +130,7 @@ class AcceleratorGroupEmbreeI
     virtual void AcquireIASConstructionParams(Span<RTCScene> hSceneHandles,
                                               Span<Matrix3x4> hInstanceMatrices,
                                               Span<uint32_t> hInstanceHitRecordCounts,
+                                              Span<AccelInstanceMask> dInstanceMasks,
                                               Span<const EmbreeHitRecord<>*> dHitRecordPtrs,
                                               const GPUQueue& queue) const = 0;
 
@@ -139,12 +142,14 @@ struct EmbreeRayQueryContext
 {
     template<class T>
     using ArrayT = StaticVector<T, EMBREE_BATCH_SIZE>;
+    using TraceMode = typename RayCastOptions::TraceMode;
 
     RTCRayQueryContext      baseContext;
     ArrayT<BackupRNGState>  rngStates;
     ArrayT<BackupRNG>       rng;
     ArrayT<AcceleratorKey>  localAccelKeys;
     ArrayT<VolumeIndex>     volumeIndices;
+    TraceMode               traceMode;
 };
 
 struct EmbreGlobalUserData
@@ -196,6 +201,7 @@ class AcceleratorGroupEmbree final
     // Per-instance data
     Span<RTCScene>          hInstanceScenes;
     Span<TransformKey>      hTransformKeys;
+    Span<AccelInstanceMask> hInstanceMasks;
     // Per-instance per-prim batch data
     Span<EmbreeHitRecord<>> hAllHitRecords;
     Span<uint32_t>          hInstanceHitRecordOffsets;
@@ -238,6 +244,8 @@ class AcceleratorGroupEmbree final
     void WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
                                    Span<AcceleratorKey> dKeyWriteRegion,
                                    const GPUQueue&) const override;
+    void WriteInstanceMasks(Span<AccelInstanceMask> dMaskWriteRegion,
+                            const GPUQueue&) const override;
     // Functionality
     void CastLocalRays(// Output
                        Span<VolumeIndex> dVolumeIndices,
@@ -251,7 +259,7 @@ class AcceleratorGroupEmbree final
                        Span<const CommonKey> dAccelKeys,
                        // Constants
                        CommonKey workId,
-                       AccelResultWriteMode,
+                       RayCastOptions,
                        const GPUQueue& queue) override;
 
     void CastVisibilityRays(// Output
@@ -264,12 +272,14 @@ class AcceleratorGroupEmbree final
                             Span<const CommonKey> dAccelKeys,
                             // Constants
                             CommonKey workId,
+                            RayCastOptions options,
                             const GPUQueue& queue) override;
 
     // Embree Related
     void    AcquireIASConstructionParams(Span<RTCScene> hSceneHandles,
                                          Span<Matrix3x4> hInstanceMatrices,
                                          Span<uint32_t> hInstanceHitRecordCounts,
+                                         Span<AccelInstanceMask> hInstanceMasks,
                                          Span<const EmbreeHitRecord<>*> dHitRecordPtrs,
                                          const GPUQueue& queue) const override;
     void    OffsetAccelKeyInRecords(uint32_t instanceRecordStartOffset) override;
@@ -316,7 +326,7 @@ class BaseAcceleratorEmbree final : public BaseAcceleratorT<BaseAcceleratorEmbre
                      // Input
                      Span<const RayIndex> dRayIndices,
                      //
-                     AccelResultWriteMode,
+                     RayCastOptions,
                      const GPUQueue& queue) override;
 
     void    CastVisibilityRays(// Output
@@ -326,6 +336,7 @@ class BaseAcceleratorEmbree final : public BaseAcceleratorT<BaseAcceleratorEmbre
                                // Input
                                Span<const RayGMem> dRays,
                                Span<const RayIndex> dRayIndices,
+                               RayCastOptions,
                                const GPUQueue& queue) override;
 
     void    CastLocalRays(// Output
@@ -340,7 +351,7 @@ class BaseAcceleratorEmbree final : public BaseAcceleratorT<BaseAcceleratorEmbre
                           Span<const AcceleratorKey> dAccelKeys,
                           //
                           CommonKey dAccelKeyBatchPortion,
-                          AccelResultWriteMode,
+                          RayCastOptions,
                           const GPUQueue& queue) override;
 
     void    AllocateForTraversal(size_t maxRayCount) override;

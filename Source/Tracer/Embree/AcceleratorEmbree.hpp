@@ -83,6 +83,7 @@ void IntersectFuncEmbree(const RTCIntersectFunctionNArguments* args)
         std::fill_n(isValid.data(), N, EMBREE_INVALID_RAY);
         std::array<Float, N> newTs;
         bool someHasAlphaMaps = false;
+        bool someArePassthrough = false;
         for(uint32_t i = 0; i < N; i++)
         {
             if(args->valid[i] == EMBREE_INVALID_RAY) continue;
@@ -133,10 +134,16 @@ void IntersectFuncEmbree(const RTCIntersectFunctionNArguments* args)
                                                                                      vIndexPart);
                 //
                 someHasAlphaMaps |= record.alphaMap.HasValue();
+                // Check if we are at PT mat
+                using namespace TracerConstants;
+                bool isMat = (record.lmKey.FetchFlagPortion() == IS_MAT_KEY_FLAG);
+                bool isPassthroughMat = (CommonKey(record.lmKey.FetchBatchPortion()) ==
+                                         CommonKey(PassthroughMatId));
+                someArePassthrough |= (isMat && isPassthroughMat);
             }
         }
         // Invoke alpha map if any rays requires it
-        if(someHasAlphaMaps)
+        if(someHasAlphaMaps || someArePassthrough)
         {
             RTCFilterFunctionNArguments filterArgs;
             filterArgs.context = args->context;
@@ -201,6 +208,7 @@ void OccludedFuncEmbree(const RTCOccludedFunctionNArguments* args)
         std::array<int, N> isValid;
         std::fill_n(isValid.begin(), N, EMBREE_INVALID_RAY);
         bool someHasAlphaMaps = false;
+        bool someArePassthrough = false;
         for(uint32_t i = 0; i < N; i++)
         {
             if(args->valid[i] == EMBREE_INVALID_RAY) continue;
@@ -242,10 +250,17 @@ void OccludedFuncEmbree(const RTCOccludedFunctionNArguments* args)
                 potentialHits.instPrimID[0][i] = args->context->instPrimID[0];
 
                 someHasAlphaMaps |= record.alphaMap.HasValue();
+
+                // Check if we are at PT mat
+                using namespace TracerConstants;
+                bool isMat = (record.lmKey.FetchFlagPortion() == IS_MAT_KEY_FLAG);
+                bool isPassthroughMat = (CommonKey(record.lmKey.FetchBatchPortion()) ==
+                                         CommonKey(PassthroughMatId));
+                someArePassthrough |= (isMat && isPassthroughMat);
             }
         }
 
-        if(someHasAlphaMaps)
+        if(someHasAlphaMaps | someArePassthrough)
         {
             RTCFilterFunctionNArguments filterArgs;
             filterArgs.context = args->context;
@@ -305,6 +320,9 @@ void FilterFuncEmbree(const RTCFilterFunctionNArguments* args)
             uint32_t geomIndex = groupData.hInstanceHitRecordOffsets[localInstanceId] + h.geomID[i];
             const HitRecordG& recordGeneric = groupData.hAllHitRecords[geomIndex];
             const HitRecord& record = reinterpret_cast<const HitRecord&>(recordGeneric);
+
+            if(!IsTraceModeMatches(embreeContext.traceMode, record.lmKey))
+                continue;
 
             // Embree default triangle routine does not have
             // runtime-enabled backface culling parameter.
@@ -642,16 +660,17 @@ void AcceleratorGroupEmbree<PG>::Construct(AccelGroupConstructParams p,
         concreteAccelCount = 0;
     //
     MemAlloc::AllocateMultiData(Tie(hConcreteScenes, hInstanceScenes,
-                                    hTransformKeys, hAllHitRecords,
+                                    hTransformKeys, hInstanceMasks,
+                                    hAllHitRecords,
                                     hInstanceHitRecordOffsets,
                                     hAllLeafs, hTransformGroupSoAList,
                                     pgSoA, geomUserData),
                                 mem,
                                 {concreteAccelCount, this->InstanceCount(),
-                                 this->InstanceCount(), hitRecordCount,
-                                 hitRecordOffsets.size(), totalLeafCount,
-                                 transformSoAOffsets.back(), 1,
-                                 geomDataArraySize});
+                                 this->InstanceCount(),this->InstanceCount(),
+                                 hitRecordCount, hitRecordOffsets.size(),
+                                 totalLeafCount, transformSoAOffsets.back(),
+                                 1, geomDataArraySize});
     // Copy pgSoA to common buffer (easy)
     auto pgSoALocal = static_cast<const PG&>(this->pg).SoA();
     queue.MemcpyAsync(pgSoA, Span<const PGSoA>(&pgSoALocal, 1));
@@ -695,6 +714,17 @@ void AcceleratorGroupEmbree<PG>::Construct(AccelGroupConstructParams p,
     );
     // Copy transform keys
     queue.MemcpyAsync(hTransformKeys, Span<const TransformKey>(ppResult.surfData.transformKeys));
+
+    // Write Instance Masks
+    Span<const LightOrMatKeyArray>(ppResult.surfData.lightOrMatKeys);
+    queue.IssueWorkKernel<KCGenerateInstanceMasks>
+    (
+        "KCGenerateInstanceMasks",
+        DeviceWorkIssueParams{.workCount = uint32_t(hInstanceMasks.size())},
+        //
+        hInstanceMasks,
+        Span<const LightOrMatKeyArray>(ppResult.surfData.lightOrMatKeys)
+    );
 
     // Write the hit records
     for(size_t i = 0; i < this->InstanceCount(); i++)
@@ -781,6 +811,13 @@ void AcceleratorGroupEmbree<PG>::WriteInstanceKeysAndAABBs(Span<AABB3>,
 }
 
 template<PrimitiveGroupC PG>
+void AcceleratorGroupEmbree<PG>::WriteInstanceMasks(Span<AccelInstanceMask>,
+                                                    const GPUQueue&) const
+{
+    throw MRayError("For Embree, this function should not be called");
+}
+
+template<PrimitiveGroupC PG>
 void AcceleratorGroupEmbree<PG>::CastLocalRays(// Output
                                                Span<VolumeIndex>,
                                                Span<HitKeyPack>,
@@ -793,7 +830,7 @@ void AcceleratorGroupEmbree<PG>::CastLocalRays(// Output
                                                Span<const CommonKey>,
                                                // Constants
                                                CommonKey,
-                                               AccelResultWriteMode,
+                                               RayCastOptions,
                                                const GPUQueue&)
 {
     throw MRayError("For Embree, this function should not be called");
@@ -810,6 +847,7 @@ void AcceleratorGroupEmbree<PG>::CastVisibilityRays(// Output
                                                     Span<const CommonKey>,
                                                     // Constants
                                                     CommonKey,
+                                                    RayCastOptions,
                                                     const GPUQueue&)
 {
     throw MRayError("For OptiX, this function should not be called");
@@ -819,10 +857,12 @@ template<PrimitiveGroupC PG>
 void AcceleratorGroupEmbree<PG>::AcquireIASConstructionParams(Span<RTCScene> hSceneHandles,
                                                               Span<Matrix3x4> hInstanceMatrices,
                                                               Span<uint32_t> hInstanceHitRecordCounts,
+                                                              Span<AccelInstanceMask> hInstanceMasksOut,
                                                               Span<const EmbreeHitRecord<>*> dHitRecordPtrs,
                                                               const GPUQueue& queue) const
 {
     queue.MemcpyAsync(hSceneHandles, ToConstSpan(hInstanceScenes));
+    queue.MemcpyAsync(hInstanceMasksOut, ToConstSpan(hInstanceMasks));
     // The hard part
     for(const auto& work : this->workInstances)
     {

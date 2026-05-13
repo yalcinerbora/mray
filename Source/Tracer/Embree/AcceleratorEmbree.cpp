@@ -131,6 +131,9 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
     Span<RTCScene> hSceneHandles = hGlobalSceneHandles;
     Span<Matrix3x4> hInstanceMatrices = hGlobalInstanceInvTransforms;
     Span<uint32_t> hInstanceHRCounts = hInstanceHRStartOffsets.subspan(1);
+    // Mask vector
+    std::vector<AccelInstanceMask> hAccelMasksVec(hGlobalSceneHandles.size());
+    Span<AccelInstanceMask> hAccelMasks = hAccelMasksVec;
     //
     embreeContext.scene = rtcNewScene(embreeContext.device);
     assert(instanceOffsets.size() == this->generatedAccels.size() + 1);
@@ -151,17 +154,18 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
         auto localHandles = hSceneHandles.subspan(iStart, iLocalSize);
         auto localMatrices = hInstanceMatrices.subspan(iStart, iLocalSize);
         auto localHRCounts = hInstanceHRCounts.subspan(iStart, iLocalSize);
+        auto localMasks = hAccelMasks.subspan(iStart, iLocalSize);
         //
         ag.AcquireIASConstructionParams(localHandles, localMatrices,
-                                        localHRCounts, localHRPointers,
-                                        queue);
+                                        localHRCounts, localMasks,
+                                        localHRPointers, queue);
         ag.OffsetAccelKeyInRecords(uint32_t(instanceOffsets[accelI]));
         queue.Barrier().Wait();
         for(uint32_t i = 0; i < localHandles.size(); i++)
         {
             auto g = rtcNewGeometry(embreeContext.device, RTC_GEOMETRY_TYPE_INSTANCE);
             rtcSetGeometryInstancedScene(g, localHandles[i]);
-
+            rtcSetGeometryMask(g, unsigned int(localMasks[i].mask));
             // Maybe there is some optimizations on embree
             // lets not give identity matrix to embree.
             if(localMatrices[i] != Matrix3x4::Identity())
@@ -216,7 +220,7 @@ void BaseAcceleratorEmbree::CastRays(// Output
                                      // Input
                                      Span<const RayIndex> dRayIndices,
                                      //
-                                     AccelResultWriteMode writeMode,
+                                     RayCastOptions options,
                                      const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -251,13 +255,15 @@ void BaseAcceleratorEmbree::CastRays(// Output
                 .filter = nullptr,
                 .intersect = nullptr,
             };
+            rqContext.traceMode = options.traceMode;
 
             // Load the data to stack
+            auto traceMask = static_cast<unsigned int>(options.traceMode);
             RTCRayHit16 rh = {};
             std::array<int, EMBREE_BATCH_SIZE> validList = {};
             // Ray
             std::fill_n(validList.begin(), localRayCount, -1);
-            std::fill_n(rh.ray.mask, localRayCount, EMBREE_ALL_VALID_MASK);
+            std::fill_n(rh.ray.mask, localRayCount, traceMask);
             std::iota(rh.ray.id, rh.ray.id + localRayCount, 0);
             // Hit
             std::fill_n(rh.hit.geomID, EMBREE_BATCH_SIZE,
@@ -315,8 +321,9 @@ void BaseAcceleratorEmbree::CastRays(// Output
                 uint32_t globalRecordIndex = iOffset + primBatchIndex;
                 const auto& record = *hAllHitRecordPtrs[globalRecordIndex];
 
-                using enum AccelResultWriteMode;
-                if(writeMode == BOTH || writeMode == HIT_KEY_AND_HIT_ONLY)
+                using enum RayCastOptions::WriteMode;
+                if(options.writeMode == WRITE_ALL ||
+                   options.writeMode == WRITE_HIT_KEY_AND_HIT)
                 {
                     dHitIds[rIndex] = HitKeyPack
                     {
@@ -334,7 +341,8 @@ void BaseAcceleratorEmbree::CastRays(// Output
                     dHitParams[rIndex] = MetaHit(ab);
                 }
 
-                if(writeMode == BOTH || writeMode == VOLUME_INDEX_ONLY)
+                if(options.writeMode == WRITE_ALL ||
+                   options.writeMode == WRITE_VOLUME_INDEX)
                     dVolumeIndices[rIndex] = rqContext.volumeIndices[i];
 
                 // We always write tMax
@@ -350,6 +358,7 @@ void BaseAcceleratorEmbree::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffe
                                                // Input
                                                Span<const RayGMem> dRays,
                                                Span<const RayIndex> dRayIndices,
+                                               RayCastOptions options,
                                                const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -384,12 +393,15 @@ void BaseAcceleratorEmbree::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffe
                 .filter = nullptr,
                 .occluded = nullptr
             };
+            rqContext.traceMode = options.traceMode;
+
             // Load the data to stack
+            auto traceMask = static_cast<unsigned int>(options.traceMode);
             RTCRay16 r = {};
             std::array<int, EMBREE_BATCH_SIZE> validList = {};
             // Ray
             std::fill_n(validList.begin(), localRayCount, -1);
-            std::fill_n(r.mask, localRayCount, EMBREE_ALL_VALID_MASK);
+            std::fill_n(r.mask, localRayCount, traceMask);
             std::iota(r.id, r.id + localRayCount, 0);
             // From GMem
             for(uint32_t i = 0; i < localRayCount; i++)
@@ -448,7 +460,7 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
                                           Span<const AcceleratorKey> dAccelKeys,
                                           //
                                           CommonKey dAccelKeyBatchPortion,
-                                          AccelResultWriteMode writeMode,
+                                          RayCastOptions options,
                                           const GPUQueue& queue)
 {
     using namespace std::string_view_literals;
@@ -464,7 +476,7 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
     using namespace std::string_view_literals;
     queue.IssueWorkLambda
     (
-        "Ray Casting"sv,
+        "Local Ray Cast"sv,
         DeviceWorkIssueParams{ .workCount = rayCount },
         [=, this](KernelCallParams kp)
         {
@@ -491,6 +503,8 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
                 .filter = nullptr,
                 .intersect = nullptr
             };
+            rqContext.traceMode = options.traceMode;
+
             // Load the data to stack
             auto [ray, tMM] = RayFromGMem(dRays, rIndex);
             // We need to manually transform the ray here
@@ -511,6 +525,9 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
             assert(tMM >= Vector2::Zero());
             rh.ray.tnear = tMM[0];
             rh.ray.tfar = tMM[1];
+            //
+            auto traceMask = static_cast<unsigned int>(options.traceMode);
+            rh.ray.mask = traceMask;
             // RNG
             rqContext.rng.emplace_back(dRNGStates[rIndex]);
             // Volume Buffer
@@ -537,8 +554,9 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
             uint32_t globalRecordIndex = iOffset + primBatchIndex;
             const auto& record = *hAllHitRecordPtrs[globalRecordIndex];
 
-            using enum AccelResultWriteMode;
-            if(writeMode == BOTH || writeMode == HIT_KEY_AND_HIT_ONLY)
+            using enum RayCastOptions::WriteMode;
+            if(options.writeMode == WRITE_ALL ||
+               options.writeMode == WRITE_HIT_KEY_AND_HIT)
             {
                 dHitIds[rIndex] = HitKeyPack
                 {
@@ -555,7 +573,8 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
                 dHitParams[rIndex] = MetaHit(ab);
             }
 
-            if(writeMode == BOTH || writeMode == VOLUME_INDEX_ONLY)
+            if(options.writeMode == WRITE_ALL ||
+               options.writeMode == WRITE_VOLUME_INDEX)
                 dVolumeIndices[rIndex] = rqContext.volumeIndices[i];
 
             // We always write tMax

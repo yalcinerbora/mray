@@ -916,19 +916,29 @@ template <ArithmeticC T>
 MR_PF_DEF
 AABB<3, T> Matrix3x4T<T>::TransformAABB(const AABB<3, T>& aabb) const noexcept
 {
-    AABB<3, T> result = AABB<3, T>::Negative();
-    Vector<4, T> vertex = Vector<4, T>(1);
-    for(unsigned int i = 0; i < AABB<3, T>::AABBVertexCount; i++)
+    // https://www.realtimerendering.com/resources/GraphicsGems/gems/TransBox.c
+    //
+    using VecT = Vector<3, T>;
+    VecT t = VecT(matrix[3], matrix[7], matrix[11]);
+
+    VecT rMin = t;
+    VecT rMax = t;
+
+    MRAY_UNROLL_LOOP
+    for(unsigned int i = 0; i < 3u; i++)
     {
         MRAY_UNROLL_LOOP
-        for(unsigned int j = 0; j < 3; j ++)
-            vertex[j] = ((i >> j) & 0b1) ? aabb.Max()[j] : aabb.Min()[j];
-        //
-        vertex = (*this) * vertex;
-        result.SetMax(Math::Max(result.Max(), Vector<3, T>(vertex)));
-        result.SetMin(Math::Min(result.Min(), Vector<3, T>(vertex)));
+        for(unsigned int j = 0; j < 3u; j++)
+        {
+            Float a = matrix[i * 4 + j] * aabb.Min()[j];
+            Float b = matrix[i * 4 + j] * aabb.Max()[j];
+            if(a >= b) std::swap(a, b);
+
+            rMin[i] += a;
+            rMax[i] += b;
+        }
     }
-    return result;
+    return AABB<3, T>(rMin, rMax);
 }
 
 template <ArithmeticC T>

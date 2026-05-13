@@ -104,6 +104,20 @@ void KCInitializePDFRatiosIndirect(MRAY_GRID_CONSTANT const Span<Spectrum> dRPat
     }
 }
 
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCCopyShadowRayTMaxIndirect(MRAY_GRID_CONSTANT const Span<Float> dTMax,
+                                 MRAY_GRID_CONSTANT const Span<const RayGMem> dShadowRays,
+                                 MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices)
+{
+    KernelCallParams kp;
+    uint32_t shadowRayCount = static_cast<uint32_t>(dIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < shadowRayCount; i += kp.TotalSize())
+    {
+        RayIndex index = dIndices[i];
+        dTMax[index] = dShadowRays[index].tMax;
+    }
+}
+
 template<SpectrumContextC SC>
 PathTracerRendererT<SC>::PathTracerRendererT(const RenderImagePtr& rb,
                                              TracerView tv,
@@ -310,7 +324,7 @@ PathTracerRendererT<SC>::DoRenderPassPure(Span<RayIndex> dIndices,
         Span<VolumeIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
         dRays, dIndices,
-        AccelResultWriteMode::HIT_KEY_AND_HIT_ONLY,
+        {RayCastOptions::WRITE_HIT_KEY_AND_HIT},
         processQueue
     );
 
@@ -427,7 +441,7 @@ PathTracerRendererT<SC>::DoRenderPassNEE(Span<RayIndex> dIndices,
         Span<VolumeIndex>(),
         dHitKeys, dHits, dBackupRNGStates,
         dRays, dIndices,
-        AccelResultWriteMode::HIT_KEY_AND_HIT_ONLY,
+        {RayCastOptions::WRITE_HIT_KEY_AND_HIT},
         processQueue
     );
     // Generate work keys from hit packs
@@ -515,7 +529,9 @@ PathTracerRendererT<SC>::DoRenderPassNEE(Span<RayIndex> dIndices,
     tracerView.baseAccelerator.CastVisibilityRays
     (
         dIsVisibleBitSpan, dBackupRNGStates,
-        dShadowRays, dIndices, processQueue
+        dShadowRays, dIndices, 
+        {.traceMode = RayCastOptions::TRACE_ALL},
+        processQueue
     );
     // Accumulate the pre-calculated radiance selectively
     processQueue.IssueWorkKernel<KCAccumulateShadowRaysPT>
@@ -619,7 +635,7 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaPure(Span<RayIndex> dIndices,
     tracerView.baseAccelerator.CastRays
     (
         dVolumeIndices, dHitKeys, dHits, dBackupRNGStates,
-        dRays, dIndices, AccelResultWriteMode::BOTH,
+        dRays, dIndices, {RayCastOptions::WRITE_ALL},
         processQueue
     );
     mediaTracker->AddNewVolumeToRaysIndirect(dRayMediaListPacks,
@@ -873,7 +889,7 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
     (
         dVolumeIndices,
         dHitKeys, dHits, dBackupRNGStates,
-        dRays, dIndices, AccelResultWriteMode::BOTH,
+        dRays, dIndices, {RayCastOptions::WRITE_ALL},
         processQueue
     );
 
@@ -1155,13 +1171,73 @@ PathTracerRendererT<SC>::RecursiveShadowRayCast(// Output
                                                 // Constants
                                                 const GPUQueue& processQueue)
 {
+    // TODO: Algorithm change may be plausible for performance
+    //
+    // We do check the each medium transition one by one.
+    // So we do n ray casts which is redundant (An example below).
+    //
+    // Given S_n, where n is in Z. and each S_n is a surface with passthrough
+    // material, we will do (n+1) ray casts:
+    //
+    //         S_0   S_1   S_2   S_3
+    // [ray] -> | --> | --> | --> | --> [light]
+    //
+    // n is unbounded (there would be dozens of clouds between shadow ray casted surface and
+    // the light source, which will correspond to (2x + 1) of ray casting. We can't find the
+    // all transisiton points in a single pass. I mean we can find it but we can't store it since
+    // the renderer is wavefront (2M rays every iteration).
+    //
+    // Since we do not use HitKey (surface hit key) buffer; which holds 4 32-bit integers
+    // (Transform, Material, Primitive, Accelerator Keys), we can use that buffer to
+    // calculate transition points 4 by 4.
+    //
+    // This will require writing OptiX / Embree stuff and use anyhit shader for all primitive
+    // types etc. It is quite a bit of work, but it definately worth the performance benefith.
+    // Writing such thing is not trivial (It is trivial but it not as trivial than writing this
+    // wall of text).
+    //
+    // So next iteration will implement a "FindNextNVolumeTransitions" function for all base
+    // accelerators.
+    //
+    // To further improve the idea is to mask surfaces with passthrough materials etc.
+    // Our basic ones do not have this
+    //
+
+    static const auto annotation = gpuSystem.CreateAnnotation("Recursive Shadow Ray Cast (RSRC)");
+    const auto _0 = annotation.AnnotateScope();
+
     assert(false);
-    //auto& rp = rayPartitioner;
+
+    // TODO:
+    // -- "CastRays" update TMax, we need to save the shadow rays' original tMax
+    //    to a buffer, and on every iteration we will update it.
+    //
+    // -- If we do volume output on the ray caster, we need to set keys
+
+
+    //
+    // Repurpose hit buffer (barycentric), we will use it to save
+    // tMax of each ray
+    uint32_t shadowRayCount = dIndices.size();
+    Span<Float> dInitialTMaxes = MemAlloc::RepurposeAlloc<Float>(dHits);
+
+    processQueue.IssueWorkKernel<KCCopyShadowRayTMaxIndirect>
+    (
+        "KCCopyShadowRayTMaxIndirect",
+        DeviceWorkIssueParams{.workCount = dIndices.size()},
+        //
+        dInitialTMaxes,
+        dShadowRays,
+        dIndices
+    );
 
     // Here we have raw paths, some of which can be invalid (we are near spp limit)
     // and some did not launch shadow rays (since they are highly specular)
     while(!dIndices.empty())
     {
+        static const auto passAnnotation = gpuSystem.CreateAnnotation("RSRC Pass");
+        const auto _1 = annotation.AnnotateScope();
+
         auto bpOut = rayPartitioner.BinaryPartition(dIndices, processQueue,
                                                     HasValidShadowRayFunctor());
         processQueue.Barrier().Wait();
@@ -1170,9 +1246,6 @@ PathTracerRendererT<SC>::RecursiveShadowRayCast(// Output
         if(dIndices.empty()) continue;
 
         // Cast rays
-        // Similar to actual ray casting of the path portion.
-        // TODO: We currently waste writing HitKeys, Hit Values (barycentrics),
-        // we should change it later.
         Span<VolumeIndex> dVolumeIndices = MemAlloc::RepurposeAlloc<VolumeIndex>(dRandomNumBuffer);
         processQueue.MemsetAsync(dVolumeIndices, 0xFF);
 
@@ -1181,9 +1254,14 @@ PathTracerRendererT<SC>::RecursiveShadowRayCast(// Output
         tracerView.baseAccelerator.CastRays
         (
             dVolumeIndices,
-            dHitKeys, dHits, dBackupRNGStates,
+            Span<HitKeyPack>(),
+            Span<MetaHit>(),
+            dBackupRNGStates,
             dShadowRays, dIndices,
-            AccelResultWriteMode::VOLUME_INDEX_ONLY,
+            {
+                RayCastOptions::WRITE_VOLUME_INDEX,
+                RayCastOptions::TRACE_PASSTHROUGH
+            },
             processQueue
         );
 

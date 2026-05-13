@@ -85,7 +85,7 @@ void KCLocalRayCast(// Output
                     MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA,
                     MRAY_GRID_CONSTANT const typename AG::DataSoA aSoA,
                     MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA,
-                    MRAY_GRID_CONSTANT const AccelResultWriteMode writeMode);
+                    MRAY_GRID_CONSTANT const RayCastOptions options);
 
 template<AccelGroupC AG, TransformGroupC TG,
          auto GenerateTransformContext = MRAY_ACCEL_TGEN_FUNCTION(AG, TG)>
@@ -101,7 +101,8 @@ void KCVisibilityRayCast(// Output
                          // Constant
                          MRAY_GRID_CONSTANT const typename TG::DataSoA tSoA,
                          MRAY_GRID_CONSTANT const typename AG::DataSoA aSoA,
-                         MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA);
+                         MRAY_GRID_CONSTANT const typename AG::PrimitiveGroup::DataSoA pSoA,
+                         MRAY_GRID_CONSTANT const RayCastOptions options);
 
 template<class T>
 concept AccelWorkBaseC = std::derived_from<T, AcceleratorWorkI>;
@@ -138,7 +139,7 @@ class AcceleratorWork : public BaseType
                        Span<const RayIndex> dRayIndices,
                        Span<const CommonKey> dAcceleratorKeys,
                        // Constants
-                       AccelResultWriteMode,
+                       RayCastOptions,
                        const GPUQueue& queue) const override;
 
     void CastVisibilityRays(// Output
@@ -150,6 +151,7 @@ class AcceleratorWork : public BaseType
                             Span<const RayIndex> dRayIndices,
                             Span<const CommonKey> dAcceleratorKeys,
                             // Constants
+                            RayCastOptions,
                             const GPUQueue& queue) const override;
 
     void GeneratePrimitiveCenters(Span<Vector3> dAllPrimCenters,
@@ -202,7 +204,7 @@ void AcceleratorWork<AG, TG, BT>::CastLocalRays(// Output
                                                 Span<const RayIndex> dRayIndices,
                                                 Span<const CommonKey> dAcceleratorKeys,
                                                 // Constants
-                                                AccelResultWriteMode writeMode,
+                                                RayCastOptions options,
                                                 const GPUQueue& queue) const
 {
     assert(dHitIds.size() == dHitParams.size());
@@ -227,7 +229,7 @@ void AcceleratorWork<AG, TG, BT>::CastLocalRays(// Output
         transGroup.SoA(),
         accelGroup.SoA(),
         primGroup.SoA(),
-        writeMode
+        options
     );
 }
 
@@ -241,6 +243,7 @@ void AcceleratorWork<AG, TG, BT>::CastVisibilityRays(// Output
                                                      Span<const RayIndex> dRayIndices,
                                                      Span<const CommonKey> dAcceleratorKeys,
                                                      // Constants
+                                                     RayCastOptions options,
                                                      const GPUQueue& queue) const
 {
     assert(dIsVisibleBuffer.Size() == dRNGStates.size());
@@ -261,7 +264,8 @@ void AcceleratorWork<AG, TG, BT>::CastVisibilityRays(// Output
         dAcceleratorKeys,
         transGroup.SoA(),
         accelGroup.SoA(),
-        primGroup.SoA()
+        primGroup.SoA(),
+        options
     );
 }
 

@@ -22,12 +22,67 @@
 // We use this to prevent writing to certain buffers so that algorithms
 // may repurpose that memory. (i.e, volume shadow ray casting will repurpose
 // hit key buffers)
-enum class AccelResultWriteMode : uint32_t
+struct RayCastOptions
 {
-    HIT_KEY_AND_HIT_ONLY = 0b01,
-    VOLUME_INDEX_ONLY    = 0b10,
-    BOTH                 = 0b11
+    // Lets make these flag-like, maybe we mask etc later
+    enum WriteMode : uint8_t
+    {
+        WRITE_HIT_KEY_AND_HIT = 0b01,
+        WRITE_VOLUME_INDEX    = 0b10,
+        WRITE_ALL             = 0b11
+    };
+
+    enum TraceMode : uint8_t
+    {
+        TRACE_OPAQUE       = 0b01,
+        TRACE_PASSTHROUGH  = 0b10,
+        TRACE_ALL          = 0b11
+    };
+    //
+    WriteMode writeMode = WRITE_ALL;
+    TraceMode traceMode = TRACE_ALL;
 };
+
+struct AccelInstanceMask
+{
+    enum Mask : uint8_t
+    {
+        HAS_OPAQUE      = 0b01,
+        HAS_PASSTHROUGH = 0b10,
+        HAS_ALL         = 0b11
+    };
+
+    Mask mask;
+
+    MR_PF_DECL
+    bool AcceptTraversal(typename RayCastOptions::TraceMode mode) const;
+};
+
+MR_PF_DECL
+bool IsTraceModeMatches(typename RayCastOptions::TraceMode mode,
+                        LightOrMatKey lmKey);
+
+MR_PF_DEF
+bool AccelInstanceMask::AcceptTraversal(typename RayCastOptions::TraceMode mode) const
+{
+    return ((uint16_t(mask) & uint16_t(mode)) != uint16_t(0));
+}
+
+MR_PF_DEF
+bool IsTraceModeMatches(typename RayCastOptions::TraceMode mode,
+                        LightOrMatKey lmKey)
+{
+    using enum RayCastOptions::TraceMode;
+    if(mode == TRACE_ALL) return true;
+
+    bool isPTMat = (CommonKey(lmKey.FetchBatchPortion()) ==
+                    CommonKey(TracerConstants::PassthroughMatGroupId));
+    isPTMat &= (lmKey.FetchFlagPortion() == IS_MAT_KEY_FLAG);
+    //
+    if(mode == TRACE_OPAQUE      &&  isPTMat) return false;
+    if(mode == TRACE_PASSTHROUGH && !isPTMat) return false;
+    return true;
+}
 
 class AcceleratorWorkI
 {
@@ -45,7 +100,7 @@ class AcceleratorWorkI
                                   Span<const RayIndex> dRayIndices,
                                   Span<const CommonKey> dAccelIdPacks,
                                   // Constants
-                                  AccelResultWriteMode,
+                                  RayCastOptions,
                                   const GPUQueue& queue) const = 0;
 
     virtual void    CastVisibilityRays(// Output
@@ -57,6 +112,7 @@ class AcceleratorWorkI
                                        Span<const RayIndex> dRayIndices,
                                        Span<const CommonKey> dAcceleratorKeys,
                                        // Constants
+                                       RayCastOptions,
                                        const GPUQueue& queue) const = 0;
 
     virtual void    GeneratePrimitiveCenters(Span<Vector3> dAllPrimCenters,
