@@ -529,7 +529,7 @@ PathTracerRendererT<SC>::DoRenderPassNEE(Span<RayIndex> dIndices,
     tracerView.baseAccelerator.CastVisibilityRays
     (
         dIsVisibleBitSpan, dBackupRNGStates,
-        dShadowRays, dIndices, 
+        dShadowRays, dIndices,
         {.traceMode = RayCastOptions::TRACE_ALL},
         processQueue
     );

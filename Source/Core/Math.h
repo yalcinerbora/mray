@@ -271,7 +271,7 @@ MR_PF_DEF T NextPrime(T value) noexcept
             if(v % prime == 0) return false;
 
         // Continue traversing incrementally now
-        for(uint32_t i = FIRST_PRIMES[63] + 2; (i * i) < v; i += 2)
+        for(T i = FIRST_PRIMES[63] + 2; (i * i) < v; i += 2)
             if(v % i == 0) return false;
 
         return true;
@@ -674,7 +674,7 @@ MR_PF_DEF T ArcTan(T x) noexcept
         r = FMA(b2, T(0.721868575f), r);                // 0x1.7198c2p-1
         r = T(1) / r;
         r = x * r;
-        if(Abs(x) >= T(0x1.0p64)) r = std::copysign(pio2, x); // may be optional
+        if(Abs(x) >= T(0x1.0p64)) r = pio2 * Math::SignPM1(x); // may be optional
         return r;
     }
     #ifndef MRAY_DEVICE_CODE_PATH

@@ -204,6 +204,7 @@ if(MSVC)
         -Xcompiler=/wd4324
         -Xcompiler=/wd4506
         -Xcompiler=/wd4505
+        -Xcompiler=/wd4193
 
         # -Xcompiler=/W3
         # -Xcompiler=/Zi
