@@ -764,7 +764,7 @@ Vector<3, T> Matrix3x4T<T>::operator*(const Vector<3, T>& v) const noexcept
 {
     using V = Vector<3, T>;
     const auto& m = matrix;
-    //
+    // Assumes v[3] is zero
     V out;
     out[0] = Math::Dot(V(m[0], m[1], m[ 2]), v);
     out[1] = Math::Dot(V(m[4], m[5], m[ 6]), v);
@@ -783,6 +783,7 @@ Vector<4, T> Matrix3x4T<T>::operator*(const Vector<4, T>& v) const noexcept
     out[0] = Math::Dot(V(m[0], m[1], m[ 2], m[ 3]), v);
     out[1] = Math::Dot(V(m[4], m[5], m[ 6], m[ 7]), v);
     out[2] = Math::Dot(V(m[8], m[9], m[10], m[11]), v);
+    out[3] = v[3];
     return out;
 }
 
