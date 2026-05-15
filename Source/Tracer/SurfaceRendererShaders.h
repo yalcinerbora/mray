@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "Core/ColorFunctions.h"
+#include "Core/NamedEnum.h"
 
 #include "RenderWork.h"
 #include "DistributionFunctions.h"
@@ -13,80 +14,70 @@ class SurfaceRenderer;
 
 namespace SurfRDetail
 {
-
-    struct Mode
+    enum class TraceMaskEnum
     {
-        public:
-        enum E
-        {
-            AO,
-            FURNACE,
-            WORLD_NORMAL,
-            WORLD_POSITION,
-            WORLD_GEO_NORMAL,
-            HIT_PARAMS,
-            MAT_ID,
-            PRIM_ID,
-            ACCEL_ID,
-            TRANSFORM_ID,
-            UV,
-            VOL_INTERFACE,
-            //
-            END
-        };
-
-        private:
-        static constexpr std::array Names =
-        {
-            "AmbientOcclusion",
-            "Furnace",
-            "WorldNormal",
-            "WorldPosition",
-            "WorldGeoNormal",
-            "HitParams",
-            "MaterialId",
-            "PrimitiveId",
-            "AcceleratorId",
-            "TransformId",
-            "UV",
-            "VolumeInterface"
-        };
-        static_assert(Names.size() == static_cast<size_t>(END),
-                      "Not enough data on enum lookup table");
-
-        public:
-        E e;
+        MASK_ALL,
+        MASK_OPAQUE,
+        MASK_PASSTHROUGH,
         //
-        static constexpr std::string_view ToString(E e)
-        {
-            assert(e < END);
-            return Names[e];
-        }
-
-        static constexpr E FromString(std::string_view sv)
-        {
-            auto loc = std::find_if(Names.cbegin(), Names.cend(),
-            [&](std::string_view r)
-            {
-                return sv == r;
-            });
-            assert(loc != Names.cend());
-            return E(std::distance(Names.cbegin(), loc));
-        }
+        END
     };
+    inline constexpr std::array TraceMaskNames =
+    {
+        "All",
+        "Opaque",
+        "Passthrough"
+    };
+    using TraceMask = NamedEnum<TraceMaskEnum, TraceMaskNames>;
+
+    enum class RenderModeEnum
+    {
+        AO,
+        FURNACE,
+        WORLD_NORMAL,
+        WORLD_POSITION,
+        WORLD_GEO_NORMAL,
+        HIT_PARAMS,
+        MAT_ID,
+        PRIM_ID,
+        ACCEL_ID,
+        TRANSFORM_ID,
+        UV,
+        VOL_INTERFACE,
+        //
+        END
+    };
+
+    static constexpr std::array RenderModeNames =
+    {
+        "AmbientOcclusion",
+        "Furnace",
+        "WorldNormal",
+        "WorldPosition",
+        "WorldGeoNormal",
+        "HitParams",
+        "MaterialId",
+        "PrimitiveId",
+        "AcceleratorId",
+        "TransformId",
+        "UV",
+        "VolumeInterface"
+    };
+    using RenderMode = NamedEnum<RenderModeEnum, RenderModeNames>;
 
     struct Options
     {
         uint32_t    totalSPP            = 16'384;
-        Mode::E     mode                = Mode::AO;
+        RenderMode  renderMode          = RenderMode::E::AO;
         bool        doStochasticFilter  = true;
         Float       tMaxAORatio         = Float(0.15);
+        TraceMask   traceMask           = TraceMask::E::MASK_ALL;
     };
 
     struct GlobalState
     {
         // What are we rendering
-        Mode mode;
+        RenderMode renderMode;
         // For AO Renderer, secondary ray's tMax
         Float tMaxAO;
         // For interface view
@@ -179,10 +170,10 @@ void WorkFunctionCommon<P, M, T>::Call(const Primitive&, const Material&, const 
 {
     using RNGFunctions::HashPCG64::Hash;
     Vector3 color = Vector3::Zero();
-    Mode::E mode = params.globalState.mode.e;
+    RenderModeEnum mode = RenderMode::E(params.globalState.renderMode);
     switch(mode)
     {
-        using enum Mode::E;
+        using enum RenderModeEnum;
         case WORLD_NORMAL:
         {
             if constexpr(std::is_same_v<BasicSurface, Surface>)
@@ -304,10 +295,11 @@ void WorkFunctionFurnaceOrAO<P, M, T>::Call(const Primitive&, const Material& ma
                                             const Params& params,
                                             RayIndex rayIndex, uint32_t)
 {
-     assert(params.globalState.mode.e == Mode::AO ||
-            params.globalState.mode.e == Mode::FURNACE);
+    using enum RenderModeEnum;
+    auto renderMode = RenderModeEnum(params.globalState.renderMode);
+    assert(renderMode == AO || renderMode == FURNACE);
 
-    if(params.globalState.mode.e == Mode::FURNACE)
+    if(renderMode == FURNACE)
     {
         using Distribution::Common::DivideByPDF;
         auto [rayIn, tMM] = RayFromGMem(params.common.dRays, rayIndex);
@@ -323,7 +315,7 @@ void WorkFunctionFurnaceOrAO<P, M, T>::Call(const Primitive&, const Material& ma
 
         params.rayState.dOutputData[rayIndex] = refl;
     }
-    else if(params.globalState.mode.e == Mode::AO)
+    else if(renderMode == AO)
     {
         Vector3 geoNormal;
         Vector3 normal;
@@ -366,7 +358,8 @@ void LightWorkFunctionCommon<L, T>::Call(const Light&, RNGDispenser&, const Spec
 {
     if constexpr(Light::IsPrimitiveBackedLight)
     {
-        if(params.globalState.mode.e == Mode::WORLD_POSITION)
+        using enum RenderModeEnum;
+        if(RenderMode::E(params.globalState.renderMode) == WORLD_POSITION)
         {
             auto [ray, tMM] = RayFromGMem(params.common.dRays, rayIndex);
             params.rayState.dOutputData[rayIndex] = Spectrum(ray.AdvancedPos(tMM[1]), 0);

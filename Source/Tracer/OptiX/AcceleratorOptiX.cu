@@ -422,9 +422,9 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
 
     // Finally do the persistent allocation
     MemAlloc::AllocateMultiData(Tie(dLaunchArgPack, dAccelMemory,
-                                         dHitRecords, dEmptyRecords,
-                                         dGlobalInstanceInvTransforms,
-                                         dGlobalTraversableHandles),
+                                    dHitRecords, dEmptyRecords,
+                                    dGlobalInstanceInvTransforms,
+                                    dGlobalTraversableHandles),
                                 allMem,
                                 {1, compactedSize, totalRecordCount, 3,
                                  instanceBatchStartOffsets.back(),

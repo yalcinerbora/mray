@@ -31,6 +31,16 @@
 //
 // For GPU side, it is fine, storage->native bitcasts does not cost anyhing
 // codegen-wise, (highly probably hinders compilation time)
+//
+// Here is the godbolt:
+// https://godbolt.org/z/hrEn3vPnr
+//
+// When instruction set supports half (AVX Half extension or smth.)
+// codegen is kinda fine except for ABI since we pass uint16_t technically,
+// so no xmm register passing etc.
+//
+// But codegen is awful when only 32-bit float is supported
+// so take care
 
 #include <cstdint>
 #include "Definitions.h"

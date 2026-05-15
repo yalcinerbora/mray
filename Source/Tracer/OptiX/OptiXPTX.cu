@@ -231,8 +231,10 @@ void KCAnyHit()
     const auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
 
     if(!IsTraceModeMatches(params.rayCastOptions.traceMode, record.lightOrMatKey))
+    {
+        optixIgnoreIntersection();
         return;
-
+    }
     if(record.alphaMap)
     {
         // This has alpha map check it

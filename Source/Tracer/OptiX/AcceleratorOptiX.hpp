@@ -565,8 +565,6 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
             if(range == INVALID_BATCH) break;
             validCount++;
         }
-        uint32_t validMask = (1 << validCount) - 1;
-
         const auto& alphaMaps = ppResult.surfData.alphaMaps[i];
         const auto& cfFlags = ppResult.surfData.cullFaceFlags[i];
         const auto& lmKeys = ppResult.surfData.lightOrMatKeys[i];
@@ -587,8 +585,8 @@ void AcceleratorGroupOptiX<PG>::Construct(AccelGroupConstructParams p,
             return isMat && isPassthroughMat;
         });
         bool enableAnyHit = hasAlphaMap || hasPassthroughMat;
-
-        bool enableCull = (cfFlags.PopCount() == validMask);
+        // Only enable culling if all primitives requested culling
+        bool enableCull = (cfFlags.PopCount() == validCount);
 
         uint32_t flag = OPTIX_INSTANCE_FLAG_NONE;
         if(!PER_PRIM_TRANSFORM)

@@ -322,7 +322,10 @@ void FilterFuncEmbree(const RTCFilterFunctionNArguments* args)
             const HitRecord& record = reinterpret_cast<const HitRecord&>(recordGeneric);
 
             if(!IsTraceModeMatches(embreeContext.traceMode, record.lmKey))
+            {
+                args->valid[i] = EMBREE_INVALID_RAY;
                 continue;
+            }
 
             // Embree default triangle routine does not have
             // runtime-enabled backface culling parameter.
@@ -460,6 +463,7 @@ void AcceleratorGroupEmbree<PG>::MultiBuildViaTriangle_CLT(const PreprocessResul
             Span<const Vector3> verts = pgTri.GetVertexPositionSpan();
             Span<const Vector3ui> indices = pgTri.GetIndexSpan();
             RTCGeometry g = rtcNewGeometry(rtcDevice, RTC_GEOMETRY_TYPE_TRIANGLE);
+            rtcSetGeometryMask(g, 0b11);
             rtcSetSharedGeometryBuffer(g, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3,
                                        verts.data(), 0u, sizeof(Vector3), verts.size());
             rtcSetSharedGeometryBuffer(g, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3,
@@ -535,6 +539,7 @@ void AcceleratorGroupEmbree<PG>::MultiBuildViaUser_CLT(const PreprocessResult& p
             Vector2ui primRange = primRanges[j];
             uint32_t primCount = primRange[1] - primRange[0];
             RTCGeometry g = rtcNewGeometry(rtcDevice, RTC_GEOMETRY_TYPE_USER);
+            rtcSetGeometryMask(g, 0b11);
             rtcSetGeometryUserPrimitiveCount(g, primCount);
             rtcSetGeometryUserData(g, &curGeomUserData);
             rtcSetGeometryBoundsFunction(g, BoundsFuncEmbree<PG>, nullptr);

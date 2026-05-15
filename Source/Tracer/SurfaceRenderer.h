@@ -49,7 +49,8 @@ class SurfaceRenderer final : public RendererBase
     Options     currentOptions  = {};
     Options     newOptions      = {};
     //
-    SurfRDetail::Mode::E        anchorMode;
+    SurfRDetail::RenderMode     anchorRenderMode;
+    SurfRDetail::TraceMask      anchorTraceMask;
     FilmFilterPtr               filmFilter;
     RenderSurfaceWorkHasher     workHasher;
     //
@@ -84,7 +85,7 @@ class SurfaceRenderer final : public RendererBase
     MediaTrackerPtr         mediaTracker;
 
     uint32_t    FindMaxSamplePerIteration(uint32_t rayCount,
-                                          SurfRDetail::Mode::E,
+                                          SurfRDetail::RenderMode,
                                           bool doStochasticFilter);
 
     public:

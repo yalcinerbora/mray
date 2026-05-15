@@ -34,7 +34,9 @@ class NamedEnum
 template<class Enum, const std::array<const char*, static_cast<size_t>(Enum::END)>& NamesIn>
 constexpr NamedEnum<Enum, NamesIn>::NamedEnum(E eIn)
     : e(eIn)
-{}
+{
+    assert((eIn >= static_cast<Enum>(0)) && (eIn < Enum::END));
+}
 
 template<class Enum, const std::array<const char*, static_cast<size_t>(Enum::END)>& NamesIn>
 constexpr NamedEnum<Enum, NamesIn>::NamedEnum(std::string_view sv)
@@ -75,4 +77,3 @@ NamedEnum<Enum, NamesIn>::ToString() const
     assert(e < E::END);
     return Names[static_cast<uint32_t>(e)];
 }
-

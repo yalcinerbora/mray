@@ -164,8 +164,8 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
         for(uint32_t i = 0; i < localHandles.size(); i++)
         {
             auto g = rtcNewGeometry(embreeContext.device, RTC_GEOMETRY_TYPE_INSTANCE);
-            rtcSetGeometryInstancedScene(g, localHandles[i]);
             rtcSetGeometryMask(g, unsigned int(localMasks[i].mask));
+            rtcSetGeometryInstancedScene(g, localHandles[i]);
             // Maybe there is some optimizations on embree
             // lets not give identity matrix to embree.
             if(localMatrices[i] != Matrix3x4::Identity())
@@ -423,6 +423,8 @@ void BaseAcceleratorEmbree::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffe
                 r.tfar[i] = tMM[1];
                 // RNG
                 rqContext.rng.emplace_back(dRNGStates[rIndex]);
+                // Volume buffer
+                rqContext.volumeIndices.emplace_back();
             }
 
             // Launch!

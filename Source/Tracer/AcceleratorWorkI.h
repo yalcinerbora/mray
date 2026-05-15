@@ -73,14 +73,14 @@ bool IsTraceModeMatches(typename RayCastOptions::TraceMode mode,
                         LightOrMatKey lmKey)
 {
     using enum RayCastOptions::TraceMode;
-    if(mode == TRACE_ALL) return true;
-
+    bool isLight = (lmKey.FetchFlagPortion() == IS_LIGHT_KEY_FLAG);
     bool isPTMat = (CommonKey(lmKey.FetchBatchPortion()) ==
                     CommonKey(TracerConstants::PassthroughMatGroupId));
-    isPTMat &= (lmKey.FetchFlagPortion() == IS_MAT_KEY_FLAG);
-    //
-    if(mode == TRACE_OPAQUE      &&  isPTMat) return false;
-    if(mode == TRACE_PASSTHROUGH && !isPTMat) return false;
+    bool isOpaque = isLight || !isPTMat;
+
+    if(mode == TRACE_ALL                    ) return true;
+    if(mode == TRACE_OPAQUE      && isPTMat ) return false;
+    if(mode == TRACE_PASSTHROUGH && isOpaque) return false;
     return true;
 }
 

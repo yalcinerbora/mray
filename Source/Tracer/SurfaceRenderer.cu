@@ -41,6 +41,26 @@ struct IsValidRayFunctor
     }
 };
 
+MR_PF_DECL
+typename RayCastOptions::TraceMode
+TraceMaskToTraceMode(SurfRDetail::TraceMask tm)
+{
+    SurfRDetail::TraceMaskEnum tmE = tm;;
+    switch(tmE)
+    {
+        using enum SurfRDetail::TraceMaskEnum;
+        case MASK_ALL:
+            return RayCastOptions::TraceMode::TRACE_ALL;
+        case MASK_OPAQUE:
+            return RayCastOptions::TraceMode::TRACE_OPAQUE;
+        case MASK_PASSTHROUGH:
+            return RayCastOptions::TraceMode::TRACE_PASSTHROUGH;
+        case END:
+        default:
+            return RayCastOptions::TraceMode::TRACE_ALL;
+    }
+}
+
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCMemsetInvalidRays(MRAY_GRID_CONSTANT const Span<RayGMem> dRays)
 {
@@ -102,7 +122,7 @@ RendererOptionPack SurfaceRenderer::CurrentAttributes() const
     result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
     result.attributes.back().Push(Span<const uint32_t>(&currentOptions.totalSPP, 1));
 
-    std::string_view curModeName = SurfRDetail::Mode::ToString(currentOptions.mode);
+    std::string_view curModeName = currentOptions.renderMode.ToString();
     result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
                                               curModeName.size()));
     auto svRead = result.attributes.back().AccessAsString();
@@ -114,6 +134,13 @@ RendererOptionPack SurfaceRenderer::CurrentAttributes() const
 
     result.attributes.push_back(TransientData(std::in_place_type_t<Float>{}, 1));
     result.attributes.back().Push(Span<const Float>(&currentOptions.tMaxAORatio, 1));
+
+    std::string_view curMaskName = currentOptions.traceMask.ToString();
+    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
+                                              curMaskName.size()));
+    auto maskSVRead = result.attributes.back().AccessAsString();
+    assert(maskSVRead.size() == maskSVRead.size());
+    std::copy(curMaskName.cbegin(), curMaskName.cend(), maskSVRead.begin());
 
     if constexpr(MRAY_IS_DEBUG)
     {
@@ -128,19 +155,22 @@ void SurfaceRenderer::PushAttribute(uint32_t attributeIndex,
 {
     switch(attributeIndex)
     {
-        case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
-        case 1: newOptions.mode = SurfRDetail::Mode::FromString(std::as_const(data).AccessAsString()); break;
+        using namespace SurfRDetail;
+        case 0: newOptions.totalSPP           = data.AccessAs<uint32_t>()[0]; break;
+        case 1: newOptions.renderMode         = RenderMode(std::as_const(data).AccessAsString()); break;
         case 2: newOptions.doStochasticFilter = data.AccessAs<bool>()[0]; break;
-        case 3: newOptions.tMaxAORatio = data.AccessAs<Float>()[0]; break;
+        case 3: newOptions.tMaxAORatio        = data.AccessAs<Float>()[0]; break;
+        case 4: newOptions.traceMask          = TraceMask(std::as_const(data).AccessAsString()); break;
         default:
             throw MRayError("{} Unknown attribute index {}", TypeName(), attributeIndex);
     }
 }
 
-uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount, SurfRDetail::Mode::E mode,
+uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount,
+                                                    SurfRDetail::RenderMode mode,
                                                     bool doStochasticFilter)
 {
-    using enum SurfRDetail::Mode::E;
+    using enum SurfRDetail::RenderMode::E;
     uint32_t camSample = (doStochasticFilter)
         ? curCamWork->StochasticFilterSampleRayRNList().TotalRNCount()
         : curCamWork->SampleRayRNList().TotalRNCount();
@@ -169,7 +199,7 @@ uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount, SurfRDeta
 RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                                               CamSurfaceId camSurfId,
                                               uint32_t customLogicIndex0,
-                                              uint32_t)
+                                              uint32_t customLogicIndex1)
 {
     using namespace SurfRDetail;
     // TODO: These may be  common operations, every renderer
@@ -179,7 +209,6 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     cameraTransform = std::nullopt;
     curCamTransformOverride = std::nullopt;
     currentOptions = newOptions;
-    anchorMode = currentOptions.mode;
     totalIterationCount = 0;
     std::fill(tilePathCounts.begin(),
               tilePathCounts.end(), 0u);
@@ -193,13 +222,25 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     filmFilter = FilterGen.Value()(gpuSystem, Float(radius));
     // Change the mode according to the render logic
     using Math::Roll;
-    int32_t modeIndex = (int32_t(anchorMode) +
+    using RM = SurfRDetail::RenderMode;
+    anchorRenderMode = currentOptions.renderMode;
+    int32_t modeIndex = (int32_t(typename RM::E(anchorRenderMode)) +
                          int32_t(customLogicIndex0));
     uint32_t sendMode = uint32_t(Roll(int32_t(customLogicIndex0), 0,
-                                      int32_t(Mode::END)));
-    uint32_t newMode = uint32_t(Roll(modeIndex, 0, int32_t(Mode::END)));
-    currentOptions.mode = SurfRDetail::Mode::E(newMode);
+                                      int32_t(RM::E::END)));
+    uint32_t newMode = uint32_t(Roll(modeIndex, 0, int32_t(RM::E::END)));
+    currentOptions.renderMode = RM::E(newMode);
+    // Change the mask according to customLogic1
+    using TM = SurfRDetail::TraceMask;
+    anchorTraceMask = currentOptions.traceMask;
+    int32_t maskIndex = (int32_t(typename TM::E(anchorTraceMask)) +
+                         int32_t(customLogicIndex1));
+    uint32_t sendMask = uint32_t(Roll(int32_t(customLogicIndex1), 0,
+                                      int32_t(TM::E::END)));
+    uint32_t newMask = uint32_t(Roll(maskIndex, 0, int32_t(TM::E::END)));
+    currentOptions.traceMask = TM(TM::E(newMask));
 
+    //
     imageTiler = ImageTiler(renderBuffer.get(), rIP,
                             tracerView.tracerParams.parallelizationHint,
                             Vector2ui::Zero());
@@ -239,9 +280,9 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
     // Find the ray count (1spp per tile)
     uint32_t maxRayCount = imageTiler.ConservativeTileSize().Multiply();
-    uint32_t maxSampleCount = FindMaxSamplePerIteration(maxRayCount, currentOptions.mode,
+    uint32_t maxSampleCount = FindMaxSamplePerIteration(maxRayCount, currentOptions.renderMode,
                                                         currentOptions.doStochasticFilter);
-    if(currentOptions.mode == SurfRDetail::Mode::AO)
+    if(currentOptions.renderMode == SurfRDetail::RenderMode::E::AO)
     {
         uint32_t isVisibleIntCount = Bitspan<uint32_t>::CountT(maxRayCount);
         MemAlloc::AllocateMultiData(Tie(dHits, dHitKeys,
@@ -268,7 +309,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     }
     else
     {
-        bool isVolumeMode = (currentOptions.mode == SurfRDetail::Mode::VOL_INTERFACE);
+        bool isVolumeMode = (currentOptions.renderMode == SurfRDetail::RenderMode::E::VOL_INTERFACE);
         size_t rayVolCount = (isVolumeMode) ? maxRayCount : size_t(0);
         assert(maxSampleCount * sizeof(RandomNumber) >=
                rayVolCount * sizeof(RayMediaListPack));
@@ -312,7 +353,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     curTMaxAO = Math::Length(tracerView.baseAccelerator.SceneAABB().GeomSpan());
     curTMaxAO *= currentOptions.tMaxAORatio;
 
-    if(currentOptions.mode == SurfRDetail::Mode::VOL_INTERFACE)
+    if(currentOptions.renderMode == SurfRDetail::RenderMode::E::VOL_INTERFACE)
     {
         mediaTracker = std::make_unique<MediaTracker>(tracerView.globalVolumeList,
                                                       tracerView.tracerParams.volumeTrackerEntryCount,
@@ -360,7 +401,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
         .renderColorSpace = colorSpace,
         .resolution = imageTiler.FullResolution(),
         .curRenderLogic0 = sendMode,
-        .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
+        .curRenderLogic1 = sendMask
     };
 }
 
@@ -457,7 +498,7 @@ RendererOutput SurfaceRenderer::DoRender()
     }
     tilePixIndex += rayCount;
 
-    if(currentOptions.mode == SurfRDetail::Mode::VOL_INTERFACE)
+    if(currentOptions.renderMode == SurfRDetail::RenderMode::E::VOL_INTERFACE)
     {
         mediaTracker->SetStartingVolumeIndirect(dRayStateCommon.dRayMediaPacks,
                                                 dIndices,
@@ -482,16 +523,17 @@ RendererOutput SurfaceRenderer::DoRender()
     Span<VolumeIndex> dVolumeIndices = MemAlloc::RepurposeAlloc<VolumeIndex>(dRandomNumBuffer);
     processQueue.MemsetAsync(dVolumeIndices, 0xFF);
 
-    SurfRDetail::Mode::E curMode = currentOptions.mode;
-    bool showVolume = (curMode == SurfRDetail::Mode::VOL_INTERFACE);
+    SurfRDetail::RenderMode curMode = currentOptions.renderMode;
+    bool showVolume = (curMode == SurfRDetail::RenderMode::E::VOL_INTERFACE);
     auto accelWriteMode = showVolume ? RayCastOptions::WRITE_ALL
                                      : RayCastOptions::WRITE_HIT_KEY_AND_HIT;
+    auto traceMode = TraceMaskToTraceMode(currentOptions.traceMask);
     tracerView.baseAccelerator.CastRays
     (
         dVolumeIndices,
         dHitKeysLocal, dHits, dBackupRNGStates,
         dRays, dIndices,
-        {accelWriteMode},
+        {accelWriteMode, traceMode},
         processQueue
     );
 
@@ -532,7 +574,7 @@ RendererOutput SurfaceRenderer::DoRender()
     // Wait for results to be available in host buffers
     processQueue.Barrier().Wait();
 
-    if(curMode == SurfRDetail::Mode::AO)
+    if(curMode == SurfRDetail::RenderMode::E::AO)
     {
         Span<RayGMem> dVisibilityRays = dRayStateAO.dVisibilityRays;
         processQueue.IssueWorkKernel<KCMemsetInvalidRays>
@@ -545,7 +587,7 @@ RendererOutput SurfaceRenderer::DoRender()
 
     SurfRDetail::GlobalState globalState =
     {
-        .mode         = SurfRDetail::Mode(curMode),
+        .renderMode   = curMode,
         .tMaxAO       = curTMaxAO,
         .mediaTracker = (mediaTracker) ? mediaTracker->View()
                                        : MediaTrackerView(),
@@ -575,21 +617,21 @@ RendererOutput SurfaceRenderer::DoRender()
         });
         if(wLoc != currentWorks.cend())
         {
-            if(currentOptions.mode == SurfRDetail::Mode::AO ||
-               currentOptions.mode == SurfRDetail::Mode::FURNACE)
+            using enum SurfRDetail::RenderMode::E;
+            if(currentOptions.renderMode == AO ||
+               currentOptions.renderMode == FURNACE)
             {
-                using enum SurfRDetail::Mode::E;
                 const auto& workI = UpcastRenderWork<SurfaceRenderer>(wLoc->workPtr);
 
-                RNRequestList rnCountList = (currentOptions.mode == AO)
+                RNRequestList rnCountList = (currentOptions.renderMode == AO)
                                                 ? GenRNRequestList<2>()
                                                 : workI.SampleRNList(1);
                 uint32_t rnCount = rnCountList.TotalRNCount();
                 uint32_t rnStart = camSamplePerRayList.TotalRNCount();
 
                 auto dLocalRNBuffer = dRandomNumBuffer.subspan(0, partitionSize * rnCount);
-                if(currentOptions.mode == SurfRDetail::Mode::AO ||
-                   currentOptions.mode == SurfRDetail::Mode::FURNACE)
+                if(currentOptions.renderMode == AO ||
+                   currentOptions.renderMode == FURNACE)
                 {
                     rnGenerator->GenerateNumbersIndirect(dLocalRNBuffer, dLocalIndices,
                                                          uint16_t(rnStart), rnCountList,
@@ -640,7 +682,7 @@ RendererOutput SurfaceRenderer::DoRender()
     }
 
     // Do shadow ray cast
-    if(currentOptions.mode == SurfRDetail::Mode::AO)
+    if(currentOptions.renderMode == SurfRDetail::RenderMode::E::AO)
     {
         Span<RayGMem> dVisibilityRays = dRayStateAO.dVisibilityRays;
         auto p = rayPartitioner.BinaryPartition(dPartitionIndices, processQueue,
@@ -658,7 +700,7 @@ RendererOutput SurfaceRenderer::DoRender()
             (
                 dIsVisibleBitSpan, dBackupRNGStates,
                 dVisibilityRays, dValidIndices,
-                {.traceMode = RayCastOptions::TRACE_ALL},
+                {.traceMode = traceMode},
                 processQueue
             );
 
@@ -759,8 +801,8 @@ RendererOutput SurfaceRenderer::DoRender()
             imageTiler.FullResolution(),
             MRayColorSpaceEnum::MR_ACES_CG,
             GPUMemoryUsage(),
-            static_cast<uint32_t>(SurfRDetail::Mode::END),
-            0
+            static_cast<uint32_t>(SurfRDetail::RenderMode::E::END),
+            static_cast<uint32_t>(SurfRDetail::TraceMask::E::END)
         },
         .imageOut = renderOut,
         .triggerSave = triggerSave
@@ -796,7 +838,8 @@ SurfaceRenderer::StaticAttributeInfo()
         {"totalSPP",            MRayDataTypeRT(MR_UINT32),  IS_SCALAR, MR_MANDATORY},
         {"renderType",          MRayDataTypeRT(MR_STRING),  IS_SCALAR, MR_MANDATORY},
         {"doStochasticFilter",  MRayDataTypeRT(MR_BOOL),    IS_SCALAR, MR_MANDATORY},
-        {"tMaxAORatio",         MRayDataTypeRT(MR_FLOAT),   IS_SCALAR, MR_MANDATORY}
+        {"tMaxAORatio",         MRayDataTypeRT(MR_FLOAT),   IS_SCALAR, MR_MANDATORY},
+        {"traceMask",           MRayDataTypeRT(MR_STRING),  IS_SCALAR, MR_MANDATORY}
     };
 }
 
