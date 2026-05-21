@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common/AnalyticStructs.h"
+#include "Common/TransferQueue.h"
 #include "Core/MathForward.h"
 #include "Core/Vector.h"
 #include "Core/Types.h"
@@ -23,9 +24,10 @@ using namespace std::string_view_literals;
 
 struct TopBarChanges
 {
+    using RendererOptionList = StaticVector<RendererOptionData, 8>;
+    //
     Optional<int32_t>   rendererIndex;
-    Optional<int32_t>   customLogicIndex0;
-    Optional<int32_t>   customLogicIndex1;
+    RendererOptionList  changedRendererOptions;
     bool                newTMParams = false;
 };
 
@@ -96,6 +98,7 @@ class VisorGUI
     bool            bottomBarOn     = true;
     bool            camLocked       = true;
     bool            tmWindowOn      = false;
+    bool            rendererOptsOn  = false;
     //
     GUITonemapperI* tonemapperGUI   = nullptr;
     //
@@ -110,6 +113,9 @@ class VisorGUI
     //
     std::mutex                  imgSaveMutex;
     Optional<ImageSaveProgress> imgSaveProgress;
+
+    //
+    HeapRendererOptionPack      rendererOptionPack;
 
     [[nodiscard]]
     TopBarChanges   ShowTopMenu(const VisorState&);
@@ -126,6 +132,10 @@ class VisorGUI
     StatusBarChanges
                     ShowStatusBar(const VisorState&);
 
+    [[nodiscard]]
+    typename TopBarChanges::RendererOptionList
+                    RenderRendererOptions(const VisorState&);
+
     public:
                     VisorGUI(const VisorKeyMap* = nullptr);
                     VisorGUI(VisorGUI&&);
@@ -134,9 +144,11 @@ class VisorGUI
     [[nodiscard]]
     GUIChanges      Render(ImFont* windowScaledFont,
                            const VisorState& globalState);
-     void           ChangeDisplayImage(const VulkanImage&);
-     void           ChangeTonemapperGUI(GUITonemapperI*);
-     // Save progress related
-     ImageSaveProgress& CreateSaveProgressWindow(std::string&& fileName);
-     void               RemoveSaveProgressWindow();
+    void            ChangeDisplayImage(const VulkanImage&);
+    void            ChangeTonemapperGUI(GUITonemapperI*);
+    void            OverrideRendererOptions(HeapRendererOptionPack&&);
+
+    // Save progress related
+    ImageSaveProgress& CreateSaveProgressWindow(std::string&& fileName);
+    void               RemoveSaveProgressWindow();
 };

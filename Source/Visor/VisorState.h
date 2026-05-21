@@ -57,6 +57,4 @@ struct VisorState
     TracerRunState          currentRendererState = TracerRunState::STOPPED;
     int32_t                 currentCameraIndex = 0;
     int32_t                 currentRenderIndex = 0;
-    int32_t                 currentRenderLogic0 = 0;
-    int32_t                 currentRenderLogic1 = 0;
 };

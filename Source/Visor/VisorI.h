@@ -30,11 +30,18 @@ enum class VisorUserAction : int
     PREV_RENDERER,
 
     // Custom renderer related
-    NEXT_RENDERER_CUSTOM_LOGIC_0,
-    PREV_RENDERER_CUSTOM_LOGIC_0,
-    NEXT_RENDERER_CUSTOM_LOGIC_1,
-    PREV_RENDERER_CUSTOM_LOGIC_1,
-
+    // These **must** be contigious so that
+    // we can do indexed access (like GL_TEXTURE0 etc)
+    // Also change "VisorMaxHotkeyCount" below
+    NEXT_RENDERER_HOTKEY_0,
+    NEXT_RENDERER_HOTKEY_1 = NEXT_RENDERER_HOTKEY_0 + 1,
+    NEXT_RENDERER_HOTKEY_2 = NEXT_RENDERER_HOTKEY_0 + 2,
+    NEXT_RENDERER_HOTKEY_3 = NEXT_RENDERER_HOTKEY_0 + 3,
+    //
+    PREV_RENDERER_HOTKEY_0,
+    PREV_RENDERER_HOTKEY_1 = PREV_RENDERER_HOTKEY_0 + 1,
+    PREV_RENDERER_HOTKEY_2 = PREV_RENDERER_HOTKEY_0 + 2,
+    PREV_RENDERER_HOTKEY_3 = PREV_RENDERER_HOTKEY_0 + 3,
     //
     PAUSE_CONT_RENDER,
     START_STOP_TRACE,
@@ -58,6 +65,8 @@ enum class VisorUserAction : int
     MOVE_LEFT,
     FAST_MOVE_MODIFIER
 };
+
+static constexpr uint32_t VisorMaxHotkeyCount = 4;
 
 using VisorKeyMap = std::map<VisorUserAction, VisorInputType>;
 

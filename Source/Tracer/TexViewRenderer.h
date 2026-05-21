@@ -37,6 +37,9 @@ class TexViewRenderer final : public RendererBase
         uint32_t    totalSPP   = 16'384;
         bool        isSpectral = false;
         Mode        renderMode = SHOW_TEXTURES;
+        //
+        uint32_t    textureIndex = 0;
+        int32_t     mipIndex     = 0;
     };
 
     private:
@@ -82,9 +85,7 @@ class TexViewRenderer final : public RendererBase
                                       const GPUQueue& q) override;
     //
     RenderBufferInfo    StartRender(const RenderImageParams&,
-                                    CamSurfaceId camSurfId,
-                                    uint32_t customLogicIndex0 = 0,
-                                    uint32_t customLogicIndex1 = 0) override;
+                                    CamSurfaceId camSurfId) override;
     RendererOutput      DoRender() override;
     void                StopRender() override;
     size_t              GPUMemoryUsage() const override;

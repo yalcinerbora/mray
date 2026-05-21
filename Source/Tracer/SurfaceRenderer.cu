@@ -117,31 +117,13 @@ SurfaceRenderer::AttributeInfo() const
 RendererOptionPack SurfaceRenderer::CurrentAttributes() const
 {
     RendererOptionPack result;
-    result.paramTypes = AttributeInfo();
-
-    result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
-    result.attributes.back().Push(Span<const uint32_t>(&currentOptions.totalSPP, 1));
-
-    std::string_view curModeName = currentOptions.renderMode.ToString();
-    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
-                                              curModeName.size()));
-    auto svRead = result.attributes.back().AccessAsString();
-    assert(svRead.size() == curModeName.size());
-    std::copy(curModeName.cbegin(), curModeName.cend(), svRead.begin());
-
-    result.attributes.push_back(TransientData(std::in_place_type_t<bool>{}, 1));
-    result.attributes.back().Push(Span<const bool>(&currentOptions.doStochasticFilter, 1));
-
-    result.attributes.push_back(TransientData(std::in_place_type_t<Float>{}, 1));
-    result.attributes.back().Push(Span<const Float>(&currentOptions.tMaxAORatio, 1));
-
-    std::string_view curMaskName = currentOptions.traceMask.ToString();
-    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
-                                              curMaskName.size()));
-    auto maskSVRead = result.attributes.back().AccessAsString();
-    assert(maskSVRead.size() == maskSVRead.size());
-    std::copy(curMaskName.cbegin(), curMaskName.cend(), maskSVRead.begin());
-
+    result.paramInfos = AttributeInfo();
+    result.PushAttribute(currentOptions.totalSPP);
+    result.PushNamedEnum(currentOptions.renderMode);
+    result.PushAttribute(currentOptions.doStochasticFilter);
+    result.PushAttribute(currentOptions.tMaxAORatio);
+    result.PushNamedEnum(currentOptions.traceMask);
+    result.PushAttribute(currentOptions.acceleratorIndex);
     if constexpr(MRAY_IS_DEBUG)
     {
         for([[maybe_unused]] const auto& d: result.attributes)
@@ -155,12 +137,28 @@ void SurfaceRenderer::PushAttribute(uint32_t attributeIndex,
 {
     switch(attributeIndex)
     {
+        using R = RendererBase;
         using namespace SurfRDetail;
-        case 0: newOptions.totalSPP           = data.AccessAs<uint32_t>()[0]; break;
-        case 1: newOptions.renderMode         = RenderMode(std::as_const(data).AccessAsString()); break;
-        case 2: newOptions.doStochasticFilter = data.AccessAs<bool>()[0]; break;
-        case 3: newOptions.tMaxAORatio        = data.AccessAs<Float>()[0]; break;
-        case 4: newOptions.traceMask          = TraceMask(std::as_const(data).AccessAsString()); break;
+        case 0: LoadAttribute(newOptions.totalSPP, data); break;
+        case 1: LoadEnumAttribute(newOptions.renderMode, data); break;
+        case 2: LoadAttribute(newOptions.doStochasticFilter, data); break;
+        case 3:
+        {
+            LoadAttribute(newOptions.tMaxAORatio, data);
+            newOptions.tMaxAORatio = Math::Clamp(newOptions.tMaxAORatio,
+                                                 Float(0), Float(1));
+            break;
+        }
+        case 4: LoadEnumAttribute(newOptions.traceMask, data); break;
+        case 5:
+        {
+            LoadAttribute(newOptions.acceleratorIndex, data);
+            // Roll the given value
+            int32_t maxInstance = int32_t(tracerView.baseAccelerator.TotalInstanceCount() + 1);
+            newOptions.acceleratorIndex = Math::Roll(int32_t(newOptions.acceleratorIndex),
+                                                     0, maxInstance);
+            break;
+        }
         default:
             throw MRayError("{} Unknown attribute index {}", TypeName(), attributeIndex);
     }
@@ -197,9 +195,7 @@ uint32_t SurfaceRenderer::FindMaxSamplePerIteration(uint32_t rayCount,
 }
 
 RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
-                                              CamSurfaceId camSurfId,
-                                              uint32_t customLogicIndex0,
-                                              uint32_t customLogicIndex1)
+                                              CamSurfaceId camSurfId)
 {
     using namespace SurfRDetail;
     // TODO: These may be  common operations, every renderer
@@ -220,26 +216,6 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                         uint32_t(tracerView.tracerParams.filmFilter.type));
     Float radius = tracerView.tracerParams.filmFilter.radius;
     filmFilter = FilterGen.Value()(gpuSystem, Float(radius));
-    // Change the mode according to the render logic
-    using Math::Roll;
-    using RM = SurfRDetail::RenderMode;
-    anchorRenderMode = currentOptions.renderMode;
-    int32_t modeIndex = (int32_t(typename RM::E(anchorRenderMode)) +
-                         int32_t(customLogicIndex0));
-    uint32_t sendMode = uint32_t(Roll(int32_t(customLogicIndex0), 0,
-                                      int32_t(RM::E::END)));
-    uint32_t newMode = uint32_t(Roll(modeIndex, 0, int32_t(RM::E::END)));
-    currentOptions.renderMode = RM::E(newMode);
-    // Change the mask according to customLogic1
-    using TM = SurfRDetail::TraceMask;
-    anchorTraceMask = currentOptions.traceMask;
-    int32_t maskIndex = (int32_t(typename TM::E(anchorTraceMask)) +
-                         int32_t(customLogicIndex1));
-    uint32_t sendMask = uint32_t(Roll(int32_t(customLogicIndex1), 0,
-                                      int32_t(TM::E::END)));
-    uint32_t newMask = uint32_t(Roll(maskIndex, 0, int32_t(TM::E::END)));
-    currentOptions.traceMask = TM(TM::E(newMask));
-
     //
     imageTiler = ImageTiler(renderBuffer.get(), rIP,
                             tracerView.tracerParams.parallelizationHint,
@@ -399,9 +375,7 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
         .data = bufferPtrAndSize.first,
         .totalSize = bufferPtrAndSize.second,
         .renderColorSpace = colorSpace,
-        .resolution = imageTiler.FullResolution(),
-        .curRenderLogic0 = sendMode,
-        .curRenderLogic1 = sendMask
+        .resolution = imageTiler.FullResolution()
     };
 }
 
@@ -835,11 +809,20 @@ SurfaceRenderer::StaticAttributeInfo()
     using enum AttributeOptionality;
     return AttribInfoList
     {
-        {"totalSPP",            MRayDataTypeRT(MR_UINT32),  IS_SCALAR, MR_MANDATORY},
-        {"renderType",          MRayDataTypeRT(MR_STRING),  IS_SCALAR, MR_MANDATORY},
-        {"doStochasticFilter",  MRayDataTypeRT(MR_BOOL),    IS_SCALAR, MR_MANDATORY},
-        {"tMaxAORatio",         MRayDataTypeRT(MR_FLOAT),   IS_SCALAR, MR_MANDATORY},
-        {"traceMask",           MRayDataTypeRT(MR_STRING),  IS_SCALAR, MR_MANDATORY}
+        .attributeInfos =
+        {
+            {"totalSPP",           MRayDataTypeRT(MR_UINT32), MR_MANDATORY},
+            {"renderType",         MRayDataTypeRT(MR_UINT32), MR_MANDATORY, uint32_t(0), uint32_t(0)},
+            {"doStochasticFilter", MRayDataTypeRT(MR_BOOL),   MR_MANDATORY},
+            {"tMaxAORatio",        MRayDataTypeRT(MR_FLOAT),  MR_MANDATORY},
+            {"traceMask",          MRayDataTypeRT(MR_UINT32), MR_MANDATORY, uint32_t(1), uint32_t(1)},
+            {"acceleratorIndex",   MRayDataTypeRT(MR_UINT32), MR_MANDATORY, std::nullopt, uint32_t(2)}
+        },
+        .enumInfos =
+        {
+            RendererAttributeInfoList::FromNamedEnum<SurfRDetail::RenderMode>(),
+            RendererAttributeInfoList::FromNamedEnum<SurfRDetail::TraceMask>()
+        }
     };
 }
 

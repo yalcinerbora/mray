@@ -4,6 +4,12 @@
 
 #include "Core/Optional.h"
 
+struct RenderLogicChange
+{
+    uint32_t index;
+    uint32_t newValue;
+};
+
 struct RenderBufferInfo
 {
     // Buffer range
@@ -14,11 +20,6 @@ struct RenderBufferInfo
     MRayColorSpaceEnum  renderColorSpace;
     // Total size of the film
     Vector2ui           resolution;
-    // Given render logic's may be morphed
-    // according to the internals of the renderer
-    // these indices should be set by the visior
-    uint32_t            curRenderLogic0 = 0;
-    uint32_t            curRenderLogic1 = 0;
 };
 
 struct RenderImageSection

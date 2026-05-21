@@ -141,6 +141,21 @@ inline Span<Byte> TransientData::AccessAs()
     return ownedMem;
 }
 
+inline TransientData TransientData::Copy()
+{
+    TransientData td;
+    td.typeHash = typeHash;
+    td.usedBytes = usedBytes;
+    td.alignment = alignment;
+    if(ownedMem.data() != nullptr)
+    {
+        td.ownedMem = Span<Byte>(static_cast<Byte*>(GetMainResource().allocate(ownedMem.size(), alignment)),
+                                 ownedMem.size());
+        std::copy(ownedMem.cbegin(), ownedMem.cend(), td.ownedMem.begin());
+    }
+    return td;
+}
+
 // =========================== //
 //    String Specialization    //
 // =========================== //

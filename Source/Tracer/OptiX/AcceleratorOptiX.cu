@@ -54,6 +54,20 @@ void KCCopyToOptixInstance(// Output
     }
 }
 
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCCopyAllAccelKeysOptiX(// Output
+                             Span<AcceleratorKey> dAccelKeys,
+                             // Input
+                             Span<const GenericHitRecord<>> dHitRecords)
+{
+    KernelCallParams kp;
+    uint32_t keyCount = uint32_t(dHitRecords.size());
+    for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
+    {
+        dAccelKeys[i] = dHitRecords[i].data.acceleratorKey;
+    }
+}
+
 static constexpr auto OPTIX_LOGGER_NAME = "OptiXLogger";
 static constexpr auto OPTIX_LOGGER_FILE_NAME = "optix_log";
 static constexpr auto OPTIX_SHADERS_FOLDER = "OptiXShaders";
@@ -841,6 +855,21 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
                             dLaunchArgPack.size_bytes(), &localCastSBT,
                             static_cast<uint32_t>(dRayIndices.size()), 1u, 1u));
     OPTIX_LAUNCH_CHECK();
+}
+
+void BaseAcceleratorOptiX::WriteAllAcceleratorKeys(Span<AcceleratorKey> dAccelKeys,
+                                                   const GPUQueue& queue) const
+{
+    assert(dAccelKeys.size() == dHitRecords.size());
+    queue.IssueWorkKernel<KCCopyAllAccelKeysOptiX>
+    (
+        "KCCopyAllAccelKeysOptiX",
+        DeviceWorkIssueParams{.workCount = uint32_t(TotalInstanceCount())},
+        // Output
+        dAccelKeys,
+        // Input
+        dHitRecords
+    );
 }
 
 size_t BaseAcceleratorOptiX::GPUMemoryUsage() const

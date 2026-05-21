@@ -529,6 +529,13 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                               queue);
 }
 
+void BaseAcceleratorLinear::WriteAllAcceleratorKeys(Span<AcceleratorKey> dAccelKeys,
+                                                    const GPUQueue& queue) const
+{
+    assert(dLeafs.size() == TotalInstanceCount());
+    queue.MemcpyAsync(dAccelKeys, ToConstSpan(dLeafs));
+}
+
 size_t BaseAcceleratorLinear::GPUMemoryUsage() const
 {
     size_t totalSize = accelMem.Size() + stackMem.Size();

@@ -16,6 +16,9 @@ namespace TracerConstants
     static constexpr size_t MaxAttributePerGroup = 16;
     // Same as above but for renderer
     static constexpr size_t MaxRendererAttributeCount = 32;
+    // Renderers may have enumerations to be changed via a GUI
+    // This is the upper limit of that
+    static constexpr size_t MaxRendererEnumCount = 8;
     // Renderer can define at most N work per Mat/Prim/Transform
     // triplet. Most of the time single work definition is enough.
     // but some renderers (path tracer renderer) may define multiple

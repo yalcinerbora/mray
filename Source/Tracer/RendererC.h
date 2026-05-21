@@ -236,8 +236,7 @@ concept RendererC = requires(RendererType rt,
     //
     {rt.PushAttribute(uint32_t{}, std::move(input), q)
     } -> std::same_as<void>;
-    {rt.StartRender(RenderImageParams{}, CamSurfaceId{},
-                    uint32_t{}, uint32_t{})
+    {rt.StartRender(RenderImageParams{}, CamSurfaceId{})
     } ->std::same_as<RenderBufferInfo>;
     {rt.StopRender()} -> std::same_as<void>;
     {rt.DoRender()} -> std::same_as<RendererOutput>;
@@ -269,9 +268,7 @@ class RendererI
     virtual RendererOptionPack  CurrentAttributes() const = 0;
     // ...
     virtual RenderBufferInfo    StartRender(const RenderImageParams&,
-                                            CamSurfaceId camSurfId,
-                                            uint32_t customLogicIndex0 = 0,
-                                            uint32_t customLogicIndex1 = 0) = 0;
+                                            CamSurfaceId camSurfId) = 0;
     virtual void                SetCameraTransform(const CameraTransform&) = 0;
     virtual RendererOutput      DoRender() = 0;
     virtual void                StopRender() = 0;
@@ -289,8 +286,6 @@ using RendererPtr = std::unique_ptr<RendererI>;
 
 namespace RendererDetail
 {
-
-
     // https://stackoverflow.com/questions/28432977/generic-way-of-lazily-evaluating-short-circuiting-with-stdconditional-t
     // Short circuit conditional
     // Render Work
@@ -1105,6 +1100,20 @@ RenderMediumWorkHasher::GenerateWorkKeyGPU(VolumeKeyPack p, RayIndex rayIndex) c
     CommonKey result = Bit::SetSubPortion(hashLower, batchId,
                                           {dataBits, dataBits + batchBits});
     return result;
+}
+
+template<class T>
+void LoadAttribute(T& out, const TransientData& data)
+{
+    out = data.AccessAs<T>()[0];
+}
+
+template<class NamedEnumT>
+void LoadEnumAttribute(NamedEnumT& out, const TransientData& data)
+{
+    using Enum = typename NamedEnumT::E;
+    using IntT = std::underlying_type_t<Enum>;
+    out = Enum(data.AccessAs<IntT>()[0]);
 }
 
 inline

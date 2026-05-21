@@ -50,7 +50,6 @@ class SurfaceRenderer final : public RendererBase
     Options     newOptions      = {};
     //
     SurfRDetail::RenderMode     anchorRenderMode;
-    SurfRDetail::TraceMask      anchorTraceMask;
     FilmFilterPtr               filmFilter;
     RenderSurfaceWorkHasher     workHasher;
     //
@@ -79,6 +78,8 @@ class SurfaceRenderer final : public RendererBase
     // Work Hash related
     Span<CommonKey>         dWorkHashes;
     Span<CommonKey>         dWorkBatchIds;
+    // Local ray casting / Filtered test related
+    Span<AcceleratorKey>    dAllInstanceAccelKeys;
     //
     bool                    saveImage;
     //
@@ -107,9 +108,7 @@ class SurfaceRenderer final : public RendererBase
                                       const GPUQueue& q) override;
     //
     RenderBufferInfo    StartRender(const RenderImageParams&,
-                                    CamSurfaceId camSurfId,
-                                    uint32_t customLogicIndex0 = 0,
-                                    uint32_t customLogicIndex1 = 0) override;
+                                    CamSurfaceId camSurfId) override;
     RendererOutput      DoRender() override;
     void                StopRender() override;
     size_t              GPUMemoryUsage() const override;

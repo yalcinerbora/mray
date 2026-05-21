@@ -315,14 +315,11 @@ TexViewRenderer::AttributeInfo() const
 RendererOptionPack TexViewRenderer::CurrentAttributes() const
 {
     RendererOptionPack result;
-    result.paramTypes = AttributeInfo();
-
-    result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
-    result.attributes.back().Push(Span<const uint32_t>(&currentOptions.totalSPP, 1));
-    //
-    result.attributes.push_back(TransientData(std::in_place_type_t<bool>{}, 1));
-    result.attributes.back().Push(Span<const bool>(&currentOptions.isSpectral, 1));
-
+    result.paramInfos = AttributeInfo();
+    result.PushAttribute(currentOptions.totalSPP);
+    result.PushAttribute(currentOptions.isSpectral);
+    result.PushAttribute(currentOptions.textureIndex);
+    result.PushAttribute(currentOptions.mipIndex);
     if constexpr(MRAY_IS_DEBUG)
     {
         for([[maybe_unused]] const auto& d: result.attributes)
@@ -334,10 +331,45 @@ RendererOptionPack TexViewRenderer::CurrentAttributes() const
 void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
                                     TransientData data, const GPUQueue&)
 {
+    auto RollTextureIndex = [this](uint32_t i) -> uint32_t
+    {
+        int32_t tI = int32_t(i);
+        int32_t totalTextures = int32_t(textureViews.size());
+        tI = Math::Roll(tI, 0, totalTextures);
+        return uint32_t(tI);
+    };
+    auto ClampMipIndex = [this](int32_t mI, uint32_t tI) -> int32_t
+    {
+        int32_t mipCount = int32_t(textures[tI]->MipCount());
+        mI = Math::Clamp(mI, 0, mipCount);
+        return mI;
+    };
+
+    using R = RendererBase;
     switch(attributeIndex)
     {
-        case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
-        case 1: newOptions.isSpectral = data.AccessAs<bool>()[0];   break;
+
+        case 0: LoadAttribute(newOptions.totalSPP, data); break;
+        case 1: LoadAttribute(newOptions.isSpectral, data); break;
+        case 2:
+        {
+            LoadAttribute(newOptions.textureIndex, data);
+            newOptions.textureIndex = RollTextureIndex(newOptions.textureIndex);
+            // TODO: Which one is more intuitive (user-wise)
+            // when texture is change should we stay on the current mip range
+            // or change to mip0?
+            newOptions.mipIndex = ClampMipIndex(newOptions.mipIndex,
+                                                newOptions.textureIndex);
+            //newOptions.mipIndex = 0;
+            break;
+        }
+        case 3:
+        {
+            LoadAttribute(newOptions.mipIndex, data);
+            newOptions.mipIndex = ClampMipIndex(newOptions.mipIndex,
+                                                newOptions.textureIndex);
+            break;
+        }
         //
         default: throw MRayError("{} Unknown attribute index {}",
                                  TypeName(), attributeIndex);
@@ -345,9 +377,7 @@ void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
 }
 
 RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
-                                              CamSurfaceId,
-                                              uint32_t customLogicIndex0,
-                                              uint32_t customLogicIndex1)
+                                              CamSurfaceId)
 {
     // TODO: This is common assignment, every renderer
     // does this move to a templated intermediate class
@@ -369,19 +399,12 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
         };
     }
 
-    // Find the texture index
-    using Math::Roll;
-    uint32_t newTextureIndex = uint32_t(Roll(int32_t(customLogicIndex0), 0,
-                                             int32_t(textures.size())));
-    const GenericTexture* t = textures[newTextureIndex];
-    // Mip Index
-    // Change to zero if texture is changed
-    mipIndex = (newTextureIndex == textureIndex)
-                ? uint32_t(Roll(int32_t(customLogicIndex1), 0,
-                                int32_t(t->MipCount())))
-                : 0;
-    textureIndex = newTextureIndex;
-    // And mip size
+    // Save texture index states etc.
+    // TODO: Why are we doing this? Why "currentOptions" is not enough?
+    textureIndex = currentOptions.textureIndex;
+    mipIndex = uint32_t(currentOptions.mipIndex);
+    //
+    const GenericTexture* t = textures[currentOptions.textureIndex];
     Vector2ui mipSize = Graphics::TextureMipSize(Vector2ui(t->Extents()), mipIndex);
 
     // Setup Image Tiler
@@ -394,8 +417,6 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
     imageTiler = ImageTiler(renderBuffer.get(), rIParams,
                             tracerView.tracerParams.parallelizationHint,
                             Vector2ui::Zero());
-
-
 
     // Load spectral system if spectral mode is enabled
     auto colorSpace = tracerView.tracerParams.globalTextureColorSpace;
@@ -439,9 +460,7 @@ RenderBufferInfo TexViewRenderer::StartRender(const RenderImageParams&,
         .data = bufferPtrAndSize.first,
         .totalSize = bufferPtrAndSize.second,
         .renderColorSpace = colorSpace,
-        .resolution = imageTiler.FullResolution(),
-        .curRenderLogic0 = textureIndex,
-        .curRenderLogic1 = mipIndex
+        .resolution = imageTiler.FullResolution()
     };
 }
 
@@ -560,8 +579,13 @@ TexViewRenderer::StaticAttributeInfo()
     using enum AttributeOptionality;
     return AttribInfoList
     {
-        {"totalSPP", MRayDataTypeRT(MR_UINT32), IS_SCALAR, MR_MANDATORY},
-        {"isSpectral", MRayDataTypeRT(MR_BOOL), IS_SCALAR, MR_MANDATORY}
+        .attributeInfos =
+        {
+            {"totalSPP",     MRayDataTypeRT(MR_UINT32), MR_MANDATORY},
+            {"isSpectral",   MRayDataTypeRT(MR_BOOL),   MR_MANDATORY},
+            {"textureIndex", MRayDataTypeRT(MR_UINT32), MR_OPTIONAL, std::nullopt, uint32_t(0)},
+            {"mipIndex",     MRayDataTypeRT(MR_INT32),  MR_OPTIONAL, std::nullopt, uint32_t(1)},
+        }
     };
 }
 

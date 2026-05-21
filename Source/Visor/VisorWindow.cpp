@@ -1055,7 +1055,7 @@ ImFont* VisorWindow::CurrentFont()
     return FontAtlas::Instance().GetMonitorFont(x);
 }
 
-void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
+void VisorWindow::HandleGUIChanges(GUIChanges&& changes)
 {
     // Check the run state
     if(changes.statusBarState.runState)
@@ -1151,33 +1151,20 @@ void VisorWindow::HandleGUIChanges(const GUIChanges& changes)
         ));
     }
 
-    if(changes.topBarChanges.customLogicIndex0)
+    if(!changes.topBarChanges.changedRendererOptions.empty())
     {
         // Custom logic may or may not mean new framebuffer.
         // Conservatively we drop the memory.
         accumulateStage.DropExternalHandles(imgWriteSem);
-
-        int32_t lIndex = changes.topBarChanges.customLogicIndex0.Value();
-        visorState.currentRenderLogic0 = lIndex;
-        transferQueue->Enqueue(VisorAction
-        (
-            std::in_place_index<VisorAction::CHANGE_RENDER_LOGIC0>,
-            lIndex
-        ));
-    }
-
-    if(changes.topBarChanges.customLogicIndex1)
-    {
-        // Same as above
-        accumulateStage.DropExternalHandles(imgWriteSem);
-
-        int32_t lIndex = changes.topBarChanges.customLogicIndex1.Value();
-        visorState.currentRenderLogic1 = lIndex;
-        transferQueue->Enqueue(VisorAction
-        (
-            std::in_place_index<VisorAction::CHANGE_RENDER_LOGIC1>,
-            lIndex
-        ));
+        // Send the options
+        for(auto& rOpts : changes.topBarChanges.changedRendererOptions)
+        {
+            transferQueue->Enqueue(VisorAction
+            (
+                std::in_place_index<VisorAction::CHANGE_RENDER_OPTION>,
+                std::move(rOpts)
+            ));
+        }
     }
 
     if(changes.hdrSaveTrigger)
@@ -1303,8 +1290,9 @@ bool VisorWindow::Render()
             }
             case RENDERER_OPTIONS:
             {
-                MRAY_LOG("[Visor] : Render Options received and ignored");
-                break; // TODO: User may change the render options during runtime
+                MRAY_LOG("[Visor] : Render Options received");
+                gui.OverrideRendererOptions(std::move(std::get<RENDERER_OPTIONS>(response)));
+                break;
             }
             case RENDER_BUFFER_INFO:
             {
@@ -1390,9 +1378,6 @@ bool VisorWindow::Render()
         // Flush the device, we will need to reallocate
         vkDeviceWaitIdle(handlesVk.deviceVk);
 
-        visorState.currentRenderLogic0 = int32_t(newRenderBuffer.Value().curRenderLogic0);
-        visorState.currentRenderLogic1 = int32_t(newRenderBuffer.Value().curRenderLogic1);
-
         const auto& newRB = newRenderBuffer.Value();
         RenderImageInitInfo renderImageInitParams =
         {
@@ -1428,7 +1413,8 @@ bool VisorWindow::Render()
     // After potential reallocation, check the GUI stuff.
     // We may not issue accumulation maybe
     GUIChanges guiChanges = gui.Render(CurrentFont(), visorState);
-    HandleGUIChanges(guiChanges);
+    bool hasNewTMParams = guiChanges.topBarChanges.newTMParams;
+    HandleGUIChanges(std::move(guiChanges));
 
     if(newSaveInfo)
     {
@@ -1482,7 +1468,7 @@ bool VisorWindow::Render()
 
     // Do tonemap
     if(newClearSignal || newRenderBuffer ||
-       newImageSection || guiChanges.topBarChanges.newTMParams)
+       newImageSection || hasNewTMParams)
     {
         auto& tm = tonemapStage;
         tm.IssueTonemap(imgWriteSem);

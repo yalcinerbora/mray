@@ -631,7 +631,15 @@ void WorkFunctionMedia<P, M, T, SC, LS>::Call(const Primitive&, const Material& 
     pathRaySample.wI.dir = Math::Normalize(tContext.ApplyV(pathRaySample.wI.dir));
     Spectrum pathThroughput = throughput * pathRaySample.eval.reflectance;
     pathThroughput = DivideByPDF(pathThroughput, pathRaySample.pdf);
-    Spectrum rPathOut = DivideByPDF(pathThroughput, pathRaySample.pdf);
+    // Do nothing here we scaled already (the throughput)
+    // We divide the the throughput with pdf to keep the number
+    // numerically calm. (Assume we multiplied and divided rPath with
+    // "pathRaySample.pdf")
+    Spectrum rPathOut = rPath;
+    // Here we divide the "pathRaySample.pdf" so that these properly cancel
+    // out with Balanced MIS (i.e, x/a / ((rl * a / a) + (ru / a) =
+    // x / rl + ru))
+    Spectrum rLightOut = DivideByPDF(rPath, pathRaySample.pdf);
     RayCone pathRayConeOut = rConeRefract.ConeAfterScatter(pathRaySample.wI.dir,
                                                            surf.geoNormal);
     // ================ //
@@ -688,7 +696,7 @@ void WorkFunctionMedia<P, M, T, SC, LS>::Call(const Primitive&, const Material& 
         RayToGMem(cS.dRays, rayIndex, pathRaySample.wI, Vector2(0, FLT_MAX));
         cS.dRayCones[rayIndex]   = pathRayConeOut;
         rS.dRPathPDF[rayIndex]   = rPathOut;
-        rS.dRLightPDF[rayIndex]  = rPathOut;
+        rS.dRLightPDF[rayIndex]  = rLightOut;
         rS.dThroughput[rayIndex] = pathThroughput;
     }
 
@@ -704,9 +712,10 @@ void WorkFunctionMedia<P, M, T, SC, LS>::Call(const Primitive&, const Material& 
     Spectrum shadowReflectance = shadowMatEval.reflectance;
     Spectrum shadowThroughput = throughput * shadowReflectance;
     Float shadowBXDFPdf = mat.Pdf(shadowWI, wO);
+    shadowThroughput = DivideByPDF(shadowThroughput, shadowBXDFPdf);
     // Re-calculate path/light pdfs and store
-    Spectrum rPathShadow = rPath * shadowBXDFPdf;
-    Spectrum rLightShadow = rPath * lightSample.pdf;
+    Spectrum rPathShadow = DivideByPDF(rPath * shadowBXDFPdf, shadowBXDFPdf);
+    Spectrum rLightShadow = DivideByPDF(rPath * lightSample.pdf, shadowBXDFPdf);
     // Pre-calculate throughput
     Spectrum shadowRadiance = shadowThroughput * lightSample.value.emission;
 
@@ -745,10 +754,10 @@ void WorkFunctionMedia<P, M, T, SC, LS>::Call(const Primitive&, const Material& 
         RayToGMem(rS.dShadowRays, rayIndex, shadowRay, shadowTMM);
         RayCone rayConeOut = rConeRefract.ConeAfterScatter(shadowRay.dir,
                                                            surf.geoNormal);
-        rS.dShadowRayCones[rayIndex] = rayConeOut;
+        rS.dShadowRayCones[rayIndex]    = rayConeOut;
         rS.dShadowRayRadiance[rayIndex] = shadowRadiance;
-        rS.dRPathPDFShadow[rayIndex] = rPathShadow;
-        rS.dRLightPDFShadow[rayIndex] = rLightShadow;
+        rS.dRPathPDFShadow[rayIndex]    = rPathShadow;
+        rS.dRLightPDFShadow[rayIndex]   = rLightShadow;
     }
 
     // Generic Write

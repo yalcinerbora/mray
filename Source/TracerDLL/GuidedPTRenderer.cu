@@ -449,38 +449,21 @@ RendererOptionPack
 GuidedPTRenderer::CurrentAttributes() const
 {
     RendererOptionPack result;
-    result.paramTypes = AttributeInfo();
-
-    auto Push = [&result]<class T>(const T& in)
-    {
-        using LT = std::in_place_type_t<T>;
-        result.attributes.push_back(TransientData(LT{}, 1));
-        result.attributes.back().Push(Span<const T>(&in, 1));
-    };
-    auto PushEnum = [&result]<class T>(const T& in)
-    {
-        using LT = std::in_place_type_t<std::string_view>;
-        std::string_view name = in.ToString();
-        result.attributes.push_back(TransientData(LT{}, name.size()));
-        auto buffer = result.attributes.back().AccessAsString();
-        assert(buffer.size() == name.size());
-        std::copy(name.cbegin(), name.cend(), buffer.begin());
-    };
-
-    Push(currentOptions.cacheEntryLimit);
-    Push(currentOptions.cachePosBits);
-    Push(currentOptions.cacheNormalBits);
-    Push(currentOptions.cacheMaxLvlOffset);
-    Push(currentOptions.cacheConeAperture);
-    Push(currentOptions.russianRouletteRange);
-    Push(currentOptions.totalSPP);
-    PushEnum(currentOptions.lightSampler);
-    PushEnum(currentOptions.renderMode);
-    Push(currentOptions.lobeProbablity);
-    PushEnum(currentOptions.displayMode);
+    result.paramInfos = AttributeInfo();
+    result.PushAttribute(currentOptions.cacheEntryLimit);
+    result.PushAttribute(currentOptions.cachePosBits);
+    result.PushAttribute(currentOptions.cacheNormalBits);
+    result.PushAttribute(currentOptions.cacheMaxLvlOffset);
+    result.PushAttribute(currentOptions.cacheConeAperture);
+    result.PushAttribute(currentOptions.russianRouletteRange);
+    result.PushAttribute(currentOptions.totalSPP);
+    result.PushNamedEnum(currentOptions.lightSampler);
+    result.PushNamedEnum(currentOptions.renderMode);
+    result.PushAttribute(currentOptions.lobeProbablity);
+    result.PushNamedEnum(currentOptions.displayMode);
     if constexpr(MRAY_IS_DEBUG)
     {
-        for([[maybe_unused]] const auto& d: result.attributes)
+        for([[maybe_unused]] const auto& d : result.attributes)
             assert(d.IsFull());
     }
     return result;
@@ -489,26 +472,22 @@ GuidedPTRenderer::CurrentAttributes() const
 void GuidedPTRenderer::PushAttribute(uint32_t attributeIndex,
                                      TransientData data, const GPUQueue&)
 {
-    auto Load = []<class T>(T & out, const TransientData & data)
-    {
-        out = data.AccessAs<T>()[0];
-    };
-
+    using R = RendererBase;
     switch(attributeIndex)
     {
-        case  0: Load(newOptions.cacheEntryLimit, data); break;
-        case  1: Load(newOptions.cachePosBits, data); break;
-        case  2: Load(newOptions.cacheNormalBits, data); break;
-        case  3: Load(newOptions.cacheMaxLvlOffset, data); break;
-        case  4: Load(newOptions.cacheConeAperture, data); break;
+        case  0: LoadAttribute(newOptions.cacheEntryLimit, data); break;
+        case  1: LoadAttribute(newOptions.cachePosBits, data); break;
+        case  2: LoadAttribute(newOptions.cacheNormalBits, data); break;
+        case  3: LoadAttribute(newOptions.cacheMaxLvlOffset, data); break;
+        case  4: LoadAttribute(newOptions.cacheConeAperture, data); break;
         //
-        case  5: Load(newOptions.russianRouletteRange, data); break;
-        case  6: Load(newOptions.totalSPP, data); break;
-        case  7: newOptions.lightSampler = LightSamplerType(std::as_const(data).AccessAsString()); break;
-        case  8: newOptions.renderMode = RenderMode(std::as_const(data).AccessAsString()); break;
-        case  9: Load(newOptions.burstSize, data); break;
-        case 10: Load(newOptions.lobeProbablity, data); break;
-        case 11: newOptions.displayMode = DisplayMode(std::as_const(data).AccessAsString()); break;
+        case  5: LoadAttribute(newOptions.russianRouletteRange, data); break;
+        case  6: LoadAttribute(newOptions.totalSPP, data); break;
+        case  7: LoadEnumAttribute(newOptions.lightSampler, data); break;
+        case  8: LoadEnumAttribute(newOptions.renderMode, data); break;
+        case  9: LoadAttribute(newOptions.burstSize, data); break;
+        case 10: LoadAttribute(newOptions.lobeProbablity, data); break;
+        case 11: LoadEnumAttribute(newOptions.displayMode, data); break;
         default:
             throw MRayError("{} Unknown attribute index {}", TypeName(), attributeIndex);
     }
@@ -814,7 +793,7 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     tracerView.baseAccelerator.CastVisibilityRays
     (
         dIsVisibleBitSpan, dBackupRNGStates,
-        dShadowRays, dIndices, 
+        dShadowRays, dIndices,
         {.traceMode = RayCastOptions::TRACE_ALL},
         processQueue
     );
@@ -1103,22 +1082,10 @@ GuidedPTRenderer::DoLatencyRender(uint32_t passCount,
 
 RenderBufferInfo
 GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
-                              CamSurfaceId camSurfId,
-                              uint32_t customLogicIndex0,
-                              uint32_t)
+                              CamSurfaceId camSurfId)
 {
     currentOptions = newOptions;
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-
-    // Change the mode according to the render logic
-    using Math::Roll;
-    int32_t modeIndex = (int32_t(DisplayMode::E(currentOptions.displayMode)) +
-                         int32_t(customLogicIndex0));
-    uint32_t sendMode = uint32_t(Roll(int32_t(customLogicIndex0), 0,
-                                      int32_t(DisplayMode::E::END)));
-    uint32_t newMode = uint32_t(Roll(modeIndex, 0, int32_t(DisplayMode::E::END)));
-    currentOptions.displayMode = DisplayMode::E(newMode);
-    MRAY_LOG("NewMode! {}", newMode);
 
     // ================================ //
     // Initialize common sub components //
@@ -1253,9 +1220,7 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
         .data = bufferPtrAndSize.first,
         .totalSize = bufferPtrAndSize.second,
         .renderColorSpace = colorSpace,
-        .resolution = imageTiler.FullResolution(),
-        .curRenderLogic0 = sendMode,
-        .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
+        .resolution = imageTiler.FullResolution()
     };
 }
 
@@ -1285,18 +1250,27 @@ GuidedPTRenderer::StaticAttributeInfo()
 
     return AttribInfoList
     {
-        {"cacheEntryLimit",   MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
-        {"cachePosBits",      MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
-        {"cacheNormalBits",   MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
-        {"cacheMaxLvlOffset", MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
-        {"cacheConeAperture", MRayDataTypeRT(MR_FLOAT),      IS_SCALAR, MR_OPTIONAL },
-        {"rrRange",           MRayDataTypeRT(MR_VECTOR_2UI), IS_SCALAR, MR_MANDATORY},
-        {"totalSPP",          MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_MANDATORY},
-        {"lightSampler",      MRayDataTypeRT(MR_STRING),     IS_SCALAR, MR_OPTIONAL },
-        {"renderMode",        MRayDataTypeRT(MR_STRING),     IS_SCALAR, MR_MANDATORY},
-        {"burstSize",         MRayDataTypeRT(MR_UINT32),     IS_SCALAR, MR_OPTIONAL },
-        {"lobeProbability",   MRayDataTypeRT(MR_FLOAT),      IS_SCALAR, MR_OPTIONAL },
-        {"displayMode",       MRayDataTypeRT(MR_STRING),     IS_SCALAR, MR_MANDATORY},
+        .attributeInfos =
+        {
+            {"cacheEntryLimit",   MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
+            {"cachePosBits",      MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
+            {"cacheNormalBits",   MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
+            {"cacheMaxLvlOffset", MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
+            {"cacheConeAperture", MRayDataTypeRT(MR_FLOAT),      MR_OPTIONAL },
+            {"rrRange",           MRayDataTypeRT(MR_VECTOR_2UI), MR_MANDATORY},
+            {"totalSPP",          MRayDataTypeRT(MR_UINT32),     MR_MANDATORY},
+            {"lightSampler",      MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL,  uint32_t(0)},
+            {"renderMode",        MRayDataTypeRT(MR_UINT32),     MR_MANDATORY, uint32_t(1)},
+            {"burstSize",         MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
+            {"lobeProbability",   MRayDataTypeRT(MR_FLOAT),      MR_OPTIONAL },
+            {"displayMode",       MRayDataTypeRT(MR_UINT32),     MR_MANDATORY, uint32_t(2), uint32_t(0)}
+        },
+        .enumInfos
+        {
+            RendererAttributeInfoList::FromNamedEnum<RenderMode>(),
+            RendererAttributeInfoList::FromNamedEnum<LightSamplerType>(),
+            RendererAttributeInfoList::FromNamedEnum<GuidedPTRDetail::DisplayMode>()
+        }
     };
 }
 

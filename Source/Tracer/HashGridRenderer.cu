@@ -57,7 +57,7 @@ HashGridRenderer::AttributeInfo() const
 RendererOptionPack HashGridRenderer::CurrentAttributes() const
 {
     RendererOptionPack result;
-    result.paramTypes = AttributeInfo();
+    result.paramInfos = AttributeInfo();
 
     result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
     result.attributes.back().Push(Span<const uint32_t>(&currentOptions.cacheEntryLimit, 1));
@@ -90,12 +90,46 @@ void HashGridRenderer::PushAttribute(uint32_t attributeIndex,
 {
     switch(attributeIndex)
     {
+        using R = RendererBase;
         case 0: newOptions.cacheEntryLimit   = data.AccessAs<uint32_t>()[0]; break;
-        case 1: newOptions.cachePosBits      = data.AccessAs<uint32_t>()[0]; break;
-        case 2: newOptions.cacheNormalBits   = data.AccessAs<uint32_t>()[0]; break;
-        case 3: newOptions.cacheLevelCount   = data.AccessAs<uint32_t>()[0]; break;
-        case 4: newOptions.cacheConeAperture = data.AccessAs<Float>()[0]; break;
-        case 5: newOptions.pathTraceDepth    = data.AccessAs<uint32_t>()[0]; break;
+        case 1:
+        {
+            LoadAttribute(newOptions.cachePosBits, data);
+            if(currentOptions.cachePosBits > SpatioDirCode::MORTON_BITS_PER_DIM)
+            {
+                MRAY_WARNING_LOG("Max position bits for HashGrid does not "
+                                 "fit to the hash code! Clamping to {}.",
+                                 SpatioDirCode::MORTON_BITS_PER_DIM);
+                currentOptions.cachePosBits = SpatioDirCode::MORTON_BITS_PER_DIM;
+            }
+            break;
+        }
+        case 2:
+        {
+            LoadAttribute(newOptions.cacheNormalBits, data);
+            if(currentOptions.cacheNormalBits > SpatioDirCode::NORMAL_BITS_PER_DIM)
+            {
+                MRAY_WARNING_LOG("Max normal bits for HashGrid does not "
+                                 "fit to the hash code! Clamping to {}.",
+                                 SpatioDirCode::NORMAL_BITS_PER_DIM);
+                currentOptions.cacheNormalBits = SpatioDirCode::NORMAL_BITS_PER_DIM;
+            }
+            break;
+        }
+        case 3:
+        {
+            LoadAttribute(newOptions.cacheLevelCount, data);
+            if(currentOptions.cacheLevelCount > SpatioDirCode::MaxLevel())
+            {
+                MRAY_WARNING_LOG("Max level for HashGrid does not "
+                                 "fit to the hash code! Clamping to {}.",
+                                 SpatioDirCode::MaxLevel());
+                currentOptions.cacheLevelCount = SpatioDirCode::MaxLevel();
+            }
+            break;
+        }
+        case 4: LoadAttribute(newOptions.cacheConeAperture, data); break;
+        case 5: LoadAttribute(newOptions.pathTraceDepth, data); break;
         //
         default: throw MRayError("{} Unknown attribute index {}",
                                  TypeName(), attributeIndex);
@@ -103,46 +137,12 @@ void HashGridRenderer::PushAttribute(uint32_t attributeIndex,
 }
 
 RenderBufferInfo HashGridRenderer::StartRender(const RenderImageParams& rIP,
-                                               CamSurfaceId camSurfId,
-                                               uint32_t customLogicIndex0,
-                                               uint32_t customLogicIndex1)
+                                               CamSurfaceId camSurfId)
 {
     totalIterationCount = 0;
     currentOptions = newOptions;
-    if(currentOptions.cachePosBits > SpatioDirCode::MORTON_BITS_PER_DIM)
-    {
-        MRAY_WARNING_LOG("Max position bits for HashGrid does not "
-                         "fit to the hash code! Clamping to {}.",
-                         SpatioDirCode::MORTON_BITS_PER_DIM);
-        currentOptions.cachePosBits = SpatioDirCode::MORTON_BITS_PER_DIM;
-    }
-    if(currentOptions.cacheNormalBits > SpatioDirCode::NORMAL_BITS_PER_DIM)
-    {
-        MRAY_WARNING_LOG("Max normal bits for HashGrid does not "
-                         "fit to the hash code! Clamping to {}.",
-                         SpatioDirCode::NORMAL_BITS_PER_DIM);
-        currentOptions.cacheNormalBits = SpatioDirCode::NORMAL_BITS_PER_DIM;
-    }
-    if(currentOptions.cacheLevelCount > SpatioDirCode::MaxLevel())
-    {
-        MRAY_WARNING_LOG("Max level for HashGrid does not "
-                         "fit to the hash code! Clamping to {}.",
-                         SpatioDirCode::MaxLevel());
-        currentOptions.cacheNormalBits = SpatioDirCode::MaxLevel();
-    }
-
     //
     uint32_t totalWorkCount = GenerateWorks();
-
-    // Get bit change from user..
-    using Math::Roll;
-    curPosBits = currentOptions.cachePosBits + customLogicIndex0;
-    curPosBits = uint32_t(Roll(int32_t(curPosBits), 0,
-                               int32_t(SpatioDirCode::MORTON_BITS_PER_DIM + 1)));
-    //
-    curNormalBits = currentOptions.cacheNormalBits + customLogicIndex1;
-    curNormalBits = uint32_t(Roll(int32_t(curNormalBits), 0,
-                                  int32_t(SpatioDirCode::NORMAL_BITS_PER_DIM + 1)));
     // Setup Image Tiler
     imageTiler = ImageTiler(renderBuffer.get(), rIP,
                             tracerView.tracerParams.parallelizationHint,
@@ -241,9 +241,7 @@ RenderBufferInfo HashGridRenderer::StartRender(const RenderImageParams& rIP,
         .data = bufferPtrAndSize.first,
         .totalSize = bufferPtrAndSize.second,
         .renderColorSpace = MRayColorSpaceEnum::MR_ACES_CG,
-        .resolution = imageTiler.FullResolution(),
-        .curRenderLogic0 = customLogicIndex0,
-        .curRenderLogic1 = customLogicIndex1
+        .resolution = imageTiler.FullResolution()
     };
 }
 
@@ -596,12 +594,15 @@ HashGridRenderer::StaticAttributeInfo()
     using enum AttributeOptionality;
     return AttribInfoList
     {
-        {"cacheEntryLimit", MRayDataTypeRT(MR_UINT32), IS_SCALAR, MR_OPTIONAL},
-        {"cachePosBits", MRayDataTypeRT(MR_UINT32), IS_SCALAR, MR_OPTIONAL},
-        {"cacheNormalBits", MRayDataTypeRT(MR_UINT32), IS_SCALAR, MR_OPTIONAL},
-        {"cacheLevelCount", MRayDataTypeRT(MR_UINT32), IS_SCALAR, MR_OPTIONAL},
-        {"cacheConeAperture", MRayDataTypeRT(MR_FLOAT), IS_SCALAR, MR_OPTIONAL},
-        {"pathTraceDepth", MRayDataTypeRT(MR_UINT32), IS_SCALAR, MR_OPTIONAL}
+        .attributeInfos =
+        {
+            {"cacheEntryLimit",   MRayDataTypeRT(MR_UINT32), MR_OPTIONAL},
+            {"cachePosBits",      MRayDataTypeRT(MR_UINT32), MR_OPTIONAL, std::nullopt, uint32_t(0)},
+            {"cacheNormalBits",   MRayDataTypeRT(MR_UINT32), MR_OPTIONAL, std::nullopt, uint32_t(1)},
+            {"cacheLevelCount",   MRayDataTypeRT(MR_UINT32), MR_OPTIONAL, std::nullopt, uint32_t(2)},
+            {"cacheConeAperture", MRayDataTypeRT(MR_FLOAT),  MR_OPTIONAL},
+            {"pathTraceDepth",    MRayDataTypeRT(MR_UINT32), MR_OPTIONAL}
+        }
     };
 }
 

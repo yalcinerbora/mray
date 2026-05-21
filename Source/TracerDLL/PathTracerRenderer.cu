@@ -142,43 +142,17 @@ RendererOptionPack
 PathTracerRendererT<SC>::CurrentAttributes() const
 {
     RendererOptionPack result;
-    result.paramTypes = AttributeInfo();
-    //
-    result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
-    result.attributes.back().Push(Span<const uint32_t>(&currentOptions.totalSPP, 1));
-    //
-    result.attributes.push_back(TransientData(std::in_place_type_t<uint32_t>{}, 1));
-    result.attributes.back().Push(Span<const uint32_t>(&currentOptions.burstSize, 1));
-    //
-    std::string_view curRenderModeName = currentOptions.renderMode.ToString();
-    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
-                                              curRenderModeName.size()));
-    auto svRead = result.attributes.back().AccessAsString();
-    assert(svRead.size() == curRenderModeName.size());
-    std::copy(curRenderModeName.cbegin(), curRenderModeName.cend(), svRead.begin());
-    //
-    std::string_view curModeName = currentOptions.sampleMode.ToString();
-    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{},
-                                              curModeName.size()));
-    svRead = result.attributes.back().AccessAsString();
-    assert(svRead.size() == curModeName.size());
-    std::copy(curModeName.cbegin(), curModeName.cend(), svRead.begin());
-    //
-    result.attributes.push_back(TransientData(std::in_place_type_t<Vector2>{}, 1));
-    result.attributes.back().Push(Span<const Vector2ui>(&currentOptions.russianRouletteRange, 1));
-    //
-    std::string_view lightSamplerName = currentOptions.lightSampler.ToString();
-    result.attributes.push_back(TransientData(std::in_place_type_t<std::string_view>{}, lightSamplerName.size()));
-    svRead = result.attributes.back().AccessAsString();
-    assert(svRead.size() == lightSamplerName.size());
-    std::copy(lightSamplerName.cbegin(), lightSamplerName.cend(), svRead.begin());
-    //
-    result.attributes.push_back(TransientData(std::in_place_type_t<bool>{}, 1));
-    result.attributes.back().Push(Span<const bool>(&currentOptions.sampleMedia, 1));
-    //
+    result.paramInfos = AttributeInfo();
+    result.PushAttribute(currentOptions.totalSPP);
+    result.PushAttribute(currentOptions.burstSize);
+    result.PushNamedEnum(currentOptions.renderMode);
+    result.PushNamedEnum(currentOptions.sampleMode);
+    result.PushAttribute(currentOptions.russianRouletteRange);
+    result.PushNamedEnum(currentOptions.lightSampler);
+    result.PushAttribute(currentOptions.sampleMedia);
     if constexpr(MRAY_IS_DEBUG)
     {
-        for([[maybe_unused]] const auto& d: result.attributes)
+        for([[maybe_unused]] const auto& d : result.attributes)
             assert(d.IsFull());
     }
     return result;
@@ -188,15 +162,16 @@ template<SpectrumContextC SC>
 void PathTracerRendererT<SC>::PushAttribute(uint32_t attributeIndex,
                                             TransientData data, const GPUQueue&)
 {
+    using R = RendererBase;
     switch(attributeIndex)
     {
-        case 0: newOptions.totalSPP = data.AccessAs<uint32_t>()[0]; break;
-        case 1: newOptions.burstSize = data.AccessAs<uint32_t>()[0]; break;
-        case 2: newOptions.renderMode = RenderMode(std::as_const(data).AccessAsString()); break;
-        case 3: newOptions.sampleMode = PathTraceRDetail::SampleMode(std::as_const(data).AccessAsString()); break;
-        case 4: newOptions.russianRouletteRange = data.AccessAs<Vector2ui>()[0]; break;
-        case 5: newOptions.lightSampler = LightSamplerType(std::as_const(data).AccessAsString()); break;
-        case 6: newOptions.sampleMedia = data.AccessAs<bool>()[0]; break;
+        case 0: LoadAttribute(newOptions.totalSPP, data); break;
+        case 1: LoadAttribute(newOptions.burstSize, data); break;
+        case 2: LoadEnumAttribute(newOptions.renderMode, data); break;
+        case 3: LoadEnumAttribute(newOptions.sampleMode, data); break;
+        case 4: LoadAttribute(newOptions.russianRouletteRange, data); break;
+        case 5: LoadEnumAttribute(newOptions.lightSampler, data); break;
+        case 6: LoadAttribute(newOptions.sampleMedia, data); break;
         default:
             throw MRayError("{} Unknown attribute index {}", TypeName(), attributeIndex);
     }
@@ -1504,20 +1479,10 @@ PathTracerRendererT<SC>::DoLatencyRender(uint32_t passCount,
 template<SpectrumContextC SC>
 RenderBufferInfo
 PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
-                                     CamSurfaceId camSurfId,
-                                     uint32_t customLogicIndex0,
-                                     uint32_t)
+                                     CamSurfaceId camSurfId)
 {
     currentOptions = newOptions;
     const GPUQueue& queue = gpuSystem.BestDevice().GetComputeQueue(0);
-    // Change the mode according to the render logic
-    using Math::Roll;
-    int32_t modeIndex = (int32_t(SampleMode::E(currentOptions.sampleMode)) +
-                         int32_t(customLogicIndex0));
-    uint32_t sendMode = uint32_t(Roll(int32_t(customLogicIndex0), 0,
-                                      int32_t(SampleMode::E::END)));
-    uint32_t newMode = uint32_t(Roll(modeIndex, 0, int32_t(SampleMode::E::END)));
-    currentOptions.sampleMode = SampleMode::E(newMode);
 
     // ================================ //
     // Initialize common sub components //
@@ -1702,9 +1667,7 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
         .data = bufferPtrAndSize.first,
         .totalSize = bufferPtrAndSize.second,
         .renderColorSpace = colorSpace,
-        .resolution = imageTiler.FullResolution(),
-        .curRenderLogic0 = sendMode,
-        .curRenderLogic1 = std::numeric_limits<uint32_t>::max()
+        .resolution = imageTiler.FullResolution()
     };
 }
 
@@ -1744,13 +1707,22 @@ PathTracerRendererT<SC>::StaticAttributeInfo()
     using enum AttributeOptionality;
     return AttribInfoList
     {
-        {"totalSPP",        MRayDataTypeRT(MR_UINT32),      IS_SCALAR, MR_MANDATORY},
-        {"burstSize",       MRayDataTypeRT(MR_UINT32),      IS_SCALAR, MR_OPTIONAL},
-        {"renderMode",      MRayDataTypeRT(MR_STRING),      IS_SCALAR, MR_MANDATORY},
-        {"sampleMode",      MRayDataTypeRT(MR_STRING),      IS_SCALAR, MR_MANDATORY},
-        {"rrRange",         MRayDataTypeRT(MR_VECTOR_2UI),  IS_SCALAR, MR_MANDATORY},
-        {"neeSamplerType",  MRayDataTypeRT(MR_STRING),      IS_SCALAR, MR_MANDATORY},
-        {"sampleMedia",     MRayDataTypeRT(MR_BOOL),      IS_SCALAR, MR_MANDATORY}
+        .attributeInfos =
+        {
+            {"totalSPP",       MRayDataTypeRT(MR_UINT32),     MR_MANDATORY},
+            {"burstSize",      MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL},
+            {"renderMode",     MRayDataTypeRT(MR_UINT32),     MR_MANDATORY, uint32_t(0)},
+            {"sampleMode",     MRayDataTypeRT(MR_UINT32),     MR_MANDATORY, uint32_t(1), uint32_t(0)},
+            {"rrRange",        MRayDataTypeRT(MR_VECTOR_2UI), MR_MANDATORY},
+            {"neeSamplerType", MRayDataTypeRT(MR_UINT32),     MR_MANDATORY, uint32_t(2)},
+            {"sampleMedia",    MRayDataTypeRT(MR_BOOL),       MR_MANDATORY}
+        },
+        .enumInfos =
+        {
+            RendererAttributeInfoList::FromNamedEnum<RenderMode>(),
+            RendererAttributeInfoList::FromNamedEnum<PathTraceRDetail::SampleMode>(),
+            RendererAttributeInfoList::FromNamedEnum<LightSamplerType>()
+        }
     };
 }
 

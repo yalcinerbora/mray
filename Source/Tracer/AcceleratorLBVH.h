@@ -314,6 +314,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                           const GPUQueue& queue) override;
 
     void    AllocateForTraversal(size_t maxRayCount) override;
+    void    WriteAllAcceleratorKeys(Span<AcceleratorKey>, const GPUQueue&) const override;
     size_t  GPUMemoryUsage() const override;
 };
 

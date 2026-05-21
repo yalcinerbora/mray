@@ -53,6 +53,7 @@ class TransientData
     size_t          alignment;
 
     public:
+    // Constructors & Destructor
     template<ImplicitLifetimeC T>
                     TransientData(std::in_place_type_t<T>, size_t count);
                     TransientData(const TransientData&) = delete;
@@ -73,6 +74,9 @@ class TransientData
     template<ImplicitLifetimeC T>
     size_t          Size() const;
     size_t          ByteSize() const;
+
+    // Explicit Copy
+    TransientData Copy();
 
     // =========================== //
     //    String Specialization    //

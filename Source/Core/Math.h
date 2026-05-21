@@ -198,7 +198,7 @@ MR_PF_DEF T Roll(T v, T minVal, T maxVal) noexcept
     T diff = maxVal - minVal;
     v -= minVal;
     v %= diff;
-    v = (v < T(0)) ? diff + v : v ;
+    v = (v < T(0)) ? diff + v : v;
     v += minVal;
     return v;
 }

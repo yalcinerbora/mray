@@ -14,13 +14,37 @@ struct SemaphoreInfo
     uint32_t            importMemAlignment  = 0;
 };
 
+// We refain from using
+// "RendererOptionPack" (defined in TracerAttribInfo.h)
+// since it is statically sized and it is around 3KiB
+//
+// To make the variant small, queue user need to convert
+// it to this format. This data is rarely passed,
+// so it reduces variant size from 3KiB to 168 bytes
+struct HeapRendererOptionPack
+{
+    using EnumInfo = typename RendererAttributeInfoList::EnumInfo;
+    //
+    std::vector<RendererAttributeInfo> paramTypes;
+    std::vector<TransientData>         attributes;
+    std::vector<EnumInfo>              enumInfoList;
+    uint32_t                           rendererIndexOnRendererList;
+};
+
+struct RendererOptionData
+{
+    uint32_t        attributeIndex;
+    TransientData   data;
+    bool            restartRenderer = true;
+};
+
 struct TracerResponse : public Variant
 <
     CameraTransform,        // initial cam transform
     SceneAnalyticData,      // scene analytics
     TracerAnalyticData,     // tracer analytics
     RendererAnalyticData,   // renderer analytics
-    RendererOptionPack,     // renderer options;
+    HeapRendererOptionPack, // renderer options;
     RenderBufferInfo,       // render output information
     bool,
     RenderImageSection,     // image section;
@@ -31,7 +55,7 @@ struct TracerResponse : public Variant
 {
     using Base = Variant<CameraTransform, SceneAnalyticData,
                          TracerAnalyticData, RendererAnalyticData,
-                         RendererOptionPack, RenderBufferInfo,
+                         HeapRendererOptionPack, RenderBufferInfo,
                          bool, RenderImageSection, RenderImageSaveInfo,
                          RenderImageSaveInfo, uint64_t>;
     enum Type
@@ -58,26 +82,24 @@ struct TracerResponse : public Variant
 
 struct VisorAction : public Variant
 <
-    CameraTransform,        // transform
-    uint32_t,               // camera index
-    std::string,            // renderer index
-    uint32_t,               // renderer logic0 index
-    uint32_t,               // renderer logic1 index
-    std::string,            // scene name
-    float,                  // scene time
-    bool,                   // start/stop render
-    bool,                   // pause render
-    SemaphoreInfo,          // Synchronization semaphore
-    bool,                   // Demand HDR save
-    bool,                   // Demand SDR save
-    std::string             // Initial Render Config
+    CameraTransform,    // transform
+    uint32_t,           // camera index
+    std::string,        // renderer index
+    RendererOptionData, // SendRendererAttribute
+    std::string,        // scene name
+    float,              // scene time
+    bool,               // start/stop render
+    bool,               // pause render
+    SemaphoreInfo,      // Synchronization semaphore
+    bool,               // Demand HDR save
+    bool,               // Demand SDR save
+    std::string         // Initial Render Config
 >
 {
     using Base = Variant<CameraTransform, uint32_t,
-                         std::string, uint32_t, uint32_t, std::string,
-                         float, bool, bool,
-                         SemaphoreInfo, bool, bool,
-                         std::string>;
+                         std::string, RendererOptionData,
+                         std::string, float, bool, bool,
+                         SemaphoreInfo, bool, bool, std::string>;
     enum Type
     {
         CHANGE_CAM_TRANSFORM = 0,   // Give new transform to the tracer
@@ -88,22 +110,19 @@ struct VisorAction : public Variant
         CHANGE_RENDERER = 2,        // Change the renderer via a name. Tracer will respond
                                     // with initial parametrization of the renderer.
                                     // renderer list is in "TracerAnalytics" structure.
-        CHANGE_RENDER_LOGIC0 = 3,   // Change the renderer logic0 via an index.
-                                    // These logic parameters may be useful for debugging,
-                                    // etc.
-        CHANGE_RENDER_LOGIC1 = 4,   // Change the renderer logic1 via an index.
-        LOAD_SCENE = 5,             // Load a scene, tracer will respond with a
+        CHANGE_RENDER_OPTION = 3,   // Change the renderer option
+        LOAD_SCENE = 4,             // Load a scene, tracer will respond with a
                                     // "SceneAnalytics" struct
-        CHANGE_TIME = 6,            // Change the time of the scene. Min max values are in
+        CHANGE_TIME = 5,            // Change the time of the scene. Min max values are in
                                     // "SceneAnalytics" strcut
-        START_STOP_RENDER = 7,      // Start stop the rendering.
-        PAUSE_RENDER = 8,           // Pause the rendering
-        SEND_SYNC_SEMAPHORE = 9,    // Send synchronization semaphore
-        DEMAND_HDR_SAVE = 10,       // Request a save event. This goes through tracer
-        DEMAND_SDR_SAVE = 11,       // because tracer knows better when to exactly save.
+        START_STOP_RENDER = 6,      // Start stop the rendering.
+        PAUSE_RENDER = 7,           // Pause the rendering
+        SEND_SYNC_SEMAPHORE = 8,    // Send synchronization semaphore
+        DEMAND_HDR_SAVE = 9,        // Request a save event. This goes through tracer
+        DEMAND_SDR_SAVE = 10,       // because tracer knows better when to exactly save.
                                     // Renderer will trigger a save when it is either on an ~spp
                                     // boundary (or closer)
-        KICKSTART_RENDER = 12       // Initial render kickstart, send renderer config
+        KICKSTART_RENDER = 11       // Initial render kickstart, send renderer config
                                     // Tracer initializes the renderer via this json file
                                     // It does not start rendering though
     };

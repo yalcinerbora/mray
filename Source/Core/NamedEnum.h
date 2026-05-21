@@ -10,9 +10,9 @@
 template<class Enum, const std::array<const char*, static_cast<size_t>(Enum::END)>& NamesIn>
 class NamedEnum
 {
-    static constexpr std::array Names = NamesIn;
     public:
     using E = Enum;
+    static constexpr std::array Names = NamesIn;
     // This do not work :(
     //using enum E;
 

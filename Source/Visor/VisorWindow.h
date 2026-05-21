@@ -172,7 +172,7 @@ class VisorWindow
 
     void        StartRenderpass(const FramePack& frameHandle);
     void        StartCommandBuffer(const FramePack& frameHandle);
-    void        HandleGUIChanges(const GUIChanges&);
+    void        HandleGUIChanges(GUIChanges&&);
     void        DoInitialActions();
     size_t      QueryTotalGPUMemory() const;
 

@@ -42,6 +42,9 @@ struct RenderImageParams
     Vector2ui               regionMax;
 };
 
+inline constexpr auto MAX_RENDER_LOGIC_COUNT = size_t(4);
+using RenderLogicArray = StaticVector<uint32_t, MAX_RENDER_LOGIC_COUNT>;
+
 struct TracerParameters
 {
     // Random Seed value, many samplers etc.
@@ -352,9 +355,9 @@ class [[nodiscard]] TracerI
     // (Similar to the all other Ids, user could've send the same
     // data twice, we could deduplicate it etc. but it would be costly,
     // i.e. a primitive would require per component match etc)
-    virtual VolumeId            RegisterVolume(VolumeParams) = 0;
-    virtual VolumeIdList        RegisterVolumes(std::vector<VolumeParams>) = 0;
-    virtual void                SetBoundaryVolume(VolumeId) = 0;
+    virtual VolumeId        RegisterVolume(VolumeParams) = 0;
+    virtual VolumeIdList    RegisterVolumes(std::vector<VolumeParams>) = 0;
+    virtual void            SetBoundaryVolume(VolumeId) = 0;
 
     //================================//
     //           Renderers            //
@@ -370,14 +373,13 @@ class [[nodiscard]] TracerI
                                                uint32_t importAlignment,
                                                uint64_t initialAcquireValue) = 0;
     virtual RenderBufferInfo    StartRender(RendererId, CamSurfaceId,
-                                            RenderImageParams,
-                                            Optional<uint32_t>,
-                                            Optional<uint32_t>) = 0;
+                                            RenderImageParams) = 0;
     virtual void                SetCameraTransform(RendererId, CameraTransform) = 0;
+    virtual RendererOptionPack  GetRendererOptions(RendererId) = 0;
     virtual void                StopRender() = 0;
-    // Renderer does a subsection of the img rendering
-    // and returns an output
-    virtual RendererOutput DoRenderWork() = 0;
+    // Renderer does a subwork of the img rendering
+    // and returns an optional output.
+    virtual RendererOutput      DoRenderWork() = 0;
 
     //================================//
     //             Misc.              //

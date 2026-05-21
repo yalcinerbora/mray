@@ -72,6 +72,7 @@ namespace SurfRDetail
         bool        doStochasticFilter  = true;
         Float       tMaxAORatio         = Float(0.15);
         TraceMask   traceMask           = TraceMask::E::MASK_ALL;
+        uint32_t    acceleratorIndex    = 0;
     };
 
     struct GlobalState

@@ -13,6 +13,7 @@ class ThreadPool;
 class TracerThread final : public RealtimeThread
 {
     using SceneLoaderPtr = SharedLibPtr<SceneLoaderI>;
+
     private:
     // Tracer Related
     std::unique_ptr<SharedLibrary>  dllFile;
@@ -23,7 +24,7 @@ class TracerThread final : public RealtimeThread
     //
     std::map<std::string_view, SharedLibrary>   sceneLoaderDLLs;
     std::map<std::string_view, SceneLoaderPtr>  sceneLoaders;
-    SceneLoaderI*                               currentScene = nullptr;
+    SceneLoaderI*                               curScene = nullptr;
 
     // Learned something new (Check the other compilers though only checked MSVC)
     // You can use std::numeric_limits on user defined integral types, nice.
@@ -31,18 +32,17 @@ class TracerThread final : public RealtimeThread
     Vector2ui   regionMin;
     Vector2ui   regionMax;
     // Current State
-    std::string         currentSceneName;
-    std::string         currentRendererName;
-    uint32_t            currentRenderLogic0     = 0;
-    uint32_t            currentRenderLogic1     = 0;
-    RendererId          currentRenderer         = TracerIdInvalid<RendererId>;
-    size_t              currentCamIndex         = 0;
-    CameraTransform     currentCamTransform;
-    AABB3               currentSceneAABB        = AABB3::Zero();
+    std::string         curSceneName;
+    std::string         curRendererName;
+    RendererId          curRenderer             = TracerIdInvalid<RendererId>;
+    uint32_t            curRendererNameInList   = 0xFFFFFFFF;
+    size_t              curCamIndex             = 0;
+    CameraTransform     curCamTransform;
+    AABB3               curSceneAABB            = AABB3::Zero();
     TracerIdPack        sceneIds;
-    SemaphoreInfo       currentSem = {};
+    SemaphoreInfo       curSem = {};
     //
-    double              currentWPP = 0;
+    double              curWPP = 0; // WPP -> Work per pixel
     Timer               renderTimer;
     // Flow states
     // TODO: I'm pretty sure this will get complicated really fast

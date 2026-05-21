@@ -20,6 +20,23 @@
     #include <xmmintrin.h>
 #endif
 
+// TODO: This may be overkill to do this copy
+// in a MT-way. Since this is used for debugging it should be fine
+MRAY_KERNEL
+void KCCopyAccelKeysFromHitRecordEmbree(MRAY_GRID_CONSTANT Span<AcceleratorKey> hAccelKeys,
+                                        MRAY_GRID_CONSTANT Span<const uint32_t> hInstanceHRStartOffsets,
+                                        MRAY_GRID_CONSTANT Span<const EmbreeHitRecord<>* const> hHitRecordPtrs)
+{
+    KernelCallParams kp;
+
+    uint32_t totalKeys = uint32_t(hInstanceHRStartOffsets.size());
+    for(uint32_t i = kp.GlobalId(); i < totalKeys; i += kp.GlobalId())
+    {
+        uint32_t index = hInstanceHRStartOffsets[i];
+        hAccelKeys[i] = hHitRecordPtrs[index]->acceleratorKey;
+    }
+}
+
 MRayEmbreeContext::MRayEmbreeContext()
     : device(rtcNewDevice(""))
 {
@@ -101,6 +118,7 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
     groupHitRecordOffsets.resize(this->generatedAccels.size() + 1, 0);
     std::transform_inclusive_scan
     (
+
         this->generatedAccels.cbegin(),
         this->generatedAccels.cend(),
         groupHitRecordOffsets.begin() + 1,
@@ -595,6 +613,20 @@ size_t BaseAcceleratorEmbree::GPUMemoryUsage() const
         totalSize += accelGroup->GPUMemoryUsage();
     }
     return totalSize;
+}
+
+void BaseAcceleratorEmbree::WriteAllAcceleratorKeys(Span<AcceleratorKey> dAccelKeys,
+                                                    const GPUQueue& queue) const
+{
+    assert(dAccelKeys.size() == hInstanceHRStartOffsets.size());
+    queue.IssueWorkKernel<KCCopyAccelKeysFromHitRecordEmbree>
+    (
+        "KCCopyAccelKeysFromHitRecordEmbree",
+        DeviceWorkIssueParams{.workCount = uint32_t(dAccelKeys.size())},
+        dAccelKeys,
+        ToConstSpan(hInstanceHRStartOffsets),
+        hAllHitRecordPtrs
+    );
 }
 
 RTCDevice BaseAcceleratorEmbree::GetRTCDeviceHandle() const

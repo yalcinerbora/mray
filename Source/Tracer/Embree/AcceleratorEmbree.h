@@ -357,6 +357,8 @@ class BaseAcceleratorEmbree final : public BaseAcceleratorT<BaseAcceleratorEmbre
     void    AllocateForTraversal(size_t maxRayCount) override;
     size_t  GPUMemoryUsage() const override;
 
+    void    WriteAllAcceleratorKeys(Span<AcceleratorKey>, const GPUQueue&) const override;
+
     // Embree Related
     RTCDevice GetRTCDeviceHandle() const;
 };

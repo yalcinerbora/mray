@@ -1098,6 +1098,13 @@ void BaseAcceleratorLBVH::CastLocalRays(// Output
                               queue);
 }
 
+void BaseAcceleratorLBVH::WriteAllAcceleratorKeys(Span<AcceleratorKey> dAccelKeys,
+                                                    const GPUQueue& queue) const
+{
+    assert(dLeafKeys.size() == TotalInstanceCount());
+    queue.MemcpyAsync(dAccelKeys, ToConstSpan(dLeafKeys));
+}
+
 size_t BaseAcceleratorLBVH::GPUMemoryUsage() const
 {
     size_t totalSize = accelMem.Size() + stackMem.Size();

@@ -138,9 +138,7 @@ class PathTracerRendererT final : public PathTracerRendererBase
                                       const GPUQueue& q) override;
     //
     RenderBufferInfo    StartRender(const RenderImageParams&,
-                                    CamSurfaceId camSurfId,
-                                    uint32_t customLogicIndex0 = 0,
-                                    uint32_t customLogicIndex1 = 0) override;
+                                    CamSurfaceId camSurfId) override;
     void                StopRender() override;
     size_t              GPUMemoryUsage() const override;
 };

@@ -171,23 +171,18 @@ MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPa
         const nlohmann::json& renderers = configJson.at(RENDERER_LIST_NAME);
         const nlohmann::json& rendererName = configJson.at(INITIAL_NAME);
         std::string rName = AddRendererPrefix(rendererName.get<std::string_view>());
-        currentRendererName = rName;
+        curRendererName = rName;
 
         const nlohmann::json& rendererNode = renderers.at(rendererName);
 
-        assert(currentRenderer == INVALID_RENDERER_ID);
-        currentRenderer = tracer->CreateRenderer(rName);
-        RendererAttributeInfoList attributes = tracer->AttributeInfo(currentRenderer);
+        assert(curRenderer == INVALID_RENDERER_ID);
+        curRenderer = tracer->CreateRenderer(rName);
+        RendererAttributeInfoList attributes = tracer->AttributeInfo(curRenderer);
 
         uint32_t attribIndex = 0;
-        for(const auto& attrib : attributes)
+        for(const auto& attrib : attributes.attributeInfos)
         {
             using enum AttributeIsArray;
-            if(attrib.isArray == IS_ARRAY)
-                return MRayError("Config read \"{}\": Array renderer attributes "
-                                 "are not supported yet",
-                                 configJsonPath);
-
             AttributeOptionality optionality = attrib.isOptional;
             std::string_view name = attrib.name;
             MRayDataTypeRT dataType = attrib.dataType;
@@ -201,33 +196,76 @@ MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPa
                                     configJsonPath, name, rName);
             if(loc == rendererNode.end()) return MRayError::OK;
 
-            size_t count = 0;
-            if(dataType.Name() == MRayDataEnum::MR_STRING)
-                count = loc->get<std::string_view>().size();
-            else
-                count = 1;
-
-            TransientData tData = AllocateTransientData(dataType, count);
-            tData.ReserveAll();
-
-            if(dataType.Name() == MRayDataEnum::MR_STRING)
+            // Check if this is an enum.
+            // Enums are written as strings for verbosity
+            if(attrib.enumerationIndex.HasValue())
             {
-                std::string_view in = loc->get<std::string_view>();
-                Span<char> out = tData.AccessAsString();
-                std::copy(in.cbegin(), in.cend(), out.begin());
-            }
-            else
-            {
-                dataType.SwitchCase([&](auto&& t)
+                uint32_t enumIndex = attrib.enumerationIndex.Value();
+                std::string_view enumName = loc->get<std::string_view>();
+                TransientData tData = AllocateTransientData(dataType, 1);
+                tData.ReserveAll();
+                size_t enumValue = std::numeric_limits<size_t>::max();
+                const auto& enumNameArray = attributes.enumInfos[enumIndex].enumNames;
+                for(size_t i = 0; i < enumNameArray.size(); i++)
                 {
-                    using MRDataType = std::remove_cvref_t<decltype(t)>;
-                    using T = MRDataType::Type;
-                    auto s = tData.AccessAs<T>();
-                    s.front() = loc->get<T>();
-                });
+                    if(enumName == enumNameArray[i])
+                    {
+                        enumValue = i;
+                        break;
+                    }
+                }
+                if(enumValue == std::numeric_limits<size_t>::max())
+                {
+                    throw MRayError("Config read \"{}\": Mandatory variable \"{}\" "
+                                    "for \"{}\" is not an enum but its value \"{}\" "
+                                    "not found in enumeration list {}!",
+                                    configJsonPath, name, rName, enumName, enumNameArray);
+                }
+                switch(dataType.Name())
+                {
+                    using enum MRayDataEnum;
+                    case MR_UINT8:  tData.AccessAs<uint8_t>()[0]  = uint8_t(enumValue); break;
+                    case MR_UINT16: tData.AccessAs<uint16_t>()[0] = uint16_t(enumValue); break;
+                    case MR_UINT32: tData.AccessAs<uint16_t>()[0] = uint16_t(enumValue); break;
+                    case MR_UINT64: tData.AccessAs<uint64_t>()[0] = uint64_t(enumValue); break;
+                    default:
+                        throw MRayError("Wrong Enumeration type on renderer \"{}\" "
+                                        "on attribute index {}. Enum type must be "
+                                        "MR_UINT8, 16, 32 or 64!",
+                                        rName, attribIndex);
+                }
+                tracer->PushRendererAttribute(curRenderer, attribIndex,
+                                              std::move(tData));
             }
-            tracer->PushRendererAttribute(currentRenderer, attribIndex,
-                                          std::move(tData));
+            else
+            {
+                size_t count = 0;
+                if(dataType.Name() == MRayDataEnum::MR_STRING)
+                    count = loc->get<std::string_view>().size();
+                else
+                    count = 1;
+                TransientData tData = AllocateTransientData(dataType, count);
+                tData.ReserveAll();
+
+                if(dataType.Name() == MRayDataEnum::MR_STRING)
+                {
+                    std::string_view in = loc->get<std::string_view>();
+                    Span<char> out = tData.AccessAsString();
+                    std::copy(in.cbegin(), in.cend(), out.begin());
+                }
+                else
+                {
+                    dataType.SwitchCase([&](auto&& t)
+                    {
+                        using MRDataType = std::remove_cvref_t<decltype(t)>;
+                        using T = MRDataType::Type;
+                        auto s = tData.AccessAs<T>();
+                        s.front() = loc->get<T>();
+                    });
+                }
+                tracer->PushRendererAttribute(curRenderer, attribIndex,
+                                              std::move(tData));
+            }
             attribIndex++;
         }
     }
@@ -245,7 +283,7 @@ MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPa
 void TracerThread::RestartRenderer()
 {
     // Nothing to restart
-    if(currentRenderer == INVALID_RENDERER_ID)
+    if(curRenderer == INVALID_RENDERER_ID)
         return;
 
     tracer->StopRender();
@@ -256,13 +294,11 @@ void TracerThread::RestartRenderer()
         .regionMin = regionMin,
         .regionMax = regionMax,
     };
-    RenderBufferInfo rbi = tracer->StartRender(currentRenderer,
-                                               sceneIds.camSurfaces[currentCamIndex].second,
-                                               rp,
-                                               currentRenderLogic0,
-                                               currentRenderLogic1);
+    RenderBufferInfo rbi = tracer->StartRender(curRenderer,
+                                               sceneIds.camSurfaces[curCamIndex].second,
+                                               rp);
     renderTimer.Start();
-    currentWPP = 0.0;
+    curWPP = 0.0;
 
     transferQueue.Enqueue(TracerResponse
     (
@@ -272,12 +308,33 @@ void TracerThread::RestartRenderer()
 
     // When new scene is loaded, send the
     // Initial cam transform
-    CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex].second;
-    currentCamTransform = tracer->GetCamTransform(camSurf);
+    CamSurfaceId camSurf = sceneIds.camSurfaces[curCamIndex].second;
+    curCamTransform = tracer->GetCamTransform(camSurf);
     transferQueue.Enqueue(TracerResponse
     (
         std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
-        currentCamTransform
+        curCamTransform
+    ));
+
+    // After renderer is restarted, send the options
+    RendererOptionPack optionPack = tracer->GetRendererOptions(curRenderer);
+    // Heapify the options
+    HeapRendererOptionPack optionPackHeap;
+    optionPackHeap.attributes.reserve(optionPack.attributes.size());
+    optionPackHeap.enumInfoList.reserve(optionPack.paramInfos.enumInfos.size());
+    optionPackHeap.paramTypes.reserve(optionPack.paramInfos.attributeInfos.size());
+    optionPackHeap.rendererIndexOnRendererList = curRendererNameInList;
+    for(auto& attrib : optionPack.attributes)
+        optionPackHeap.attributes.push_back(std::move(attrib));
+    for(const auto& eInfo : optionPack.paramInfos.enumInfos)
+        optionPackHeap.enumInfoList.push_back(eInfo);
+    for(const auto& attribType : optionPack.paramInfos.attributeInfos)
+        optionPackHeap.paramTypes.push_back(attribType);
+
+    transferQueue.Enqueue(TracerResponse
+    (
+        std::in_place_index<TracerResponse::RENDERER_OPTIONS>,
+        std::move(optionPackHeap)
     ));
 }
 
@@ -286,7 +343,7 @@ void TracerThread::HandleRendering()
     RendererOutput renderOut = tracer->DoRenderWork();
     if(renderOut.analytics)
     {
-        currentWPP = renderOut.analytics.Value().workPerPixel;
+        curWPP = renderOut.analytics.Value().workPerPixel;
         transferQueue.Enqueue(TracerResponse
         (
             std::in_place_index<TracerResponse::RENDERER_ANALYTICS>,
@@ -312,7 +369,7 @@ void TracerThread::HandleRendering()
             {
                 .prefix = std::move(prefix),
                 .time = renderTimer.Elapsed<Second>(),
-                .workPerPixel = currentWPP
+                .workPerPixel = curWPP
             }
         ));
         // TODO: We are wasting a single "DoRender"
@@ -375,15 +432,15 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
     // Flush the GPU before freeing memory
     tracer->Flush();
     tracer->ClearAll();
-    currentRenderer = INVALID_RENDERER_ID;
+    curRenderer = INVALID_RENDERER_ID;
     // TODO: Single scene loading, change this later maybe
     // for tracer supporting multiple scenes
     using namespace std::filesystem;
-    if(currentScene) currentScene->ClearScene();
+    if(curScene) curScene->ClearScene();
 
     MRAY_LOG("[Tracer]: Loading Scene...");
     auto scenePath = path(newScene);
-    currentSceneName = scenePath.filename().string();
+    curSceneName = scenePath.filename().string();
     std::string fileExt = scenePath.extension().string();
 
     fileExt = fileExt.substr(1);
@@ -394,8 +451,8 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
                         "for extension \"{}\"",
                         fileExt);
     }
-    currentScene = loaderIt->second.get();
-    Expected<TracerIdPack> result = currentScene->LoadScene(*tracer, newScene);
+    curScene = loaderIt->second.get();
+    Expected<TracerIdPack> result = curScene->LoadScene(*tracer, newScene);
     if(result.has_error())
     {
         throw MRayError("Failed to Load Scene\n    {}",
@@ -413,7 +470,7 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
     //
     auto [sceneAABB, instanceCount,
           accelCount] = tracer->CommitSurfaces();
-    currentSceneAABB = sceneAABB;
+    curSceneAABB = sceneAABB;
     // We need to flush the Tracer to time.
     // Commit surfaces may be hybrid process (GPU/CPU combo)
     // so we can't directly measure from GPU.
@@ -424,19 +481,19 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
              "    Instances: {}\n"
              "    Accels   : {}",
              timer.Elapsed<Millisecond>(),
-             currentSceneAABB,
+             curSceneAABB,
              instanceCount, accelCount);
 
-    currentCamIndex = 0;
-    CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex].second;
-    currentCamTransform = tracer->GetCamTransform(camSurf);
+    curCamIndex = 0;
+    CamSurfaceId camSurf = sceneIds.camSurfaces[curCamIndex].second;
+    curCamTransform = tracer->GetCamTransform(camSurf);
 
     // When new scene is loaded, send the
     // Initial cam transform
     transferQueue.Enqueue(TracerResponse
     (
         std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
-        currentCamTransform
+        curCamTransform
     ));
 
     // Scene Analytic Data
@@ -453,7 +510,7 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
             .surfaceCount = static_cast<uint32_t>(sceneIds.surfaces.size()),
             .lightCount = static_cast<uint32_t>(sceneIds.lightSurfaces.size()),
             .cameraCount = static_cast<uint32_t>(sceneIds.camSurfaces.size()),
-            .sceneExtent = currentSceneAABB
+            .sceneExtent = curSceneAABB
         }
     ));
     // Send Used Memory
@@ -464,8 +521,8 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
     ));
 
     // Recreate the renderer
-    if(!currentRendererName.empty())
-        currentRenderer = tracer->CreateRenderer(currentRendererName);
+    if(!curRendererName.empty())
+        curRenderer = tracer->CreateRenderer(curRendererName);
 
     // Restart the renderer
     RestartRenderer();
@@ -474,12 +531,18 @@ void TracerThread::HandleSceneChange(const std::string& newScene)
 void TracerThread::HandleRendererChange(const std::string& rendererName)
 {
     MRAY_LOG("[Tracer]: NewRenderer {}", rendererName);
-    currentRendererName = rendererName;
-    currentRenderLogic0 = 0;
-    currentRenderLogic1 = 0;
-    if(currentRenderer != INVALID_RENDERER_ID)
-        tracer->DestroyRenderer(currentRenderer);
-    currentRenderer = tracer->CreateRenderer(currentRendererName);
+    curRendererName = rendererName;
+    if(curRenderer != INVALID_RENDERER_ID)
+        tracer->DestroyRenderer(curRenderer);
+    curRenderer = tracer->CreateRenderer(curRendererName);
+
+    // TODO: Memcy of "TypeNameList" here maybe not required
+    curRendererNameInList = 0;
+    for(const auto& rName : tracer->Renderers())
+    {
+        if(rName == rendererName) break;
+        curRendererNameInList++;
+    }
 
     RestartRenderer();
 }
@@ -487,11 +550,11 @@ void TracerThread::HandleRendererChange(const std::string& rendererName)
 std::string TracerThread::GenSavePrefix() const
 {
     std::string prefix;
-    prefix.reserve(currentSceneName.size() +
-                   currentRendererName.size() + 1);
-    prefix += currentSceneName;
+    prefix.reserve(curSceneName.size() +
+                   curRendererName.size() + 1);
+    prefix += curSceneName;
     prefix += '_';
-    prefix += currentRendererName;
+    prefix += curRendererName;
     return prefix;
 }
 
@@ -499,7 +562,7 @@ void TracerThread::LoopWork()
 {
     Optional<CameraTransform>       transform;
     Optional<std::string>           rendererName;
-    Optional<uint32_t>              renderLogic0;
+    Optional<RendererOptionData>    rendererOption;
     Optional<uint32_t>              renderLogic1;
     Optional<uint32_t>              cameraIndex;
     Optional<std::string>           scenePath;
@@ -511,7 +574,7 @@ void TracerThread::LoopWork()
     bool                            sdrSaveDemand = false;
     Optional<std::string>           initialRenderConfig;
 
-    auto ProcessCommand = [&](VisorAction command)
+    auto ProcessCommand = [&](VisorAction&& command)
     {
         bool stopConsuming = false;
         using ActionType = typename VisorAction::Type;
@@ -522,8 +585,7 @@ void TracerThread::LoopWork()
             case CHANGE_CAMERA: cameraIndex = std::get<CHANGE_CAMERA>(command); break;
             case CHANGE_CAM_TRANSFORM: transform = std::get<CHANGE_CAM_TRANSFORM>(command); break;
             case CHANGE_RENDERER: rendererName = std::get<CHANGE_RENDERER>(command); break;
-            case CHANGE_RENDER_LOGIC0: renderLogic0 = std::get<CHANGE_RENDER_LOGIC0>(command); break;
-            case CHANGE_RENDER_LOGIC1: renderLogic1 = std::get<CHANGE_RENDER_LOGIC1>(command); break;
+            case CHANGE_RENDER_OPTION: rendererOption = std::move(std::get<CHANGE_RENDER_OPTION>(command)); break;
             case CHANGE_TIME: time = std::get<CHANGE_TIME>(command); break;
             case LOAD_SCENE: scenePath = std::get<LOAD_SCENE>(command); break;
             case SEND_SYNC_SEMAPHORE: syncSem = std::get<SEND_SYNC_SEMAPHORE>(command); break;
@@ -558,13 +620,13 @@ void TracerThread::LoopWork()
 
     auto CheckQueueAndExit = [this]()
     {
-        bool semaphoreDropped = (currentSem.semaphore &&
-                                 currentSem.semaphore->IsInvalidated());
+        bool semaphoreDropped = (curSem.semaphore &&
+                                 curSem.semaphore->IsInvalidated());
         bool queueDropped = transferQueue.IsTerminated();
         isTerminated = (semaphoreDropped || queueDropped);
 
         if(semaphoreDropped) transferQueue.Terminate();
-        if(queueDropped && currentSem.semaphore) currentSem.semaphore->Invalidate();
+        if(queueDropped && curSem.semaphore) curSem.semaphore->Invalidate();
 
         if(isTerminated) MRAY_LOG("[Tracer]: Terminating!");
         return isTerminated;
@@ -578,7 +640,7 @@ void TracerThread::LoopWork()
         {
             transferQueue.Dequeue(command);
             if(CheckQueueAndExit()) return;
-            ProcessCommand(command);
+            ProcessCommand(std::move(command));
         }
         // On every "frame", we will do the latest common commands
         // Low latency commands should be transform commands probably
@@ -587,7 +649,7 @@ void TracerThread::LoopWork()
             // Technically this loop may not terminate,
             // if stuff comes too fast. But we just setting some data so
             // it should not be possible
-            bool stopConsuming = ProcessCommand(command);
+            bool stopConsuming = ProcessCommand(std::move(command));
             if(stopConsuming) break;
         }
 
@@ -603,7 +665,7 @@ void TracerThread::LoopWork()
                 {
                     .prefix = std::move(prefix),
                     .time = renderTimer.Elapsed<Second>(),
-                    .workPerPixel = currentWPP
+                    .workPerPixel = curWPP
                 }
             ));
         }
@@ -620,7 +682,7 @@ void TracerThread::LoopWork()
                 {
                     .prefix = std::move(prefix),
                     .time = renderTimer.Elapsed<Second>(),
-                    .workPerPixel = currentWPP
+                    .workPerPixel = curWPP
                 }
             ));
         }
@@ -640,16 +702,16 @@ void TracerThread::LoopWork()
         if(cameraIndex)
         {
             MRAY_LOG("[Tracer]: NewCamera {}", cameraIndex.Value());
-            currentCamIndex = cameraIndex.Value();
+            curCamIndex = cameraIndex.Value();
 
-            CamSurfaceId camSurf = sceneIds.camSurfaces[currentCamIndex].second;
-            currentCamTransform = tracer->GetCamTransform(camSurf);
+            CamSurfaceId camSurf = sceneIds.camSurfaces[curCamIndex].second;
+            curCamTransform = tracer->GetCamTransform(camSurf);
 
             // When cam is changed send the initial transform
             transferQueue.Enqueue(TracerResponse
             (
                 std::in_place_index<TracerResponse::CAMERA_INIT_TRANSFORM>,
-                currentCamTransform
+                curCamTransform
             ));
 
             RestartRenderer();
@@ -657,9 +719,9 @@ void TracerThread::LoopWork()
         // New transform
         if(transform)
         {
-            currentCamTransform = transform.Value();
+            curCamTransform = transform.Value();
             // Transform change should be as real time as possible so
-            tracer->SetCameraTransform(currentRenderer, currentCamTransform);
+            tracer->SetCameraTransform(curRenderer, curCamTransform);
             transferQueue.Enqueue(TracerResponse
             (
                 std::in_place_index<TracerResponse::CLEAR_IMAGE_SECTION>,
@@ -674,9 +736,9 @@ void TracerThread::LoopWork()
             MRAY_LOG("[Tracer]: NewSem {:p} - {:d}",
                      static_cast<void*>(syncSem.Value().semaphore),
                      syncSem.Value().importMemAlignment);
-            currentSem = syncSem.Value();
-            tracer->SetupRenderEnv(currentSem.semaphore,
-                                   currentSem.importMemAlignment, 0);
+            curSem = syncSem.Value();
+            tracer->SetupRenderEnv(curSem.semaphore,
+                                   curSem.importMemAlignment, 0);
         }
         // New scene
         if(scenePath) HandleSceneChange(scenePath.Value());
@@ -687,17 +749,17 @@ void TracerThread::LoopWork()
         // TODO: Support scene time change
         if(time) MRAY_WARNING_LOG("[Tracer]: Scene time change is not supported!");
         // Render logic changes
-        if(renderLogic0)
+        if(rendererOption)
         {
-            MRAY_LOG("[Tracer]: NewRenderLogic0 {}", renderLogic0.Value());
-            currentRenderLogic0 = renderLogic0.Value();
-            RestartRenderer();
+            MRAY_LOG("[Tracer]: NewRendererOption (AttribI: {})", rendererOption.Value().attributeIndex);
+            RendererOptionData& rOpt = rendererOption.Value();
+            tracer->PushRendererAttribute(curRenderer, rOpt.attributeIndex,
+                                          std::move(rOpt.data));
+            rendererOption = std::nullopt;
 
-        }
-        if(renderLogic1)
-        {
-            MRAY_LOG("[Tracer]: NewRenderLogic1 {}", renderLogic1.Value());
-            currentRenderLogic1 = renderLogic1.Value();
+            // TODO: When we get an options we always restart the renderer
+            // since "restartRender" parameter ignored throughout.
+            // Change it later.
             RestartRenderer();
         }
 
@@ -771,7 +833,7 @@ TracerThread::TracerThread(TransferQueue& queue,
     , tracer{nullptr, nullptr}
     , transferQueue(queue.GetTracerView())
     , threadPool(tp)
-    , currentRenderer(INVALID_RENDERER_ID)
+    , curRenderer(INVALID_RENDERER_ID)
 {}
 
 MRayError TracerThread::LoadSceneLoaderDLLs()
@@ -1012,6 +1074,26 @@ void TracerThread::DisplayTypeAttributes(std::string_view typeName)
                      isColor == AttributeIsColor::IS_COLOR);
         }
     };
+    auto PrintRendererAttributes = [](std::string_view name,
+                                      const RendererAttributeInfoList& attribInfo)
+    {
+        // TODO: Add Enumeration stuff
+        MRAY_LOG("Attributes of {}:", name);
+        MRAY_LOG("{:^16s} | {:^16s} | {:^6s} | {:^9s}",
+                 "Name", "Layout", "Array?", "Optional?");
+        MRAY_LOG("--------------------------------------------------------");
+        for(const auto& a : attribInfo.attributeInfos)
+        {
+            std::string logic = a.name;
+            MRayDataTypeRT layout = a.dataType;
+            AttributeOptionality isOptional = a.isOptional;
+
+            MRAY_LOG("{:<16} | {:<16} | {:<9s}",
+                     logic,
+                     MRayDataTypeStringifier::ToString(layout.Name()),
+                     isOptional == AttributeOptionality::MR_OPTIONAL);
+        }
+    };
 
     auto prefixEnd = typeName.find_first_of(')');
     if(prefixEnd == std::string_view::npos)
@@ -1036,7 +1118,7 @@ void TracerThread::DisplayTypeAttributes(std::string_view typeName)
         else if(prefix == TracerConstants::LIGHT_PREFIX)
             PrintTexturableAttributes(typeName, tracer->AttributeInfoLight(typeName));
         else if(prefix == TracerConstants::RENDERER_PREFIX)
-            PrintGenericAttributes(typeName, tracer->AttributeInfoRenderer(typeName));
+            PrintRendererAttributes(typeName, tracer->AttributeInfoRenderer(typeName));
         else
             MRAY_LOG("Unkown type prefix \"{}\"", prefix);
     }

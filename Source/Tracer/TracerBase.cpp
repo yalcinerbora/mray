@@ -5,7 +5,6 @@
 using FilterFuncPair = std::pair< const FilterType::E, TexFilterGenerator>;
 template<class T>
 static constexpr auto FilterGenFuncPack = FilterFuncPair
-
 {
     T::TypeName,
     &GenerateType<TextureFilterI, T, const GPUSystem&, Float>
@@ -1804,9 +1803,7 @@ void TracerBase::PushRendererAttribute(RendererId rId,
 }
 
 RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
-                                         RenderImageParams rIParams,
-                                         Optional<uint32_t> renderLogic0,
-                                         Optional<uint32_t> renderLogic1)
+                                         RenderImageParams rIParams)
 {
     // Check render image is setup properly
     if(renderImage.get() == nullptr)
@@ -1822,10 +1819,7 @@ RenderBufferInfo TracerBase::StartRender(RendererId rId, CamSurfaceId cId,
     currentRenderer = renderer.Value().get();
     currentRendererId = rId;
 
-    return currentRenderer->StartRender(rIParams,
-                                        cId,
-                                        renderLogic0.ValueOr(0),
-                                        renderLogic1.ValueOr(0));
+    return currentRenderer->StartRender(rIParams, cId);
 }
 
 void TracerBase::SetCameraTransform(RendererId rId, CameraTransform transform)
@@ -1838,6 +1832,18 @@ void TracerBase::SetCameraTransform(RendererId rId, CameraTransform transform)
     }
     RendererI* rendererPtr = renderer.Value().get();
     rendererPtr->SetCameraTransform(transform);
+}
+
+RendererOptionPack TracerBase::GetRendererOptions(RendererId rId)
+{
+    auto renderer = renderers.at(rId);
+    if(!renderer)
+    {
+        throw MRayError("Unable to find Renderer({})",
+                        static_cast<CommonKey>(rId));
+    }
+    RendererI* rendererPtr = renderer.Value().get();
+    return rendererPtr->CurrentAttributes();
 }
 
 void TracerBase::StopRender()
