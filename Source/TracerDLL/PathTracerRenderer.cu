@@ -1100,7 +1100,9 @@ PathTracerRendererT<SC>::DoRenderPass(uint32_t sppLimit, const GPUQueue& process
         dReloadIndices,
         dFilledRayIndices,
         aliveRayCount
-    ] = ReloadPaths(dIndices, sppLimit, processQueue);
+    ] = ReloadPaths(dIndices, sppLimit,
+                    currentOptions.sampleMedia,
+                    processQueue);
     //
     dIndices = dReloadIndices.subspan(0, aliveRayCount);
     dKeys = dKeys.subspan(0, aliveRayCount);

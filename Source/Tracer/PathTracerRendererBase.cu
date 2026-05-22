@@ -68,7 +68,9 @@ uint64_t PathTracerRendererBase::TotalSampleLimit(uint32_t spp) const
 
 typename PathTracerRendererBase::ReloadPathOutput
 PathTracerRendererBase::ReloadPaths(Span<const RayIndex> dIndices,
-                                   uint32_t sppLimit, const GPUQueue& processQueue)
+                                    uint32_t sppLimit,
+                                    bool setStartingVolumes,
+                                    const GPUQueue& processQueue)
 {
     // RELOADING!!!
     // Find the dead rays
@@ -136,7 +138,7 @@ PathTracerRendererBase::ReloadPaths(Span<const RayIndex> dIndices,
                 dFilledRayIndices
             );
 
-            if(mediaTracker)
+            if(setStartingVolumes)
             {
                 mediaTracker->SetStartingVolumeIndirect(dRayMediaListPacks,
                                                         dFilledRayIndices,

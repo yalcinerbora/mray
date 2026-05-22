@@ -727,7 +727,6 @@ VisorGUI::RenderRendererOptions(const VisorState&)
         result.push_back(std::move(d));
     };
 
-
     // Even without window, check the global hot keys.
     for(size_t i = 0; i < options.attributes.size(); i++)
     {
@@ -812,7 +811,6 @@ VisorGUI::RenderRendererOptions(const VisorState&)
                     ImGui::EndCombo();
                 }
                 // We did select something memcpy to
-                //if(ImGui::IsItemDeactivatedAfterEdit())
                 if(newValue != enumValue)
                 {
                     // Save it back to transient buffer and send
@@ -840,8 +838,7 @@ VisorGUI::RenderRendererOptions(const VisorState&)
             else if(typeResult.isBool)
             {
                 bool& b = attribValue.AccessAs<bool>()[0];
-                bool valChanged = ImGui::Checkbox(attribType.name.c_str(), &b);
-                if(ImGui::IsItemDeactivatedAfterEdit())
+                if(ImGui::Checkbox(attribType.name.c_str(), &b))
                 {
                     TransientData tData = attribValue.Copy();
                     TryAddChange({uint32_t(i), std::move(tData)});
@@ -851,9 +848,9 @@ VisorGUI::RenderRendererOptions(const VisorState&)
             {
 
                 Span<Byte> data = attribValue.AccessAs<Byte>();
-                bool valChanged = ImGui::InputScalarN(attribType.name.c_str(),
-                                                      typeResult.dataType,
-                                                      data.data(), typeResult.amount);
+                ImGui::InputScalarN(attribType.name.c_str(),
+                                    typeResult.dataType,
+                                    data.data(), typeResult.amount);
                 if(ImGui::IsItemDeactivatedAfterEdit())
                 {
                     TransientData tData = attribValue.Copy();

@@ -643,8 +643,13 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
     DeviceAlgorithms::Iota(dIndices, RayIndex(0), processQueue);
 
     // Reload dead paths with new
-    auto [dReloadIndices, dFilledIndices, aliveRayCount] = ReloadPaths(dIndices, sppLimit,
-                                                                       processQueue);
+    auto
+    [
+        dReloadIndices,
+        dFilledIndices,
+        aliveRayCount
+    ] = ReloadPaths(dIndices, sppLimit, false, processQueue);
+    //
     dIndices = dReloadIndices.subspan(0, aliveRayCount);
     dKeys = dKeys.subspan(0, aliveRayCount);
 

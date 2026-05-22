@@ -24,8 +24,13 @@ inline InputChecker::InputChecker(const VisorKeyMap& km)
 
 inline bool InputChecker::CheckKeyPress(VisorUserAction a, bool repeat) const
 {
-    return ImGui::IsKeyChordPressed(ImGuiKey(keyMap->at(a)));
-    //return ImGui::IsKeyPressed(ImGuiKey(keyMap->at(a)), repeat);
+    ImGuiKey key = ImGuiKey(keyMap->at(a));
+    // TODO: ImGuiMod_Mask_ is probably internal? Check that is is stable etc.
+    bool hasModifiers = ImGuiKey(key & ImGuiMod_Mask_) != ImGuiKey(0);
+    if(hasModifiers)
+        return ImGui::IsKeyChordPressed(key);
+    else
+        return ImGui::IsKeyPressed(key, repeat);
 }
 
 inline bool InputChecker::CheckKeyRelease(VisorUserAction a) const

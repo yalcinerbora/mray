@@ -1136,6 +1136,25 @@ void VisorWindow::HandleGUIChanges(GUIChanges&& changes)
         ));
     }
 
+    // Do not bother sending renderer option changes if
+    // the renderer is already changed
+    if(!changes.topBarChanges.rendererIndex &&
+       !changes.topBarChanges.changedRendererOptions.empty())
+    {
+        // Custom logic may or may not mean new framebuffer.
+        // Conservatively we drop the memory.
+        accumulateStage.DropExternalHandles(imgWriteSem);
+        // Send the options
+        for(auto& rOpts : changes.topBarChanges.changedRendererOptions)
+        {
+            transferQueue->Enqueue(VisorAction
+            (
+                std::in_place_index<VisorAction::CHANGE_RENDER_OPTION>,
+                std::move(rOpts)
+            ));
+        }
+    }
+
     if(changes.topBarChanges.rendererIndex)
     {
         // New renderer means new framebuffer
@@ -1151,21 +1170,6 @@ void VisorWindow::HandleGUIChanges(GUIChanges&& changes)
         ));
     }
 
-    if(!changes.topBarChanges.changedRendererOptions.empty())
-    {
-        // Custom logic may or may not mean new framebuffer.
-        // Conservatively we drop the memory.
-        accumulateStage.DropExternalHandles(imgWriteSem);
-        // Send the options
-        for(auto& rOpts : changes.topBarChanges.changedRendererOptions)
-        {
-            transferQueue->Enqueue(VisorAction
-            (
-                std::in_place_index<VisorAction::CHANGE_RENDER_OPTION>,
-                std::move(rOpts)
-            ));
-        }
-    }
 
     if(changes.hdrSaveTrigger)
     {
