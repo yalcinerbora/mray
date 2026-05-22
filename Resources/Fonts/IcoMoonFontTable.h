@@ -12,7 +12,6 @@
 #define ICON_MAX_ICOMN 0xea38
 
 #define ICON_ICOMN_HOME3 "\xee\xa4\x82"         // U+e902
-#define ICON_ICOMN_PENCIL "\xee\xa4\x85"        // U+e905
 #define ICON_ICOMN_IMAGE "\xee\xa4\x8d"         // U+e90d
 #define ICON_ICOMN_IMAGES "\xee\xa4\x8e"        // U+e90e
 #define ICON_ICOMN_VIDEO_CAMERA "\xee\xa4\x94"  // U+e914

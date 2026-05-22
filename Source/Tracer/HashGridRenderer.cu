@@ -94,7 +94,7 @@ void HashGridRenderer::PushAttribute(uint32_t attributeIndex,
         case 0: newOptions.cacheEntryLimit   = data.AccessAs<uint32_t>()[0]; break;
         case 1:
         {
-            LoadAttribute(newOptions.cachePosBits, data);
+            LoadFromTransientData(newOptions.cachePosBits, data);
             if(currentOptions.cachePosBits > SpatioDirCode::MORTON_BITS_PER_DIM)
             {
                 MRAY_WARNING_LOG("Max position bits for HashGrid does not "
@@ -106,7 +106,7 @@ void HashGridRenderer::PushAttribute(uint32_t attributeIndex,
         }
         case 2:
         {
-            LoadAttribute(newOptions.cacheNormalBits, data);
+            LoadFromTransientData(newOptions.cacheNormalBits, data);
             if(currentOptions.cacheNormalBits > SpatioDirCode::NORMAL_BITS_PER_DIM)
             {
                 MRAY_WARNING_LOG("Max normal bits for HashGrid does not "
@@ -118,7 +118,7 @@ void HashGridRenderer::PushAttribute(uint32_t attributeIndex,
         }
         case 3:
         {
-            LoadAttribute(newOptions.cacheLevelCount, data);
+            LoadFromTransientData(newOptions.cacheLevelCount, data);
             if(currentOptions.cacheLevelCount > SpatioDirCode::MaxLevel())
             {
                 MRAY_WARNING_LOG("Max level for HashGrid does not "
@@ -128,8 +128,8 @@ void HashGridRenderer::PushAttribute(uint32_t attributeIndex,
             }
             break;
         }
-        case 4: LoadAttribute(newOptions.cacheConeAperture, data); break;
-        case 5: LoadAttribute(newOptions.pathTraceDepth, data); break;
+        case 4: LoadFromTransientData(newOptions.cacheConeAperture, data); break;
+        case 5: LoadFromTransientData(newOptions.pathTraceDepth, data); break;
         //
         default: throw MRayError("{} Unknown attribute index {}",
                                  TypeName(), attributeIndex);

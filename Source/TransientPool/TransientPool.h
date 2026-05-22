@@ -138,3 +138,16 @@ inline Span<T> ToSpan(const TransientData& v)
 {
     return v.AccessAs<T>();
 }
+
+template<class T>
+void LoadFromTransientData(T& out, const TransientData& data)
+{
+    out = data.AccessAs<T>()[0];
+}
+
+template<class IntT, class NamedEnumT>
+void LoadEnumFromTransientData(NamedEnumT& out, const TransientData& data)
+{
+    using Enum = typename NamedEnumT::E;
+    out = Enum(data.AccessAs<IntT>()[0]);
+}

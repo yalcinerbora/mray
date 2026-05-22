@@ -1102,20 +1102,6 @@ RenderMediumWorkHasher::GenerateWorkKeyGPU(VolumeKeyPack p, RayIndex rayIndex) c
     return result;
 }
 
-template<class T>
-void LoadAttribute(T& out, const TransientData& data)
-{
-    out = data.AccessAs<T>()[0];
-}
-
-template<class NamedEnumT>
-void LoadEnumAttribute(NamedEnumT& out, const TransientData& data)
-{
-    using Enum = typename NamedEnumT::E;
-    using IntT = std::underlying_type_t<Enum>;
-    out = Enum(data.AccessAs<IntT>()[0]);
-}
-
 inline
 void RendererBase::ClearAllWorkMappings()
 {

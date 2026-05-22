@@ -35,7 +35,7 @@ class TracerThread final : public RealtimeThread
     std::string         curSceneName;
     std::string         curRendererName;
     RendererId          curRenderer             = TracerIdInvalid<RendererId>;
-    uint32_t            curRendererNameInList   = 0xFFFFFFFF;
+    uint32_t            curRendererIndexInList  = 0xFFFFFFFF;
     size_t              curCamIndex             = 0;
     CameraTransform     curCamTransform;
     AABB3               curSceneAABB            = AABB3::Zero();

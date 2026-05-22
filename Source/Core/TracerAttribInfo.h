@@ -149,9 +149,14 @@ struct RendererOptionPack
     RendererAttributeInfoList   paramInfos;
     AttributeList               attributes;
 
-    template<class T> void PushAttribute(const T&);
-    template<class T> void PushNamedEnum(const T&);
-    template<class T> void PushString(const T&);
+    template<class T>
+    void PushAttribute(const T&);
+
+    template<class IntT, class T>
+    void PushNamedEnum(const T&);
+
+    template<class T>
+    void PushString(const T&);
 };
 
 template<class NamedEnumT>
@@ -172,21 +177,22 @@ template<class T>
 inline void RendererOptionPack::PushAttribute(const T& t)
 {
     attributes.push_back(TransientData(std::in_place_type_t<T>{}, 1));
+    attributes.back().ReserveAll();
     auto buffer = attributes.back().AccessAs<T>();
     auto readBuffer = Span<const T>(&t, 1);
     std::copy(readBuffer.cbegin(), readBuffer.cend(), buffer.begin());
 }
 
-template<class NamedEnumT>
+template<class IntT, class NamedEnumT>
 inline void RendererOptionPack::PushNamedEnum(const NamedEnumT& t)
 {
     using Enum = typename NamedEnumT::E;
-    using IntType = std::underlying_type_t<Enum >;
-    IntType tInt = IntType(static_cast<Enum>(t));
+    IntT tInt = IntT(static_cast<Enum>(t));
 
-    attributes.push_back(TransientData(std::in_place_type_t<IntType >{}, 1));
-    auto buffer = attributes.back().AccessAs<IntType>();
-    auto readBuffer = Span<const IntType>(&tInt, 1);
+    attributes.push_back(TransientData(std::in_place_type_t<IntT>{}, 1));
+    attributes.back().ReserveAll();
+    auto buffer = attributes.back().AccessAs<IntT>();
+    auto readBuffer = Span<const IntT>(&tInt, 1);
     std::copy(readBuffer.cbegin(), readBuffer.cend(), buffer.begin());
 }
 

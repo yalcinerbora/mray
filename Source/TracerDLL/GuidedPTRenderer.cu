@@ -457,10 +457,10 @@ GuidedPTRenderer::CurrentAttributes() const
     result.PushAttribute(currentOptions.cacheConeAperture);
     result.PushAttribute(currentOptions.russianRouletteRange);
     result.PushAttribute(currentOptions.totalSPP);
-    result.PushNamedEnum(currentOptions.lightSampler);
-    result.PushNamedEnum(currentOptions.renderMode);
+    result.PushNamedEnum<uint32_t>(currentOptions.lightSampler);
+    result.PushNamedEnum<uint32_t>(currentOptions.renderMode);
     result.PushAttribute(currentOptions.lobeProbablity);
-    result.PushNamedEnum(currentOptions.displayMode);
+    result.PushNamedEnum<uint32_t>(currentOptions.displayMode);
     if constexpr(MRAY_IS_DEBUG)
     {
         for([[maybe_unused]] const auto& d : result.attributes)
@@ -475,19 +475,19 @@ void GuidedPTRenderer::PushAttribute(uint32_t attributeIndex,
     using R = RendererBase;
     switch(attributeIndex)
     {
-        case  0: LoadAttribute(newOptions.cacheEntryLimit, data); break;
-        case  1: LoadAttribute(newOptions.cachePosBits, data); break;
-        case  2: LoadAttribute(newOptions.cacheNormalBits, data); break;
-        case  3: LoadAttribute(newOptions.cacheMaxLvlOffset, data); break;
-        case  4: LoadAttribute(newOptions.cacheConeAperture, data); break;
+        case  0: LoadFromTransientData(newOptions.cacheEntryLimit, data); break;
+        case  1: LoadFromTransientData(newOptions.cachePosBits, data); break;
+        case  2: LoadFromTransientData(newOptions.cacheNormalBits, data); break;
+        case  3: LoadFromTransientData(newOptions.cacheMaxLvlOffset, data); break;
+        case  4: LoadFromTransientData(newOptions.cacheConeAperture, data); break;
         //
-        case  5: LoadAttribute(newOptions.russianRouletteRange, data); break;
-        case  6: LoadAttribute(newOptions.totalSPP, data); break;
-        case  7: LoadEnumAttribute(newOptions.lightSampler, data); break;
-        case  8: LoadEnumAttribute(newOptions.renderMode, data); break;
-        case  9: LoadAttribute(newOptions.burstSize, data); break;
-        case 10: LoadAttribute(newOptions.lobeProbablity, data); break;
-        case 11: LoadEnumAttribute(newOptions.displayMode, data); break;
+        case  5: LoadFromTransientData(newOptions.russianRouletteRange, data); break;
+        case  6: LoadFromTransientData(newOptions.totalSPP, data); break;
+        case  7: LoadEnumFromTransientData<uint32_t>(newOptions.lightSampler, data); break;
+        case  8: LoadEnumFromTransientData<uint32_t>(newOptions.renderMode, data); break;
+        case  9: LoadFromTransientData(newOptions.burstSize, data); break;
+        case 10: LoadFromTransientData(newOptions.lobeProbablity, data); break;
+        case 11: LoadEnumFromTransientData<uint32_t>(newOptions.displayMode, data); break;
         default:
             throw MRayError("{} Unknown attribute index {}", TypeName(), attributeIndex);
     }

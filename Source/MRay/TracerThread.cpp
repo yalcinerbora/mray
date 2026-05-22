@@ -71,6 +71,7 @@ void from_json(const nlohmann::json& node, MRayColorSpaceEnum& t)
     t = e;
 }
 
+static
 Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
 {
     using namespace std::literals;
@@ -150,6 +151,20 @@ Expected<TracerConfig> LoadTracerConfig(const std::string& configJsonPath)
     }
 }
 
+static
+uint32_t FindRendererIndexOnTracer(std::string_view rName,
+                                   const TypeNameList& nameList)
+{
+    size_t result = 0;
+    for(const auto& r : nameList)
+    {
+        if(rName == r) break;
+        result++;
+    }
+    assert(result < nameList.size());
+    return uint32_t(result);
+}
+
 MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPath)
 {
     using namespace TypeNameGen::Runtime;
@@ -178,6 +193,8 @@ MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPa
         assert(curRenderer == INVALID_RENDERER_ID);
         curRenderer = tracer->CreateRenderer(rName);
         RendererAttributeInfoList attributes = tracer->AttributeInfo(curRenderer);
+        // TODO: Copying strings due to "tracer->Renderers()" cache the list later
+        curRendererIndexInList = FindRendererIndexOnTracer(rName, tracer->Renderers());
 
         uint32_t attribIndex = 0;
         for(const auto& attrib : attributes.attributeInfos)
@@ -224,9 +241,9 @@ MRayError TracerThread::CreateRendererFromConfig(const std::string& configJsonPa
                 switch(dataType.Name())
                 {
                     using enum MRayDataEnum;
-                    case MR_UINT8:  tData.AccessAs<uint8_t>()[0]  = uint8_t(enumValue); break;
+                    case MR_UINT8:  tData.AccessAs<uint8_t >()[0]  = uint8_t(enumValue); break;
                     case MR_UINT16: tData.AccessAs<uint16_t>()[0] = uint16_t(enumValue); break;
-                    case MR_UINT32: tData.AccessAs<uint16_t>()[0] = uint16_t(enumValue); break;
+                    case MR_UINT32: tData.AccessAs<uint32_t>()[0] = uint32_t(enumValue); break;
                     case MR_UINT64: tData.AccessAs<uint64_t>()[0] = uint64_t(enumValue); break;
                     default:
                         throw MRayError("Wrong Enumeration type on renderer \"{}\" "
@@ -323,7 +340,7 @@ void TracerThread::RestartRenderer()
     optionPackHeap.attributes.reserve(optionPack.attributes.size());
     optionPackHeap.enumInfoList.reserve(optionPack.paramInfos.enumInfos.size());
     optionPackHeap.paramTypes.reserve(optionPack.paramInfos.attributeInfos.size());
-    optionPackHeap.rendererIndexOnRendererList = curRendererNameInList;
+    optionPackHeap.rendererIndexOnRendererList = curRendererIndexInList;
     for(auto& attrib : optionPack.attributes)
         optionPackHeap.attributes.push_back(std::move(attrib));
     for(const auto& eInfo : optionPack.paramInfos.enumInfos)
@@ -536,14 +553,9 @@ void TracerThread::HandleRendererChange(const std::string& rendererName)
         tracer->DestroyRenderer(curRenderer);
     curRenderer = tracer->CreateRenderer(curRendererName);
 
-    // TODO: Memcy of "TypeNameList" here maybe not required
-    curRendererNameInList = 0;
-    for(const auto& rName : tracer->Renderers())
-    {
-        if(rName == rendererName) break;
-        curRendererNameInList++;
-    }
-
+    // TODO: Copying strings due to "tracer->Renderers()" cache the list later
+    curRendererIndexInList = FindRendererIndexOnTracer(rendererName,
+                                                       tracer->Renderers());
     RestartRenderer();
 }
 

@@ -160,7 +160,7 @@ MRayImGuiDataType MRayDataTypeToImGui(MRayDataEnum e, bool isEnum)
             .amount     = 0,
             .isString   = false,
             .isBool     = true,
-            .isEnum = true
+            .isEnum     = false
         };
         // TODO: These are probably will not be used
         case MR_MATRIX_4x4:
@@ -727,9 +727,46 @@ VisorGUI::RenderRendererOptions(const VisorState&)
         result.push_back(std::move(d));
     };
 
-    ImGui::ToggleButton(ICON_ICOMN_DATABASE, &rendererOptsOn);
-    //ImGui::ToggleButton(ICON_ICOMN_PENCIL, &rendererOptsOn);
-    if(ImGui::Begin("Renderer Options", &rendererOptsOn))
+
+    // Even without window, check the global hot keys.
+    for(size_t i = 0; i < options.attributes.size(); i++)
+    {
+        TransientData& attribValue = options.attributes[i];
+        const RendererAttributeInfo& attribType = options.paramTypes[i];
+        MRayDataEnum typeName = attribType.dataType.Name();
+        auto typeResult = MRayDataTypeToImGui(typeName, attribType.enumerationIndex.HasValue());
+        if(typeResult.isString) continue;
+
+        //
+        int64_t rolloverValue = std::numeric_limits<int64_t>::max();
+        if(typeResult.isEnum)
+        {
+            uint32_t enumIndex = attribType.enumerationIndex.Value();
+            const auto& enumNameList = options.enumInfoList[enumIndex].enumNames;
+            rolloverValue = int64_t(enumNameList.size());
+        }
+        else if(typeResult.isBool)
+        {
+            rolloverValue = 1;
+        }
+
+        Span<Byte> d = attribValue.AccessAs<Byte>();
+        if(UpdateValueViaHotKey(d.data(), typeName,
+                                inputChecker,
+                                attribType.hotKeyIndex,
+                                rolloverValue))
+        {
+            TransientData tData = attribValue.Copy();
+            TryAddChange({uint32_t(i), std::move(tData)});
+        }
+    }
+
+    // Render the window if requested
+    ImGui::ToggleButton(ICON_ICOMN_MENU, &rendererOptsOn);
+    if(!rendererOptsOn) return result;
+
+    if(ImGui::Begin("Renderer Options", &rendererOptsOn,
+                    ImGuiWindowFlags_AlwaysAutoResize))
     {
         // This part is somewhat complex, Thankfully imgui is has type erased
         // functions so we can call them.
@@ -772,14 +809,10 @@ VisorGUI::RenderRendererOptions(const VisorState&)
                         if(ImGui::Selectable(enumNameList[j].c_str(), &isSelected))
                             newValue = j;
                     }
+                    ImGui::EndCombo();
                 }
-                bool dataChanged = (newValue != enumValue);
-                // Check Hotkey
-                dataChanged |= UpdateValueViaHotKey(&enumValue, MRayDataEnum::MR_UINT64,
-                                                    inputChecker,
-                                                    attribType.hotKeyIndex,
-                                                    int64_t(enumNameList.size()));
                 // We did select something memcpy to
+                //if(ImGui::IsItemDeactivatedAfterEdit())
                 if(newValue != enumValue)
                 {
                     // Save it back to transient buffer and send
@@ -788,15 +821,14 @@ VisorGUI::RenderRendererOptions(const VisorState&)
                     switch(typeName)
                     {
                         using enum MRayDataEnum;
-                        case MR_UINT8:  tData.AccessAs<uint8_t >()[0] = uint8_t (enumValue); break;
-                        case MR_UINT16: tData.AccessAs<uint16_t>()[0] = uint16_t(enumValue); break;
-                        case MR_UINT32: tData.AccessAs<uint32_t>()[0] = uint32_t(enumValue); break;
-                        case MR_UINT64: tData.AccessAs<uint64_t>()[0] = uint64_t(enumValue); break;
+                        case MR_UINT8:  tData.AccessAs<uint8_t >()[0] = uint8_t (newValue); break;
+                        case MR_UINT16: tData.AccessAs<uint16_t>()[0] = uint16_t(newValue); break;
+                        case MR_UINT32: tData.AccessAs<uint32_t>()[0] = uint32_t(newValue); break;
+                        case MR_UINT64: tData.AccessAs<uint64_t>()[0] = uint64_t(newValue); break;
                         default: assert(false); break;
                     }
                     TryAddChange({uint32_t(i), std::move(tData)});
                 }
-                ImGui::EndCombo();
             }
             else if(typeResult.isString)
             {
@@ -808,11 +840,8 @@ VisorGUI::RenderRendererOptions(const VisorState&)
             else if(typeResult.isBool)
             {
                 bool& b = attribValue.AccessAs<bool>()[0];
-                bool valChangeViaGUI = ImGui::Checkbox(attribType.name.c_str(), &b);
-                bool valChangeViaKey = UpdateValueViaHotKey(&b, MRayDataEnum::MR_BOOL,
-                                                            inputChecker,
-                                                            attribType.hotKeyIndex, 1);
-                if(valChangeViaGUI || valChangeViaKey)
+                bool valChanged = ImGui::Checkbox(attribType.name.c_str(), &b);
+                if(ImGui::IsItemDeactivatedAfterEdit())
                 {
                     TransientData tData = attribValue.Copy();
                     TryAddChange({uint32_t(i), std::move(tData)});
@@ -820,14 +849,12 @@ VisorGUI::RenderRendererOptions(const VisorState&)
             }
             else
             {
+
                 Span<Byte> data = attribValue.AccessAs<Byte>();
-                bool valChangeViaGUI = ImGui::InputScalarN(attribType.name.c_str(),
-                                                           typeResult.dataType,
-                                                           data.data(), typeResult.amount);
-                bool valChangeViaKey = UpdateValueViaHotKey(data.data(), typeName,
-                                                            inputChecker,
-                                                            attribType.hotKeyIndex);
-                if(valChangeViaGUI || valChangeViaKey)
+                bool valChanged = ImGui::InputScalarN(attribType.name.c_str(),
+                                                      typeResult.dataType,
+                                                      data.data(), typeResult.amount);
+                if(ImGui::IsItemDeactivatedAfterEdit())
                 {
                     TransientData tData = attribValue.Copy();
                     TryAddChange({uint32_t(i), std::move(tData)});
@@ -842,38 +869,9 @@ VisorGUI::RenderRendererOptions(const VisorState&)
 
 TopBarChanges VisorGUI::ShowTopMenu(const VisorState& visorState)
 {
-    auto CheckLogic = [&](int32_t index, uint32_t size,
-                          VisorUserAction nextAction,
-                          VisorUserAction prevAction) -> Optional<int32_t>
-    {
-        Optional<int32_t> result;
-        if(size == 0) return result;
-
-        int32_t count = static_cast<int32_t>(size);
-        if(inputChecker.CheckKeyPress(nextAction) ||
-           inputChecker.CheckKeyPress(prevAction))
-        {
-            int32_t i = inputChecker.CheckKeyPress(prevAction) ? -1 : 1;
-            index += i;
-            index = Math::Roll(index, 0, count);
-            result = index;
-        }
-        return result;
-    };
-
     TopBarChanges result;
     if(inputChecker.CheckKeyPress(VisorUserAction::TOGGLE_MOVEMENT_LOCK))
         camLocked = !camLocked;
-
-
-    //result.customLogicIndex0 = CheckLogic(visorState.currentRenderLogic0,
-    //                                      visorState.renderer.customLogicSize0,
-    //                                      VisorUserAction::NEXT_RENDERER_CUSTOM_LOGIC_0,
-    //                                      VisorUserAction::PREV_RENDERER_CUSTOM_LOGIC_0);
-    //result.customLogicIndex1 = CheckLogic(visorState.currentRenderLogic1,
-    //                                      visorState.renderer.customLogicSize1,
-    //                                      VisorUserAction::NEXT_RENDERER_CUSTOM_LOGIC_1,
-    //                                      VisorUserAction::PREV_RENDERER_CUSTOM_LOGIC_1);
 
     if(ImGui::BeginMainMenuBar())
     {
@@ -885,12 +883,12 @@ TopBarChanges VisorGUI::ShowTopMenu(const VisorState& visorState)
             ImGui::SetNextWindowPos(wPos, ImGuiCond_Appearing, wPivot);
             result.newTMParams = tonemapperGUI->Render(tmWindowOn);
         }
-
         ImGui::Separator();
 
         //
         result.rendererIndex = ShowRendererComboBox(visorState);
         result.changedRendererOptions = RenderRendererOptions(visorState);
+        ImGui::Separator();
 
         static constexpr const char* VISOR_INFO_NAME = "VisorInfo ";
         float offsetX = (ImGui::GetWindowContentRegionMax().x -

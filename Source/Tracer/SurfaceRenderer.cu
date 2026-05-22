@@ -119,10 +119,10 @@ RendererOptionPack SurfaceRenderer::CurrentAttributes() const
     RendererOptionPack result;
     result.paramInfos = AttributeInfo();
     result.PushAttribute(currentOptions.totalSPP);
-    result.PushNamedEnum(currentOptions.renderMode);
+    result.PushNamedEnum<uint32_t>(currentOptions.renderMode);
     result.PushAttribute(currentOptions.doStochasticFilter);
     result.PushAttribute(currentOptions.tMaxAORatio);
-    result.PushNamedEnum(currentOptions.traceMask);
+    result.PushNamedEnum<uint32_t>(currentOptions.traceMask);
     result.PushAttribute(currentOptions.acceleratorIndex);
     if constexpr(MRAY_IS_DEBUG)
     {
@@ -139,20 +139,20 @@ void SurfaceRenderer::PushAttribute(uint32_t attributeIndex,
     {
         using R = RendererBase;
         using namespace SurfRDetail;
-        case 0: LoadAttribute(newOptions.totalSPP, data); break;
-        case 1: LoadEnumAttribute(newOptions.renderMode, data); break;
-        case 2: LoadAttribute(newOptions.doStochasticFilter, data); break;
+        case 0: LoadFromTransientData(newOptions.totalSPP, data); break;
+        case 1: LoadEnumFromTransientData<uint32_t>(newOptions.renderMode, data); break;
+        case 2: LoadFromTransientData(newOptions.doStochasticFilter, data); break;
         case 3:
         {
-            LoadAttribute(newOptions.tMaxAORatio, data);
+            LoadFromTransientData(newOptions.tMaxAORatio, data);
             newOptions.tMaxAORatio = Math::Clamp(newOptions.tMaxAORatio,
                                                  Float(0), Float(1));
             break;
         }
-        case 4: LoadEnumAttribute(newOptions.traceMask, data); break;
+        case 4: LoadEnumFromTransientData<uint32_t>(newOptions.traceMask, data); break;
         case 5:
         {
-            LoadAttribute(newOptions.acceleratorIndex, data);
+            LoadFromTransientData(newOptions.acceleratorIndex, data);
             // Roll the given value
             int32_t maxInstance = int32_t(tracerView.baseAccelerator.TotalInstanceCount() + 1);
             newOptions.acceleratorIndex = Math::Roll(int32_t(newOptions.acceleratorIndex),

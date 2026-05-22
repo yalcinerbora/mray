@@ -349,11 +349,11 @@ void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
     switch(attributeIndex)
     {
 
-        case 0: LoadAttribute(newOptions.totalSPP, data); break;
-        case 1: LoadAttribute(newOptions.isSpectral, data); break;
+        case 0: LoadFromTransientData(newOptions.totalSPP, data); break;
+        case 1: LoadFromTransientData(newOptions.isSpectral, data); break;
         case 2:
         {
-            LoadAttribute(newOptions.textureIndex, data);
+            LoadFromTransientData(newOptions.textureIndex, data);
             newOptions.textureIndex = RollTextureIndex(newOptions.textureIndex);
             // TODO: Which one is more intuitive (user-wise)
             // when texture is change should we stay on the current mip range
@@ -365,7 +365,7 @@ void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
         }
         case 3:
         {
-            LoadAttribute(newOptions.mipIndex, data);
+            LoadFromTransientData(newOptions.mipIndex, data);
             newOptions.mipIndex = ClampMipIndex(newOptions.mipIndex,
                                                 newOptions.textureIndex);
             break;

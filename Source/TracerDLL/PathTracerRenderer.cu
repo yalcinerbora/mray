@@ -145,10 +145,10 @@ PathTracerRendererT<SC>::CurrentAttributes() const
     result.paramInfos = AttributeInfo();
     result.PushAttribute(currentOptions.totalSPP);
     result.PushAttribute(currentOptions.burstSize);
-    result.PushNamedEnum(currentOptions.renderMode);
-    result.PushNamedEnum(currentOptions.sampleMode);
+    result.PushNamedEnum<uint32_t>(currentOptions.renderMode);
+    result.PushNamedEnum<uint32_t>(currentOptions.sampleMode);
     result.PushAttribute(currentOptions.russianRouletteRange);
-    result.PushNamedEnum(currentOptions.lightSampler);
+    result.PushNamedEnum<uint32_t>(currentOptions.lightSampler);
     result.PushAttribute(currentOptions.sampleMedia);
     if constexpr(MRAY_IS_DEBUG)
     {
@@ -165,13 +165,13 @@ void PathTracerRendererT<SC>::PushAttribute(uint32_t attributeIndex,
     using R = RendererBase;
     switch(attributeIndex)
     {
-        case 0: LoadAttribute(newOptions.totalSPP, data); break;
-        case 1: LoadAttribute(newOptions.burstSize, data); break;
-        case 2: LoadEnumAttribute(newOptions.renderMode, data); break;
-        case 3: LoadEnumAttribute(newOptions.sampleMode, data); break;
-        case 4: LoadAttribute(newOptions.russianRouletteRange, data); break;
-        case 5: LoadEnumAttribute(newOptions.lightSampler, data); break;
-        case 6: LoadAttribute(newOptions.sampleMedia, data); break;
+        case 0: LoadFromTransientData(newOptions.totalSPP, data); break;
+        case 1: LoadFromTransientData(newOptions.burstSize, data); break;
+        case 2: LoadEnumFromTransientData<uint32_t>(newOptions.renderMode, data); break;
+        case 3: LoadEnumFromTransientData<uint32_t>(newOptions.sampleMode, data); break;
+        case 4: LoadFromTransientData(newOptions.russianRouletteRange, data); break;
+        case 5: LoadEnumFromTransientData<uint32_t>(newOptions.lightSampler, data); break;
+        case 6: LoadFromTransientData(newOptions.sampleMedia, data); break;
         default:
             throw MRayError("{} Unknown attribute index {}", TypeName(), attributeIndex);
     }

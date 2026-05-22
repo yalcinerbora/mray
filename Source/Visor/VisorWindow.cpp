@@ -1291,7 +1291,10 @@ bool VisorWindow::Render()
             case RENDERER_OPTIONS:
             {
                 MRAY_LOG("[Visor] : Render Options received");
-                gui.OverrideRendererOptions(std::move(std::get<RENDERER_OPTIONS>(response)));
+                auto& rendererOptPack = std::get<RENDERER_OPTIONS>(response);
+                visorState.currentRenderIndex = rendererOptPack.rendererIndexOnRendererList;
+                gui.OverrideRendererOptions(std::move(rendererOptPack));
+
                 break;
             }
             case RENDER_BUFFER_INFO:

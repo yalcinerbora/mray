@@ -24,7 +24,8 @@ inline InputChecker::InputChecker(const VisorKeyMap& km)
 
 inline bool InputChecker::CheckKeyPress(VisorUserAction a, bool repeat) const
 {
-    return ImGui::IsKeyPressed(ImGuiKey(keyMap->at(a)), repeat);
+    return ImGui::IsKeyChordPressed(ImGuiKey(keyMap->at(a)));
+    //return ImGui::IsKeyPressed(ImGuiKey(keyMap->at(a)), repeat);
 }
 
 inline bool InputChecker::CheckKeyRelease(VisorUserAction a) const

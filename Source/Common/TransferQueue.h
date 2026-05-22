@@ -28,7 +28,7 @@ struct HeapRendererOptionPack
     std::vector<RendererAttributeInfo> paramTypes;
     std::vector<TransientData>         attributes;
     std::vector<EnumInfo>              enumInfoList;
-    uint32_t                           rendererIndexOnRendererList;
+    uint32_t                           rendererIndexOnRendererList = 0;
 };
 
 struct RendererOptionData
