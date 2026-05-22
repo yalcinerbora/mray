@@ -191,9 +191,9 @@ class PhysicalTileId
     MR_HF_DECL PhysicalTileId(uint32_t physicalArrayIndex,
                               uint32_t physicalTileIndex);
     //
-    MR_HF_DECL explicit operator uint32_t();
-    MR_HF_DECL uint32_t ArrayIndex();
-    MR_HF_DECL uint32_t TileIndex();
+    MR_HF_DECL explicit operator uint32_t() const;
+    MR_HF_DECL uint32_t ArrayIndex() const;
+    MR_HF_DECL uint32_t TileIndex() const;
 };
 
 class VirtualTextureId
@@ -225,10 +225,10 @@ class VirtualTextureId
                                 uint32_t typeIndex,
                                 uint32_t textureIndex);
     //
-    MR_HF_DECL explicit operator uint32_t();
-    MR_HF_DECL uint32_t PackIndex();
-    MR_HF_DECL uint32_t TypeIndex();
-    MR_HF_DECL uint32_t TextureIndex();
+    MR_HF_DECL explicit operator uint32_t() const;
+    MR_HF_DECL uint32_t PackIndex() const;
+    MR_HF_DECL uint32_t TypeIndex() const;
+    MR_HF_DECL uint32_t TextureIndex() const;
 };
 
 struct StreamingTextureDeviceData
@@ -355,19 +355,19 @@ PhysicalTileId::PhysicalTileId(uint32_t physicalArrayIndex,
 {}
 
 MR_HF_DEF
-PhysicalTileId::operator uint32_t()
+PhysicalTileId::operator uint32_t() const
 {
     return value;
 }
 
 MR_HF_DEF
-uint32_t PhysicalTileId::ArrayIndex()
+uint32_t PhysicalTileId::ArrayIndex() const
 {
     return Bit::FetchSubPortion(value, {PA_BITS_START, PA_BITS_END});
 }
 
 MR_HF_DEF
-uint32_t PhysicalTileId::TileIndex()
+uint32_t PhysicalTileId::TileIndex() const
 {
     return Bit::FetchSubPortion(value, {TI_BITS_START, TI_BITS_END});
 }
@@ -380,25 +380,25 @@ VirtualTextureId::VirtualTextureId(uint32_t packIndex,
 {}
 
 MR_HF_DEF
-VirtualTextureId::operator uint32_t()
+VirtualTextureId::operator uint32_t() const
 {
     return value;
 }
 
 MR_HF_DEF
-uint32_t VirtualTextureId::PackIndex()
+uint32_t VirtualTextureId::PackIndex() const
 {
     return Bit::FetchSubPortion(value, {PI_BITS_START, PI_BITS_END});
 }
 
 MR_HF_DEF
-uint32_t VirtualTextureId::TypeIndex()
+uint32_t VirtualTextureId::TypeIndex() const
 {
     return Bit::FetchSubPortion(value, {TI_BITS_START, TI_BITS_END});
 }
 
 MR_HF_DEF
-uint32_t VirtualTextureId::TextureIndex()
+uint32_t VirtualTextureId::TextureIndex() const
 {
     return Bit::FetchSubPortion(value, {TEX_BITS_START, TEX_BITS_END});
 }
