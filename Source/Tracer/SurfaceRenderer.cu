@@ -816,7 +816,7 @@ SurfaceRenderer::StaticAttributeInfo()
             {"doStochasticFilter", MRayDataTypeRT(MR_BOOL),   MR_MANDATORY},
             {"tMaxAORatio",        MRayDataTypeRT(MR_FLOAT),  MR_MANDATORY},
             {"traceMask",          MRayDataTypeRT(MR_UINT32), MR_MANDATORY, uint32_t(1), uint32_t(1)},
-            {"acceleratorIndex",   MRayDataTypeRT(MR_UINT32), MR_MANDATORY, std::nullopt, uint32_t(2)}
+            {"acceleratorIndex",   MRayDataTypeRT(MR_UINT32), MR_MANDATORY, std::nullopt, uint32_t(3)}
         },
         .enumInfos =
         {
