@@ -147,11 +147,7 @@ void KCSampleTextureSpectral(// I-O
         auto converter = Converter(waves, data);
         Spectrum s = isIlluminant ? converter.ConvertRadiance(result)
                                   : converter.ConvertAlbedo(result);
-        Spectrum t = dThroughput[i];
-
-        // Multiply with the "1 / PDF"
-        // (we do not explicitly store PDFs yet (~32MiB extra memory))
-        t = t * s;
+        Spectrum t = s;
 
         // Multiply with Illuminant, since these colors are optimized by
         // that illum conditions.

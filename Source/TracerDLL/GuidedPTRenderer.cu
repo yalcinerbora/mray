@@ -459,6 +459,7 @@ GuidedPTRenderer::CurrentAttributes() const
     result.PushAttribute(currentOptions.totalSPP);
     result.PushNamedEnum<uint32_t>(currentOptions.lightSampler);
     result.PushNamedEnum<uint32_t>(currentOptions.renderMode);
+    result.PushAttribute(currentOptions.burstSize);
     result.PushAttribute(currentOptions.lobeProbablity);
     result.PushNamedEnum<uint32_t>(currentOptions.displayMode);
     if constexpr(MRAY_IS_DEBUG)
@@ -648,7 +649,9 @@ GuidedPTRenderer::DoRenderPass(uint32_t sppLimit,
         dReloadIndices,
         dFilledIndices,
         aliveRayCount
-    ] = ReloadPaths(dIndices, sppLimit, false, processQueue);
+    ] = ReloadPaths(dIndices, sppLimit,
+                    false, IsSpectral,
+                    processQueue);
     //
     dIndices = dReloadIndices.subspan(0, aliveRayCount);
     dKeys = dKeys.subspan(0, aliveRayCount);
@@ -1250,9 +1253,7 @@ typename GuidedPTRenderer::AttribInfoList
 GuidedPTRenderer::StaticAttributeInfo()
 {
     using enum MRayDataEnum;
-    using enum AttributeIsArray;
     using enum AttributeOptionality;
-
     return AttribInfoList
     {
         .attributeInfos =

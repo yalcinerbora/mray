@@ -230,8 +230,9 @@ struct PathTracerRendererBase : public RendererBase
 
     RendererAnalyticData  CalculateAnalyticDataLatency(uint32_t passPathCount, uint32_t totalSPP,
                                                        const Timer& timer) const;
-    ReloadPathOutput      ReloadPaths(Span<const RayIndex> dIndices,
-                                      uint32_t sppLimit, bool setStartingVolumes,
+    ReloadPathOutput      ReloadPaths(Span<const RayIndex> dIndices, uint32_t sppLimit,
+                                      bool setStartingVolumes,
+                                      bool sampleSpectrumWavelengths,
                                       const GPUQueue& processQueue);
     void                  ResetAllPaths(const GPUQueue& queue);
     void                  MarkPathsTransmittedIndirect(Span<PathDataPack> dPathStates,

@@ -70,6 +70,7 @@ typename PathTracerRendererBase::ReloadPathOutput
 PathTracerRendererBase::ReloadPaths(Span<const RayIndex> dIndices,
                                     uint32_t sppLimit,
                                     bool setStartingVolumes,
+                                    bool sampleSpectrumWavelengths,
                                     const GPUQueue& processQueue)
 {
     // RELOADING!!!
@@ -150,7 +151,7 @@ PathTracerRendererBase::ReloadPaths(Span<const RayIndex> dIndices,
             // Now we can call spectral wavelength sample routine.
             // It stores the PDF values in the througput
             uint32_t usedRNDimensionCount = camSamplePerRay;
-            if(spectrumContext != nullptr)
+            if(sampleSpectrumWavelengths)
             {
                 RNRequestList spectralRNList = spectrumContext->SampleSpectrumRNList();
                 uint32_t rnPerSample = spectralRNList.TotalRNCount();
