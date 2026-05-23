@@ -17,7 +17,7 @@
 class SpatioDirCode
 {
     public:
-    static constexpr uint32_t LEVEL_BITS = 4;           // At most 256-level (overkill but bits left)
+    static constexpr uint32_t LEVEL_BITS = 4;           // At most 15-level
     static constexpr uint32_t NORMAL_BITS_PER_DIM = 3;  // 16-cardinal normal directions
                                                         // (We could've put bits here but then it will be too much)
     static constexpr uint32_t MORTON_BITS_PER_DIM = 18; // 2^54 3D-positions
@@ -79,14 +79,16 @@ struct HashGridView
     Span<uint32_t, 1>   dAllocCounter;
     // Parameters
     Vector3             camLocation;
-    AABB3               hashGridRegion;  // Region of the hash grid, probably scene AABB.
-                                         // (Unless it is teapot in a stadium kind of scene)
-    Float               baseRegionDelta; // Minimum region cell size of the positional codes.
-    uint32_t            baseRegionDim;   // Minimum region size of the positional codes.
-    Float               normalDelta;     // Same stuff but for normals.
-    uint32_t            normalRegionDim; //
-    uint32_t            maxLevelOffset;  // Maximum level offset that the grid can achieve
-    uint32_t            maxEntryLimit;   // Entry limit to prevent explosion of the hash table
+    AABB3               hashGridRegion;   // Region of the hash grid, probably scene AABB.
+                                          // (Unless it is teapot in a stadium kind of scene)
+    Float               baseRegionDelta;  // Minimum region cell size of the positional codes.
+    uint32_t            baseRegionDim;    // Minimum region size of the positional codes.
+    Float               normalDelta;      // Same stuff but for normals.
+    uint32_t            normalRegionDim;  //
+    uint32_t            maxLevel;         // Maximum level that the grid can achieve
+    uint32_t            sampleLevelLimit; // While random sampling, this is the uppoer limit of
+                                          // sampling a higher level grid
+    uint32_t            maxEntryLimit;    // Entry limit to prevent explosion of the hash table
     // Similar to ray cones, tangent of the ray's aperture.
     // (which is quite larger than the actual ray differential
     // to prevent explosion of nodes).
@@ -127,7 +129,8 @@ class HashGrid
     Vector3     camLocation;
     uint32_t    baseLevelPositionBits;
     uint32_t    normalBits;
-    uint32_t    maxLevelOffset;
+    uint32_t    maxLevel;
+    uint32_t    sampleLevelLimit;
     Float       coneAperture;
 
     public:
@@ -142,8 +145,9 @@ class HashGrid
     //
     void        Reset(AABB3 regionAABB, Vector3 camLocation,
                       uint32_t baseLevelPositionBits,
-                      uint32_t normalBits, uint32_t maxLvlOffset,
+                      uint32_t normalBits,
                       Float coneApertureDegrees,
+                      uint32_t sampleLevelLimitIn,
                       uint32_t maxEntryCount, const GPUQueue&);
     void        SetCameraPos(Vector3 camLocation);
     void        ClearAllEntries(const GPUQueue&);
@@ -160,7 +164,7 @@ uint32_t SpatioDirCode::MaxLevel()
 {
     // -1 is here to create a unique value(s) that is never used
     // which will be used as hash table empty marker and sentinel
-    constexpr auto R = ((1u << LEVEL_BITS) - 1);
+    static constexpr auto R = ((1u << LEVEL_BITS) - 1);
     return R;
 }
 
@@ -215,11 +219,10 @@ SpatioDirCode HashGridView::GenCode(const Vector3& pos,
                                     const Vector3& normal) const
 {
     // Level
-    uint32_t levelMax = Bit::RequiredBitsToRepresent(baseRegionDim) - 1;
     Float coneWidth = tanConeHalfTimes2 * Math::Length(pos - camLocation);
     uint32_t ratio = uint32_t(Math::RoundInt(coneWidth * baseRegionDelta));
     uint32_t level = Bit::RequiredBitsToRepresent(ratio);
-    level = Math::Min(level, levelMax);
+    level = Math::Min(level, maxLevel);
 
     // Position
     Float levelDelta = baseRegionDelta / Float(1u << level);
@@ -249,13 +252,12 @@ SpatioDirCode HashGridView::GenCodeStochastic(const Vector3& pos,
                                               BackupRNG& rng) const
 {
     // Level
-    uint32_t levelMax = Bit::RequiredBitsToRepresent(baseRegionDim) - 1;
     Float coneWidth = tanConeHalfTimes2 * Math::Length(pos - camLocation);
     uint32_t ratio = uint32_t(Math::RoundInt(coneWidth * baseRegionDelta));
     uint32_t level = Bit::RequiredBitsToRepresent(ratio);
     uint32_t rndLevelOffset = uint32_t(-Math::Log2(Float(1) - rng.NextFloat()));
-    rndLevelOffset = Math::Min(rndLevelOffset, maxLevelOffset);
-    level = Math::Min(level + rndLevelOffset, levelMax);
+    rndLevelOffset = Math::Min(rndLevelOffset, sampleLevelLimit);
+    level = Math::Min(level + rndLevelOffset, maxLevel);
 
     // Position
     Float levelDelta = baseRegionDelta / Float(1u << level);
@@ -457,7 +459,8 @@ HashGridView HashGrid::View() const
         .baseRegionDim     = baseLevelGridCount,
         .normalDelta       = normalDelta,
         .normalRegionDim   = normalRegionDim,
-        .maxLevelOffset    = maxLevelOffset,
+        .maxLevel          = maxLevel,
+        .sampleLevelLimit  = sampleLevelLimit,
         .maxEntryLimit     = maxEntryLimit,
         .tanConeHalfTimes2 = tanHalfTimes2
     };

@@ -80,16 +80,16 @@ namespace GuidedPTRDetail
         // ====================== //
         //    Hash Grid Related   //
         // ====================== //
-        uint32_t cacheEntryLimit   = 2'000'000; // At most 2M entries
-                                                // (allocation is 2x 2M = nearest pow2)
-        uint32_t cachePosBits      = 14;        // Maximum subdiv of bottom level voxel
-                                                // SceneAABB / 2^16 = voxel size
-        uint32_t cacheNormalBits   = 2;         // Concentric Octrahedral map of the normal
-                                                // which will be divided on to 4x4 grid
-        uint32_t cacheMaxLvlOffset = 3;         // Maximum upper levels of the voxel grid
-        Float    cacheConeAperture = Float(0.6);// When a ray hits a cache entry, it will be assumed
-                                                // has a differential as if it had a ray cone with this
-                                                // aperture.
+        uint32_t cacheEntryLimit       = 2'000'000; // At most 2M entries
+                                                    // (allocation is 2x 2M = nearest pow2)
+        uint32_t cachePosBits          = 14;        // Maximum subdiv of bottom level voxel
+                                                    // SceneAABB / 2^16 = voxel size
+        uint32_t cacheNormalBits       = 2;         // Concentric Octrahedral map of the normal
+                                                    // which will be divided on to 4x4 grid
+        uint32_t cacheSampleLevelLimit = 3;         // Maximum upper level sample limit for random grid selection
+        Float    cacheConeAperture = Float(0.6);    // When a ray hits a cache entry, it will be assumed
+                                                    // has a differential as if it had a ray cone with this
+                                                    // aperture.
         // ====================== //
         //  Path Tracing Related  //
         // ====================== //

@@ -9,14 +9,15 @@ HashGrid::HashGrid(const GPUSystem& gpuSystem)
 
 void HashGrid::Reset(AABB3 aabbIn, Vector3 camLocationIn,
                      uint32_t baseLevelPositionBitsIn,
-                     uint32_t normalBitsIn, uint32_t maxLvlOffsetIn,
+                     uint32_t normalBitsIn,
                      Float coneApertureDegrees,
+                     uint32_t sampleLevelLimitIn,
                      uint32_t maxEntryCount, const GPUQueue& queue)
 {
     regionAABB = aabbIn;
     camLocation = camLocationIn;
     normalBits = normalBitsIn;
-    maxLevelOffset = maxLvlOffsetIn;
+    sampleLevelLimit = sampleLevelLimitIn;
     baseLevelPositionBits = baseLevelPositionBitsIn;
     coneAperture = MathConstants::DegToRadCoef<Float>() * coneApertureDegrees;
 
@@ -26,15 +27,19 @@ void HashGrid::Reset(AABB3 aabbIn, Vector3 camLocationIn,
                         "exceeds the maximum \"{}\"!",
                         normalBits, SpatioDirCode::NORMAL_BITS_PER_DIM);
     }
-    if(baseLevelPositionBits > SpatioDirCode::MORTON_BITS_PER_DIM ||
-       baseLevelPositionBits > SpatioDirCode::MaxLevel())
+    if(baseLevelPositionBits > SpatioDirCode::MORTON_BITS_PER_DIM)
     {
         throw MRayError("Positional bits (which is \"{}\") for hash grid "
                         "exceeds the maximum \"{}\"!",
                         baseLevelPositionBits,
                         SpatioDirCode::MORTON_BITS_PER_DIM);
     }
+    // Calculate the actual max level
+    uint32_t baseLevelGridCount = 1u << baseLevelPositionBits;
+    uint32_t dimLevelMax = Bit::RequiredBitsToRepresent(baseLevelGridCount) - 1;
+    maxLevel = Math::Min(dimLevelMax, SpatioDirCode::MaxLevel());
 
+    // Caclulate HT size
     static constexpr Float BASE_LOAD_MULT = Float(1) / BASE_LOAD_FACTOR;
     uint32_t htSize = Math::NextPowerOfTwo(uint32_t(Float(maxEntryCount) * BASE_LOAD_MULT));
 

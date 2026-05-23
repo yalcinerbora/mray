@@ -46,11 +46,11 @@ class HashGridRenderer final : public RendererBase
 
     struct Options
     {
-        uint32_t cacheEntryLimit   = 3'000'000;
-        uint32_t cachePosBits      = 12;
-        uint32_t cacheNormalBits   = 2;
-        uint32_t cacheLevelCount   = 4;
-        Float    cacheConeAperture = Float(0.6);
+        uint32_t cacheEntryLimit       = 3'000'000;
+        uint32_t cachePosBits          = 12;
+        uint32_t cacheNormalBits       = 2;
+        uint32_t cacheSampleLevelLimit = 4;
+        Float    cacheConeAperture     = Float(0.6);
         //
         uint32_t pathTraceDepth    = 3;
     };
@@ -58,9 +58,6 @@ class HashGridRenderer final : public RendererBase
     private:
     Options     currentOptions  = {};
     Options     newOptions      = {};
-    // State
-    uint32_t    curPosBits    = 0;
-    uint32_t    curNormalBits = 0;
     //
     bool        saveImage;
     // Camera stuff
@@ -70,7 +67,7 @@ class HashGridRenderer final : public RendererBase
     CameraKey                   curCamKey;
     const RenderCameraWorkI*    curCamWork;
     // Renderer Systems and Memory
-    HashGrid                hashGrid;
+    HashGrid            hashGrid;
     RayPartitioner      rayPartitioner;
     RNGeneratorPtr      rnGenerator;
     //

@@ -453,7 +453,7 @@ GuidedPTRenderer::CurrentAttributes() const
     result.PushAttribute(currentOptions.cacheEntryLimit);
     result.PushAttribute(currentOptions.cachePosBits);
     result.PushAttribute(currentOptions.cacheNormalBits);
-    result.PushAttribute(currentOptions.cacheMaxLvlOffset);
+    result.PushAttribute(currentOptions.cacheSampleLevelLimit);
     result.PushAttribute(currentOptions.cacheConeAperture);
     result.PushAttribute(currentOptions.russianRouletteRange);
     result.PushAttribute(currentOptions.totalSPP);
@@ -479,7 +479,7 @@ void GuidedPTRenderer::PushAttribute(uint32_t attributeIndex,
         case  0: LoadFromTransientData(newOptions.cacheEntryLimit, data); break;
         case  1: LoadFromTransientData(newOptions.cachePosBits, data); break;
         case  2: LoadFromTransientData(newOptions.cacheNormalBits, data); break;
-        case  3: LoadFromTransientData(newOptions.cacheMaxLvlOffset, data); break;
+        case  3: LoadFromTransientData(newOptions.cacheSampleLevelLimit, data); break;
         case  4: LoadFromTransientData(newOptions.cacheConeAperture, data); break;
         //
         case  5: LoadFromTransientData(newOptions.russianRouletteRange, data); break;
@@ -1135,8 +1135,8 @@ GuidedPTRenderer::StartRender(const RenderImageParams& rIP,
                        Vector3::Zero(),
                        currentOptions.cachePosBits,
                        currentOptions.cacheNormalBits,
-                       currentOptions.cacheMaxLvlOffset,
                        currentOptions.cacheConeAperture,
+                       currentOptions.cacheSampleLevelLimit,
                        currentOptions.cacheEntryLimit,
                        queue);
         //hgInit = true;
@@ -1258,23 +1258,23 @@ GuidedPTRenderer::StaticAttributeInfo()
     {
         .attributeInfos =
         {
-            {"cacheEntryLimit",   MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
-            {"cachePosBits",      MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
-            {"cacheNormalBits",   MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
-            {"cacheMaxLvlOffset", MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
-            {"cacheConeAperture", MRayDataTypeRT(MR_FLOAT),      MR_OPTIONAL },
-            {"rrRange",           MRayDataTypeRT(MR_VECTOR_2UI), MR_MANDATORY},
-            {"totalSPP",          MRayDataTypeRT(MR_UINT32),     MR_MANDATORY},
-            {"lightSampler",      MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL,  uint32_t(0)},
-            {"renderMode",        MRayDataTypeRT(MR_UINT32),     MR_MANDATORY, uint32_t(1)},
-            {"burstSize",         MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
-            {"lobeProbability",   MRayDataTypeRT(MR_FLOAT),      MR_OPTIONAL },
-            {"displayMode",       MRayDataTypeRT(MR_UINT32),     MR_MANDATORY, uint32_t(2), uint32_t(0)}
+            {"cacheEntryLimit",       MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
+            {"cachePosBits",          MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
+            {"cacheNormalBits",       MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
+            {"cacheSampleLevelLimit", MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
+            {"cacheConeAperture",     MRayDataTypeRT(MR_FLOAT),      MR_OPTIONAL },
+            {"rrRange",               MRayDataTypeRT(MR_VECTOR_2UI), MR_MANDATORY},
+            {"totalSPP",              MRayDataTypeRT(MR_UINT32),     MR_MANDATORY},
+            {"lightSampler",          MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL,  uint32_t(0)},
+            {"renderMode",            MRayDataTypeRT(MR_UINT32),     MR_MANDATORY, uint32_t(1)},
+            {"burstSize",             MRayDataTypeRT(MR_UINT32),     MR_OPTIONAL },
+            {"lobeProbability",       MRayDataTypeRT(MR_FLOAT),      MR_OPTIONAL },
+            {"displayMode",           MRayDataTypeRT(MR_UINT32),     MR_MANDATORY, uint32_t(2), uint32_t(0)}
         },
         .enumInfos
         {
-            RendererAttributeInfoList::FromNamedEnum<RenderMode>(),
             RendererAttributeInfoList::FromNamedEnum<LightSamplerType>(),
+            RendererAttributeInfoList::FromNamedEnum<RenderMode>(),
             RendererAttributeInfoList::FromNamedEnum<GuidedPTRDetail::DisplayMode>()
         }
     };
