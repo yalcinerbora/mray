@@ -29,8 +29,8 @@ void KCCopyAccelKeysFromHitRecordEmbree(MRAY_GRID_CONSTANT Span<AcceleratorKey> 
 {
     KernelCallParams kp;
 
-    uint32_t totalKeys = uint32_t(hInstanceHRStartOffsets.size());
-    for(uint32_t i = kp.GlobalId(); i < totalKeys; i += kp.GlobalId())
+    uint32_t totalKeys = uint32_t(hInstanceHRStartOffsets.size() - 1);
+    for(uint32_t i = kp.GlobalId(); i < totalKeys; i += kp.TotalSize())
     {
         uint32_t index = hInstanceHRStartOffsets[i];
         hAccelKeys[i] = hHitRecordPtrs[index]->acceleratorKey;
@@ -479,7 +479,7 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
                                           Span<const RayIndex> dRayIndices,
                                           Span<const AcceleratorKey> dAccelKeys,
                                           //
-                                          CommonKey dAccelKeyBatchPortion,
+                                          CommonKey hAccelKeyBatchPortion,
                                           RayCastOptions options,
                                           const GPUQueue& queue)
 {
@@ -487,8 +487,19 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
     static const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
     const auto _ = annotation.AnnotateScope();
 
-    size_t groupStart = hInstanceBatchStartOffsets[dAccelKeyBatchPortion];
-    size_t groupEnd = hInstanceBatchStartOffsets[dAccelKeyBatchPortion + 1];
+    auto accelGroupOpt = accelInstances.at(hAccelKeyBatchPortion);
+    if(!accelGroupOpt)
+    {
+        throw MRayError("BaseAccelerator: Unknown accelerator batch {}",
+                        hAccelKeyBatchPortion);
+    }
+    const AcceleratorGroupI* accelGroup = accelGroupOpt.Value();
+    const AcceleratorGroupEmbreeI* accelGroupE  = dynamic_cast<const AcceleratorGroupEmbreeI*>(accelGroup);
+    CommonKey accelGroupId = accelGroup->GroupId();
+    uint32_t globalToLocalInstanceOffset = accelGroupE->GlobalToLocalInstanceOffset();
+
+    size_t groupStart = hInstanceBatchStartOffsets[accelGroupId];
+    size_t groupEnd = hInstanceBatchStartOffsets[accelGroupId + 1];
     Span<const Matrix3x4> hLocalInvTransforms = hGlobalInstanceInvTransforms.subspan(groupStart, groupEnd - groupStart);
     Span<const RTCScene> hLocalScenes =  hGlobalSceneHandles.subspan(groupStart, groupEnd - groupStart);
 
@@ -508,7 +519,8 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
             // to increase batch size
             uint32_t i = kp.GlobalId();
             uint32_t rIndex = dRayIndices[i];
-            CommonKey accIndex = dAccelKeys[rIndex].FetchIndexPortion();
+            AcceleratorKey curAccelKey = dAccelKeys[rIndex];
+            CommonKey accIndex = curAccelKey.FetchIndexPortion();
 
             const Matrix3x4& transform = hLocalInvTransforms[accIndex];
             RTCScene t = hLocalScenes[accIndex];
@@ -552,12 +564,13 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
             rqContext.rng.emplace_back(dRNGStates[rIndex]);
             // Volume Buffer
             rqContext.volumeIndices.emplace_back();
+            //
+            rqContext.localAccelKeys.emplace_back(curAccelKey);
             // Launch!
             rtcIntersect1(t, &rh, &intersectArgs);
             //
             uint32_t primBatchIndex = rh.hit.geomID;
             uint32_t primIndex      = rh.hit.primID;
-            uint32_t instanceIndex  = rh.hit.instID[0];
             // No matter what, relaod the rng state back.
             // Even if there is not hit ray may used it
             // during traversal.
@@ -567,12 +580,16 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
             rqContext.rng.clear();
 
             // Skip if no hit has occured,
+            //assert(rh.hit.instID[0] == RTC_INVALID_GEOMETRY_ID);
             if(primBatchIndex == RTC_INVALID_GEOMETRY_ID)
                 return;
 
-            uint32_t iOffset = hInstanceHRStartOffsets[instanceIndex];
+            uint32_t iOffset = hInstanceHRStartOffsets[accIndex + globalToLocalInstanceOffset];
             uint32_t globalRecordIndex = iOffset + primBatchIndex;
             const auto& record = *hAllHitRecordPtrs[globalRecordIndex];
+
+            // Might aswell validate here
+            assert(curAccelKey == record.acceleratorKey);
 
             using enum RayCastOptions::WriteMode;
             if(options.writeMode == WRITE_ALL ||
@@ -595,7 +612,7 @@ void BaseAcceleratorEmbree::CastLocalRays(// Output
 
             if(options.writeMode == WRITE_ALL ||
                options.writeMode == WRITE_VOLUME_INDEX)
-                dVolumeIndices[rIndex] = rqContext.volumeIndices[i];
+                dVolumeIndices[rIndex] = rqContext.volumeIndices.front();
 
             // We always write tMax
             UpdateTMax(dRays, rIndex, rh.ray.tfar);
@@ -618,7 +635,7 @@ size_t BaseAcceleratorEmbree::GPUMemoryUsage() const
 void BaseAcceleratorEmbree::WriteAllAcceleratorKeys(Span<AcceleratorKey> dAccelKeys,
                                                     const GPUQueue& queue) const
 {
-    assert(dAccelKeys.size() == hInstanceHRStartOffsets.size());
+    assert(dAccelKeys.size() == hInstanceHRStartOffsets.size() - 1);
     queue.IssueWorkKernel<KCCopyAccelKeysFromHitRecordEmbree>
     (
         "KCCopyAccelKeysFromHitRecordEmbree",

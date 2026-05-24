@@ -917,6 +917,12 @@ size_t AcceleratorGroupEmbree<PG>::HitRecordCount() const
 }
 
 template<PrimitiveGroupC PG>
+uint32_t AcceleratorGroupEmbree<PG>::GlobalToLocalInstanceOffset() const
+{
+    return geomGlobalData.globalToLocalOffset;
+}
+
+template<PrimitiveGroupC PG>
 typename AcceleratorGroupEmbree<PG>::DataSoA
 AcceleratorGroupEmbree<PG>::SoA() const
 {

@@ -97,6 +97,21 @@ void KCIsVisibleToSpectrum(MRAY_GRID_CONSTANT const Span<Spectrum> dOutputData,
     }
 }
 
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCSplatAcceleratorKeyToRays(MRAY_GRID_CONSTANT const Span<AcceleratorKey> dOutputKeys,
+                                 MRAY_GRID_CONSTANT const Span<const RayIndex> dIndices,
+                                 MRAY_GRID_CONSTANT const Span<const AcceleratorKey, 1> dAcceleratorKey)
+{
+    AcceleratorKey key = dAcceleratorKey[0];
+
+    KernelCallParams kp;
+    uint32_t rayCount = static_cast<uint32_t>(dIndices.size());
+    for(uint32_t i = kp.GlobalId(); i < rayCount; i += kp.TotalSize())
+    {
+        dOutputKeys[i] = key;
+    }
+}
+
 SurfaceRenderer::SurfaceRenderer(const RenderImagePtr& rb,
                                  TracerView tv,
                                  ThreadPool& tp,
@@ -267,17 +282,21 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                                         dRayStateAO.dImageCoordinates,
                                         dRayStateAO.dOutputData,
                                         dRayStateAO.dFilmFilterWeights,
+                                        dRayInstanceAccelKeys,
                                         dIsVisibleBuffer,
                                         dRandomNumBuffer,
                                         dWorkHashes, dWorkBatchIds,
+                                        dAllInstanceAccelKeys,
                                         dSubCameraBuffer),
                                     rendererGlobalMem,
                                     {maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount,
+                                     maxRayCount,
                                      isVisibleIntCount, maxSampleCount,
                                      totalWorkCount, totalWorkCount,
+                                     tracerView.baseAccelerator.TotalInstanceCount(),
                                      SUB_CAMERA_BUFFER_SIZE});
         dRayStateCommon.dImageCoordinates = dRayStateAO.dImageCoordinates;
         dRayStateCommon.dOutputData = dRayStateAO.dOutputData;
@@ -295,14 +314,17 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
                                         dRayStateCommon.dOutputData,
                                         dRayStateCommon.dFilmFilterWeights,
                                         dRayStateCommon.dRayMediaPacks,
+                                        dRayInstanceAccelKeys,
                                         dRandomNumBuffer,
                                         dWorkHashes, dWorkBatchIds,
+                                        dAllInstanceAccelKeys,
                                         dSubCameraBuffer),
                                     rendererGlobalMem,
                                     {maxRayCount, maxRayCount, maxRayCount,
                                      maxRayCount, maxRayCount, maxRayCount,
-                                     maxRayCount, rayVolCount, maxSampleCount,
-                                     totalWorkCount, totalWorkCount,
+                                     maxRayCount, rayVolCount, maxRayCount,
+                                     maxSampleCount, totalWorkCount, totalWorkCount,
+                                     tracerView.baseAccelerator.TotalInstanceCount(),
                                      SUB_CAMERA_BUFFER_SIZE});
 
         dRayStateAO.dImageCoordinates = dRayStateCommon.dImageCoordinates;
@@ -324,6 +346,9 @@ RenderBufferInfo SurfaceRenderer::StartRender(const RenderImageParams& rIP,
     // Also allocate for the partitioner inside the
     // base accelerator (This should not allocate for HW accelerators)
     tracerView.baseAccelerator.AllocateForTraversal(maxRayCount);
+    // Get Accelerator Keys for Local Ray Cast Debugging
+    tracerView.baseAccelerator.WriteAllAcceleratorKeys(dAllInstanceAccelKeys,
+                                                       queue);
 
     // Calculate tMax for ambient occlusion
     curTMaxAO = Math::Length(tracerView.baseAccelerator.SceneAABB().GeomSpan());
@@ -502,15 +527,47 @@ RendererOutput SurfaceRenderer::DoRender()
     auto accelWriteMode = showVolume ? RayCastOptions::WRITE_ALL
                                      : RayCastOptions::WRITE_HIT_KEY_AND_HIT;
     auto traceMode = TraceMaskToTraceMode(currentOptions.traceMask);
-    tracerView.baseAccelerator.CastRays
-    (
-        dVolumeIndices,
-        dHitKeysLocal, dHits, dBackupRNGStates,
-        dRays, dIndices,
-        {accelWriteMode, traceMode},
-        processQueue
-    );
 
+    //
+    if(currentOptions.acceleratorIndex != 0)
+    {
+        uint32_t instanceIndex = currentOptions.acceleratorIndex - 1;
+        AcceleratorKey accelKey;
+        Span<AcceleratorKey> dCurrentAccelKey = dAllInstanceAccelKeys.subspan(instanceIndex, 1);
+        processQueue.MemcpyAsync(Span(&accelKey, 1), ToConstSpan(dCurrentAccelKey));
+        processQueue.IssueWorkKernel<KCSplatAcceleratorKeyToRays>
+        (
+            "KCSplatAcceleratorKeyToRays",
+            DeviceWorkIssueParams{.workCount = uint32_t(dIndices.size())},
+            //
+            dRayInstanceAccelKeys,
+            dIndices,
+            Span<AcceleratorKey, 1>(dCurrentAccelKey)
+        );
+
+        processQueue.Barrier().Wait();
+        tracerView.baseAccelerator.CastLocalRays
+        (
+            dVolumeIndices, dHitKeysLocal, dHits,
+            dBackupRNGStates, dRays, dIndices,
+            dRayInstanceAccelKeys,
+            accelKey.FetchBatchPortion(),
+            {accelWriteMode, traceMode},
+            processQueue
+        );
+    }
+    else
+    {
+        tracerView.baseAccelerator.CastRays
+        (
+            dVolumeIndices,
+            dHitKeysLocal, dHits,
+            dBackupRNGStates,
+            dRays, dIndices,
+            {accelWriteMode, traceMode},
+            processQueue
+        );
+    }
     // Resolve the VolumeIndices to
     if(showVolume)
     {

@@ -446,7 +446,7 @@ Float BxDF::LambdaSmith(const Vector3& vec, Float alpha)
 {
     Vector3 vSqr = vec * vec;
     Float alpha2 = alpha * alpha;
-    Float inner = alpha2 * (vSqr[0] + vSqr[1]) / vSqr[2];
+    Float inner = alpha2 * (vSqr[0] + vSqr[1]) / (vSqr[2] + MathConstants::Epsilon<Float>());
     Float lambda = Math::Sqrt(Float(1) + inner) - Float(1);
     lambda *= Float(0.5);
     return lambda;

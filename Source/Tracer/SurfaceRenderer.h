@@ -79,7 +79,8 @@ class SurfaceRenderer final : public RendererBase
     Span<CommonKey>         dWorkHashes;
     Span<CommonKey>         dWorkBatchIds;
     // Local ray casting / Filtered test related
-    Span<AcceleratorKey>    dAllInstanceAccelKeys;
+    Span<AcceleratorKey>    dAllInstanceAccelKeys; // All Keys on the system
+    Span<AcceleratorKey>    dRayInstanceAccelKeys; // Copied key for each accel
     //
     bool                    saveImage;
     //

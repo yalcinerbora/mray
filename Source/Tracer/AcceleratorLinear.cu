@@ -492,7 +492,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                                           Span<const RayIndex> dRayIndices,
                                           Span<const AcceleratorKey> dAccelKeys,
                                           //
-                                          CommonKey dAccelKeyBatchPortion,
+                                          CommonKey hAccelKeyBatchPortion,
                                           RayCastOptions options,
                                           const GPUQueue& queue)
 {
@@ -504,11 +504,11 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
     if(maxBitsUsedOnKey == Vector2ui::Zero())
         return;
 
-    auto accelGroupOpt = accelInstances.at(dAccelKeyBatchPortion);
+    auto accelGroupOpt = accelInstances.at(hAccelKeyBatchPortion);
     if(!accelGroupOpt)
     {
         throw MRayError("BaseAccelerator: Unknown accelerator batch {}",
-                        dAccelKeyBatchPortion);
+                        hAccelKeyBatchPortion);
     }
     AcceleratorGroupI* accelGroup = accelGroupOpt.Value();
     auto dAccelKeysCommon = MemAlloc::RepurposeAlloc<const CommonKey>(dAccelKeys);
@@ -524,7 +524,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                               dRayIndices,
                               dAccelKeysCommon,
                               //
-                              dAccelKeyBatchPortion,
+                              hAccelKeyBatchPortion,
                               options,
                               queue);
 }

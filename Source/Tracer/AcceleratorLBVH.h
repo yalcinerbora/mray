@@ -309,7 +309,7 @@ class BaseAcceleratorLBVH final : public BaseAcceleratorT<BaseAcceleratorLBVH>
                           Span<const RayIndex> dRayIndices,
                           Span<const AcceleratorKey> dAccelKeys,
                           //
-                          CommonKey dAccelKeyBatchPortion,
+                          CommonKey hAccelKeyBatchPortion,
                           RayCastOptions,
                           const GPUQueue& queue) override;
 

@@ -136,6 +136,7 @@ class AcceleratorGroupEmbreeI
 
     virtual void OffsetAccelKeyInRecords(uint32_t instanceRecordStartOffset) = 0;
     virtual size_t HitRecordCount() const = 0;
+    virtual uint32_t GlobalToLocalInstanceOffset() const = 0;
 };
 
 struct EmbreeRayQueryContext
@@ -276,14 +277,15 @@ class AcceleratorGroupEmbree final
                             const GPUQueue& queue) override;
 
     // Embree Related
-    void    AcquireIASConstructionParams(Span<RTCScene> hSceneHandles,
-                                         Span<Matrix3x4> hInstanceMatrices,
-                                         Span<uint32_t> hInstanceHitRecordCounts,
-                                         Span<AccelInstanceMask> hInstanceMasks,
-                                         Span<const EmbreeHitRecord<>*> dHitRecordPtrs,
-                                         const GPUQueue& queue) const override;
-    void    OffsetAccelKeyInRecords(uint32_t instanceRecordStartOffset) override;
-    size_t  HitRecordCount() const override;
+    void     AcquireIASConstructionParams(Span<RTCScene> hSceneHandles,
+                                          Span<Matrix3x4> hInstanceMatrices,
+                                          Span<uint32_t> hInstanceHitRecordCounts,
+                                          Span<AccelInstanceMask> hInstanceMasks,
+                                          Span<const EmbreeHitRecord<>*> dHitRecordPtrs,
+                                          const GPUQueue& queue) const override;
+    void     OffsetAccelKeyInRecords(uint32_t instanceRecordStartOffset) override;
+    size_t   HitRecordCount() const override;
+    uint32_t GlobalToLocalInstanceOffset() const override;
 
     DataSoA SoA() const;
     size_t  GPUMemoryUsage() const override;
@@ -350,7 +352,7 @@ class BaseAcceleratorEmbree final : public BaseAcceleratorT<BaseAcceleratorEmbre
                           Span<const RayIndex> dRayIndices,
                           Span<const AcceleratorKey> dAccelKeys,
                           //
-                          CommonKey dAccelKeyBatchPortion,
+                          CommonKey hAccelKeyBatchPortion,
                           RayCastOptions,
                           const GPUQueue& queue) override;
 

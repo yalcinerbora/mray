@@ -196,6 +196,7 @@ class AcceleratorGroupI
     virtual uint32_t    InstanceTypeCount() const = 0;
     virtual uint32_t    AcceleratorCount() const = 0;
     virtual uint32_t    UsedIdBitsInKey() const = 0;
+    virtual uint32_t    GroupId() const = 0;
     virtual void        WriteInstanceKeysAndAABBs(Span<AABB3> dAABBWriteRegion,
                                                   Span<AcceleratorKey> dKeyWriteRegion,
                                                   const GPUQueue& queue) const = 0;
@@ -365,6 +366,7 @@ class AcceleratorGroup : public AcceleratorGroupI
     uint32_t            InstanceTypeCount() const override;
     uint32_t            AcceleratorCount() const override;
     uint32_t            UsedIdBitsInKey() const override;
+    uint32_t            GroupId() const override;
     void                SetKeyOffset(uint32_t) override;
     //
     const GenericGroupPrimitiveT& PrimGroup() const override;
@@ -425,7 +427,7 @@ class BaseAcceleratorI
                                   Span<const RayIndex> dRayIndices,
                                   Span<const AcceleratorKey> dAccelKeys,
                                   //
-                                  CommonKey dAccelKeyBatchPortion,
+                                  CommonKey hAccelKeyBatchPortion,
                                   RayCastOptions,
                                   const GPUQueue& queue) = 0;
 
@@ -539,6 +541,11 @@ inline uint32_t AcceleratorGroup::UsedIdBitsInKey() const
     using namespace Bit;
     size_t bitCount = RequiredBitsToRepresent(InstanceCount());
     return static_cast<uint32_t>(bitCount);
+}
+
+inline uint32_t AcceleratorGroup::GroupId() const
+{
+    return accelGroupId;
 }
 
 inline void AcceleratorGroup::SetKeyOffset(uint32_t offset)
