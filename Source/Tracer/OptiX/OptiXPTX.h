@@ -8,6 +8,12 @@
 
 #include <optix_device.h>
 
+struct alignas(2) InstanceMaskOptiX
+{
+    AccelInstanceMask mask;
+    bool              enforceAnyHit;
+};
+
 enum class RenderModeOptiX
 {
     NORMAL,
@@ -56,6 +62,8 @@ struct LocalRayCastArgPackOptiX
     // Constants
     Span<const OptixTraversableHandle>  dGlobalInstanceTraversables;
     Span<const Matrix3x4>               dGlobalInstanceInvTransforms;
+    Span<const uint32_t>                dGlobalInstanceSBTOffsets;
+    Span<const InstanceMaskOptiX>       dGlobalInstanceMasks;
     uint32_t                            batchStartOffset;
 };
 

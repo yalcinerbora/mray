@@ -164,7 +164,7 @@ uint32_t SpatioDirCode::MaxLevel()
 {
     // -1 is here to create a unique value(s) that is never used
     // which will be used as hash table empty marker and sentinel
-    static constexpr auto R = ((1u << LEVEL_BITS) - 1);
+    constexpr auto R = ((1u << LEVEL_BITS) - 1);
     return R;
 }
 

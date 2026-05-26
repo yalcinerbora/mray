@@ -393,11 +393,17 @@ void KCLocalRayGenOptix()
     // If we are doing local ray casting, we can't rely on
     // OptiX implicit transform changes.
     AcceleratorKey aKey = params.lParams.dAcceleratorKeys[launchIndex];
-    uint32_t globalIndex = params.lParams.batchStartOffset + aKey.FetchIndexPortion();
-    OptixTraversableHandle traversable = params.lParams.dGlobalInstanceTraversables[globalIndex];
+    uint32_t globalInstanceIndex = params.lParams.batchStartOffset + aKey.FetchIndexPortion();
+    OptixTraversableHandle traversable = params.lParams.dGlobalInstanceTraversables[globalInstanceIndex];
+    uint32_t sbtOffset = params.lParams.dGlobalInstanceSBTOffsets[globalInstanceIndex];
+    InstanceMaskOptiX mask = params.lParams.dGlobalInstanceMasks[globalInstanceIndex];
     auto traceMode = params.rayCastOptions.traceMode;
 
-    Matrix3x4 invTransform = params.lParams.dGlobalInstanceInvTransforms[globalIndex];
+    // Coarse grain check the masks
+    if(!mask.mask.AcceptTraversal(traceMode))
+        return;
+
+    Matrix3x4 invTransform = params.lParams.dGlobalInstanceInvTransforms[globalInstanceIndex];
     Vector3 dir = invTransform * ray.dir;
     Vector3 pos = Vector3(invTransform * Vector4(ray.pos, Float(1)));
     ray = Ray(dir, pos);
@@ -408,21 +414,23 @@ void KCLocalRayGenOptix()
     // Set the ray index (indirection) as payload as well
     // so we do not hit GMem for this.
     uint32_t flags = OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+    if(mask.enforceAnyHit) flags |= OPTIX_RAY_FLAG_ENFORCE_ANYHIT;
+    //
     // Trace!
     optixTrace(// Accelerator
-              traversable,
-              // Ray Input
-              make_float3(ray.pos[0], ray.pos[1], ray.pos[2]),
-              make_float3(ray.dir[0], ray.dir[1], ray.dir[2]),
-              tMM[0], tMM[1],
-              0.0f,
-              //
-              OptixVisibilityMask(traceMode),
-              // Flags
-              flags,
-              // SBT
-              0, 1, 0,
-              rIndex, rngState);
+               traversable,
+               // Ray Input
+               make_float3(ray.pos[0], ray.pos[1], ray.pos[2]),
+               make_float3(ray.dir[0], ray.dir[1], ray.dir[2]),
+               tMM[0], tMM[1],
+               0.0f,
+               //
+               OptixVisibilityMask(traceMode),
+               // Flags
+               flags,
+               // SBT
+               sbtOffset, 1, 0,
+               rIndex, rngState);
 
     // Save the state back
     params.lParams.dRNGStates[rIndex] = rngState;

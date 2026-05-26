@@ -54,17 +54,43 @@ void KCCopyToOptixInstance(// Output
     }
 }
 
+
+MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
+void KCCopyInstanceMaskInfo(// Output
+                            MRAY_GRID_CONSTANT const Span<InstanceMaskOptiX> dInstanceMaskPacks,
+                            // Input
+                            MRAY_GRID_CONSTANT const Span<const uint32_t> dInstanceFlags,
+                            MRAY_GRID_CONSTANT const Span<const AccelInstanceMask> dInstanceMasks)
+{
+    uint32_t totalInstanceCount = static_cast<uint32_t>(dInstanceMaskPacks.size());
+
+    KernelCallParams kp;
+    for(uint32_t i = kp.GlobalId(); i < totalInstanceCount; i += kp.TotalSize())
+    {
+        InstanceMaskOptiX mask =
+        {
+            .mask = dInstanceMasks[i],
+            .enforceAnyHit = (dInstanceFlags[i] & OPTIX_INSTANCE_FLAG_ENFORCE_ANYHIT) > 0
+        };
+
+        dInstanceMaskPacks[i] = mask;
+    }
+}
+
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCCopyAllAccelKeysOptiX(// Output
                              Span<AcceleratorKey> dAccelKeys,
                              // Input
-                             Span<const GenericHitRecord<>> dHitRecords)
+                             Span<const GenericHitRecord<>> dHitRecords,
+                             Span<const uint32_t> dGlobalInstanceSBTOffsets)
 {
     KernelCallParams kp;
-    uint32_t keyCount = uint32_t(dHitRecords.size());
+    uint32_t keyCount = uint32_t(dAccelKeys.size());
     for(uint32_t i = kp.GlobalId(); i < keyCount; i += kp.TotalSize())
     {
-        dAccelKeys[i] = dHitRecords[i].data.acceleratorKey;
+        uint32_t offset = dGlobalInstanceSBTOffsets[i];
+        const auto& dHR = dHitRecords[offset];
+        dAccelKeys[i] = dHR.data.acceleratorKey;
     }
 }
 
@@ -260,18 +286,11 @@ BaseAcceleratorOptiX::BaseAcceleratorOptiX(ThreadPool& tp, const GPUSystem& sys,
     }
 }
 
-struct PrimShaderNames
-{
-    std::string_view PGName;
-    std::string_view TGName;
-};
-
 AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanceOffsets)
 {
     static_assert((sizeof(OptixAabb) == sizeof(AABB3)) &&
                   (alignof(OptixAabb) <= alignof(AABB3)),
                   "Optix and MRay AABBs do not match!");
-    instanceBatchStartOffsets = instanceOffsets;
     size_t totalInstanceCount = instanceOffsets.back();
 
     // First, create the traversable
@@ -310,25 +329,35 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     queue.Barrier().Wait();
 
     // Write all required data to buffers
-    size_t i = 0;
+    hBatchStartOffsets.reserve(accelInstances.size());
+    //
+    size_t accelI = 0;
     GPUQueueIteratorRoundRobin qIt(gpuSystem);
     for(const auto& accGroup : generatedAccels)
     {
-        using Base = AcceleratorGroupOptixI;
-        Base* aGroup = dynamic_cast<Base*>(accGroup.second.get());
-        size_t localCount = instanceOffsets[i + 1] - instanceOffsets[i];
-        size_t offset = instanceOffsets[i];
+        using BaseOptiX = AcceleratorGroupOptixI;
+        using Base = AcceleratorGroupI;
+        Base* aGroup = accGroup.second.get();
+        BaseOptiX* aGroupOptiX = dynamic_cast<BaseOptiX*>(aGroup);
+        size_t localCount = instanceOffsets[accelI + 1] - instanceOffsets[accelI];
+        size_t offset = instanceOffsets[accelI];
         // Get required parameters for IAS construction
         auto dHandleRegion = dTraversableHandles.subspan(offset, localCount);
         auto dSBTCountRegion = dSBTCounts.subspan(offset, localCount);
         auto dMatrixRegion = dInstanceMatrices.subspan(offset, localCount);
         auto dFlagRegion = dFlags.subspan(offset, localCount);
         auto dMaskRegion = dInstanceMasks.subspan(offset, localCount);
-        aGroup->AcquireIASConstructionParams(dHandleRegion, dMatrixRegion,
-                                             dSBTCountRegion, dFlagRegion,
-                                             dMaskRegion, qIt.Queue());
-        aGroup->OffsetAccelKeyInRecords();
-        i++;
+        aGroupOptiX->AcquireIASConstructionParams(dHandleRegion, dMatrixRegion,
+                                                  dSBTCountRegion, dFlagRegion,
+                                                  dMaskRegion, qIt.Queue());
+        aGroupOptiX->OffsetAccelKeyInRecords();
+
+        //
+        hBatchStartOffsets.insert(hBatchStartOffsets.cend(),
+                                  size_t(aGroup->InstanceTypeCount()),
+                                  uint32_t(instanceOffsets[accelI]));
+
+        accelI++;
         qIt.Next();
     }
     // Wait all queues
@@ -395,7 +424,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     // Memset anyway
     queue.MemsetAsync(Span(static_cast<Byte*>(accelTempMem), accelTempMem.Size()), 0x00);
 
-    std::array<OptixAccelEmitDesc, 2> emitProps =
+    Array<OptixAccelEmitDesc, 2> emitProps =
     {
         OptixAccelEmitDesc
         {
@@ -438,11 +467,13 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     MemAlloc::AllocateMultiData(Tie(dLaunchArgPack, dAccelMemory,
                                     dHitRecords, dEmptyRecords,
                                     dGlobalInstanceInvTransforms,
-                                    dGlobalTraversableHandles),
+                                    dGlobalInstanceTraversableHandles,
+                                    dGlobalInstanceMasks,
+                                    dGlobalInstanceSBTOffsets),
                                 allMem,
                                 {1, compactedSize, totalRecordCount, 3,
-                                 instanceBatchStartOffsets.back(),
-                                 instanceBatchStartOffsets.back()});
+                                 instanceOffsets.back(), instanceOffsets.back(),
+                                 instanceOffsets.back(), instanceOffsets.back() + 1});
 
     OPTIX_CHECK(optixAccelCompact(contextOptiX, ToHandleCUDA(queue), phonyHandle,
                                   std::bit_cast<CUdeviceptr>(dAccelMemory.data()),
@@ -452,8 +483,24 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     DeviceAlgorithms::Transform(dGlobalInstanceInvTransforms,
                                 ToConstSpan(dInstanceMatrices), queue,
                                 KCInvertTransforms());
-
-    queue.MemcpyAsync(dGlobalTraversableHandles, ToConstSpan(dTraversableHandles));
+    // Copy the traversable handles
+    queue.MemcpyAsync(dGlobalInstanceTraversableHandles, ToConstSpan(dTraversableHandles));
+    // Copy the SBT offsets to the persistent buffer.
+    // This is required for local ray casting
+    queue.MemcpyAsync(dGlobalInstanceSBTOffsets,
+                      ToConstSpan(Span(dSBTOffsets)));
+    // Copy instance mask and any hit requirement to a buffer
+    // Write these to OptixInstance struct
+    queue.IssueWorkKernel<KCCopyInstanceMaskInfo>
+    (
+        "KCCopyInstanceMaskInfo",
+        DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(totalInstanceCount)},
+        // Output
+        dGlobalInstanceMasks,
+        // Input
+        dFlags,
+        dInstanceMasks
+    );
 
     // Easy part is done
     // now compile the shaders and attach those on the records
@@ -467,14 +514,16 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
         const Base* aGroup = dynamic_cast<const Base*>(accGroup.second.get());
         uint32_t recordStartOffset = static_cast<uint32_t>(hAllHitRecords.size());
         // Get the shader names
-        auto hitRecords = aGroup->GetHitRecords();
+        const auto& hitRecords = aGroup->GetHitRecords();
         hAllHitRecords.insert(hAllHitRecords.end(), hitRecords.cbegin(), hitRecords.cend());
+
         //
         auto localTypeNames = aGroup->GetShaderTypeNames();
         auto recordOffsets = aGroup->GetShaderOffsets();
         assert(localTypeNames.size() == (recordOffsets.size() - 1));
         for(size_t j = 0; j < recordOffsets.size() - 1; j++)
         {
+
             uint32_t start = recordOffsets[j];
             uint32_t end = recordOffsets[j + 1];
             uint32_t count = end - start;
@@ -805,7 +854,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
                                          Span<const RayIndex> dRayIndices,
                                          Span<const AcceleratorKey> dAccelKeys,
                                          //
-                                         CommonKey dAccelKeyBatchPortion,
+                                         CommonKey hAccelKeyBatchPortion,
                                          RayCastOptions options,
                                          const GPUQueue& queue)
 {
@@ -826,7 +875,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
     const ComputeCapabilityTypePackOptiX& deviceTypes = optixTypesPerCC[currentCCIndex];
 
     // Find the offset
-    uint32_t batchStartOffset = uint32_t(instanceBatchStartOffsets[dAccelKeyBatchPortion]);
+    uint32_t batchStartOffset = uint32_t(hBatchStartOffsets[hAccelKeyBatchPortion]);
 
     // Copy args
     ArgumentPackOptiX argPack =
@@ -842,8 +891,10 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
             .dRays               = dRays,
             .dRayIndices         = dRayIndices,
             .dAcceleratorKeys    = dAccelKeys,
-            .dGlobalInstanceTraversables  = dGlobalTraversableHandles,
+            .dGlobalInstanceTraversables  = dGlobalInstanceTraversableHandles,
             .dGlobalInstanceInvTransforms = dGlobalInstanceInvTransforms,
+            .dGlobalInstanceSBTOffsets    = dGlobalInstanceSBTOffsets,
+            .dGlobalInstanceMasks         = dGlobalInstanceMasks,
             .batchStartOffset    = batchStartOffset
         }
     };
@@ -860,7 +911,8 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
 void BaseAcceleratorOptiX::WriteAllAcceleratorKeys(Span<AcceleratorKey> dAccelKeys,
                                                    const GPUQueue& queue) const
 {
-    assert(dAccelKeys.size() == dHitRecords.size());
+    assert(dAccelKeys.size() == dGlobalInstanceSBTOffsets.size() - 1);
+
     queue.IssueWorkKernel<KCCopyAllAccelKeysOptiX>
     (
         "KCCopyAllAccelKeysOptiX",
@@ -868,7 +920,8 @@ void BaseAcceleratorOptiX::WriteAllAcceleratorKeys(Span<AcceleratorKey> dAccelKe
         // Output
         dAccelKeys,
         // Input
-        dHitRecords
+        dHitRecords,
+        dGlobalInstanceSBTOffsets
     );
 }
 

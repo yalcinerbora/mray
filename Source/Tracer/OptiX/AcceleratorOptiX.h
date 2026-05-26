@@ -170,11 +170,14 @@ class AcceleratorGroupOptixI
     virtual std::vector<OptiXAccelDetail::ShaderTypeNames>
     GetShaderTypeNames() const = 0;
     //
-    virtual std::vector<GenericHitRecord<>>
+    virtual const std::vector<GenericHitRecord<>>&
     GetHitRecords() const = 0;
 
     virtual std::vector<uint32_t>
     GetShaderOffsets() const = 0;
+
+    virtual const std::vector<uint32_t>&
+    GetHitRecordCounts() const = 0;
 
     virtual void OffsetAccelKeyInRecords() = 0;
 };
@@ -256,14 +259,20 @@ class AcceleratorGroupOptiX final
                                          Span<uint32_t> dFlags,
                                          Span<AccelInstanceMask> dInstanceMasks,
                                          const GPUQueue& queue) const override;
+
     std::vector<OptiXAccelDetail::ShaderTypeNames>
             GetShaderTypeNames() const override;
 
-    std::vector<GenericHitRecord<>>
+    const std::vector<GenericHitRecord<>>&
             GetHitRecords() const override;
+
     std::vector<uint32_t>
             GetShaderOffsets() const override;
+
     void    OffsetAccelKeyInRecords() override;
+
+    const std::vector<uint32_t>&
+            GetHitRecordCounts() const override;
 
     // Functionality
     void    CastLocalRays(// Output
@@ -318,9 +327,11 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
     Span<GenericHitRecord<>>    dHitRecords;
     Span<EmptyHitRecord>        dEmptyRecords;
     // For local ray casting
-    std::vector<size_t>             instanceBatchStartOffsets;
+    std::vector<size_t>             hBatchStartOffsets;
     Span<Matrix3x4>                 dGlobalInstanceInvTransforms;
-    Span<OptixTraversableHandle>    dGlobalTraversableHandles;
+    Span<OptixTraversableHandle>    dGlobalInstanceTraversableHandles;
+    Span<uint32_t>                  dGlobalInstanceSBTOffsets;
+    Span<InstanceMaskOptiX>         dGlobalInstanceMasks;
 
     // State of the CC
     uint32_t currentCCIndex     = std::numeric_limits<uint32_t>::max();
@@ -375,7 +386,7 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
                           // Input
                           Span<const RayIndex> dRayIndices,
                           Span<const AcceleratorKey> dAccelKeys,
-                          CommonKey dAccelKeyBatchPortion,
+                          CommonKey hAccelKeyBatchPortion,
                           RayCastOptions,
                           const GPUQueue& queue) override;
 

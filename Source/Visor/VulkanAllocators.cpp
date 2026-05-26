@@ -59,14 +59,14 @@ VulkanDeviceAllocator::VulkanDeviceAllocator(VkDevice d, uint32_t dA,
     , deviceCommonAlignment(dA)
 {
     // TODO: Remove this when we are confident about memories
-    if constexpr(MRAY_IS_DEBUG)
-    {
-        for(const auto& memType : mL)
-        {
-            std::string s = vk::to_string(vk::MemoryPropertyFlags(memType.propertyFlags));
-            MRAY_DEBUG_LOG("Mem type: {}, HeapIndex: {}", s, memType.heapIndex);
-        }
-    }
+    //if constexpr(MRAY_IS_DEBUG)
+    //{
+    //    for(const auto& memType : mL)
+    //    {
+    //        std::string s = vk::to_string(vk::MemoryPropertyFlags(memType.propertyFlags));
+    //        MRAY_DEBUG_LOG("Mem type: {}, HeapIndex: {}", s, memType.heapIndex);
+    //    }
+    //}
     // Copy to local
     for(const auto& mt : mL) memoryList.push_back(mt);
 
@@ -134,8 +134,8 @@ VulkanDeviceAllocator::AllocateForeignObject(VulkanBuffer& buffer,
                                              size_t totalSize,
                                              uint32_t memTypeBits)
 {
-    std::string s = vk::to_string(vk::MemoryPropertyFlags(memTypeBits));
-    MRAY_DEBUG_LOG("Foreign Mem Flags: {}", s);
+    //std::string s = vk::to_string(vk::MemoryPropertyFlags(memTypeBits));
+    //MRAY_DEBUG_LOG("Foreign Mem Flags: {}", s);
 
     auto loc = std::find_if(memoryList.cbegin(), memoryList.cend(),
                             [memTypeBits](const VkMemoryType& memType)

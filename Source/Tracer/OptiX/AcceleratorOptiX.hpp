@@ -740,10 +740,17 @@ AcceleratorGroupOptiX<PG>::GetShaderTypeNames() const
 }
 
 template<PrimitiveGroupC PG>
-std::vector<GenericHitRecord<>>
+const std::vector<GenericHitRecord<>>&
 AcceleratorGroupOptiX<PG>::GetHitRecords() const
 {
     return hHitRecords;
+}
+
+template<PrimitiveGroupC PG>
+const std::vector<uint32_t>&
+AcceleratorGroupOptiX<PG>::GetHitRecordCounts() const
+{
+    return hInstanceHitRecordCounts;
 }
 
 template<PrimitiveGroupC PG>
