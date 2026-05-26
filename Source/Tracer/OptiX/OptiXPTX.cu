@@ -129,8 +129,24 @@ BackupRNGState GetRNGStateFromPayload()
     return BackupRNGState(optixGetPayload_1());
 }
 
+template<class HitRecordT>
+MR_GF_DECL
+const HitRecordT& GetHitRecord()
+{
+    // Hit Record via "optixGetSbtDataPointer"
+    // only works properly for non-local ray casting
+    // for local ray casting we need to manually find it from the global list
+    if(params.mode == RenderModeOptiX::LOCAL)
+    {
+        uint32_t sbtOffset = uint32_t(optixGetPayload_2());
+        sbtOffset += uint32_t(optixGetSbtGASIndex());
+        const GenericHitRecordData<>& d = params.lParams.dGlobalHitRecordList[sbtOffset].data;
+        return reinterpret_cast<const HitRecordT&>(d);
+    }
+    else return *DriverPtrToType<const HitRecordT>(optixGetSbtDataPointer());
+}
+
 // Meta Closest Hit Shader
-//template<PrimitiveGroupC PGroup>
 template<class PGroup>
 MR_GF_DECL
 void KCClosestHit()
@@ -147,11 +163,10 @@ void KCClosestHit()
 
     using Hit = typename PGroup::Hit;
     using HitRecord = GenericHitRecordData<>;
-    const auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
 
+    const auto& record = GetHitRecord<HitRecord>();
     const uint32_t leafId = optixGetPrimitiveIndex();
     const RayIndex rIndex = GetRayIndexFromPayload();
-
     // Fetch the workKey, transformId, primitiveId from table
     PrimitiveKey pKey = record.dPrimKeys[leafId];
     TransformKey tKey = record.transformKey;
@@ -228,7 +243,7 @@ void KCAnyHit()
     using Primitive = typename PGroup:: template Primitive<>;
     using Hit = typename PGroup::Hit;
     using HitRecord = GenericHitRecordData<typename PGroup::DataSoA>;
-    const auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
+    const auto& record = GetHitRecord<HitRecord>();
 
     if(!IsTraceModeMatches(params.rayCastOptions.traceMode, record.lightOrMatKey))
     {
@@ -278,7 +293,7 @@ void KCIntersect()
     using Hit = typename PGroup::Hit;
     using HitRecord = GenericHitRecordData<typename PGroup::DataSoA,
                                            typename TGroup::DataSoA>;
-    const auto& record = *DriverPtrToType<const HitRecord>(optixGetSbtDataPointer());
+    const auto& record = GetHitRecord<HitRecord>();
 
     // Prim Key
     const uint32_t leafId = optixGetPrimitiveIndex();
@@ -398,7 +413,6 @@ void KCLocalRayGenOptix()
     uint32_t sbtOffset = params.lParams.dGlobalInstanceSBTOffsets[globalInstanceIndex];
     InstanceMaskOptiX mask = params.lParams.dGlobalInstanceMasks[globalInstanceIndex];
     auto traceMode = params.rayCastOptions.traceMode;
-
     // Coarse grain check the masks
     if(!mask.mask.AcceptTraversal(traceMode))
         return;
@@ -429,8 +443,8 @@ void KCLocalRayGenOptix()
                // Flags
                flags,
                // SBT
-               sbtOffset, 1, 0,
-               rIndex, rngState);
+               0, 1, 0,
+               rIndex, rngState, sbtOffset);
 
     // Save the state back
     params.lParams.dRNGStates[rIndex] = rngState;

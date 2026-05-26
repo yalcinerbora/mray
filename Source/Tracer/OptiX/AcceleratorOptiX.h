@@ -34,6 +34,12 @@ namespace OptiXAccelDetail
         auto operator<=>(const ShaderTypeNames& t) const;
     };
 
+    struct ShaderInfo
+    {
+        uint32_t              localRayCastHROffset;
+        std::vector<uint32_t> globalRayCastHROffsets;
+    };
+
     static constexpr OptixModuleCompileOptions MODULE_OPTIONS_OPTIX =
     {
         .maxRegisterCount = 0,
@@ -64,8 +70,10 @@ namespace OptiXAccelDetail
             (OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING |
              // We will need this for SSS
              OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS),
-        .numPayloadValues = (sizeof(BackupRNGState) / sizeof(uint32_t) +
-                             sizeof(RayIndex)       / sizeof(RayIndex)),
+        // TODO: What are we trying to accomplish here?
+        .numPayloadValues = (sizeof(BackupRNGState) / sizeof(unsigned int) +
+                             sizeof(RayIndex)       / sizeof(unsigned int) +
+                             sizeof(uint32_t)       /  sizeof(unsigned int)),
         .numAttributeValues = MetaHit::MaxDim,
         .exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE,
         .pipelineLaunchParamsVariableName = "params",
@@ -75,9 +83,10 @@ namespace OptiXAccelDetail
                                                           OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM),
         .allowOpacityMicromaps = 0
     };
-    static_assert(PIPELINE_OPTIONS_OPTIX.numPayloadValues == 2,
+    static_assert(PIPELINE_OPTIONS_OPTIX.numPayloadValues == 3,
                   "Currently OptiX shaders are compiled with "
-                  "single word for index and another single word for backup RNG state. "
+                  "single word for index, another single word for backup RNG state, "
+                  "and final single word for SBT offset only for local ray casting. "
                   "Type sizes do not match with this assumption.");
 
     // Phony type to satisfy the concept
@@ -310,7 +319,9 @@ class AcceleratorGroupOptiX final
 class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
 {
     public:
-    using ShaderNameMap = std::map<OptiXAccelDetail::ShaderTypeNames, std::vector<uint32_t>>;
+    static constexpr uint32_t MAX_GAS_IN_AN_INSTANCE = TracerConstants::MaxPrimBatchPerSurface;
+    using ShaderNameMap = std::map<OptiXAccelDetail::ShaderTypeNames,
+                                   OptiXAccelDetail::ShaderInfo>;
     static std::string_view TypeName();
 
     static constexpr auto RG_COMMON_RECORD = 0;
@@ -335,17 +346,16 @@ class BaseAcceleratorOptiX final : public BaseAcceleratorT<BaseAcceleratorOptiX>
 
     // State of the CC
     uint32_t currentCCIndex     = std::numeric_limits<uint32_t>::max();
-    //
-
     // Host
     OptixShaderBindingTable commonCastSBT;
-    OptixShaderBindingTable localCastSBT;
     OptixTraversableHandle  baseAccelerator;
+    // Per-accelerator work type
+    std::vector<OptixShaderBindingTable> localCastSBTList;
 
     protected:
     AABB3           InternalConstruct(const std::vector<size_t>& instanceOffsets) override;
-    void            GenerateShaders(EmptyHitRecord& rgCommonRecord, EmptyHitRecord& rgLocalRecord,
-                                    EmptyHitRecord& missRecord, std::vector<GenericHitRecord<>>&,
+    void            GenerateShaders(std::vector<EmptyHitRecord>&,
+                                    std::vector<GenericHitRecord<>>&,
                                     const ShaderNameMap&);
     public:
     // Constructors & Destructor

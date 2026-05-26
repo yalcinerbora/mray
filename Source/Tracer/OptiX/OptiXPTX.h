@@ -21,64 +21,6 @@ enum class RenderModeOptiX
     LOCAL
 };
 
-struct NormalRayCastArgPackOptiX
-{
-    OptixTraversableHandle  baseAccelerator;
-    // Outputs
-    Span<VolumeIndex>       dVolumeIndices;
-    Span<HitKeyPack>        dHitKeys;
-    Span<MetaHit>           dHits;
-    // I-O
-    Span<BackupRNGState>    dRNGStates;
-    Span<RayGMem>           dRays;
-    // Inputs
-    Span<const RayIndex>    dRayIndices;
-};
-
-struct VisibilityCastArgPackOptiX
-{
-    OptixTraversableHandle  baseAccelerator;
-    // Input
-    Bitspan<uint32_t>       dIsVisibleBuffer;
-    // I-O
-    Span<BackupRNGState>    dRNGStates;
-    // Inputs
-    Span<const RayGMem>     dRays;
-    Span<const RayIndex>    dRayIndices;
-};
-
-struct LocalRayCastArgPackOptiX
-{
-    // Outputs
-    Span<VolumeIndex>       dVolumeIndices;
-    Span<HitKeyPack>        dHitKeys;
-    Span<MetaHit>           dHits;
-    // I-O
-    Span<BackupRNGState>    dRNGStates;
-    Span<RayGMem>           dRays;
-    // Inputs
-    Span<const RayIndex>        dRayIndices;
-    Span<const AcceleratorKey>  dAcceleratorKeys;
-    // Constants
-    Span<const OptixTraversableHandle>  dGlobalInstanceTraversables;
-    Span<const Matrix3x4>               dGlobalInstanceInvTransforms;
-    Span<const uint32_t>                dGlobalInstanceSBTOffsets;
-    Span<const InstanceMaskOptiX>       dGlobalInstanceMasks;
-    uint32_t                            batchStartOffset;
-};
-
-struct ArgumentPackOptiX
-{
-    RayCastOptions  rayCastOptions;
-    RenderModeOptiX mode;
-    union
-    {
-        NormalRayCastArgPackOptiX   nParams;
-        VisibilityCastArgPackOptiX  vParams;
-        LocalRayCastArgPackOptiX    lParams;
-    };
-};
-
 // Hit records (as far as I understand) can be defined multiple times
 // per-GAS / per build input
 //
@@ -133,4 +75,63 @@ struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) EmptyHitRecord
     __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
     // Optix 7 Course had dummy pointer here so i will leave it as well
     void* data;
+};
+
+struct NormalRayCastArgPackOptiX
+{
+    OptixTraversableHandle  baseAccelerator;
+    // Outputs
+    Span<VolumeIndex>       dVolumeIndices;
+    Span<HitKeyPack>        dHitKeys;
+    Span<MetaHit>           dHits;
+    // I-O
+    Span<BackupRNGState>    dRNGStates;
+    Span<RayGMem>           dRays;
+    // Inputs
+    Span<const RayIndex>    dRayIndices;
+};
+
+struct VisibilityCastArgPackOptiX
+{
+    OptixTraversableHandle  baseAccelerator;
+    // Input
+    Bitspan<uint32_t>       dIsVisibleBuffer;
+    // I-O
+    Span<BackupRNGState>    dRNGStates;
+    // Inputs
+    Span<const RayGMem>     dRays;
+    Span<const RayIndex>    dRayIndices;
+};
+
+struct LocalRayCastArgPackOptiX
+{
+    // Outputs
+    Span<VolumeIndex>       dVolumeIndices;
+    Span<HitKeyPack>        dHitKeys;
+    Span<MetaHit>           dHits;
+    // I-O
+    Span<BackupRNGState>    dRNGStates;
+    Span<RayGMem>           dRays;
+    // Inputs
+    Span<const RayIndex>        dRayIndices;
+    Span<const AcceleratorKey>  dAcceleratorKeys;
+    // Constants
+    Span<const OptixTraversableHandle>  dGlobalInstanceTraversables;
+    Span<const Matrix3x4>               dGlobalInstanceInvTransforms;
+    Span<const uint32_t>                dGlobalInstanceSBTOffsets;
+    Span<const InstanceMaskOptiX>       dGlobalInstanceMasks;
+    Span<const GenericHitRecord<>>      dGlobalHitRecordList;
+    uint32_t                            batchStartOffset;
+};
+
+struct ArgumentPackOptiX
+{
+    RayCastOptions  rayCastOptions;
+    RenderModeOptiX mode;
+    union
+    {
+        NormalRayCastArgPackOptiX   nParams;
+        VisibilityCastArgPackOptiX  vParams;
+        LocalRayCastArgPackOptiX    lParams;
+    };
 };

@@ -331,6 +331,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     // Write all required data to buffers
     hBatchStartOffsets.reserve(accelInstances.size());
     //
+    uint32_t totalAcceleratorWorkCount = 0;
     size_t accelI = 0;
     GPUQueueIteratorRoundRobin qIt(gpuSystem);
     for(const auto& accGroup : generatedAccels)
@@ -351,6 +352,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
                                                   dSBTCountRegion, dFlagRegion,
                                                   dMaskRegion, qIt.Queue());
         aGroupOptiX->OffsetAccelKeyInRecords();
+        totalAcceleratorWorkCount += aGroup->InstanceTypeCount();
 
         //
         hBatchStartOffsets.insert(hBatchStartOffsets.cend(),
@@ -414,8 +416,8 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     Span<Byte> dNonCompactAccelTempMem;
     DeviceMemory accelTempMem({queue.Device()}, totalTempAccelMemSize, totalTempAccelMemSize << 1);
     MemAlloc::AllocateMultiData(Tie(dNonCompactAccelMem,
-                                         dNonCompactAccelTempMem,
-                                         dCompactSize),
+                                    dNonCompactAccelTempMem,
+                                    dCompactSize),
                                 accelTempMem,
                                 {bufferSizes.outputSizeInBytes,
                                  bufferSizes.tempSizeInBytes, 1});
@@ -471,7 +473,8 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
                                     dGlobalInstanceMasks,
                                     dGlobalInstanceSBTOffsets),
                                 allMem,
-                                {1, compactedSize, totalRecordCount, 3,
+                                {1, compactedSize, totalRecordCount,
+                                 3 + totalAcceleratorWorkCount * MAX_GAS_IN_AN_INSTANCE,
                                  instanceOffsets.back(), instanceOffsets.back(),
                                  instanceOffsets.back(), instanceOffsets.back() + 1});
 
@@ -479,18 +482,13 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
                                   std::bit_cast<CUdeviceptr>(dAccelMemory.data()),
                                   dAccelMemory.size(), &baseAccelerator));
 
+    // Copy the traversable handles etc. to the persistent buffer.
     // Invert the transforms
-    DeviceAlgorithms::Transform(dGlobalInstanceInvTransforms,
-                                ToConstSpan(dInstanceMatrices), queue,
-                                KCInvertTransforms());
-    // Copy the traversable handles
-    queue.MemcpyAsync(dGlobalInstanceTraversableHandles, ToConstSpan(dTraversableHandles));
-    // Copy the SBT offsets to the persistent buffer.
+    DeviceAlgorithms::Transform(dGlobalInstanceInvTransforms, ToConstSpan(dInstanceMatrices),
+                                queue, KCInvertTransforms());
     // This is required for local ray casting
-    queue.MemcpyAsync(dGlobalInstanceSBTOffsets,
-                      ToConstSpan(Span(dSBTOffsets)));
-    // Copy instance mask and any hit requirement to a buffer
-    // Write these to OptixInstance struct
+    queue.MemcpyAsync(dGlobalInstanceTraversableHandles, ToConstSpan(dTraversableHandles));
+    queue.MemcpyAsync(dGlobalInstanceSBTOffsets, ToConstSpan(Span(dSBTOffsets)));
     queue.IssueWorkKernel<KCCopyInstanceMaskInfo>
     (
         "KCCopyInstanceMaskInfo",
@@ -504,10 +502,28 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
 
     // Easy part is done
     // now compile the shaders and attach those on the records
+    //
+    // -- Local Ray Casting Related --
+    // To Support local ray casting for all the instances of the scene
+    // we emulate the SBT lookup by hand. Thus we create empty hit records
+    // for all accelerator work types (aka. Primitive/Transform pairs).
+    // Since MRay at most supports "TracerConstants::MaxPrimBatchPerSurface"
+    // ; which is MAX_GAS_IN_AN_INSTANCE, we pre allocate that amount of records
+    //
+    // For each accelerator work type, a single kernel will be launched its SBT
+    // will consists of these empty records. Global hit record array that IAS
+    // uses will be indexed via AcceleratorKey + some offset that is fed to OptiX
+    // launch.
+    //
+    // +3 is for Miss / Common RayGeneration / Local RayGeneration shaders.
+    uint32_t emptyHRCount = 3 + totalAcceleratorWorkCount * MAX_GAS_IN_AN_INSTANCE;
+    std::vector<EmptyHitRecord> hEmptyRecords(emptyHRCount, EmptyHitRecord{});
+    //
     ShaderNameMap shaderNames;
     std::vector<GenericHitRecord<>> hAllHitRecords;
     hAllHitRecords.reserve(totalInstanceCount);
     // Write all required data to buffers
+    uint32_t accelWorkId = 0;
     for(const auto& accGroup : generatedAccels)
     {
         using Base = AcceleratorGroupOptixI;
@@ -528,18 +544,17 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
             uint32_t end = recordOffsets[j + 1];
             uint32_t count = end - start;
             const auto& typeName = localTypeNames[j];
-            auto& indexList = shaderNames[typeName];
+            auto& shaderOffsetList = shaderNames[typeName];
+            shaderOffsetList.localRayCastHROffset = accelWorkId * MAX_GAS_IN_AN_INSTANCE;
+            auto& indexList = shaderOffsetList.globalRayCastHROffsets;
             auto endLoc = indexList.insert(indexList.end(), count, 0);
             std::iota(endLoc, endLoc + count, recordStartOffset + start);
+            accelWorkId++;
         }
     }
 
     // Now we have all the things we need to generate shaders.
-    std::array<EmptyHitRecord, 3> hEmptyRecords;
-    GenerateShaders(hEmptyRecords[RG_COMMON_RECORD],
-                    hEmptyRecords[RG_LOCAL_RECORD],
-                    hEmptyRecords[MISS_RECORD],
-                    hAllHitRecords, shaderNames);
+    GenerateShaders(hEmptyRecords, hAllHitRecords, shaderNames);
 
     //
     queue.MemcpyAsync(dHitRecords, ToConstSpan(Span(hAllHitRecords)));
@@ -554,11 +569,26 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     commonCastSBT.missRecordCount = 1u;
     // HITS
     commonCastSBT.hitgroupRecordBase = std::bit_cast<CUdeviceptr>(dHitRecords.data());
-    commonCastSBT.hitgroupRecordStrideInBytes= sizeof(GenericHitRecord<>);
+    commonCastSBT.hitgroupRecordStrideInBytes = sizeof(GenericHitRecord<>);
     commonCastSBT.hitgroupRecordCount = static_cast<uint32_t>(dHitRecords.size());
     //
-    localCastSBT = commonCastSBT;
-    localCastSBT.raygenRecord = std::bit_cast<CUdeviceptr>(dEmptyRecords.data() + RG_LOCAL_RECORD);
+    localCastSBTList.reserve(totalAcceleratorWorkCount);
+    for(uint32_t i = 0; i < totalAcceleratorWorkCount; i++)
+    {
+        OptixShaderBindingTable localCastSBT = {};
+        localCastSBT.missRecordBase = std::bit_cast<CUdeviceptr>(dEmptyRecords.data() + MISS_RECORD);
+        localCastSBT.missRecordStrideInBytes = sizeof(EmptyHitRecord);
+        localCastSBT.missRecordCount = 1u;
+        //
+        localCastSBT.hitgroupRecordBase = std::bit_cast<CUdeviceptr>(dEmptyRecords.data() + 3 +
+                                                                     i * MAX_GAS_IN_AN_INSTANCE);
+        localCastSBT.hitgroupRecordStrideInBytes = sizeof(EmptyHitRecord);
+        localCastSBT.hitgroupRecordCount = MAX_GAS_IN_AN_INSTANCE;
+        //
+        localCastSBT.raygenRecord = std::bit_cast<CUdeviceptr>(dEmptyRecords.data() + RG_LOCAL_RECORD);
+        //
+        localCastSBTList.push_back(localCastSBT);
+    }
 
     // Wait all queues
     gpuSystem.SyncAll();
@@ -566,8 +596,7 @@ AABB3 BaseAcceleratorOptiX::InternalConstruct(const std::vector<size_t>& instanc
     return sceneAABB;
 }
 
-void BaseAcceleratorOptiX::GenerateShaders(EmptyHitRecord& rgCommonRecord, EmptyHitRecord& rgLocalRecord,
-                                           EmptyHitRecord& missRecord,
+void BaseAcceleratorOptiX::GenerateShaders(std::vector<EmptyHitRecord>& emptyRecords,
                                            std::vector<GenericHitRecord<>>& records,
                                            const ShaderNameMap& shaderNames)
 {
@@ -716,11 +745,19 @@ void BaseAcceleratorOptiX::GenerateShaders(EmptyHitRecord& rgCommonRecord, Empty
     currentCCIndex = 0;
     const auto& ccPack = optixTypesPerCC[currentCCIndex];
     uint32_t pgIndex = 0;
-    for(const auto& [_, hitRecordIndices] : shaderNames)
+    for(const auto& [_, offsetPack] : shaderNames)
     {
-        for(uint32_t index : hitRecordIndices)
+        for(uint32_t index : offsetPack.globalRayCastHROffsets)
         {
             auto& record = records[index];
+            OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[pgIndex + 3],
+                                                 record.header));
+        }
+        // TODO: We probably can memcpy here, but dunno. Just let the OptiX
+        // to write w/e it is needed by itself.
+        for(uint32_t index = 0; index < MAX_GAS_IN_AN_INSTANCE; index++)
+        {
+            auto& record = emptyRecords[offsetPack.localRayCastHROffset + index + 3];
             OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[pgIndex + 3],
                                                  record.header));
         }
@@ -728,11 +765,11 @@ void BaseAcceleratorOptiX::GenerateShaders(EmptyHitRecord& rgCommonRecord, Empty
     }
     // RG and Miss records and finish
     OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[RG_COMMON_RECORD],
-                                         rgCommonRecord.header));
+                                         emptyRecords[RG_COMMON_RECORD].header));
     OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[RG_LOCAL_RECORD],
-                                         rgLocalRecord.header));
+                                         emptyRecords[RG_LOCAL_RECORD].header));
     OPTIX_CHECK(optixSbtRecordPackHeader(ccPack.programGroups[MISS_RECORD],
-                                         missRecord.header));
+                                         emptyRecords[MISS_RECORD].header));
 }
 
 void BaseAcceleratorOptiX::AllocateForTraversal(size_t)
@@ -876,6 +913,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
 
     // Find the offset
     uint32_t batchStartOffset = uint32_t(hBatchStartOffsets[hAccelKeyBatchPortion]);
+    const auto* localCastSBT = &localCastSBTList[hAccelKeyBatchPortion];
 
     // Copy args
     ArgumentPackOptiX argPack =
@@ -895,6 +933,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
             .dGlobalInstanceInvTransforms = dGlobalInstanceInvTransforms,
             .dGlobalInstanceSBTOffsets    = dGlobalInstanceSBTOffsets,
             .dGlobalInstanceMasks         = dGlobalInstanceMasks,
+            .dGlobalHitRecordList         = dHitRecords,
             .batchStartOffset    = batchStartOffset
         }
     };
@@ -903,7 +942,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
 
     // Launch!
     OPTIX_CHECK(optixLaunch(deviceTypes.pipeline, ToHandleCUDA(queue), argsPtr,
-                            dLaunchArgPack.size_bytes(), &localCastSBT,
+                            dLaunchArgPack.size_bytes(), localCastSBT,
                             static_cast<uint32_t>(dRayIndices.size()), 1u, 1u));
     OPTIX_LAUNCH_CHECK();
 }
