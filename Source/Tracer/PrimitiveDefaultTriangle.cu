@@ -95,7 +95,7 @@ void KCApplyTransformsTriangle(// I-O
                 sVertexRanges = dVertexRanges[batchI];
             }
         #else
-            assert(kp.blockSize >= 34);
+            assert(kp.blockSize >= 26);
             // Load matrices / ranges
             if(kp.threadId < 12)
             {
@@ -105,12 +105,12 @@ void KCApplyTransformsTriangle(// I-O
             }
             else if(kp.threadId >= 12 && kp.threadId < 24)
             {
-                uint32_t i = kp.threadId - 16;
+                uint32_t i = kp.threadId - 12;
                 sBatchInvTransform[i] = dBatchInvTransforms[batchI][i];
             }
             else if(kp.threadId >= 24 && kp.threadId < 26)
             {
-                uint32_t i = kp.threadId - 32;
+                uint32_t i = kp.threadId - 24;
                 sVertexRanges[i] = dVertexRanges[batchI][i];
             }
         #endif
@@ -135,8 +135,8 @@ void KCApplyTransformsTriangle(// I-O
             Vector3 b = tbn.OrthoBasisY();
             Vector3 n = tbn.OrthoBasisZ();
             // We need to multiply these with normal matrix
-            t = Math::Normalize(sBatchInvTransform.LeftMultiply(t));
-            b = Math::Normalize(sBatchInvTransform.LeftMultiply(b));
+            t = Math::Normalize(sBatchTransform * t);
+            b = Math::Normalize(sBatchTransform * b);
             n = Math::Normalize(sBatchInvTransform.LeftMultiply(n));
             auto[tN, bN] = Graphics::GSOrthonormalize(t, b, n);
             //

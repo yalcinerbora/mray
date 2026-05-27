@@ -890,7 +890,7 @@ Matrix3x4T<T> Matrix3x4T<T>::Inverse() const noexcept requires FloatC<T>
         // Row1
         (-m[ 4] * c5 + m[ 6] * c2             ),
         (+m[ 0] * c5 - m[ 2] * c2             ),
-        (                                   s1),
+        (                                  -s1),
         (+m[ 8] * s5 - m[10] * s2 + m[11] * s1),
         // Row2
         (+m[ 4] * c4 - m[ 5] * c2             ),

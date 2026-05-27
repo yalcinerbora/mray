@@ -90,10 +90,10 @@ TransientData GenRadiance()
 
 TransientData GenMatrix()
 {
-    TransientData data(std::in_place_type_t<Matrix4x4>{}, 1);
+    TransientData data(std::in_place_type_t<Matrix3x4>{}, 1);
     data.ReserveAll();
-    auto span = data.AccessAs<Matrix4x4>();
-    span[0] = Matrix4x4::Identity();
+    auto span = data.AccessAs<Matrix3x4>();
+    span[0] = Matrix3x4::Identity();
     return data;
 }
 

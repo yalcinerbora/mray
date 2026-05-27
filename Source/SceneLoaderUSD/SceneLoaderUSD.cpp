@@ -48,12 +48,13 @@ enum class MRayUSDGeomMatResolveWarningsEnum : uint32_t
 };
 using MRayUSDGeomMatResolWarnings = std::bitset<uint32_t(MRayUSDGeomMatResolveWarningsEnum::END)>;
 
-Matrix4x4 ConvertToMRayMatrix(const pxr::GfMatrix4d& matIn)
+Matrix3x4 ConvertToMRayMatrix(const pxr::GfMatrix4d& matIn)
 {
     // USD says their matrix is row-major order but their vectors are
     // row vectors I think. Because the matrix translation portion is on bottom row.
     // So we transpose
-    return Matrix4x4(Span<const double, 16>(matIn.data(), 16)).Transpose();
+    Matrix4x4 mat4x4 = Matrix4x4(Span<const double, 16>(matIn.data(), 16)).Transpose();
+    return Matrix3x4(mat4x4);
 }
 
 void PrintPrims(const CollapsedPrims& meshMatPrims,
@@ -358,10 +359,11 @@ MRayError ProcessCameras(CameraGroupId& camGroupId,
         auto camPrim = pxr::UsdGeomCamera(cam.surfacePrim);
         //
         using TransformGen::ZUpToYUpMat, TransformGen::YUpToZUpMat;
-        Matrix4x4 transform = cam.surfaceTransform.Value();
+        Matrix3x4 transform = cam.surfaceTransform.Value();
         bool zUp = pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z;
         if(zUp)
-            transform = ZUpToYUpMat<Float>() * transform * YUpToZUpMat<Float>();
+            transform = (Matrix3x4(ZUpToYUpMat<Float>()) * transform *
+                         Matrix3x4(YUpToZUpMat<Float>()));
         // For camera matrices, embed to the camera position,
         // look direction etc.
         // Anchor the up as Y axis, out camera re-orthogonalize the vectors.
@@ -583,7 +585,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
             continue;
         }
         //
-        Matrix4x4 toWorld = ConvertToMRayMatrix(transformCache.GetLocalToWorldTransform(prim));
+        Matrix3x4 toWorld = ConvertToMRayMatrix(transformCache.GetLocalToWorldTransform(prim));
         pxr::UsdPrim uniquePrim = prim.IsInstanceProxy() ? prim.GetPrimInPrototype() : prim;
         surfaces.emplace_back(false, prim, uniquePrim, toWorld);
     }
@@ -773,9 +775,9 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
                                                  surface.uniquePrim);
             if(std::distance(end, start) > 1) continue;
 
-            Matrix4x4 transform = surface.surfaceTransform.Value();
+            Matrix3x4 transform = surface.surfaceTransform.Value();
             if(pxr::UsdGeomGetStageUpAxis(loadedStage) == pxr::UsdGeomTokens->z)
-                transform = TransformGen::ZUpToYUpMat<Float>() * transform;
+                transform = Matrix3x4(TransformGen::ZUpToYUpMat<Float>()) * transform;
 
             for(PrimBatchId pbId : uniqueMeshPrimBatches.at(surface.uniquePrim))
             {
@@ -818,9 +820,9 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     std::inclusive_scan(allSizes.cbegin(), allSizes.cend(), allSizes.begin());
     size_t totalSurfSize = allSizes.back();
     //
-    TransientData matrixBuffer(std::in_place_type_t<Matrix4x4>(), totalSurfSize);
+    TransientData matrixBuffer(std::in_place_type_t<Matrix3x4>(), totalSurfSize);
     matrixBuffer.ReserveAll();
-    Span allMatrices           = matrixBuffer.AccessAs<Matrix4x4>();
+    Span allMatrices           = matrixBuffer.AccessAs<Matrix3x4>();
     Span meshSurfMats          = allMatrices.subspan(allSizes[0], allSizes[1] - allSizes[0]);
     Span meshLightSurfMats     = allMatrices.subspan(allSizes[1], allSizes[2] - allSizes[1]);
     Span sphereSurfMats        = allMatrices.subspan(allSizes[2], allSizes[3] - allSizes[2]);
@@ -851,7 +853,7 @@ Expected<TracerIdPack> SceneLoaderUSD::LoadScene(TracerI& tracer,
     {
         Span allExceptDome = allMatrices.subspan(allSizes[0], allSizes[5] - allSizes[0]);
         for(auto& mat : allExceptDome)
-            mat = TransformGen::ZUpToYUpMat<Float>() * mat;
+            mat = Matrix3x4(TransformGen::ZUpToYUpMat<Float>()) * mat;
     }
     //
     std::vector<TransformId> tIds;
