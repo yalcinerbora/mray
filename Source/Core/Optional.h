@@ -114,7 +114,7 @@ namespace OptionalDetail
         template<class Input>
         constexpr               OptionalPOD(Input&&) noexcept  requires(SameType<Input>);
         template<class Input>
-        constexpr OptionalPOD& operator=(Input&&) noexcept requires(SameType<Input>);
+        constexpr OptionalPOD&  operator=(Input&&) noexcept requires(SameType<Input>);
         template<class Input>
         explicit constexpr      OptionalPOD(const std::optional<Input>&) requires(SameType<Input>);
         template<class Input>
