@@ -669,7 +669,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
     std::array<Span<uint32_t>, 2> dIndices;
     std::array<Span<uint64_t>, 2> dMortonCodes;
     //
-    size_t segTRMemSize = SegmentedTransformReduceTMSize<AABB3, PrimitiveKey>(processedAccelCount, queue);
+    size_t segTRMemSize = SegmentedTransformReduceTMSize<AABB3, AABB3>(processedAccelCount, queue);
     size_t segSortTMSize = SegmentedRadixSortTMSize<true, uint64_t, uint32_t>(totalLeafCount,
                                                                               processedAccelCount, queue);
     size_t tempMemSize = Math::Max(segTRMemSize, segSortTMSize);

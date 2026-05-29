@@ -6,22 +6,22 @@
 #include "Math.h"
 #include "Definitions.h"
 
-constexpr inline size_t operator ""_TiB(unsigned long long int s)
+constexpr inline size_t operator""_TiB(unsigned long long int s)
 {
     return s << 40;
 }
 
-constexpr inline size_t operator ""_GiB(unsigned long long int s)
+constexpr inline size_t operator""_GiB(unsigned long long int s)
 {
     return s << 30;
 }
 
-constexpr inline size_t operator ""_MiB(unsigned long long int s)
+constexpr inline size_t operator""_MiB(unsigned long long int s)
 {
     return s << 20;
 }
 
-constexpr inline size_t operator ""_KiB(unsigned long long int s)
+constexpr inline size_t operator""_KiB(unsigned long long int s)
 {
     return s << 10;
 }

@@ -97,7 +97,9 @@ static constexpr bool MRAY_CPU_EMULATE_FP16 = std::is_same_v<CPUNativeFP16, uint
     }
 
 #else
+    #include <immintrin.h>
     #include <emmintrin.h>
+    #include <cmath>
 #endif
 
 namespace HalfDetail

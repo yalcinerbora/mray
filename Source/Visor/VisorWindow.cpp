@@ -524,30 +524,30 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
     // swapchain's surface format change). For example user move the window
     // to a HDR screen etc, we need to shutdown imgui then re-init. This feels
     // wrong but w/e.
-    ImGui_ImplVulkan_InitInfo imguiInitInfo
+    ImGui_ImplVulkan_InitInfo imguiInitInfo = {};
+    imguiInitInfo.ApiVersion = MRAY_VK_API_VERSION,
+    imguiInitInfo.Instance = handlesVk.instanceVk,
+    imguiInitInfo.PhysicalDevice = handlesVk.pDeviceVk,
+    imguiInitInfo.Device = handlesVk.deviceVk,
+    imguiInitInfo.QueueFamily = handlesVk.queueIndex;
+    imguiInitInfo.Queue = handlesVk.mainQueueVk;
+    imguiInitInfo.DescriptorPool = imguiDescPool;
+    imguiInitInfo.DescriptorPoolSize = 0;
+    imguiInitInfo.MinImageCount = requestedImgCount;
+    imguiInitInfo.ImageCount = imageCount;
+    imguiInitInfo.PipelineCache = nullptr;
+    imguiInitInfo.PipelineInfoMain = ImGui_ImplVulkan_PipelineInfo
     {
-        .Instance = handlesVk.instanceVk,
-        .PhysicalDevice = handlesVk.pDeviceVk,
-        .Device = handlesVk.deviceVk,
-        .QueueFamily = handlesVk.queueIndex,
-        .Queue = handlesVk.mainQueueVk,
-        .DescriptorPool = imguiDescPool,
         .RenderPass = renderPass,
-        .MinImageCount = requestedImgCount,
-        .ImageCount = imageCount,
-        .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
-        //
-        .PipelineCache = nullptr,
         .Subpass = 0,
-        //
-        .UseDynamicRendering = false,
-        .PipelineRenderingCreateInfo = {},
-        //
-        .Allocator = VulkanHostAllocator::Functions(),
-        .CheckVkResultFn = &ImguiCallback,
-        .MinAllocationSize = 1_MiB
-        //
-    };
+        .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+        .ExtraDynamicStates = {},
+        .PipelineRenderingCreateInfo = {}
+    },
+    imguiInitInfo.UseDynamicRendering = false;
+    imguiInitInfo.Allocator = VulkanHostAllocator::Functions();
+    imguiInitInfo.CheckVkResultFn = &ImguiCallback;
+    imguiInitInfo.MinAllocationSize = 1_MiB;
     ImGui_ImplVulkan_Init(&imguiInitInfo);
 
     return MRayError::OK;
@@ -588,14 +588,14 @@ MRayError Swapchain::Initialize(VulkanSystemView handles,
 
     static const StaticVector<VkDescriptorPoolSize, 1> imguiPoolSizes =
     {
-        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16 },
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
     };
     VkDescriptorPoolCreateInfo descPoolInfo =
     {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .pNext = nullptr,
         .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-        .maxSets = 16,
+        .maxSets = 1024,
         .poolSizeCount = static_cast<uint32_t>(imguiPoolSizes.size()),
         .pPoolSizes = imguiPoolSizes.data()
     };
@@ -751,14 +751,12 @@ void VisorWindow::WndFBChanged(int newX, int newY)
     assert(newX >= 0 && newY >= 0);
     // Send FBO size change request
     swapchain.FBOSizeChanged(Vector2ui(newX, newY));
-
     // But do not present if any size is 0
     stopPresenting = (newX == 0 || newY == 0);
 }
 
 void VisorWindow::WndResized(int, int)
-{
-}
+{}
 
 void VisorWindow::WndClosed()
 {
@@ -808,6 +806,13 @@ void VisorWindow::PathDropped(int count, const char** paths)
     {
         MRAY_LOG("Path: {}", paths[i]);
     }
+}
+
+void VisorWindow::ContentScaleChanged(float xScale,
+                                      [[maybe_unused]] float yScale)
+{
+    assert(xScale == yScale);
+    FontAtlas::Instance().AddScaledFont(xScale);
 }
 
 MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
@@ -865,6 +870,8 @@ MRayError VisorWindow::Initialize(TransferQueue::VisorView& transferQueueIn,
 
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
+    glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_FALSE);
     window = glfwCreateWindow(config.wSize[0], config.wSize[1],
                               windowTitle.c_str(), nullptr, nullptr);
     glfwSetWindowUserPointer(window, this);
@@ -1052,7 +1059,7 @@ ImFont* VisorWindow::CurrentFont()
     float x, y;
     glfwGetWindowContentScale(window, &x, &y);
     assert(x == y);
-    return FontAtlas::Instance().GetMonitorFont(x);
+    return FontAtlas::Instance().GetScaledFont(x);
 }
 
 void VisorWindow::HandleGUIChanges(GUIChanges&& changes)
@@ -1296,7 +1303,7 @@ bool VisorWindow::Render()
             {
                 MRAY_LOG("[Visor] : Render Options received");
                 auto& rendererOptPack = std::get<RENDERER_OPTIONS>(response);
-                visorState.currentRenderIndex = rendererOptPack.rendererIndexOnRendererList;
+                visorState.currentRenderIndex = int32_t(rendererOptPack.rendererIndexOnRendererList);
                 gui.OverrideRendererOptions(std::move(rendererOptPack));
 
                 break;

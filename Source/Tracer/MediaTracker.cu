@@ -24,15 +24,16 @@ void SortByPrio(std::array<uint32_t, MAX_NESTED_MEDIA>& ml,
         int32_t prio = priorities[i];
         uint32_t index = ml[i];
 
-        int32_t j = i - 1;
-        for(; j >= 0 && IsLess(j, index, prio); j--)
+        int32_t j = int32_t(i - 1);
+        for(; j >= 0 && IsLess(uint32_t(j), index, prio); j--)
         {
-            std::swap(priorities[j + 1], priorities[j]);
-            std::swap(ml[j + 1], ml[j]);
+            uint32_t jI = uint32_t(j);
+            std::swap(priorities[jI + 1], priorities[jI]);
+            std::swap(ml[jI + 1], ml[jI]);
         }
         // Insert to the slot
-        ml[j + 1] = index;
-        priorities[j + 1] = prio;
+        ml[uint32_t(j) + 1] = index;
+        priorities[uint32_t(j) + 1] = prio;
     }
 }
 
@@ -135,8 +136,8 @@ uint32_t MediaTracker::FindVolumeIndex(VolumeId vId) const
 // Constructors & Destructor
 MediaTracker::MediaTracker(const VolumeList& globalVolumeList,
                            uint32_t maximumEntryCount,
-                           const GPUSystem& gpuSystem)
-    : gpuSystem(gpuSystem)
+                           const GPUSystem& gpuSystemIn)
+    : gpuSystem(gpuSystemIn)
     , globalVolumeList(globalVolumeList)
     , mem(gpuSystem.AllGPUs(), 2_MiB, 4_MiB, true)
 {
@@ -257,7 +258,7 @@ void MediaTracker::PrimeHashTable(const std::vector<const SurfaceVolumeList*>& h
         for(VolumeId v : bList)
         {
             volIndices.push_back(FindVolumeIndex(v));
-            uint32_t prio = globalVolumeList[volIndices.back()].second.priority;
+            int32_t prio = globalVolumeList[volIndices.back()].second.priority;
             priorities.push_back(prio);
         }
 

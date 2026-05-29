@@ -361,12 +361,12 @@ ZSobolDetail::ZSobol::ZSobol(const LocalState& ls,
     // Determine the current sample rotation from sampleId
     // Loop for worst case, maxSPP was 1 and we did ~4billion samples
     uint32_t sppLocalSampleIndex = ls.sampleIndex;
-    uint32_t sppLocalMaxSPP = gs.initialMaxSPP;
+    uint32_t sppLocalMaxSPP = globalState.initialMaxSPP;
 
     MRAY_UNROLL_LOOP_N(8)
     for(uint32_t i = 0; i < 32; i++)
     {
-        uint32_t curSize = gs.initialMaxSPP << i;
+        uint32_t curSize = globalState.initialMaxSPP << i;
         //
         if(sppLocalSampleIndex < curSize) break;
         //
@@ -376,7 +376,7 @@ ZSobolDetail::ZSobol::ZSobol(const LocalState& ls,
     //
     log2SPP = Bit::RequiredBitsToRepresent(sppLocalMaxSPP) - 1;
     uint32_t log4SPP = Math::DivideUp(log2SPP, 2u);
-    nBase4Digits = int32_t(gs.resMaxBits + log4SPP);
+    nBase4Digits = int32_t(globalState.resMaxBits + log4SPP);
 
     mortonIndex = (ls.pixelMortonCode << log2SPP) | sppLocalSampleIndex;
 }
@@ -687,7 +687,7 @@ RNGGroupIndependent::RNGGroupIndependent(const RenderImageParams& rip,
     std::mt19937 rngTemp = rng0;
 
     auto hMainStates = hMainStatesAll;
-    auto future0 = tp.SubmitBlocks(uint32_t(totalRNGCount),
+    auto future0 = mainThreadPool.SubmitBlocks(uint32_t(totalRNGCount),
     [&rng0, hMainStates](uint32_t start, uint32_t end)
     {
         // Local copy to the stack
@@ -708,7 +708,7 @@ RNGGroupIndependent::RNGGroupIndependent(const RenderImageParams& rip,
     const std::mt19937 rng1 = rngTemp;
 
     auto hBackupStates = hBackupStatesAll;
-    auto future1 = tp.SubmitBlocks(uint32_t(totalRNGCount),
+    auto future1 = mainThreadPool.SubmitBlocks(uint32_t(totalRNGCount),
     [&rng1, hBackupStates](uint32_t start, uint32_t end)
     {
         // Local copy to the stack
@@ -921,7 +921,7 @@ RNGGroupSobol::RNGGroupSobol(const RenderImageParams& rip,
     std::mt19937 rngTemp = rng0;
 
     auto hMainStates = hMainStatesAll;
-    auto future0 = tp.SubmitBlocks(uint32_t(totalRNGCount),
+    auto future0 = mainThreadPool.SubmitBlocks(uint32_t(totalRNGCount),
     [&rng0, hMainStates, rip](uint32_t start, uint32_t end)
     {
         // Local copy to the stack
@@ -952,7 +952,7 @@ RNGGroupSobol::RNGGroupSobol(const RenderImageParams& rip,
     const std::mt19937 rng1 = rngTemp;
 
     auto hBackupStates = hBackupStatesAll;
-    auto future1 = tp.SubmitBlocks(uint32_t(totalRNGCount),
+    auto future1 = mainThreadPool.SubmitBlocks(uint32_t(totalRNGCount),
     [&rng1, hBackupStates](uint32_t start, uint32_t end)
     {
         // Local copy to the stack
@@ -1183,7 +1183,7 @@ RNGGroupZSobol::RNGGroupZSobol(const RenderImageParams& rip,
     std::mt19937 rngTemp = rng0;
 
     auto hMainStates = hMainStatesAll;
-    auto future0 = tp.SubmitBlocks(uint32_t(totalRNGCount),
+    auto future0 = mainThreadPool.SubmitBlocks(uint32_t(totalRNGCount),
     [&rng0, hMainStates, rip](uint32_t start, uint32_t end)
     {
         // Local copy to the stack
@@ -1216,7 +1216,7 @@ RNGGroupZSobol::RNGGroupZSobol(const RenderImageParams& rip,
     const std::mt19937 rng1 = rngTemp;
 
     auto hBackupStates = hBackupStatesAll;
-    auto future1 = tp.SubmitBlocks(uint32_t(totalRNGCount),
+    auto future1 = mainThreadPool.SubmitBlocks(uint32_t(totalRNGCount),
     [&rng1, hBackupStates](uint32_t start, uint32_t end)
     {
         // Local copy to the stack

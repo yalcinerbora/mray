@@ -44,6 +44,7 @@ Expected<VisorConfig> LoadVisorConfig(const std::string& configJsonPath)
     static constexpr auto OPT_DISPLAY_HDR_NAME  = "displayHDR"sv;
     static constexpr auto OPT_WINDOW_SIZE_NAME  = "windowSize"sv;
     static constexpr auto OPT_REAL_TIME_NAME    = "realTime"sv;
+    static constexpr auto OPT_USE_WAYLAND_NAME  = "useWayland"sv;
 
     nlohmann::json configJson;
 
@@ -78,6 +79,7 @@ Expected<VisorConfig> LoadVisorConfig(const std::string& configJsonPath)
         OptionalFetch(config.displayHDR, OPT_DISPLAY_HDR_NAME, optJson);
         OptionalFetch(config.realTime, OPT_REAL_TIME_NAME, optJson);
         OptionalFetch(config.wSize, OPT_WINDOW_SIZE_NAME, optJson);
+        OptionalFetch(config.useWayland, OPT_USE_WAYLAND_NAME, optJson);
 
         // TODO: Add interval output config reading
         // ...

@@ -49,7 +49,6 @@ class SurfaceRenderer final : public RendererBase
     Options     currentOptions  = {};
     Options     newOptions      = {};
     //
-    SurfRDetail::RenderMode     anchorRenderMode;
     FilmFilterPtr               filmFilter;
     RenderSurfaceWorkHasher     workHasher;
     //

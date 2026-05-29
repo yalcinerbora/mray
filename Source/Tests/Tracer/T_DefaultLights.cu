@@ -267,7 +267,8 @@ TEST(DefaultLights, MetaLight)
             LightSurfaceParams
             {
                 .lightId = std::bit_cast<LightId>(hTriLightIds[0]),
-                .transformId = std::bit_cast<TransformId>(hIdentityTransIds[0])
+                .transformId = std::bit_cast<TransformId>(hIdentityTransIds[0]),
+                .nestedVolumes = {}
             },
         },
         {
@@ -275,7 +276,8 @@ TEST(DefaultLights, MetaLight)
             LightSurfaceParams
             {
                 .lightId = std::bit_cast<LightId>(hTriLightIds[0]),
-                .transformId = std::bit_cast<TransformId>(hSingleTransIds[0])
+                .transformId = std::bit_cast<TransformId>(hSingleTransIds[0]),
+                .nestedVolumes = {}
             }
         },
         {
@@ -283,14 +285,16 @@ TEST(DefaultLights, MetaLight)
             LightSurfaceParams
             {
                 .lightId = std::bit_cast<LightId>(hSkysphereLightIds[0]),
-                .transformId = std::bit_cast<TransformId>(hIdentityTransIds[0])
+                .transformId = std::bit_cast<TransformId>(hIdentityTransIds[0]),
+                .nestedVolumes = {}
             }
         }
     };
     LightSurfaceParams boundarySurface =
     {
         .lightId = std::bit_cast<LightId>(hSkysphereLightIds[0]),
-        .transformId = std::bit_cast<TransformId>(hSingleTransIds[0])
+        .transformId = std::bit_cast<TransformId>(hSingleTransIds[0]),
+        .nestedVolumes = {}
     };
     std::sort(lSurfs.begin(), lSurfs.end(), LightSurfaceLessThan);
 

@@ -575,7 +575,6 @@ void TracerThread::LoopWork()
     Optional<CameraTransform>       transform;
     Optional<std::string>           rendererName;
     Optional<RendererOptionData>    rendererOption;
-    Optional<uint32_t>              renderLogic1;
     Optional<uint32_t>              cameraIndex;
     Optional<std::string>           scenePath;
     Optional<SemaphoreInfo>         syncSem;

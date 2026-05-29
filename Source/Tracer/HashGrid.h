@@ -226,7 +226,7 @@ SpatioDirCode HashGridView::GenCode(const Vector3& pos,
 
     // Position
     Float levelDelta = baseRegionDelta / Float(1u << level);
-    int32_t curLevelEdge = (baseRegionDim >> level) - 1;
+    int32_t curLevelEdge = (int32_t(baseRegionDim) >> level) - 1;
     Vector3 locF = (pos - hashGridRegion.Min()) * levelDelta;
     auto iX = int32_t(locF[0]);
     auto iY = int32_t(locF[1]);
@@ -261,7 +261,7 @@ SpatioDirCode HashGridView::GenCodeStochastic(const Vector3& pos,
 
     // Position
     Float levelDelta = baseRegionDelta / Float(1u << level);
-    int32_t curLevelEdge = (baseRegionDim >> level) - 1;
+    int32_t curLevelEdge = (int32_t(baseRegionDim) >> level) - 1;
     Vector3 locF = (pos - hashGridRegion.Min()) * levelDelta;
     auto [iX, fX] = Math::ModFInt(locF[0]);
     auto [iY, fY] = Math::ModFInt(locF[1]);

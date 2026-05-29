@@ -2,6 +2,7 @@
 
 #include "Core/MemAlloc.h"
 #include "Core/Timer.h"
+
 #include "Tracer/RendererCommon.h"
 
 #include "Device/GPUAlgBinaryPartition.h"
@@ -162,7 +163,6 @@ template<SpectrumContextC SC>
 void PathTracerRendererT<SC>::PushAttribute(uint32_t attributeIndex,
                                             TransientData data, const GPUQueue&)
 {
-    using R = RendererBase;
     switch(attributeIndex)
     {
         case 0: LoadFromTransientData(newOptions.totalSPP, data); break;
@@ -266,20 +266,18 @@ PathTracerRendererT<SC>::DoRenderPassPure(Span<RayIndex> dIndices,
     //  |       |           |
 
     const SpectrumContext& typedSpectrumContext = *static_cast<const SpectrumContext*>(spectrumContext.get());
-    RayState dRayState =
-    {
-        .dPathRadiance      = dPathRadiance,
-        .dImageCoordinates  = dImageCoordinates,
-        .dFilmFilterWeights = dFilmFilterWeights,
-        .dThroughput        = dThroughputs,
-        .dPathDataPack      = dPathDataPack,
-        .dPathWavelengths   = dPathWavelengths,
-        .dShadowRays        = dShadowRays,
-        .dShadowRayCones    = dShadowRayCones,
-        .dShadowRayRadiance = dShadowRayRadiance,
-        .dPrevMatPDF        = dPrevMatPDF,
-        .dMediaListPack     = dRayMediaListPacks
-    };
+    RayState dRayState = {};
+    dRayState.dPathRadiance      = dPathRadiance;
+    dRayState.dImageCoordinates  = dImageCoordinates;
+    dRayState.dFilmFilterWeights = dFilmFilterWeights;
+    dRayState.dThroughput        = dThroughputs;
+    dRayState.dPathDataPack      = dPathDataPack;
+    dRayState.dPathWavelengths   = dPathWavelengths;
+    dRayState.dShadowRays        = dShadowRays;
+    dRayState.dShadowRayCones    = dShadowRayCones;
+    dRayState.dShadowRayRadiance = dShadowRayRadiance;
+    dRayState.dPrevMatPDF        = dPrevMatPDF;
+    dRayState.dMediaListPack     = dRayMediaListPacks;
 
     // Cast rays
     using namespace std::string_view_literals;
@@ -384,20 +382,18 @@ PathTracerRendererT<SC>::DoRenderPassNEE(Span<RayIndex> dIndices,
     //  |       |             |                |             |
     //  |       |             |                |             |
     const SpectrumContext& typedSpectrumContext = *static_cast<const SpectrumContext*>(spectrumContext.get());
-    RayState dRayState =
-    {
-        .dPathRadiance      = dPathRadiance,
-        .dImageCoordinates  = dImageCoordinates,
-        .dFilmFilterWeights = dFilmFilterWeights,
-        .dThroughput        = dThroughputs,
-        .dPathDataPack      = dPathDataPack,
-        .dPathWavelengths   = dPathWavelengths,
-        .dShadowRays        = dShadowRays,
-        .dShadowRayCones    = dShadowRayCones,
-        .dShadowRayRadiance = dShadowRayRadiance,
-        .dPrevMatPDF        = dPrevMatPDF,
-        .dMediaListPack     = dRayMediaListPacks
-    };
+    RayState dRayState = {};
+    dRayState.dPathRadiance      = dPathRadiance;
+    dRayState.dImageCoordinates  = dImageCoordinates;
+    dRayState.dFilmFilterWeights = dFilmFilterWeights;
+    dRayState.dThroughput        = dThroughputs;
+    dRayState.dPathDataPack      = dPathDataPack;
+    dRayState.dPathWavelengths   = dPathWavelengths;
+    dRayState.dShadowRays        = dShadowRays;
+    dRayState.dShadowRayCones    = dShadowRayCones;
+    dRayState.dShadowRayRadiance = dShadowRayRadiance;
+    dRayState.dPrevMatPDF        = dPrevMatPDF;
+    dRayState.dMediaListPack     = dRayMediaListPacks;
 
     // Cast rays
     using namespace std::string_view_literals;
@@ -570,18 +566,16 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaPure(Span<RayIndex> dIndices,
     //  |            |       [Media Scattered]         --> |
     //  |            |                                     |
     const SpectrumContext& typedSpectrumContext = *static_cast<const SpectrumContext*>(spectrumContext.get());
-    RayState dRayState =
-    {
-        .dPathRadiance      = dPathRadiance,
-        .dImageCoordinates  = dImageCoordinates,
-        .dFilmFilterWeights = dFilmFilterWeights,
-        .dThroughput        = dThroughputs,
-        .dPathDataPack      = dPathDataPack,
-        .dPathWavelengths   = dPathWavelengths,
-        .dBackupRNGStates   = rnGenerator->GetBackupStates(),
-        .dMediaListPack     = dRayMediaListPacks
+    RayState dRayState = {};
+    dRayState.dPathRadiance      = dPathRadiance;
+    dRayState.dImageCoordinates  = dImageCoordinates;
+    dRayState.dFilmFilterWeights = dFilmFilterWeights;
+    dRayState.dThroughput        = dThroughputs;
+    dRayState.dPathDataPack      = dPathDataPack;
+    dRayState.dPathWavelengths   = dPathWavelengths;
+    dRayState.dBackupRNGStates   = rnGenerator->GetBackupStates();
+    dRayState.dMediaListPack     = dRayMediaListPacks;
 
-    };
     GlobalStatePure globalState
     {
         .russianRouletteRange = currentOptions.russianRouletteRange,
@@ -797,25 +791,23 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
     //
     const SpectrumContext& typedSpectrumContext = *static_cast<const SpectrumContext*>(spectrumContext.get());
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
-    RayState dRayState =
-    {
-        .dPathRadiance        = dPathRadiance,
-        .dImageCoordinates    = dImageCoordinates,
-        .dFilmFilterWeights   = dFilmFilterWeights,
-        .dThroughput          = dThroughputs,
-        .dPathDataPack        = dPathDataPack,
-        .dPathWavelengths     = dPathWavelengths,
-        .dShadowRays          = dShadowRays,
-        .dShadowRayCones      = dShadowRayCones,
-        .dShadowRayRadiance   = dShadowRayRadiance,
-        .dRPathPDF            = dRPathPDF,
-        .dRLightPDF           = dRLightPDF,
-        .dRPathPDFShadow      = dRPathPDFShadow,
-        .dRLightPDFShadow     = dRLightPDFShadow,
-        .dBackupRNGStates     = dBackupRNGStates,
-        .dMediaListPack       = dRayMediaListPacks,
-        .dShadowMediaListPack = dShadowRayMediaListPacks
-    };
+    RayState dRayState = {};
+    dRayState.dPathRadiance        = dPathRadiance;
+    dRayState.dImageCoordinates    = dImageCoordinates;
+    dRayState.dFilmFilterWeights   = dFilmFilterWeights;
+    dRayState.dThroughput          = dThroughputs;
+    dRayState.dPathDataPack        = dPathDataPack;
+    dRayState.dPathWavelengths     = dPathWavelengths;
+    dRayState.dShadowRays          = dShadowRays;
+    dRayState.dShadowRayCones      = dShadowRayCones;
+    dRayState.dShadowRayRadiance   = dShadowRayRadiance;
+    dRayState.dRPathPDF            = dRPathPDF;
+    dRayState.dRLightPDF           = dRLightPDF;
+    dRayState.dRPathPDFShadow      = dRPathPDFShadow;
+    dRayState.dRLightPDFShadow     = dRLightPDFShadow;
+    dRayState.dBackupRNGStates     = dBackupRNGStates;
+    dRayState.dMediaListPack       = dRayMediaListPacks;
+    dRayState.dShadowMediaListPack = dShadowRayMediaListPacks;
 
     UniformLightSampler lightSampler(metaLightArray.Array(),
                                      metaLightArray.IndexHashTable());
@@ -1213,7 +1205,7 @@ PathTracerRendererT<SC>::RecursiveShadowRayCast(// Output
     while(!dIndices.empty())
     {
         static const auto passAnnotation = gpuSystem.CreateAnnotation("RSRC Pass");
-        const auto _1 = annotation.AnnotateScope();
+        const auto _1 = passAnnotation.AnnotateScope();
 
         auto bpOut = rayPartitioner.BinaryPartition(dIndices, processQueue,
                                                     HasValidShadowRayFunctor());
@@ -1511,10 +1503,8 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
         }
     }
 
-    uint32_t perRayMediaListCount = 0;
     if(currentOptions.sampleMedia)
     {
-        perRayMediaListCount = maxRayCount;
         mediaTracker = std::make_unique<MediaTracker>(tracerView.globalVolumeList,
                                                       tracerView.tracerParams.volumeTrackerEntryCount,
                                                       gpuSystem);

@@ -13,6 +13,9 @@
 #define MR_STAMP_PRAGMA_(X)     _Pragma(#X)
 #define MR_STAMP_PRAGMA(X)      MR_STAMP_PRAGMA_(X)
 
+// Macro Arg with commas etc
+#define MRAY_MACRO_ARG(...)    __VA_ARGS__
+
 // From macro space to language space (for "if constexpr" usage)
 #ifdef MRAY_WINDOWS
     static constexpr bool MRAY_IS_ON_WINDOWS = true;

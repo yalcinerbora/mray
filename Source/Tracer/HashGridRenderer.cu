@@ -42,7 +42,6 @@ HashGridRenderer::HashGridRenderer(const RenderImagePtr& rb,
                                    const GPUSystem& s,
                                    const RenderWorkPack& wp)
     : RendererBase(rb, wp, tv, s, tp, TypeName())
-    , saveImage(true)
     , hashGrid(s)
     , rayPartitioner(gpuSystem)
     , rendererGlobalMem(s.AllGPUs(), 128_MiB, 512_MiB)
@@ -77,7 +76,6 @@ void HashGridRenderer::PushAttribute(uint32_t attributeIndex,
 {
     switch(attributeIndex)
     {
-        using R = RendererBase;
         case 0: newOptions.cacheEntryLimit   = data.AccessAs<uint32_t>()[0]; break;
         case 1:
         {
@@ -527,7 +525,6 @@ RendererOutput HashGridRenderer::DoRender()
     totalIterationCount++;
     spp *= static_cast<double>(totalIterationCount);
 
-    bool triggerSave = false;
     // Roll to the next tile
     imageTiler.NextTile();
     return RendererOutput
@@ -547,7 +544,7 @@ RendererOutput HashGridRenderer::DoRender()
             SpatioDirCode::NORMAL_BITS_PER_DIM + 1
         },
         .imageOut = renderOut,
-        .triggerSave = triggerSave
+        .triggerSave = false
     };
 }
 
@@ -581,7 +578,8 @@ HashGridRenderer::StaticAttributeInfo()
             {"cacheSampleLevelLimit", MRayDataTypeRT(MR_UINT32), MR_OPTIONAL, std::nullopt, uint32_t(2)},
             {"cacheConeAperture",     MRayDataTypeRT(MR_FLOAT),  MR_OPTIONAL},
             {"pathTraceDepth",        MRayDataTypeRT(MR_UINT32), MR_OPTIONAL}
-        }
+        },
+        .enumInfos = {}
     };
 }
 

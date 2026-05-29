@@ -58,8 +58,6 @@ class HashGridRenderer final : public RendererBase
     private:
     Options     currentOptions  = {};
     Options     newOptions      = {};
-    //
-    bool        saveImage;
     // Camera stuff
     Optional<CameraTransform>   curCamTransformOverride;
     CameraSurfaceParams         curCamSurfaceParams;

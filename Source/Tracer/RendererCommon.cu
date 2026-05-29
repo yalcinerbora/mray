@@ -238,7 +238,8 @@ RenderMediumWorkHasher::PopulateHashesAndKeys(const TracerView& tracerView,
         VolumeKeyPack kp =
         {
             .medKey   = mK,
-            .transKey = tK
+            .transKey = tK,
+            .priority = 0   // Not important
         };
         hHashes.emplace_back(HashWorkBatchPortion(kp));
         hBatchIds.push_back(work.workGroupId);

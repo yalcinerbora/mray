@@ -190,7 +190,8 @@ void HostLocalMemoryCPU::ResizeBuffer(size_t newSize)
 
     size_t copySize = std::min(newSize, size);
     HostLocalMemoryCPU newMem(*system, newSize, neverDecrease);
-    std::memcpy(newMem.hPtr, hPtr, copySize);
+    // UBSan did not like passing a nullptr and copySize = 0.
+    if(copySize != 0) std::memcpy(newMem.hPtr, hPtr, copySize);
     *this = std::move(newMem);
 }
 

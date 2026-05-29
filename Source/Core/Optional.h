@@ -47,7 +47,9 @@
 // code.
 //
 #include "Types.h"
+#include <memory>
 #include <optional>
+#include <type_traits>
 
 namespace OptionalDetail
 {
@@ -84,6 +86,56 @@ namespace OptionalDetail
         constexpr const InnerType& ValueOr(const InnerType&) const requires(!InnerConst);
     };
 
+    // This is due to my bad implementation
+    // or a bug on NVCC (CUDA 13.0) that compiles incorrectly
+    // For most GPU types this type overload should activate
+    // and we will not bother with union stuff.
+    template<class T>
+    class OptionalPOD
+    {
+        private:
+        using This = OptionalPOD;
+        static_assert(!std::is_const_v<T>,
+                      "Optional can't be instantiated with a \"const\" type");
+        static_assert(!std::is_volatile_v<T>,
+                      "Optional can't be instantiated with a \"volatile\" type");
+
+        template<class In>
+        static constexpr bool SameType = std::is_same_v<std::remove_cvref_t<In>, T>;
+
+        private:
+        T       data;
+        bool    isActive;
+
+        public:
+        // Constructors & Destructor
+        constexpr               OptionalPOD() noexcept;
+        constexpr               OptionalPOD(std::nullopt_t) noexcept;
+        template<class Input>
+        constexpr               OptionalPOD(Input&&) noexcept  requires(SameType<Input>);
+        template<class Input>
+        constexpr OptionalPOD& operator=(Input&&) noexcept requires(SameType<Input>);
+        template<class Input>
+        explicit constexpr      OptionalPOD(const std::optional<Input>&) requires(SameType<Input>);
+        template<class Input>
+        explicit constexpr      OptionalPOD(std::optional<Input>&&) requires(SameType<Input>);
+
+        // These all can be default
+        constexpr       OptionalPOD(const This& other) noexcept = default;
+        constexpr       OptionalPOD(This&& other) noexcept      = default;
+        constexpr This& operator=(const This& other) noexcept   = default;
+        constexpr This& operator=(This&& other) noexcept        = default;
+        //
+        constexpr explicit     operator bool() const noexcept;
+        constexpr bool         HasValue() const noexcept;
+
+        // TODO: Add fancy other contexts later
+        constexpr T&       Value();
+        constexpr const T& Value() const;
+        constexpr T&       ValueOr(T&);
+        constexpr const T& ValueOr(const T&) const;
+    };
+
     // Now the big boy
     template<class T>
     class OptionalBase
@@ -96,17 +148,16 @@ namespace OptionalDetail
 
         using InnerType = std::remove_cvref_t<T>;
 
-        static constexpr bool TC = std::is_trivially_constructible_v<InnerType>;
         static constexpr bool TD = std::is_trivially_destructible_v<InnerType>;
         // Logistics, if non-trivial, implement else do "=default"
         // and let the compiler take the wheel.
         static constexpr bool CC = (std::is_copy_constructible_v<InnerType> &&
                                     !std::is_trivially_copy_constructible_v<InnerType>);
-        static constexpr bool MC = (std::is_move_constructible_v<T> &&
+        static constexpr bool MC = (std::is_move_constructible_v<InnerType> &&
                                     !std::is_trivially_move_constructible_v<InnerType>);
-        static constexpr bool CA = (std::is_copy_assignable_v<T> &&
+        static constexpr bool CA = (std::is_copy_assignable_v<InnerType> &&
                                     !std::is_trivially_copy_assignable_v<InnerType>);
-        static constexpr bool MA = (std::is_move_assignable_v<T> &&
+        static constexpr bool MA = (std::is_move_assignable_v<InnerType> &&
                                     !std::is_trivially_move_assignable_v<InnerType>);
 
         template<class In>
@@ -115,7 +166,8 @@ namespace OptionalDetail
         private:
         union
         {
-            T data;
+            char empty;
+            T    data;
         };
         bool isActive;
 
@@ -162,16 +214,28 @@ namespace OptionalDetail
         constexpr InnerType&       ValueOr(InnerType&);
         constexpr const InnerType& ValueOr(const InnerType&) const;
     };
+
+    // Combination of the Type
+    // Oh boy going full Allman here
+    template<class T>
+    using OptionalImpl = std::conditional_t
+    <
+        std::is_reference_v<T>,
+        OptionalDetail::OptionalRef<T>,
+        std::conditional_t
+        <
+            std::is_default_constructible_v<T>,
+            OptionalDetail::OptionalPOD<T>,
+            OptionalDetail::OptionalBase<T>
+        >
+    >;
 }
 
 template<class T>
-struct Optional : public std::conditional_t<std::is_reference_v<T>,
-                                            OptionalDetail::OptionalRef<T>,
-                                            OptionalDetail::OptionalBase<T>>
+struct Optional : public OptionalDetail::OptionalImpl<T>
 {
-    using Base = std::conditional_t<std::is_reference_v<T>,
-                                    OptionalDetail::OptionalRef<T>,
-                                    OptionalDetail::OptionalBase<T>>;
+    using Base = OptionalDetail::OptionalImpl<T>;
+
     public:
     using Base::Base;
 };
@@ -281,16 +345,119 @@ OptionalRef<T>::ValueOr(const InnerType& t) const requires(!InnerConst)
     return (ptr != nullptr) ? *ptr : t;
 }
 
+}
+
+namespace OptionalDetail
+{
+
 template<class T>
 constexpr
-OptionalBase<T>::OptionalBase() noexcept
+OptionalPOD<T>::OptionalPOD() noexcept
     : isActive{false}
 {}
 
 template<class T>
 constexpr
-OptionalBase<T>::OptionalBase(std::nullopt_t) noexcept
+OptionalPOD<T>::OptionalPOD(std::nullopt_t) noexcept
     : isActive{false}
+{}
+
+template<class T>
+template<class Input>
+constexpr
+OptionalPOD<T>::OptionalPOD(Input&& other) noexcept  requires(SameType<Input>)
+    : data(std::forward<Input>(other))
+    , isActive{true}
+{}
+
+template<class T>
+template<class Input>
+constexpr
+OptionalPOD<T>& OptionalPOD<T>::operator=(Input&& other) noexcept requires(SameType<Input>)
+{
+    data = std::forward<Input>(other);
+    isActive = true;
+}
+
+template<class T>
+template<class Input>
+constexpr
+OptionalPOD<T>::OptionalPOD(const std::optional<Input>& in) requires(SameType<Input>)
+{
+    if(in.has_value()) data = in.value();
+    isActive = in.has_value();
+}
+
+template<class T>
+template<class Input>
+constexpr
+OptionalPOD<T>::OptionalPOD(std::optional<Input>&& in) requires(SameType<Input>)
+{
+    if(in.has_value()) data = std::move(in.value());
+    isActive = in.has_value();
+}
+
+template<class T>
+constexpr
+OptionalPOD<T>::operator bool() const noexcept
+{
+    return isActive;
+}
+
+template<class T>
+constexpr
+bool OptionalPOD<T>::HasValue() const noexcept
+{
+    return isActive;
+}
+
+template<class T>
+constexpr
+T& OptionalPOD<T>::Value()
+{
+    assert(isActive && "Inactive data access on Optional!");
+    return data;
+}
+
+template<class T>
+constexpr
+const T& OptionalPOD<T>::Value() const
+{
+    assert(isActive && "Inactive data access on Optional!");
+    return data;
+}
+
+template<class T>
+constexpr
+T& OptionalPOD<T>::ValueOr(T& other)
+{
+    return (isActive) ? data : other;
+}
+
+template<class T>
+constexpr
+const T& OptionalPOD<T>::ValueOr(const T& other) const
+{
+    return (isActive) ? data : other;
+}
+
+}
+
+namespace OptionalDetail
+{
+
+template<class T>
+constexpr
+OptionalBase<T>::OptionalBase() noexcept
+    : empty{}
+    , isActive{false}
+{}
+
+template<class T>
+constexpr
+OptionalBase<T>::OptionalBase(std::nullopt_t) noexcept
+    : empty{}
+    , isActive{false}
 {}
 
 template<class T>
@@ -307,7 +474,10 @@ constexpr
 OptionalBase<T>&
 OptionalBase<T>::operator=(Input&& in) noexcept requires(SameType<Input>)
 {
-    data = std::forward<Input>(in);
+    if(isActive)
+        data = std::forward<Input>(in);
+    else
+        std::construct_at(&data, std::forward<Input>(in));
     isActive = true;
     return *this;
 }
@@ -316,18 +486,18 @@ template<class T>
 template<class Input>
 constexpr
 OptionalBase<T>::OptionalBase(const std::optional<Input>& in) requires(SameType<Input>)
+    : isActive{in.has_value()}
 {
-    if(in) data = (in.value());
-    isActive = in.has_value();
+    if(in) std::construct_at(&data, in.value());
 }
 
 template<class T>
 template<class Input>
 constexpr
 OptionalBase<T>::OptionalBase(std::optional<Input>&& in) requires(SameType<Input>)
+    : isActive{in.has_value()}
 {
-    if(in) data = std::move(in.value);
-    isActive = in.has_value();
+    if(in) std::construct_at(&data, std::move(in.value()));
 }
 
 template<class T>
@@ -346,6 +516,7 @@ OptionalBase<T>::OptionalBase(OptionalBase&& other) noexcept requires(MC)
     if(other.isActive)
     {
         std::construct_at(&data, std::move(other.data));
+        std::destroy_at(&other.data);   // TODO: Is this correct?
         other.isActive = false;
     }
 }
@@ -354,10 +525,20 @@ template<class T>
 constexpr OptionalBase<T>&
 OptionalBase<T>::operator=(const OptionalBase& other) noexcept requires(CA)
 {
-    if(isActive) std::destroy_at(&data);
-    isActive = other.isActive;
-    //
-    if(other.isActive) std::construct_at(&data, other.data);
+    if(isActive && other.isActive)
+    {
+        data = other.data;
+    }
+    else if(!isActive && other.isActive)
+    {
+        std::construct_at(&data, other.data);
+        isActive = true;
+    }
+    else if(isActive && !other.isActive)
+    {
+        std::destroy_at(&data);
+        isActive = false;
+    }
     return *this;
 }
 
@@ -365,11 +546,24 @@ template<class T>
 constexpr OptionalBase<T>&
 OptionalBase<T>::operator=(OptionalBase&& other) noexcept requires(MA)
 {
-    if(isActive) std::destroy_at(&data);
-    isActive = other.isActive;
-    //
-    if(other.isActive) std::construct_at(&data, std::move(other.data));
-    other.isActive = false;
+    if(isActive && other.isActive)
+    {
+        data = std::move(other.data);
+        std::destroy_at(&other.data);
+        other.isActive = false;
+    }
+    else if(!isActive && other.isActive)
+    {
+        std::construct_at(&data, std::move(other.data));
+        std::destroy_at(&other.data);
+        isActive = true;
+        other.isActive = false;
+    }
+    else if(isActive && !other.isActive)
+    {
+        std::destroy_at(&data);
+        isActive = false;
+    }
     return *this;
 }
 
