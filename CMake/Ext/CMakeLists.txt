@@ -165,7 +165,7 @@ if(MRAY_BUILD_VISOR)
     mray_build_ext_dependency_git(
         NAME glfw_ext
         URL "https://github.com/glfw/glfw.git"
-        TAG "3fa2360720eeba1964df3c0ecf4b5df8648a8e52" # 17.06.2023 Latest Commit
+        TAG "b00e6a8a88ad1b60c0a045e696301deb92c9a13e" # 28.05.2026 Latest Commit
         LICENSE_NAME "LICENSE.md"
         BUILD_ARGS
             -DBUILD_SHARED_LIBS=ON

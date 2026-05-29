@@ -13,6 +13,7 @@
 #include "ImageLoader/EntryPoint.h"
 
 #include <CLI/CLI.hpp>
+#include <cstddef>
 #include <string_view>
 #include <barrier>
 #include <immintrin.h>
@@ -444,15 +445,16 @@ void Accum::AccumulatePortionBulk(double* MRAY_RESTRICT rOutPtr,
 {
     static constexpr size_t SIMD_WIDTH = MRay::HostArchSIMDWidth<double>();
 
-    static constexpr auto DSA = MemAlloc::DefaultSystemAlignment();
-    double* MRAY_RESTRICT rOutPtrA = std::assume_aligned<DSA>(rOutPtr);
-    double* MRAY_RESTRICT gOutPtrA = std::assume_aligned<DSA>(gOutPtr);
-    double* MRAY_RESTRICT bOutPtrA = std::assume_aligned<DSA>(bOutPtr);
-    double* MRAY_RESTRICT wOutPtrA = std::assume_aligned<DSA>(wOutPtr);
-    const Float* MRAY_RESTRICT rInPtrA = std::assume_aligned<DSA>(rInPtr);
-    const Float* MRAY_RESTRICT gInPtrA = std::assume_aligned<DSA>(gInPtr);
-    const Float* MRAY_RESTRICT bInPtrA = std::assume_aligned<DSA>(bInPtr);
-    const Float* MRAY_RESTRICT wInPtrA = std::assume_aligned<DSA>(wInPtr);
+    static constexpr auto D_ALGN = SIMD_WIDTH * sizeof(double);
+    static constexpr auto F_ALGN = SIMD_WIDTH * sizeof(Float);
+    double* MRAY_RESTRICT rOutPtrA = std::assume_aligned<D_ALGN>(rOutPtr);
+    double* MRAY_RESTRICT gOutPtrA = std::assume_aligned<D_ALGN>(gOutPtr);
+    double* MRAY_RESTRICT bOutPtrA = std::assume_aligned<D_ALGN>(bOutPtr);
+    double* MRAY_RESTRICT wOutPtrA = std::assume_aligned<D_ALGN>(wOutPtr);
+    const Float* MRAY_RESTRICT rInPtrA = std::assume_aligned<F_ALGN>(rInPtr);
+    const Float* MRAY_RESTRICT gInPtrA = std::assume_aligned<F_ALGN>(gInPtr);
+    const Float* MRAY_RESTRICT bInPtrA = std::assume_aligned<F_ALGN>(bInPtr);
+    const Float* MRAY_RESTRICT wInPtrA = std::assume_aligned<F_ALGN>(wInPtr);
 
     auto Iteration_AVX512 = [&](size_t i)
     {
@@ -764,7 +766,7 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
             }
             case RENDERER_OPTIONS:
             {
-                MRAY_LOG("[Run]   :Render Options received and ignored");
+                //MRAY_LOG("[Run]   :Render Options received and ignored");
                 break; // TODO: User may change the render options during runtime
             }
             case RENDER_BUFFER_INFO:
@@ -827,7 +829,6 @@ bool RunCommand::EventLoop(TransferQueue& transferQueue,
                                     {pixelCount, pixelCount,
                                     pixelCount, pixelCount});
         renderBufferInfo = newRenderBuffer.Value();
-
         std::fill(imageRData.begin(), imageRData.end(), 0.0);
         std::fill(imageGData.begin(), imageGData.end(), 0.0);
         std::fill(imageBData.begin(), imageBData.end(), 0.0);

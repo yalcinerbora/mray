@@ -729,7 +729,6 @@ class RendererBase : public RendererI
 
     private:
     uint32_t         workCounter = 0;
-    uint32_t         mediumWorkCounter = 0;
     RenderWorkPack   workPack;
 
     uint32_t        GenerateWorkMappings(uint32_t workIdStart);
@@ -1108,6 +1107,7 @@ void RendererBase::ClearAllWorkMappings()
     currentWorks.clear();
     currentLightWorks.clear();
     currentCameraWorks.clear();
+    currentMediumWorks.clear();
     workCounter = 0;
 }
 
@@ -1117,6 +1117,7 @@ uint32_t RendererBase::GenerateWorks()
     assert(currentWorks.empty());
     assert(currentLightWorks.empty());
     assert(currentCameraWorks.empty());
+    assert(currentMediumWorks.empty());
     // Generate works per
     // Material1/Primitive/Transform triplet,
     // Light/Transform pair,

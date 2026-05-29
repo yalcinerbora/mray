@@ -170,6 +170,7 @@ class PathTracerRenderWork : public RenderWork<R, PG, MG, TG>
         //
              if(workIndex == 0) return matSampleList.Append(rrSampleList);
         else if(workIndex == 1) return lightSampleList;
+        else if(workIndex == 2) return matSampleList.Append(rrSampleList).Append(lightSampleList);
         else                    return RNRequestList();
     }
 };
@@ -195,7 +196,7 @@ class PathTracerRenderMediumWork : public RenderMediumWork<R, MG, TG>
         static constexpr auto lightSampleList = R::UniformLightSampler::SampleLightRNList;
         //
              if(workIndex == 0) return medSampleList.Append(rrSampleList);
-        else if(workIndex == 1) return medSampleList.Append(rrSampleList);
+        else if(workIndex == 1) return medSampleList.Append(rrSampleList).Append(lightSampleList);
         else                    return RNRequestList();
     }
 };

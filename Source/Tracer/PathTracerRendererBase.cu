@@ -10,6 +10,11 @@
 
 #include <numeric>
 
+template MRAY_DEVICE_ALGO_BINARY_PARTITION_TM_SIZE_SIGNATURE(CommonIndex);
+template MRAY_DEVICE_ALGO_BINARY_PARTITION_SIGNATURE(CommonIndex, MRAY_MACRO_ARG(TernaryToBinaryFunctor<0, IsDeadAliveInvalidFunctor>));
+template MRAY_DEVICE_ALGO_BINARY_PARTITION_SIGNATURE(CommonIndex, MRAY_MACRO_ARG(TernaryToBinaryFunctor<1, IsDeadAliveInvalidFunctor>));
+template MRAY_DEVICE_ALGO_BINARY_PARTITION_SIGNATURE(CommonIndex, IsMediumTransmittedFunctor);
+
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 static
 void KCWriteInvalidRaysIndirect(MRAY_GRID_CONSTANT const Span<PathDataPack> dPathDataPack,

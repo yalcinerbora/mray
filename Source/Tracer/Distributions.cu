@@ -405,7 +405,7 @@ struct SetupDistPointers
 
 DistributionGroupPwC2D::DistributionGroupPwC2D(const GPUSystem& s)
     : system(s)
-    , memory(s.AllGPUs(), 32_MiB, 64_MiB)
+    , memory(system.AllGPUs(), 32_MiB, 64_MiB)
 {}
 
 uint32_t DistributionGroupPwC2D::Reserve(Vector2ui size)

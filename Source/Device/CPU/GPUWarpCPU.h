@@ -9,32 +9,31 @@ namespace mray::host::warp
     inline uint32_t ActiveLaneMask() { return uint32_t(1); }
 
     template<uint32_t LogicalWarpSize = WarpSize()>
-    inline uint32_t WarpBallot(bool predicate, unsigned int mask = ALL_WARP_MASK)
+    inline uint32_t WarpBallot(bool, unsigned int = ALL_WARP_MASK)
     {
-        static_assert(std::is_same_v<LogicalWarpSize, UINT32_MAX>,
+        static_assert(LogicalWarpSize == UINT32_MAX,
                       "Warp operation does not makes sense in CPU mode! "
                       "Please guard the code via \"MRAY_DEVICE_CODE_PATH*\"");
     }
 
     template<uint32_t LogicalWarpSize = WarpSize()>
-    inline bool WarpAny(bool predicate, unsigned int mask = ALL_WARP_MASK)
+    inline bool WarpAny(bool, unsigned int = ALL_WARP_MASK)
     {
-        static_assert(std::is_same_v<LogicalWarpSize, UINT32_MAX>,
+        static_assert(LogicalWarpSize == UINT32_MAX,
                       "Warp operation does not makes sense in CPU mode! "
                       "Please guard the code via \"MRAY_DEVICE_CODE_PATH*\"");
     }
 
     template<uint32_t LogicalWarpSize = WarpSize()>
-    inline bool WarpAll(bool predicate, unsigned int mask = ALL_WARP_MASK)
+    inline bool WarpAll(bool, unsigned int = ALL_WARP_MASK)
     {
-        static_assert(std::is_same_v<LogicalWarpSize, UINT32_MAX>,
+        static_assert(LogicalWarpSize == UINT32_MAX,
                       "Warp operation does not makes sense in CPU mode! "
                       "Please guard the code via \"MRAY_DEVICE_CODE_PATH*\"");
     }
 
     template<uint32_t LogicalWarpSize = WarpSize(), class T>
-    inline T WarpBroadcast(T varName, int laneId,
-                           unsigned int mask = ALL_WARP_MASK)
+    inline T WarpBroadcast(T, int, unsigned int = ALL_WARP_MASK)
     {
         static_assert(!std::is_same_v<T, T>,
                       "Warp operation does not makes sense in CPU mode! "
@@ -42,8 +41,7 @@ namespace mray::host::warp
     }
 
     template<uint32_t LogicalWarpSize = WarpSize(), class T>
-    inline T WarpFetchForward(T varName, int offset,
-                              unsigned int mask = ALL_WARP_MASK)
+    inline T WarpFetchForward(T, int, unsigned int = ALL_WARP_MASK)
     {
         static_assert(!std::is_same_v<T, T>,
                       "Warp operation does not makes sense in CPU mode! "
@@ -51,8 +49,7 @@ namespace mray::host::warp
     }
 
     template<uint32_t LogicalWarpSize = WarpSize(), class T>
-    inline T WarpFetchBackward(T varName, int offset,
-                               unsigned int mask = ALL_WARP_MASK)
+    inline T WarpFetchBackward(T, int, unsigned int = ALL_WARP_MASK)
     {
         static_assert(!std::is_same_v<T, T>,
                       "Warp operation does not makes sense in CPU mode! "
@@ -61,8 +58,7 @@ namespace mray::host::warp
 
     template<uint32_t LogicalWarpSize = WarpSize(),
              class T, class BinaryFunc>
-    inline T WarpReduce(T varName, BinaryFunc&&,
-                        unsigned int mask = ALL_WARP_MASK)
+    inline T WarpReduce(T, BinaryFunc&&, unsigned int = ALL_WARP_MASK)
     {
         static_assert(!std::is_same_v<T, T>,
                       "Warp operation does not makes sense in CPU mode! "
@@ -70,7 +66,7 @@ namespace mray::host::warp
     }
 
     template<class T>
-    inline T WarpReduceAdd(T varName, unsigned int mask = ALL_WARP_MASK)
+    inline T WarpReduceAdd(T, unsigned int = ALL_WARP_MASK)
     {
         static_assert(!std::is_same_v<T, T>,
                       "Warp operation does not makes sense in CPU mode! "
@@ -78,7 +74,7 @@ namespace mray::host::warp
     }
 
     template<class T>
-    inline T WarpReduceMin(T varName, unsigned int mask = ALL_WARP_MASK)
+    inline T WarpReduceMin(T, unsigned int = ALL_WARP_MASK)
     {
         static_assert(!std::is_same_v<T, T>,
                       "Warp operation does not makes sense in CPU mode! "
@@ -86,7 +82,7 @@ namespace mray::host::warp
     }
 
     template<class T>
-    inline T WarpReduceMax(T varName, unsigned int mask = ALL_WARP_MASK)
+    inline T WarpReduceMax(T, unsigned int = ALL_WARP_MASK)
     {
         static_assert(!std::is_same_v<T, T>,
                       "Warp operation does not makes sense in CPU mode! "
@@ -94,7 +90,7 @@ namespace mray::host::warp
     }
 
     template<class T>
-    inline T WarpReduceAnd(T varName, unsigned int mask = ALL_WARP_MASK)
+    inline T WarpReduceAnd(T, unsigned int = ALL_WARP_MASK)
     {
         static_assert(!std::is_same_v<T, T>,
                       "Warp operation does not makes sense in CPU mode! "
@@ -102,7 +98,7 @@ namespace mray::host::warp
     }
 
     template<class T>
-    inline T WarpReduceOr(T varName, unsigned int mask = ALL_WARP_MASK)
+    inline T WarpReduceOr(T, unsigned int = ALL_WARP_MASK)
     {
         static_assert(!std::is_same_v<T, T>,
                       "Warp operation does not makes sense in CPU mode! "
@@ -110,7 +106,7 @@ namespace mray::host::warp
     }
 
     template<class T>
-    inline T WarpReduceXor(T varName, unsigned int mask = ALL_WARP_MASK)
+    inline T WarpReduceXor(T, unsigned int = ALL_WARP_MASK)
     {
         static_assert(!std::is_same_v<T, T>,
                       "Warp operation does not makes sense in CPU mode! "

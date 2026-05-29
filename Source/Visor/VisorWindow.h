@@ -158,6 +158,7 @@ class VisorWindow
     void        MousePressed(int button, int action, int modifier);
     void        MouseScrolled(double dx, double dy);
     void        PathDropped(int count, const char** paths);
+    void        ContentScaleChanged(float xScale, float yScale);
     // Only Visor can create windows
                 VisorWindow() = default;
     // Thus, only visor can initialize windows

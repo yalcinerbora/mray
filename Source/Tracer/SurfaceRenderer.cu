@@ -152,7 +152,6 @@ void SurfaceRenderer::PushAttribute(uint32_t attributeIndex,
 {
     switch(attributeIndex)
     {
-        using R = RendererBase;
         using namespace SurfRDetail;
         case 0: LoadFromTransientData(newOptions.totalSPP, data); break;
         case 1: LoadEnumFromTransientData<uint32_t>(newOptions.renderMode, data); break;
@@ -170,8 +169,8 @@ void SurfaceRenderer::PushAttribute(uint32_t attributeIndex,
             LoadFromTransientData(newOptions.acceleratorIndex, data);
             // Roll the given value
             int32_t maxInstance = int32_t(tracerView.baseAccelerator.TotalInstanceCount() + 1);
-            newOptions.acceleratorIndex = Math::Roll(int32_t(newOptions.acceleratorIndex),
-                                                     0, maxInstance);
+            newOptions.acceleratorIndex = uint32_t(Math::Roll(int32_t(newOptions.acceleratorIndex),
+                                                              0, maxInstance));
             break;
         }
         default:

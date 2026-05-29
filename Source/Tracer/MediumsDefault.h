@@ -18,24 +18,24 @@ namespace BlackbodySPD
     {
         // Trying to create constants as precise as possible
         using LD = long double;
-        inline constexpr LD PLANCK_CONST = 6.62607015e-34;
-        inline constexpr LD BOLTZ_CONST = 1.380649e-23;
-        inline constexpr LD C = 299'792'458;
-        inline constexpr LD WIEN_CONST = 2.897771955e-3;
+        inline constexpr LD PLANCK_CONST    = LD(6.62607015e-34);
+        inline constexpr LD BOLTZ_CONST     = LD(1.380649e-23);
+        inline constexpr LD C               = LD(299'792'458);
+        inline constexpr LD WIEN_CONST      = LD(2.897771955e-3);
         // We provide nm scale wavelengths to our system
-        inline constexpr LD NM_TO_M_CONST = 1e9;
-        inline constexpr LD EMIT_FACTOR = (2 * C * C * PLANCK_CONST *
-                                           NM_TO_M_CONST * NM_TO_M_CONST *
-                                           NM_TO_M_CONST * NM_TO_M_CONST *
-                                           NM_TO_M_CONST);
-        inline constexpr long double EXP_FACTOR = (PLANCK_CONST * C / BOLTZ_CONST *
-                                                   NM_TO_M_CONST);
+        inline constexpr LD NM_TO_M_CONST   = LD(1e9);
+        inline constexpr LD EMIT_FACTOR     = (LD(2) * C * C * PLANCK_CONST *
+                                               NM_TO_M_CONST * NM_TO_M_CONST *
+                                               NM_TO_M_CONST * NM_TO_M_CONST *
+                                               NM_TO_M_CONST);
+        inline constexpr LD EXP_FACTOR = (PLANCK_CONST * C / BOLTZ_CONST *
+                                          NM_TO_M_CONST);
         inline constexpr LD SPD_FACTOR = []()
         {
             // Result of "e^(PLANCK_CONST * C / (WIEN_CONST * BOLTZ_CONST) - 1"
             // Our constexpr Exp is single precision so I've put this in a calculator
             // and get the result.
-            constexpr LD MAX_EXP_FACTOR = 142.32492163952976;
+            constexpr LD MAX_EXP_FACTOR = LD(142.32492163952976);
             // We are incorporating NM_TO_M factor here to ease the FP calculation
             constexpr LD x = WIEN_CONST * NM_TO_M_CONST;
             LD x2 = x * x;
@@ -45,8 +45,8 @@ namespace BlackbodySPD
     }
     // Then above constants are converted to "Float", renderer's FP type.
     inline constexpr Float EMIT_FACTOR = Float(Detail::EMIT_FACTOR);
-    inline constexpr Float EXP_FACTOR = Float(Detail::EXP_FACTOR);
-    inline constexpr Float SPD_FACTOR = Float(Detail::SPD_FACTOR);
+    inline constexpr Float EXP_FACTOR  = Float(Detail::EXP_FACTOR);
+    inline constexpr Float SPD_FACTOR  = Float(Detail::SPD_FACTOR);
 
     // Plank's Law, from here (or PBRT Book)
     // https://topex.ucsd.edu/rs/radiation.pdf

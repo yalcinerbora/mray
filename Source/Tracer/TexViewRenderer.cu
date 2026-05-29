@@ -341,7 +341,6 @@ void TexViewRenderer::PushAttribute(uint32_t attributeIndex,
         return mI;
     };
 
-    using R = RendererBase;
     switch(attributeIndex)
     {
 
@@ -581,7 +580,8 @@ TexViewRenderer::StaticAttributeInfo()
             {"isSpectral",   MRayDataTypeRT(MR_BOOL),   MR_MANDATORY},
             {"textureIndex", MRayDataTypeRT(MR_UINT32), MR_OPTIONAL, std::nullopt, uint32_t(0)},
             {"mipIndex",     MRayDataTypeRT(MR_INT32),  MR_OPTIONAL, std::nullopt, uint32_t(1)},
-        }
+        },
+        .enumInfos = {}
     };
 }
 

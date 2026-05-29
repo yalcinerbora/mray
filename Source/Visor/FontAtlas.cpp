@@ -23,18 +23,18 @@ FontAtlas& FontAtlas::Instance(std::string_view execPath)
     return instance;
 }
 
-ImFont* FontAtlas::GetMonitorFont(float scaling)
+ImFont* FontAtlas::GetScaledFont(float scaling)
 {
-    auto loc = std::find_if(monitorFonts.cbegin(), monitorFonts.cend(),
+    auto loc = std::find_if(scaledFonts.cbegin(), scaledFonts.cend(),
                             [scaling](const auto& pair)
     {
         return (scaling == pair.first);
     });
-    assert(loc != monitorFonts.cend());
+    assert(loc != scaledFonts.cend());
     return loc->second;
 }
 
-void FontAtlas::AddMonitorFont(GLFWmonitor* monitor)
+void FontAtlas::AddScaledFont(float scaling)
 {
     using namespace std::string_view_literals;
     static constexpr auto VERA_MONO_FONT_PATH = "Fonts/VeraMono.ttf"sv;
@@ -44,22 +44,16 @@ void FontAtlas::AddMonitorFont(GLFWmonitor* monitor)
     static constexpr float INITIAL_SCALE = 1.00f;
     static constexpr float PIXEL_SIZE = 14;
 
-    float monitorScaleX, monitorScaleY;
-    glfwGetMonitorContentScale(monitor,
-                               &monitorScaleX,
-                               &monitorScaleY);
-    assert(monitorScaleX == monitorScaleY);
-
     // Only add font with this scale if not available
-    auto loc = std::find_if(monitorFonts.cbegin(), monitorFonts.cend(),
-                            [monitorScaleX](const auto& pair)
+    auto loc = std::find_if(scaledFonts.cbegin(), scaledFonts.cend(),
+                            [scaling](const auto& pair)
     {
-        return monitorScaleX == pair.first;
+        return scaling == pair.first;
     });
-    if(loc != monitorFonts.cend()) return;
+    if(loc != scaledFonts.cend()) return;
 
     float scaledPixelSize = std::roundf(PIXEL_SIZE * INITIAL_SCALE *
-                                        monitorScaleX);
+                                        scaling);
     ImGuiIO& io = ImGui::GetIO();
     ImFontConfig config;
     config.RasterizerDensity = 2.0f;
@@ -88,10 +82,10 @@ void FontAtlas::AddMonitorFont(GLFWmonitor* monitor)
                                                     &config, icon_ranges);
     // We are merging this must be true
     assert(font == iconFont);
-    monitorFonts.emplace_back(monitorScaleX, font);
+    scaledFonts.emplace_back(scaling, font);
 }
 
-void FontAtlas::RemoveMonitorFont(GLFWmonitor*)
+void FontAtlas::RemoveScaledFont(float)
 {
     // TODO: There is a "memory leak" (technically not)
     // here, if user repeatedly removes adds monitors during a session
@@ -109,5 +103,5 @@ void FontAtlas::RemoveMonitorFont(GLFWmonitor*)
 void FontAtlas::ClearFonts()
 {
     // TODO: Same as above
-    monitorFonts.clear();
+    scaledFonts.clear();
 }

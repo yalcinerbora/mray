@@ -8,6 +8,9 @@
 #include "Core/DataStructures.h"
 #include "VisorWindow.h"
 
+// TODO: Get this from CMake later
+static constexpr auto MRAY_VK_API_VERSION = VK_MAKE_API_VERSION(0, 1, 4, 433);
+
 struct MRayError;
 
 // We gonna use this a lot I think
@@ -62,6 +65,7 @@ class VisorVulkan : public VisorI
     static void     MousePressedGLFW(GLFWwindow*, int, int, int);
     static void     MouseScrolledGLFW(GLFWwindow*, double, double);
     static void     PathDroppedGLFW(GLFWwindow*, int, const char**);
+    static void     ContentScaleChangedGLFW(GLFWwindow*, float, float);
     static void     RegisterCallbacks(GLFWwindow*);
 
     static void     ErrorCallbackGLFW(int, const char*);

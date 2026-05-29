@@ -1,3 +1,4 @@
+#pragma once
 
 #include "GPUSystemCUDA.h"
 #include "Core/BitFunctions.h"

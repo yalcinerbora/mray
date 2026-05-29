@@ -1,4 +1,6 @@
 
+#pragma once
+
 #include "GPUSystemHIP.h"
 #include "Core/BitFunctions.h"
 

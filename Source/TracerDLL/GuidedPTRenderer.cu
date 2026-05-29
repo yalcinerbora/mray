@@ -218,7 +218,7 @@ void KCBackpropagateHashGridPath(// Output
         //outRadiance = Math::Min(outRadiance, Float(100.0));
         if(!Math::IsFinite(outRadiance))
         {
-            printf("Out Rad not finite! %f, %f\n", irrad, refl);
+            Device::Print("Out Rad not finite! %f, %f\n", irrad, refl);
             outRadiance = Float(0);
         }
         MCIrradiance::AtomicEMA(dIrradHashGrid[prevMCIndex], outRadiance);
@@ -281,7 +281,7 @@ void KCBackpropagateHashGridPath(// Output
         {
             if(!Math::IsFinite(outRadiance))
             {
-                printf("Out Rad not finite!\n");
+                Device::Print("Out Rad not finite!\n");
                 outRadiance = Float(0);
             }
             // Update routine
@@ -291,17 +291,17 @@ void KCBackpropagateHashGridPath(// Output
         //
         if(!Math::IsFinite(s.cosine))
         {
-            printf("MC Cos Not finite!\n");
+            Device::Print("MC Cos Not finite!\n");
             s.cosine = Float(0);
         }
         if(!Math::IsFinite(s.target))
         {
-            printf("MC Target Not finite!\n");
+            Device::Print("MC Target Not finite!\n");
             s.target = Vector3::Zero();
         }
         if(!Math::IsFinite(s.weight))
         {
-            printf("MC Weight Not finite!\n");
+            Device::Print("MC Weight Not finite!\n");
             s.weight = Float(0);
         }
         // Write back to intermediate buffer
@@ -378,7 +378,7 @@ void KCBackpropagateIrradNEE(// I-O
 
         if(!Math::IsFinite(radEstimate))
         {
-            printf("NEE Not finite!\n");
+            Device::Print("NEE Not finite!\n");
             radEstimate = Float(0);
         }
         MCIrradiance::AtomicEMA(dIrradHashGrid[prevMCIndex], radEstimate);
@@ -418,7 +418,7 @@ void KCBackpropagateIrradLight(// I-O
 
         if(!Math::IsFinite(outRadiance))
         {
-            printf("Light Not finite!\n");
+            Device::Print("Light Not finite!\n");
             outRadiance = Float(0);
         }
 
@@ -473,7 +473,6 @@ GuidedPTRenderer::CurrentAttributes() const
 void GuidedPTRenderer::PushAttribute(uint32_t attributeIndex,
                                      TransientData data, const GPUQueue&)
 {
-    using R = RendererBase;
     switch(attributeIndex)
     {
         case  0: LoadFromTransientData(newOptions.cacheEntryLimit, data); break;

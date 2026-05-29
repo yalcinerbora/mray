@@ -245,6 +245,12 @@ void VisorVulkan::PathDroppedGLFW(GLFWwindow* wind, int count, const char** path
     wPtr->PathDropped(count, paths);
 }
 
+void VisorVulkan::ContentScaleChangedGLFW(GLFWwindow* wind, float xScale, float yScale)
+{
+    auto wPtr = static_cast<VisorWindow*>(glfwGetWindowUserPointer(wind));
+    wPtr->ContentScaleChanged(xScale, yScale);
+}
+
 void VisorVulkan::RegisterCallbacks(GLFWwindow* w)
 {
     glfwSetWindowPosCallback(w, &VisorVulkan::WindowPosGLFW);
@@ -260,6 +266,7 @@ void VisorVulkan::RegisterCallbacks(GLFWwindow* w)
     glfwSetMouseButtonCallback(w, &VisorVulkan::MousePressedGLFW);
     glfwSetScrollCallback(w, &VisorVulkan::MouseScrolledGLFW);
     glfwSetDropCallback(w, &VisorVulkan::PathDroppedGLFW);
+    glfwSetWindowContentScaleCallback(w, &VisorVulkan::ContentScaleChangedGLFW);
 }
 
 // System related
@@ -270,18 +277,21 @@ void VisorVulkan::ErrorCallbackGLFW(int errorCode, const char* err)
 
 void VisorVulkan::MonitorCallback(GLFWmonitor* monitor, int action)
 {
-    MRAY_LOG("Monitor!!!!!");
+    float xScale = 1.0f, yScale = 1.0f;
+    glfwGetMonitorContentScale(monitor, &xScale, &yScale);
+    assert(xScale == yScale);
+
     if(action == GLFW_CONNECTED)
     {
         MRAY_LOG("[GLFW]: New Monitor: {}",
                  glfwGetMonitorName(monitor));
-        FontAtlas::Instance().AddMonitorFont(monitor);
+        FontAtlas::Instance().AddScaledFont(xScale);
     }
     else if(action == GLFW_DISCONNECTED)
     {
         MRAY_LOG("[GLFW]: Monitor Removed: {}",
                  glfwGetMonitorName(monitor));
-        FontAtlas::Instance().RemoveMonitorFont(monitor);
+        FontAtlas::Instance().RemoveScaledFont(xScale);
     }
 }
 
@@ -637,7 +647,13 @@ MRayError VisorVulkan::InitImGui()
     int monitorCount;
     GLFWmonitor** monitorList = glfwGetMonitors(&monitorCount);
     for(int i = 0; i < monitorCount; i++)
-        FontAtlas::Instance().AddMonitorFont(monitorList[i]);
+    {
+        float xScale = 1.0f, yScale = 1.0f;
+        glfwGetMonitorContentScale(monitorList[i], &xScale, &yScale);
+        assert(xScale == yScale);
+        FontAtlas::Instance().AddScaledFont(xScale);
+    }
+
 
     ImGui::StyleColorsDark();
     auto& style = ImGui::GetStyle();
@@ -664,6 +680,13 @@ MRayError VisorVulkan::MTInitialize(TransferQueue& transferQueue,
     instanceExtList.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
 
     glfwInitVulkanLoader(vkGetInstanceProcAddr);
+
+    #ifndef MRAY_WINDOWS
+        if(visorConfig.useWayland)
+            glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
+        else
+            glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+    #endif
     int err = glfwInit();
     if(err != GLFW_TRUE)
     {
@@ -693,7 +716,7 @@ MRayError VisorVulkan::MTInitialize(TransferQueue& transferQueue,
                                              MRay::VersionMajor,
                                              MRay::VersionMinor,
                                              MRay::VersionPatch),
-        .apiVersion = VK_MAKE_API_VERSION(0, 1, 3, 280)
+        .apiVersion = MRAY_VK_API_VERSION
     };
     VkInstanceCreateInfo instanceCreateInfo =
     {

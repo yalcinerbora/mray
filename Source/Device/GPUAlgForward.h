@@ -40,6 +40,8 @@ namespace mray::algorithms
 
     #include "CUDA/AlgForwardCUDA.h" // IWYU pragma: export
 
+    #define MRAY_DEVICE_ALGO_NAMESPACE ::mray::cuda::algorithms
+
     namespace DeviceAlgorithms
     {
         inline namespace DeviceSpecific{ using namespace ::mray::cuda::algorithms; }
@@ -49,6 +51,8 @@ namespace mray::algorithms
 
     #include "HIP/AlgForwardHIP.h" // IWYU pragma: export
 
+    #define MRAY_DEVICE_ALGO_NAMESPACE ::mray::hip::algorithms
+
     namespace DeviceAlgorithms
     {
         inline namespace DeviceSpecific{ using namespace ::mray::hip::algorithms; }
@@ -56,6 +60,8 @@ namespace mray::algorithms
     }
 #elif defined MRAY_GPU_BACKEND_CPU
     #include "CPU/AlgForwardCPU.h" // IWYU pragma: export
+
+    #define MRAY_DEVICE_ALGO_NAMESPACE ::mray::host::algorithms
 
     namespace DeviceAlgorithms
     {
@@ -65,3 +71,53 @@ namespace mray::algorithms
 #else
     #error Please define a GPU Backend!
 #endif
+
+// TODO: Add as needed
+#define MRAY_DEVICE_ALGO_BINARY_PARTITION_TM_SIZE_SIGNATURE(T) \
+    size_t (MRAY_DEVICE_ALGO_NAMESPACE::BinPartitionTMSize<T>) \
+    (                                                          \
+        size_t, const GPUQueue&                                \
+    )
+
+#define MRAY_DEVICE_ALGO_BINARY_PARTITION_SIGNATURE(T, F)      \
+    void (MRAY_DEVICE_ALGO_NAMESPACE::BinaryPartition<T, F>)   \
+    (                                                          \
+        Span<T>, Span<uint32_t, 1>, Span<Byte>, Span<const T>, \
+        const GPUQueue&, F&&                                   \
+    )
+
+#define MRAY_DEVICE_ALGO_SEG_TRANSFORM_REDUCE_TM_SIZE_SIGNATURE(T0, T1)         \
+    size_t (MRAY_DEVICE_ALGO_NAMESPACE::SegmentedTransformReduceTMSize<T0, T1>) \
+    (                                                                           \
+        size_t, const GPUQueue&                                                 \
+    )
+
+#define MRAY_DEVICE_ALGO_SEG_TRANSFORM_REDUCE_SIGNATURE(T0, T1, F0, F1)         \
+    void (MRAY_DEVICE_ALGO_NAMESPACE::SegmentedTransformReduce<T0, T1, F0, F1>) \
+    (                                                                           \
+        Span<T0>,                                                               \
+        Span<Byte>,                                                             \
+        Span<const T0>,                                                         \
+        Span<const uint32_t>,                                                   \
+        const T0&,                                                              \
+        const GPUQueue&,                                                        \
+        F0&&,                                                                   \
+        F1&&                                                                    \
+    )
+
+#define MRAY_DEVICE_ALGO_SEG_RADIX_SORT_TM_SIZE_SIGNATURE(B, T0, T1)         \
+    size_t (MRAY_DEVICE_ALGO_NAMESPACE::SegmentedRadixSortTMSize<B, T0, T1>) \
+    (                                                                        \
+        size_t, size_t, const GPUQueue&                                      \
+    )
+
+#define MRAY_DEVICE_ALGO_SEG_RADIX_SORT_SIGNATURE(B, T0, T1)             \
+    uint32_t (MRAY_DEVICE_ALGO_NAMESPACE::SegmentedRadixSort<B, T0, T1>) \
+    (                                                                    \
+        Span<Span<T0>, 2>,                                               \
+        Span<Span<T1>, 2>,                                               \
+        Span<Byte>,                                                      \
+        Span<const uint32_t>,                                            \
+        const GPUQueue&,                                                 \
+        const Vector2ui&                                                 \
+    )

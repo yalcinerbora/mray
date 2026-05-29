@@ -2,8 +2,8 @@
 #include "Device/GPUSystem.h"
 #include "Device/GPUSystem.hpp"
 
-HashGrid::HashGrid(const GPUSystem& gpuSystem)
-    : gpuSystem(gpuSystem)
+HashGrid::HashGrid(const GPUSystem& gpuSystemIn)
+    : gpuSystem(gpuSystemIn)
     , mem(gpuSystem.AllGPUs(), 64_MiB, 128_MiB, true)
 {}
 

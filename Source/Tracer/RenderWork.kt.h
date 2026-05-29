@@ -100,8 +100,6 @@ MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCRenderLightWork(MRAY_GRID_CONSTANT const typename WorkFunction::Params params)
 {
     using SpectrumConv = typename WorkFunction::SpectrumConv;
-    //
-    using PG = typename WorkFunction::PG;
     // Define the types
     // First, this kernel uses a transform context.
     // This will be used to transform the primitive.

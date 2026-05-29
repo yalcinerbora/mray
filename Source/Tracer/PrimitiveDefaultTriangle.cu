@@ -8,19 +8,12 @@
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCAdjustIndices(// I-O
-                     MRAY_GRID_CONSTANT const Span<Vector3ui> dIndicesInOut,
+                     MRAY_GRID_CONSTANT const Span<uint32_t> dIndicesInOut,
                      // Input
                      MRAY_GRID_CONSTANT const Span<const Vector4ui> dVertexIndexRanges)
 {
     KernelCallParams kp;
     uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
-
-    // TODO: Check if this is undefined behavior,
-    // We technically do an out of bounds access over the "std::array<uint32_t, 3>"
-    // Sanity check, if there is a padding (it should not but just to be sure)
-    static_assert(sizeof(std::array<Vector3ui, 2>) == sizeof(Vector3ui) * 2);
-    Span<uint32_t> dVertexIndices = Span<uint32_t>(dIndicesInOut.data()->AsSpan().data(),
-                                                   dIndicesInOut.size() * Vector3ui::Dims);
 
     // Block-stride Loop
     for(uint32_t blockId = kp.blockId; blockId < totalRanges;
@@ -51,7 +44,7 @@ void KCAdjustIndices(// I-O
         uint32_t vStart = sVertexIndexRange[0];
 
         // Hand unroll some here (slightly improved performance)
-        auto& dVI = dVertexIndices;
+        auto& dVI = dIndicesInOut;
         for(uint32_t j = localTid; j < vICount;)
         {
                             {dVI[vIStart + j] += vStart;} j += kp.blockSize;
@@ -281,6 +274,11 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
     }
     queue.MemcpyAsync(dVertexIndexRanges, Span<const Vector4ui>(hVertexIndexRanges));
 
+    // Send the index data as "uint32_t | size * 3", instead of "Vector3ui | size"
+    // so we can coalesce reads/writes better
+    Span<uint32_t> dIndicesAsU32 = MemAlloc::RepurposeAlloc<uint32_t>(dIndexList);
+    assert(dIndicesAsU32.size() == dIndexList.size() * Vector3ui::Dims);
+
     uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
     using namespace std::string_view_literals;
     queue.IssueBlockKernel<KCAdjustIndices>
@@ -292,7 +290,7 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
             .blockSize = StaticThreadPerBlock1D()
         },
         // I-O
-        dIndexList,
+        dIndicesAsU32,
         dVertexIndexRanges
     );
     queue.Barrier().Wait();
@@ -532,6 +530,11 @@ void PrimGroupSkinnedTriangle::Finalize(const GPUQueue& queue)
     }
     queue.MemcpyAsync(dVertexIndexRanges, Span<const Vector4ui>(hVertexIndexRanges));
 
+    // Send the index data as "uint32_t | size * 3", instead of "Vector3ui | size"
+    // so we can coalesce reads/writes better
+    Span<uint32_t> dIndicesAsU32 = MemAlloc::RepurposeAlloc<uint32_t>(dIndexList);
+    assert(dIndicesAsU32.size() == dIndexList.size() * Vector3ui::Dims);
+
     uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
     using namespace std::string_view_literals;
     queue.IssueBlockKernel<KCAdjustIndices>
@@ -543,7 +546,7 @@ void PrimGroupSkinnedTriangle::Finalize(const GPUQueue& queue)
             .blockSize = StaticThreadPerBlock1D()
         },
         // I-O
-        dIndexList,
+        dIndicesAsU32,
         dVertexIndexRanges
     );
     queue.Barrier().Wait();

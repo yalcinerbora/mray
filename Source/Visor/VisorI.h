@@ -80,6 +80,7 @@ struct VisorConfig
     bool        enforceIGPU = true;
     bool        displayHDR  = true;
     bool        realTime    = false;
+    bool        useWayland  = true;
     Vector2i    wSize       = Vector2i(1280, 720);
     // Technical
     uint32_t    commandBufferSize   = 8;

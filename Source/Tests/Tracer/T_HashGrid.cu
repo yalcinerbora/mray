@@ -31,6 +31,7 @@ TEST(HashGrid, Deterministic)
         .baseRegionDim      = 16384,
         .normalDelta        = 2,
         .normalRegionDim    = 2,
+        .maxLevel           = 4,
         .sampleLevelLimit   = 3,
         .maxEntryLimit      = 1'000,
         .tanConeHalfTimes2  = Math::Tan(radiansHalf) * Float(2)

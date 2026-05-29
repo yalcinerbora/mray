@@ -617,7 +617,7 @@ void WorkFunctionMedia<P, M, T, SC, LS>::Call(const Primitive&, const Material& 
     auto [rayIn, tMM]                = RayFromGMem(cS.dRays, rayIndex);
     const Vector3 wO                 = Math::Normalize(tContext.InvApplyV(-rayIn.dir));
     const Spectrum rPath             = rS.dRPathPDF[rayIndex];
-    const Spectrum rLight            = rS.dRLightPDF[rayIndex];
+    //const Spectrum rLight            = rS.dRLightPDF[rayIndex];
     const LightSampler& lightSampler = gS.lightSampler;
     RayConeSurface rConeRefract      = mat.RefractRayCone(surfRayCone, wO);
     PathDataPack dataPack            = rS.dPathDataPack[rayIndex];

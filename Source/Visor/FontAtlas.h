@@ -4,7 +4,6 @@
 
 #include <string>
 
-struct GLFWmonitor;
 struct ImFont;
 
 class FontAtlas
@@ -14,7 +13,7 @@ class FontAtlas
     using FontList = StaticVector<Pair<float, ImFont*>, MAX_FONT_COUNT>;
 
     private:
-    FontList            monitorFonts;
+    FontList            scaledFonts;
     std::string         executablePath = "";
 
     // Constructors & Destructor
@@ -23,8 +22,8 @@ class FontAtlas
     public:
     static FontAtlas&   Instance(std::string_view execPath = "");
 
-    ImFont*             GetMonitorFont(float scalingX);
-    void                AddMonitorFont(GLFWmonitor*);
-    void                RemoveMonitorFont(GLFWmonitor*);
+    ImFont*             GetScaledFont(float scaling);
+    void                AddScaledFont(float scaling);
+    void                RemoveScaledFont(float scaling);
     void                ClearFonts();
 };

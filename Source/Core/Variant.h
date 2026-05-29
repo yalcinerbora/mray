@@ -219,7 +219,7 @@ namespace VariantDetail
         static constexpr bool CA = (AllTrait<std::is_copy_assignable>(TP{}) &&
                                     !AllTrait<std::is_trivially_copy_assignable>(TP{}));
         static constexpr bool MA = (AllTrait<std::is_move_assignable>(TP{}) &&
-                                    !AllTrait<std::is_trivially_copy_assignable>(TP{}));
+                                    !AllTrait<std::is_trivially_move_assignable>(TP{}));
         // Is first type default constructible ?
         using FirstType = TypePackElement<0, TP>;
         static constexpr bool FIRST_DC = std::is_default_constructible_v<FirstType>;
@@ -604,7 +604,7 @@ VariantDetail::VariantImpl<Types...>::VariantImpl() noexcept requires(FIRST_DC)
     : tag(VariantIndex(0))
 {
     // TODO: Do we really need this?
-    if constexpr(FIRST_TDC)
+    if constexpr(!FIRST_TDC)
     {
         std::construct_at<FirstType>(&MetaGet<0, 0, TypeCount>(storage));
     }

@@ -182,7 +182,7 @@ AABB3 BaseAcceleratorEmbree::InternalConstruct(const std::vector<size_t>& instan
         for(uint32_t i = 0; i < localHandles.size(); i++)
         {
             auto g = rtcNewGeometry(embreeContext.device, RTC_GEOMETRY_TYPE_INSTANCE);
-            rtcSetGeometryMask(g, unsigned int(localMasks[i].mask));
+            rtcSetGeometryMask(g, static_cast<unsigned int>(localMasks[i].mask));
             rtcSetGeometryInstancedScene(g, localHandles[i]);
             // Maybe there is some optimizations on embree
             // lets not give identity matrix to embree.

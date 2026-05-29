@@ -4,6 +4,8 @@
 #include "Core/Definitions.h"
 #include "Core/Vector.h"
 
+#include "Device/GPUPrint.h"
+
 #include "Tracer/PathTracerRendererBase.h"
 #include "Tracer/HashGrid.h"
 #include "Tracer/SpectrumContext.h"
@@ -331,7 +333,7 @@ uint32_t MCState::EMA(const Vector3& distPos,
     constexpr uint32_t MAX_SAMPLE_MC = uint32_t(1024);
 
     N = Math::Min(N + 1, MAX_SAMPLE_MC);
-    Float a = Math::Max(Float(1) / N, MIN_EMA_RATIO_MC);
+    Float a = Math::Max(Float(1) / Float(N), MIN_EMA_RATIO_MC);
 
     weight = Math::Lerp(weight, newWeight, a);
     target = Math::Lerp(target, newWeight * newTarget, a);
@@ -474,7 +476,12 @@ MR_GF_DEF
 typename GaussLobeMixtureSharedT<N>::Storage&
 GaussLobeMixtureSharedT<N>::SMem() const
 {
-    extern MRAY_SHARED_MEMORY Byte s[];
+    // TODO: This is probably wrong for CPU
+    #ifdef MRAY_DEVICE_CODE_PATH
+        extern MRAY_SHARED_MEMORY char s[];
+    #else
+        MRAY_SHARED_MEMORY char s[512];
+    #endif
     return *reinterpret_cast<Storage*>(s);
 }
 
@@ -487,6 +494,7 @@ GaussLobeMixtureSharedT<N>::Sample(RNGDispenser& rng) const
     {
         return SampleT<Vector3>
         {
+            .value = Vector3::Zero(),
             .pdf = Float(0)
         };
     }
@@ -674,11 +682,10 @@ void WorkFunction<P, M, T>::Call(const Primitive&, const Material& mat, const Su
     Float pdfPath = BalanceCancelled<2>(misPDFs, misWeights);
     if(pdfPath < Float(0))
     {
-        printf("wut? %.10f | %.10f %.10f | %.10f %.10f \n",
-               pdfPath, misPDFs[0], misPDFs[1],
-               misWeights[0], misWeights[1]);
+        Device::Print("wut? %.10f | %.10f %.10f | %.10f %.10f \n",
+                      pdfPath, misPDFs[0], misPDFs[1],
+                      misWeights[0], misWeights[1]);
     }
-
 
     // ================ //
     // Russian Roulette //

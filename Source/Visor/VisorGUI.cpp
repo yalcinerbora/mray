@@ -850,7 +850,7 @@ VisorGUI::RenderRendererOptions(const VisorState&)
                 Span<Byte> data = attribValue.AccessAs<Byte>();
                 ImGui::InputScalarN(attribType.name.c_str(),
                                     typeResult.dataType,
-                                    data.data(), typeResult.amount);
+                                    data.data(), int(typeResult.amount));
                 if(ImGui::IsItemDeactivatedAfterEdit())
                 {
                     TransientData tData = attribValue.Copy();
@@ -1031,12 +1031,9 @@ GUIChanges VisorGUI::Render(ImFont* windowScaledFont, const VisorState& visorSta
 
     if(inputChecker.CheckKeyPress(PRINT_CUSTOM_CAMERA))
     {
-        std::span<const Float, 3> test(visorState.transform.gazePoint.AsSpan().data(), 3);
-
         MRAY_LOG("\"gaze\"     : {},\n"
                  "\"position\" : {},\n"
                  "\"up\"       : {}",
-                 //test, test, test
                  visorState.transform.gazePoint.AsSpan(),
                  visorState.transform.position.AsSpan(),
                  visorState.transform.up.AsSpan()
