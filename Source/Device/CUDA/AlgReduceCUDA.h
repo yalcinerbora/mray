@@ -79,8 +79,7 @@ void Reduce(Span<T, 1> dReducedValue,
             BinaryOp&& op)
 {
     using namespace cub;
-    using namespace std::literals;
-    static const auto annotation = queue.CreateAnnotation("KCReduce"sv);
+    static const auto annotation = queue.CreateAnnotation("KCReduce");
     const auto _ = annotation.AnnotateScope();
 
     size_t size = dTempMemory.size();
@@ -102,8 +101,7 @@ void TransformReduce(Span<OutT, 1> dReducedValue,
                      TransformOp&& transformOp)
 {
     using namespace cub;
-    using namespace std::literals;
-    static const auto annotation = queue.CreateAnnotation("KCTransformReduce"sv);
+    static const auto annotation = queue.CreateAnnotation("KCTransformReduce");
     const auto _ = annotation.AnnotateScope();
 
     using TransIt = thrust::transform_iterator<TransformOp, const InT*, OutT>;
@@ -129,8 +127,7 @@ void SegmentedTransformReduce(Span<OutT> dReducedValues,
                               TransformOp&& transformOp)
 {
     using namespace cub;
-    using namespace std::literals;
-    static const auto annotation = queue.CreateAnnotation("KCSegmentedTransformReduce"sv);
+    static const auto annotation = queue.CreateAnnotation("KCSegmentedTransformReduce");
     const auto _ = annotation.AnnotateScope();
     //using TransIt = thrust::transform_iterator<OutT, TransformOp, const InT*>;
     using TransIt = thrust::transform_iterator<TransformOp, const InT*, OutT>;

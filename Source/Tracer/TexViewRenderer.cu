@@ -180,8 +180,6 @@ void KCSplatRGBToImageSpan(MRAY_GRID_CONSTANT const ImageSpan imgSpan,
 
 void TexViewRenderer::RenderTextureAsData(const GPUQueue& processQueue)
 {
-    using namespace std::string_view_literals;
-
     uint32_t curPixelCount = imageTiler.CurrentTileSize().Multiply();
     auto texView = *textureViews[textureIndex];
     uint32_t texChannelCount = FindTexViewChannelCount(texView);
@@ -191,7 +189,7 @@ void TexViewRenderer::RenderTextureAsData(const GPUQueue& processQueue)
         // (device buffer is read fully)
         processQueue.IssueWorkKernel<KCShowTexture<C>>
         (
-            "KCShowTexture"sv,
+            "KCShowTexture",
             DeviceWorkIssueParams{.workCount = curPixelCount},
             //
             imageTiler.GetTileSpan(),
@@ -235,12 +233,11 @@ void TexViewRenderer::RenderTextureAsSpectral(const GPUQueue& processQueue)
     bool isIlluminant = (textures[textureIndex]->IsIlluminant() ==
                          MRayTextureIsIlluminant::IS_ILLUMINANT);
     uint32_t texChannelCount = FindTexViewChannelCount(texView);
-    using namespace std::string_view_literals;
     auto KernelCall = [&, this]<uint32_t C>()
     {
         processQueue.IssueWorkKernel<KCSampleTextureSpectral<C>>
         (
-            "KCSampleTextureSpectral"sv,
+            "KCSampleTextureSpectral",
             DeviceWorkIssueParams{.workCount = curPixelCount},
             //
             dThroughputLocal,
@@ -269,7 +266,7 @@ void TexViewRenderer::RenderTextureAsSpectral(const GPUQueue& processQueue)
     // Write these RGB to buffer
     processQueue.IssueWorkKernel<KCSplatRGBToImageSpan>
     (
-        "KCSplatRGBToImageSpan"sv,
+        "KCSplatRGBToImageSpan",
         DeviceWorkIssueParams{.workCount = curPixelCount},
         //
         imageTiler.GetTileSpan(),
@@ -472,7 +469,6 @@ RendererOutput TexViewRenderer::DoRender()
     // Render nothing...
     if(textures.empty()) return {};
 
-    using namespace std::string_view_literals;
     const GPUQueue& processQueue = device.GetComputeQueue(0);
 
     uint32_t curPixelCount = imageTiler.CurrentTileSize().Multiply();
@@ -485,7 +481,7 @@ RendererOutput TexViewRenderer::DoRender()
         {
             processQueue.IssueWorkKernel<KCColorTiles>
             (
-                "KCColorTiles"sv,
+                "KCColorTiles",
                 DeviceWorkIssueParams{.workCount = curPixelCount},
                 //
                 imageTiler.GetTileSpan(),

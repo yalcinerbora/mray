@@ -1063,7 +1063,7 @@ void VisorGUI::ChangeDisplayImage(const VulkanImage& img)
     if(mainImage) ImGui_ImplVulkan_RemoveTexture(mainImage);
 
     imgSize = Vector2(img.Extent());
-    mainImage = ImGui_ImplVulkan_AddTexture(img.Sampler(), img.View(),
+    mainImage = ImGui_ImplVulkan_AddTexture(img.View(),
                                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 

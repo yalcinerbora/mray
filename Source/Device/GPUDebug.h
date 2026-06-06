@@ -14,14 +14,12 @@
 namespace DeviceDebug
 {
 
-    enum WriteMode
-    {
-        DEFAULT,
-        HEXADECIMAL,
-        BINARY
-    };
-
-using namespace std::string_view_literals;
+enum WriteMode
+{
+    DEFAULT,
+    HEXADECIMAL,
+    BINARY
+};
 
 template<WriteMode MODE = DEFAULT, class T>
 void DumpGPUMemToStream(std::ostream& s,
@@ -56,7 +54,7 @@ template<WriteMode MODE = DEFAULT, class T>
 void DumpGPUMemToFile(const std::string& fName,
                       Span<const T> data,
                       const GPUQueue& queue,
-                      std::string_view separator = "\n"sv)
+                      std::string_view separator = "\n")
 {
     std::ofstream file(fName);
     DumpGPUMemToStream<MODE>(file, data, queue, separator);
@@ -66,7 +64,7 @@ template<WriteMode MODE = DEFAULT, class T>
 void DumpGPUMemToStdOut(std::string_view header,
                         Span<const T> data,
                         const GPUQueue& queue,
-                        std::string_view separator = "\n"sv)
+                        std::string_view separator = "\n")
 {
     if(!header.empty()) MRAY_LOG("{}", header);
     DumpGPUMemToStream<MODE>(std::cout, data, queue, separator);

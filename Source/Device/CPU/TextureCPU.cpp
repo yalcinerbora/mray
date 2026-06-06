@@ -84,8 +84,9 @@ void TextureCPU_Normal<D, T>::CommitMemory(const GPUQueueCPU&,
                                            const TextureBackingMemoryCPU& deviceMem,
                                            size_t offset)
 {
-    Span<Byte> data = ToHandleCPU(deviceMem);
-    dataPtr = reinterpret_cast<PaddedChannelType*>(data.subspan(offset, size).data());
+    Byte* data = ToHandleCPU(deviceMem);
+    assert(offset < deviceMem.Size());
+    dataPtr = reinterpret_cast<PaddedChannelType*>(data + offset);
 }
 
 template<uint32_t D, class T>
@@ -283,8 +284,8 @@ void TextureCPU_BC<T>::CopyFromAsync(const GPUQueueCPU&, uint32_t,
 
 template<class T>
 void TextureCPU_BC<T>::CopyToAsync(Span<PaddedChannelType>, const GPUQueueCPU&,
-                                    uint32_t, const TextureExtent<2>&,
-                                    const TextureExtent<2>&) const
+                                   uint32_t, const TextureExtent<2>&,
+                                   const TextureExtent<2>&) const
 {
     throw MRayError("CPU Device does not support BC textures!");
 }

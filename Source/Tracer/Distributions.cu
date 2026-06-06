@@ -492,7 +492,6 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
                                        const GPUQueue& queue)
 {
     using namespace DeviceAlgorithms;
-    using namespace std::literals;
     assert(index < distData.size());
 
     // TODO: select a device?
@@ -506,7 +505,7 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
     // Directly scan to cdf array
     queue.IssueBlockKernel<KCSegmentedScanPrecise>
     (
-        "Dist2D-PreciseSegmentedScan"sv,
+        "Dist2D-PreciseSegmentedScan",
         //
         DeviceBlockIssueParams
         {
@@ -523,7 +522,7 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
     {
         queue.IssueBlockKernel<KCValidateScan>
         (
-            "Dist2D-ValidateScanX"sv,
+            "Dist2D-ValidateScanX",
             DeviceBlockIssueParams
             {
                 .gridSize = yCount,
@@ -538,7 +537,7 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
     // Copy to Y and normalize
     queue.IssueBlockKernel<KCCopyScanY>
     (
-        "Dist2D-Copy&ScanY"sv,
+        "Dist2D-Copy&ScanY",
         DeviceBlockIssueParams{.gridSize = 1, .blockSize = TPBCall},
         //
         d.dCDFsY,
@@ -547,7 +546,7 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
     // Normalize rows, finally making it a proper CDF
     queue.IssueBlockKernel<KCNormalizeXY>
     (
-        "Dist2D-NormalizeXY"sv,
+        "Dist2D-NormalizeXY",
         DeviceBlockIssueParams{.gridSize = yCount + 1, .blockSize = TPBCall},
         //
         d.dCDFsX,
@@ -556,7 +555,7 @@ void DistributionGroupPwC2D::Construct(uint32_t index,
 
     queue.IssueWorkLambda
     (
-        "Dist2D-ConstructDist"sv,
+        "Dist2D-ConstructDist",
         DeviceWorkIssueParams{.workCount = yCount},
         SetupDistPointers{xCount, yCount, dDistributions.subspan(index, 1), d}
     );

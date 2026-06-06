@@ -57,7 +57,6 @@ struct DistTester2D
                const Vector2ui& size,
                const std::vector<Vector2>& hRandomNumbers)
     {
-        using namespace std::literals;
         const GPUQueue& queue = system.BestDevice().GetComputeQueue(0);
 
         uint32_t sampleCount = static_cast<uint32_t>(hRandomNumbers.size());
@@ -84,7 +83,7 @@ struct DistTester2D
 
         queue.IssueWorkKernel<KCSampleDist<Dist2D, DoUV>>
         (
-            "GTest SampleDist2D"sv,
+            "GTest SampleDist2D",
             DeviceWorkIssueParams{.workCount = sampleCount},
             //
             dOutSamples,

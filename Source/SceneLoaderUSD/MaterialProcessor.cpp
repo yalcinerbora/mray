@@ -144,7 +144,7 @@ ReadUSDMatAttribute(const MaterialTerminalVariant<T>& mt,
     using ResultT = Pair<T, Optional<TextureId>>;
 
     ResultT result = ResultT(T(), std::nullopt);
-    if(std::holds_alternative<MTT>(mt))
+    if(HoldsAlternative<MTT>(mt))
     {
         const pxr::UsdPrim& texName = std::get<MTT>(mt).texShaderNode;
         TextureId tId = texLookup.at(texName);
@@ -526,7 +526,7 @@ MRayUSDMaterialProps MaterialConverter::ResolveMatPropsSingle(const MRayUSDBound
     MRAY_PROFILER_ANNOTATE_SCOPE(annotation, _);
 
     const auto& tokens = MRayUSDShadeTokens();
-    if(std::holds_alternative<MRayUSDFallbackMaterial>(m))
+    if(HoldsAlternative<MRayUSDFallbackMaterial>(m))
     {
         return MRayUSDMaterialProps
         {
@@ -557,16 +557,16 @@ MRayUSDMaterialProps MaterialConverter::ResolveMatPropsSingle(const MRayUSDBound
     auto iorOrSpec  = GetTexturedAttribute(shader.GetInput(tokens.ior), 1.0f);
 
     using MTT = MRayUSDTextureTerminal;
-    bool nonMetal = (!std::holds_alternative<MTT>(metallic) &&
+    bool nonMetal = (!HoldsAlternative<MTT>(metallic) &&
                      std::get<float>(metallic) == 0.0f);
-    //bool smooth = (!std::holds_alternative<MTT>(roughness) &&
+    //bool smooth = (!std::HoldsAlternative<MTT>(roughness) &&
     //               std::get<float>(roughness) == 0.0f);
-    bool rough = (!std::holds_alternative<MTT>(roughness) &&
+    bool rough = (!HoldsAlternative<MTT>(roughness) &&
                    std::get<float>(roughness) == 1.0f);
     //
     MRayUSDMaterialType type;
     if(dielectric && nonMetal &&
-       std::holds_alternative<float>(opacity) &&
+       HoldsAlternative<float>(opacity) &&
        std::get<float>(opacity) < 1.0f)
     {
         warnDielectricMaterialSucks = true;
@@ -579,7 +579,7 @@ MRayUSDMaterialProps MaterialConverter::ResolveMatPropsSingle(const MRayUSDBound
 
     // Convert ior to "specularity" if material is opaque
     if(type == MRayUSDMaterialType::SPECULAR_DIFFUSE_COMBO &&
-       std::holds_alternative<float>(iorOrSpec))
+       HoldsAlternative<float>(iorOrSpec))
     {
         static constexpr float MaxF0 = 0.08f;
         static constexpr float MaxF0Recip = 1.0f / MaxF0;
@@ -625,7 +625,7 @@ MaterialConverter::ResolveTextures(const std::vector<MRayUSDMaterialProps>& prop
                                             bool isNormal = false)
     {
         using MTT = MRayUSDTextureTerminal;
-        if(std::holds_alternative<MTT>(t))
+        if(HoldsAlternative<MTT>(t))
         {
             const auto& texTerminal = std::get<MTT>(t);
             textures.emplace
@@ -894,7 +894,7 @@ void PrintMaterials(const std::vector<MRayUSDMaterialProps>& matPropList,
     };
     auto AttributeToString = []<class T>(const MaterialTerminalVariant<T>& t)
     {
-        if(std::holds_alternative<MRayUSDTextureTerminal>(t))
+        if(HoldsAlternative<MRayUSDTextureTerminal>(t))
         {
             const auto& tt = std::get<MRayUSDTextureTerminal>(t);
             return MRAY_FORMAT("{}| {}",

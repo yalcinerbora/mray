@@ -280,11 +280,10 @@ PathTracerRendererT<SC>::DoRenderPassPure(Span<RayIndex> dIndices,
     dRayState.dMediaListPack     = dRayMediaListPacks;
 
     // Cast rays
-    using namespace std::string_view_literals;
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
     processQueue.IssueWorkKernel<KCSetBoundaryWorkKeysIndirect>
     (
-        "KCSetBoundaryWorkKeys"sv,
+        "KCSetBoundaryWorkKeys",
         DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         dHitKeys,
         ToConstSpan(dIndices),
@@ -396,11 +395,10 @@ PathTracerRendererT<SC>::DoRenderPassNEE(Span<RayIndex> dIndices,
     dRayState.dMediaListPack     = dRayMediaListPacks;
 
     // Cast rays
-    using namespace std::string_view_literals;
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
     processQueue.IssueWorkKernel<KCSetBoundaryWorkKeysIndirect>
     (
-        "KCSetBoundaryWorkKeys"sv,
+        "KCSetBoundaryWorkKeys",
         DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         dHitKeys,
         ToConstSpan(dIndices),
@@ -586,11 +584,10 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaPure(Span<RayIndex> dIndices,
     };
 
     // Cast rays
-    using namespace std::string_view_literals;
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
     processQueue.IssueWorkKernel<KCSetBoundaryWorkKeysIndirect>
     (
-        "KCSetBoundaryWorkKeys"sv,
+        "KCSetBoundaryWorkKeys",
         DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         dHitKeys,
         ToConstSpan(dIndices),
@@ -829,10 +826,9 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
     };
 
     // Fill the PDF ratios for new rays/paths.
-    using namespace std::string_view_literals;
     processQueue.IssueWorkKernel<KCInitializePDFRatiosIndirect>
     (
-        "KCInitializePDFRatiosIndirect"sv,
+        "KCInitializePDFRatiosIndirect",
         DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dFilledRayIndices.size())},
         dRPathPDF,
         dRLightPDF,
@@ -842,7 +838,7 @@ PathTracerRendererT<SC>::DoRenderPassWithMediaNEE(Span<RayIndex> dIndices,
     // Cast rays
     processQueue.IssueWorkKernel<KCSetBoundaryWorkKeysIndirect>
     (
-        "KCSetBoundaryWorkKeys"sv,
+        "KCSetBoundaryWorkKeys",
         DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
         dHitKeys,
         ToConstSpan(dIndices),

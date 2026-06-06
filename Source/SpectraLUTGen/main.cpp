@@ -588,7 +588,6 @@ int main(int argc, const char* argv[])
     }
 
     // Finally write
-    using namespace std::string_view_literals;
     auto outFilePath = (fs::path(outputFolder) /
                         fs::path(std::string(colorSpaceString) +
                                  std::string(Color::LUT_FILE_EXT)));

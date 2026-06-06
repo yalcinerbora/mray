@@ -1068,12 +1068,16 @@ MR_PF_DEF T Ceil(T x) noexcept
 {
     if(std::is_constant_evaluated())
     {
+        using I = IntegralSister<T>;
+        static_assert(std::numeric_limits<T>::is_iec559,
+                      "constexpr ceil only works for ieee754 floats");
+        //
+
         // Not good, but it is constexpr
         // so no undefined behavour is allowed
         // we can get sloppy code.
         // Also for large numbers this will shit the bed
         //
-        using I = IntegralSister<T>;
         if(x < T(0)) return T(I(x - PrevFloat<T>(1)));
         else         return T(I(x + PrevFloat<T>(1)));
     }

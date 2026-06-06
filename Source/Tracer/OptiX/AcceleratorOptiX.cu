@@ -788,8 +788,7 @@ void BaseAcceleratorOptiX::CastRays(// Output
                                     RayCastOptions options,
                                     const GPUQueue& queue)
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Ray Casting");
     const auto _ = annotation.AnnotateScope();
 
     // Scene may be empty, skip ray casting
@@ -840,8 +839,7 @@ void BaseAcceleratorOptiX::CastVisibilityRays(Bitspan<uint32_t> dIsVisibleBuffer
                                               RayCastOptions options,
                                               const GPUQueue& queue)
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = gpuSystem.CreateAnnotation("Visibilty Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Visibilty Casting");
     const auto _ = annotation.AnnotateScope();
 
     // Scene may be empty, skip ray casting
@@ -895,8 +893,7 @@ void BaseAcceleratorOptiX::CastLocalRays(// Output
                                          RayCastOptions options,
                                          const GPUQueue& queue)
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting");
     const auto _ = annotation.AnnotateScope();
 
     // Scene may be empty, skip ray casting

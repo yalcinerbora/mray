@@ -301,7 +301,7 @@ LinearizedSurfaceData AcceleratorGroup::LinearizeSurfaceData(const AccelGroupCon
                                     typeName, static_cast<CommonKey>(surf.alphaMaps[i].Value()));
                 }
                 const GenericTextureView& view = optView.Value();
-                if(!std::holds_alternative<AlphaMap>(view))
+                if(!HoldsAlternative<AlphaMap>(view))
                 {
                     throw MRayError("{:s}: Alpha map texture({:d}) is not a single channel texture!",
                                     typeName, static_cast<CommonKey>(surf.alphaMaps[i].Value()));

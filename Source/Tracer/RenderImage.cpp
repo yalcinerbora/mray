@@ -163,7 +163,6 @@ RenderImage::RenderImage(TimelineSemaphore* semaphore,
 Optional<RenderImageSection> RenderImage::TransferToHost(const GPUQueue& processQueue,
                                                          const GPUQueue& copyQueue)
 {
-    using namespace std::string_view_literals;
     static const auto semWaitAnnotation = gpuSystem.CreateAnnotation("RB Semaphore Wait");
 
     // Let's not wait on the driver here

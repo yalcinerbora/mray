@@ -227,6 +227,7 @@ void KCConvertColorBC(// I-O
         // Load to local space
         const BCColorConvParams& curParams = texConvParams[texI];
         uint32_t tileCount = uint32_t(curParams.blockRange[1] - curParams.blockRange[0]);
+        uint32_t totalProcs = Math::DivideUp(tileCount, TPB);
         if(texI >= validTexCount) continue;
 
         // Skip this mip if it is not available.
@@ -261,45 +262,62 @@ void KCConvertColorBC(// I-O
         };
 
         // Loop over the blocks for this tex
-        uint32_t tileStart = localProcI * kp.blockSize + kp.threadId;
-        uint32_t tileIncrement = processorPerTexture * kp.blockSize;
-        for(uint32_t tileI = tileStart; tileI < tileCount; tileI += tileIncrement)
+        for(uint32_t passI = localProcI; passI < totalProcs; passI += processorPerTexture)
         {
-            using BlockType = typename BCReader::BlockType;
-            BlockType block = dBCBlocks[curParams.blockRange[0] + tileI];
-
-            // YOLO constexpr here,
-            // BC7 has too many colors, register spill galore.
-            // For BC7 we do streaming architecture
-            // so that we do not have to store the all colors.
-            //
-            // BC(1-5) has small inter color dependency
-            // (i.e. color0 > color1 switches to alpha mode etc.)
-            // For these we could not do streaming.
-            // Thus; this constexpr if statement
-            static constexpr bool IsBC7 = std::is_same_v<BCReader, BlockCompressedIO::BC7>;
-            if constexpr(IsBC7)
+            // Please check the comment block at "TextureFilter.cu"
+            // for explanation about this.
+            #ifdef MRAY_GPU_BACKEND_CPU
+                // All the work is done by the first thread
+                // For CPU kernel call, we will do 1 thread per block
+                //
+                // These threads are logical each actual OS thread
+                // works on block, the kernel functions called inside
+                // a loop for each "thread".
+                if(kp.threadId == 0)
+                for(uint32_t i = 0; i < TPB; i++)
+            #else
+                // Same thing but we exactly have enough threads in a block
+                // so no loops
+                uint32_t i = kp.threadId;
+            #endif
             {
-                BCReader bcIO(block);
-                for(uint32_t i = 0; i < bcIO.ColorCount(); i++)
+                uint32_t tileI = passI * TPB + i;
+                using BlockType = typename BCReader::BlockType;
+                BlockType block = dBCBlocks[curParams.blockRange[0] + tileI];
+
+                // YOLO constexpr here,
+                // BC7 has too many colors, register spill galore.
+                // For BC7 we do streaming architecture
+                // so that we do not have to store the all colors.
+                //
+                // BC(1-5) has small inter color dependency
+                // (i.e. color0 > color1 switches to alpha mode etc.)
+                // For these we could not do streaming.
+                // Thus; this constexpr if statement
+                static constexpr bool IsBC7 = std::is_same_v<BCReader, BlockCompressedIO::BC7>;
+                if constexpr(IsBC7)
                 {
-                    Vector3 c = bcIO.ExtractColor(i);
-                    c = ConvColor(c);
-                    bcIO.InjectColor(i, c);
+                    BCReader bcIO(block);
+                    for(uint32_t j = 0; j < bcIO.ColorCount(); i++)
+                    {
+                        Vector3 c = bcIO.ExtractColor(i);
+                        c = ConvColor(c);
+                        bcIO.InjectColor(i, c);
+                    }
+                    block = bcIO.Block();
                 }
-                block = bcIO.Block();
-            }
-            else
-            {
-                using ColorPack = typename BCReader::ColorPack;
-                ColorPack localPixels = BCReader::ExtractColors(block);
-                for(auto& localPixRGB : localPixels)
-                    localPixRGB = ConvColor(localPixRGB);
-                block = BCReader::InjectColors(block, localPixels);
-            }
+                else
+                {
+                    using ColorPack = typename BCReader::ColorPack;
+                    ColorPack localPixels = BCReader::ExtractColors(block);
+                    for(auto& localPixRGB : localPixels)
+                        localPixRGB = ConvColor(localPixRGB);
+                    block = BCReader::InjectColors(block, localPixels);
+                }
 
-            // Finally, Write back
-            dBCBlocks[curParams.blockRange[0] + tileI] = block;
+                // Finally, Write back
+                dBCBlocks[curParams.blockRange[0] + tileI] = block;
+            }
         }
     }
 }
@@ -336,7 +354,7 @@ void KCConvertColor(// I-O
         // Skip this mip if it is not available.
         // Mips may be partially available so we check all mips.
         if(!curParams.validMips[currentMipLevel]) continue;
-        if(std::holds_alternative<std::monostate>(rwSurf)) continue;
+        if(HoldsAlternative<std::monostate>(rwSurf)) continue;
 
         bool noColorConvert = (curParams.fromColorSpace == MRayColorSpaceEnum::MR_DEFAULT ||
                                curParams.fromColorSpace == globalColorSpace);
@@ -351,51 +369,69 @@ void KCConvertColor(// I-O
         for(uint32_t tileI = localBI; tileI < totalTiles.Multiply();
             tileI += blockPerTexture)
         {
-            Vector2ui localPI = Vector2ui(kp.threadId % TILE_SIZE[0],
-                                          kp.threadId / TILE_SIZE[0]);
-            Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
-                                         tileI / totalTiles[0]);
-            Vector2ui pixCoord = tile2D * TILE_SIZE + localPI;
-
-            if(pixCoord[0] >= mipRes[0] ||
-               pixCoord[1] >= mipRes[1]) continue;
-
-            // We assume 4 channel textures are RGB (first 3 channels)
-            // and something else (A channel) so clamp to Vector3 and calculate
-            // If it is two or one channel, other one/two parameter(s) will be
-            // zeroed out.
-            Vector4 localPix = GenericRead(pixCoord, rwSurf);
-            Vector3 localPixRGB = Vector3(localPix);
-
-            // Another problem is that RWTextureRead returns exact values (in float
-            // representation, for example 8-bit will return [0, 255] or [-128, 127]
-            // we need to normalize these (we could get a texture view, but writing
-            // these is also a problem anyway)
-            // Technically signed normalization should not be used so we can abuse that
-            localPixRGB = GenericFromNorm(localPixRGB, rwSurf);
-
-            using namespace Color;
-            // First do gamma correction
-            if(!noGammaConvert)
-                localPixRGB = OpticalTransferGamma(curParams.gamma).ToLinear(localPixRGB);
-
-            // Then color
-            if(!noColorConvert)
+            // Please check the comment block at "TextureFilter.cu"
+            // for explanation about this.
+            #ifdef MRAY_GPU_BACKEND_CPU
+                // All the work is done by the first thread
+                // For CPU kernel call, we will do 1 thread per block
+                //
+                // These threads are logical each actual OS thread
+                // works on block, the kernel functions called inside
+                // a loop for each "thread".
+                if(kp.threadId == 0)
+                for(uint32_t i = 0; i < TILE_SIZE.Multiply(); i++)
+            #else
+                // Same thing but we exactly have enough threads in a block
+                // so no loops
+                uint32_t i = kp.threadId;
+            #endif
             {
-                uint32_t i = static_cast<uint32_t>(curParams.fromColorSpace);
-                [[maybe_unused]]
-                bool invoked = InvokeAt(i, converterList, [&localPixRGB](auto&& tupleElem)
+                Vector2ui localPI = Vector2ui(i % TILE_SIZE[0],
+                                              i / TILE_SIZE[0]);
+                Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
+                                             tileI / totalTiles[0]);
+                Vector2ui pixCoord = tile2D * TILE_SIZE + localPI;
+
+                if(pixCoord[0] >= mipRes[0] ||
+                   pixCoord[1] >= mipRes[1]) continue;
+
+                // We assume 4 channel textures are RGB (first 3 channels)
+                // and something else (A channel) so clamp to Vector3 and calculate
+                // If it is two or one channel, other one/two parameter(s) will be
+                // zeroed out.
+                Vector4 localPix = GenericRead(pixCoord, rwSurf);
+                Vector3 localPixRGB = Vector3(localPix);
+
+                // Another problem is that RWTextureRead returns exact values (in float
+                // representation, for example 8-bit will return [0, 255] or [-128, 127]
+                // we need to normalize these (we could get a texture view, but writing
+                // these is also a problem anyway)
+                // Technically signed normalization should not be used so we can abuse that
+                localPixRGB = GenericFromNorm(localPixRGB, rwSurf);
+
+                using namespace Color;
+                // First do gamma correction
+                if(!noGammaConvert)
+                    localPixRGB = OpticalTransferGamma(curParams.gamma).ToLinear(localPixRGB);
+
+                // Then color
+                if(!noColorConvert)
                 {
-                    localPixRGB = tupleElem.Convert(localPixRGB);
-                    return true;
-                });
-                assert(invoked);
+                    uint32_t j = static_cast<uint32_t>(curParams.fromColorSpace);
+                    [[maybe_unused]]
+                    bool invoked = InvokeAt(j, converterList, [&localPixRGB](auto&& tupleElem)
+                    {
+                        localPixRGB = tupleElem.Convert(localPixRGB);
+                        return true;
+                    });
+                    assert(invoked);
+                }
+
+                // Convert it back to normalized state
+                localPixRGB = GenericToNorm(localPixRGB, rwSurf);
+
+                GenericWrite(rwSurf, Vector4(localPixRGB, localPix[3]), pixCoord);
             }
-
-            // Convert it back to normalized state
-            localPixRGB = GenericToNorm(localPixRGB, rwSurf);
-
-            GenericWrite(rwSurf, Vector4(localPixRGB, localPix[3]), pixCoord);
         }
     }
 }
@@ -425,7 +461,7 @@ void KCExtractLuminance(// I-O
         // Load to local space
         LuminanceExtractParams curParams = dLuminanceParams[tI];
 
-        if(std::holds_alternative<std::monostate>(dTextureViews[tI]))
+        if(HoldsAlternative<std::monostate>(dTextureViews[tI]))
            continue;
 
         GenericTextureView texView = std::get<GenericTextureView>(dTextureViews[tI]);
@@ -440,37 +476,56 @@ void KCExtractLuminance(// I-O
         for(uint32_t tileI = localBI; tileI < totalTiles.Multiply();
             tileI += blockPerTexture)
         {
-            Vector2ui localPI = Vector2ui(kp.threadId % TILE_SIZE[0],
-                                          kp.threadId / TILE_SIZE[0]);
-            Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
-                                         tileI / totalTiles[0]);
-            Vector2ui pixCoord = tile2D * TILE_SIZE + localPI;
-            if(pixCoord[0] >= res[0] || pixCoord[1] >= res[1]) continue;
-
-            // We assume 4 channel textures are RGB (first 3 channels)
-            // and something else (A channel) so clamp to Vector3 and calculate
-            // If it is two or one channel, other one/two parameter(s) will be
-            // zeroed out.
-            // We disregard if the pixel data is normalized or not.
-            // It is user's problem.
-            Vector2 uv = (Vector2(pixCoord) + Vector2(0.5)) * resRecip;
-            Vector3 localPixRGB = GenericReadFromView(uv, texView);
-
-            Float luminance = Float{0};
-            // Do the conversion
-            uint32_t i = static_cast<uint32_t>(curParams.colorSpace);
-            [[maybe_unused]]
-            bool invoked = InvokeAt(i, colorspaceList, [&luminance, &localPixRGB](auto&& tupleElem)
+            // Please check the comment block at "TextureFilter.cu"
+            // for explanation about this.
+            #ifdef MRAY_GPU_BACKEND_CPU
+                // All the work is done by the first thread
+                // For CPU kernel call, we will do 1 thread per block
+                //
+                // These threads are logical each actual OS thread
+                // works on block, the kernel functions called inside
+                // a loop for each "thread".
+                if(kp.threadId == 0)
+                for(uint32_t i = 0; i < TILE_SIZE.Multiply(); i++)
+            #else
+                // Same thing but we exactly have enough threads in a block
+                // so no loops
+                uint32_t i = kp.threadId;
+            #endif
             {
-                luminance = Color::XYZToYxy(tupleElem.ToXYZ(localPixRGB))[0];
-                return true;
-            });
-            assert(invoked);
+                Vector2ui localPI = Vector2ui(i % TILE_SIZE[0],
+                                              i / TILE_SIZE[0]);
+                Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
+                                             tileI / totalTiles[0]);
+                Vector2ui pixCoord = tile2D * TILE_SIZE + localPI;
+                if(pixCoord[0] >= res[0] || pixCoord[1] >= res[1]) continue;
 
-            //
-            Span<Float> dCurrentOutputSpan = dLuminanceOutput[tI];
-            uint32_t linearPixelIndex =  pixCoord[1] * res[0] + pixCoord[0];
-            dCurrentOutputSpan[linearPixelIndex] = luminance;
+                // We assume 4 channel textures are RGB (first 3 channels)
+                // and something else (A channel) so clamp to Vector3 and calculate
+                // If it is two or one channel, other one/two parameter(s) will be
+                // zeroed out.
+                // We disregard if the pixel data is normalized or not.
+                // It is user's problem.
+                Vector2 uv = (Vector2(pixCoord) + Vector2(0.5)) * resRecip;
+                Vector3 localPixRGB = GenericReadFromView(uv, texView);
+
+                Float luminance = Float{0};
+                // Do the conversion
+                uint32_t csIndex = static_cast<uint32_t>(curParams.colorSpace);
+                [[maybe_unused]]
+                bool invoked = InvokeAt(csIndex, colorspaceList,
+                                        [&luminance, &localPixRGB](auto&& tupleElem)
+                {
+                    luminance = Color::XYZToYxy(tupleElem.ToXYZ(localPixRGB))[0];
+                    return true;
+                });
+                assert(invoked);
+
+                //
+                Span<Float> dCurrentOutputSpan = dLuminanceOutput[tI];
+                uint32_t linearPixelIndex =  pixCoord[1] * res[0] + pixCoord[0];
+                dCurrentOutputSpan[linearPixelIndex] = luminance;
+            }
         }
     }
 }
@@ -638,8 +693,13 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
             using ConvListType = std::remove_cvref_t<decltype(ConvList)>;
             uint32_t textureCount = static_cast<uint32_t>(paramsList.size());
             uint32_t blockCount = PROCESSOR_PER_TEXTURE * textureCount;
+            #ifdef MRAY_GPU_BACKEND_CPU
+                uint32_t blockSize = 1;
+            #else
+                uint32_t blockSize = TPB;
+            #endif
             using namespace std::string_literals;
-            static const std::string KernelName = ("KCConvertColorspaceBC"s +
+            static const std::string KernelName = ("KCConvertColorspaceBC_"s +
                                                    std::string(MRayPixelTypeStringifier::ToString(E)));
             queue.IssueBlockKernel<KCConvertColorBC<TPB, BCReaderType, ConvListType>>
             (
@@ -647,7 +707,7 @@ void BCColorConverter::CallKernelForType(Span<Byte> dScratchBuffer,
                 DeviceBlockIssueParams
                 {
                     .gridSize = blockCount,
-                    .blockSize = TPB
+                    .blockSize = blockSize
                 },
                 // I-O
                 dBlocks,
@@ -768,11 +828,11 @@ void BCColorConverter::CallBCColorConvertKernels(Span<Byte> dScratchBuffer,
 struct ConvertKernelCallFunctor
 {
     Span<MipArray<TracerSurfView>> dSufViews;
-    Span<const ColorConvParams>     dColorConvParams;
-    uint8_t                         maxMipCount;
-    MRayColorSpaceEnum              globalColorSpace;
-    const GPUQueue&                 queue;
-    uint16_t                        i;
+    Span<const ColorConvParams>    dColorConvParams;
+    uint8_t                        maxMipCount;
+    MRayColorSpaceEnum             globalColorSpace;
+    const GPUQueue&                queue;
+    uint16_t                       i;
 
     template<class T>
     bool operator()(T ConvList) const
@@ -781,18 +841,22 @@ struct ConvertKernelCallFunctor
         static constexpr uint32_t BLOCK_PER_TEXTURE = 256;
         static constexpr uint32_t TPB = 512;
         constexpr uint32_t BlockPerTexture = Math::Max(1u, TPB >> 1);
+        #ifdef MRAY_GPU_BACKEND_CPU
+            uint32_t blockSize = 1;
+        #else
+            uint32_t blockSize = TPB;
+        #endif
         // Get Compile Time Type
         using ConvListType = std::remove_cvref_t<decltype(ConvList)>;
         uint32_t texCount = static_cast<uint32_t>(dSufViews.size());
         uint32_t blockCount = texCount * BLOCK_PER_TEXTURE;
-        using namespace std::string_view_literals;
         queue.IssueBlockKernel<KCConvertColor<TPB, ConvListType>>
         (
-            "KCConvertColorspace"sv,
+            "KCConvertColorspace",
             DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
-                .blockSize = TPB
+                .blockSize = blockSize
             },
             // I-O
             dSufViews,
@@ -911,7 +975,7 @@ void ColorConverter::ConvertColor(std::vector<MipArray<TracerSurfRef>> textures,
             return p.mipCount;
         });
         NormalColorConverter().CallColorConvertKernel(dSufViews, dColorConvParams, maxMipCount,
-                                                      globalColorSpace, queue);
+                                                        globalColorSpace, queue);
     }
     //==============================//
     //       BC TEXTURES            //
@@ -990,14 +1054,19 @@ void ColorConverter::ExtractLuminance(std::vector<Span<Float>> hLuminanceBuffers
     // Find maximum block count for state allocation
     uint32_t textureCount = static_cast<uint32_t>(dTextureViews.size());
     uint32_t blockCount = BLOCK_PER_TEXTURE * textureCount;
-    using namespace std::string_view_literals;
+    #ifdef MRAY_GPU_BACKEND_CPU
+        uint32_t blockSize = 1;
+    #else
+        uint32_t blockSize = THREAD_PER_BLOCK;
+    #endif
+
     queue.IssueBlockKernel<KCExtractLuminance<THREAD_PER_BLOCK>>
     (
-        "KCExtractLuminance"sv,
+        "KCExtractLuminance",
         DeviceBlockIssueParams
         {
             .gridSize = blockCount,
-            .blockSize = THREAD_PER_BLOCK
+            .blockSize = blockSize
         },
         ToConstSpan(dLuminanceBuffers),
         dLuminanceExtractParams,

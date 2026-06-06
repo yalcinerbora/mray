@@ -433,10 +433,9 @@ AcceleratorGroupOptiX<PG>::MultiBuildAABB_CLT(const PreprocessResult& ppResult,
     // Dedicate a block for each
     // concrete accelerator for copy
     uint32_t blockCount = static_cast<uint32_t>(dConcreteLeafRanges.size());
-    using namespace std::string_view_literals;
     queue.IssueBlockKernel<KCGeneratePrimitiveKeys>
     (
-        "KCGeneratePrimitiveKeys-Temp"sv,
+        "KCGeneratePrimitiveKeys-Temp",
         DeviceBlockIssueParams
         {
             .gridSize = blockCount,

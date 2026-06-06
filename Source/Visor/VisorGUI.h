@@ -20,8 +20,6 @@ class VulkanImage;
 struct VisorState;
 struct ImFont;
 
-using namespace std::string_view_literals;
-
 struct TopBarChanges
 {
     using RendererOptionList = StaticVector<RendererOptionData, 8>;
@@ -50,9 +48,9 @@ struct GUIChanges
 class MainStatusBar
 {
     private:
-    static constexpr auto RENDERING_NAME = "Rendering"sv;
-    static constexpr auto PAUSED_NAME    = "PAUSED"sv;
-    static constexpr auto STOPPED_NAME   = "STOPPED"sv;
+    static constexpr auto RENDERING_NAME = "Rendering";
+    static constexpr auto PAUSED_NAME    = "PAUSED";
+    static constexpr auto STOPPED_NAME   = "STOPPED";
 
     const InputChecker* inputChecker;
 

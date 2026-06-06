@@ -505,12 +505,11 @@ RendererOutput SurfaceRenderer::DoRender()
     }
 
     // Cast rays
-    using namespace std::string_view_literals;
     Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
     auto dHitKeysLocal = dHitKeys.subspan(0, rayCount);
     processQueue.IssueWorkKernel<KCSetBoundaryWorkKeys>
     (
-        "KCSetBoundaryWorkKeys"sv,
+        "KCSetBoundaryWorkKeys",
         DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dHitKeysLocal.size())},
         dHitKeysLocal,
         boundaryLightKeyPack
@@ -764,19 +763,11 @@ RendererOutput SurfaceRenderer::DoRender()
     else
     {
         // Old code used partition based filtering. It was slow,
-        // invalidated ray partitioner (to save memory we shared
+        // invalidated ray partitioner (to save memory, we shared
         // ray partitioner between the renderer and filter).
         //
-        // Filter that uses atomic is faster, do not use any extra
-        // memory. It can be used
-        //
-        //
-        // Please note that ray partitioner will be invalidated here.
-        // In this case, we do not use the partitioner anymore
-        // so its fine.
-
-        // Using atomic filter since the samples are uniformly distributed
-        // And it is faster
+        // Filter that uses atomics is faster,
+        // do not use any extra memory.
         filmFilter->ReconstructionFilterAtomicRGB
         (
             filmSpan,

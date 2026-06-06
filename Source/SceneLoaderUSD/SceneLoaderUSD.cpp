@@ -77,7 +77,7 @@ void PrintPrims(const CollapsedPrims& meshMatPrims,
             {
                 pxr::UsdPrim matKey = loadedStage->GetPrimAtPath(mk);
                 const auto& material = uniqueMaterials.at(matKey);
-                if(std::holds_alternative<pxr::UsdPrim>(material))
+                if(HoldsAlternative<pxr::UsdPrim>(material))
                     MRAY_LOG("    {} | {}", subGeoIndex,
                              std::get<pxr::UsdPrim>(material).GetPath().GetString());
                 else
@@ -104,7 +104,7 @@ void PrintPrims(const CollapsedPrims& meshMatPrims,
     MRAY_LOG(HEADER, "Materials");
     for(const auto& [_, mat] : uniqueMaterials)
     {
-        if(std::holds_alternative<pxr::UsdPrim>(mat))
+        if(HoldsAlternative<pxr::UsdPrim>(mat))
             MRAY_LOG("[M]: {}", std::get<pxr::UsdPrim>(mat).GetPath().GetString());
         else
         {

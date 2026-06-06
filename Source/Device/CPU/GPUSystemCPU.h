@@ -523,8 +523,6 @@ template <class T>
 MRAY_HOST inline
 void GPUQueueCPU::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
 {
-    using namespace std::string_view_literals;
-
     assert(regionTo.size() >= regionFrom.size());
     static constexpr uint32_t TPB = 4096;
     uint32_t elemCount = uint32_t(regionFrom.size());
@@ -535,7 +533,7 @@ void GPUQueueCPU::MemcpyAsync(Span<T> regionTo, Span<const T> regionFrom) const
     // one by one.
     IssueBlockLambda
     (
-        "MemcpyAsync"sv,
+        "MemcpyAsync",
         DeviceBlockIssueParams
         {
             .gridSize= blockCount,
@@ -566,8 +564,6 @@ void GPUQueueCPU::MemcpyAsync2D(Span<T> regionTo, size_t toStride,
                                 Span<const T> regionFrom, size_t fromStride,
                                 Vector2ui copySize) const
 {
-    using namespace std::string_view_literals;
-
     assert(toStride * (copySize[1] - 1) + copySize[0] <=
            regionTo.size());
     assert(fromStride * (copySize[1] - 1) + copySize[0] <=
@@ -579,7 +575,7 @@ void GPUQueueCPU::MemcpyAsync2D(Span<T> regionTo, size_t toStride,
     //
     IssueBlockLambda
     (
-        "MemcpyAsync2D"sv,
+        "MemcpyAsync2D",
         DeviceBlockIssueParams
         {
             .gridSize = copySize[1],
@@ -616,7 +612,7 @@ void GPUQueueCPU::MemcpyAsyncStrided(Span<T> regionTo, size_t outputByteStride,
 
     IssueWorkLambda
     (
-        "MemcpyAsyncStrided"sv,
+        "MemcpyAsyncStrided",
         DeviceWorkIssueParams{ .workCount = static_cast<uint32_t>(elemCountIn)},
         [=](KernelCallParamsCPU kp)
         {
@@ -639,15 +635,13 @@ template <class T>
 MRAY_HOST inline
 void GPUQueueCPU::MemsetAsync(Span<T> region, uint8_t perByteValue) const
 {
-    using namespace std::string_view_literals;
-
     assert(region.size() > 0);
     static constexpr uint32_t TPB = 4096;
     uint32_t elemCount = static_cast<uint32_t>(region.size());
     uint32_t blockCount = Math::DivideUp(elemCount, TPB);
     IssueBlockLambda
     (
-        "MemsetAsync"sv,
+        "MemsetAsync",
         DeviceBlockIssueParams
         {
             .gridSize = blockCount,
@@ -673,7 +667,6 @@ void GPUQueueCPU::MemsetAsync(Span<T> region, uint8_t perByteValue) const
 MRAY_HOST inline
 void GPUQueueCPU::IssueBufferForDestruction(TransientData data) const
 {
-    using namespace std::string_view_literals;
     // We technically do not need to go through delete callbacks etc
     // but ThreadPool accepts non-mutable functions (lambda's)
     // so we rely on that
@@ -681,7 +674,7 @@ void GPUQueueCPU::IssueBufferForDestruction(TransientData data) const
     void* ptr = TransientPoolIssueBufferForDestruction(std::move(data));
     IssueBlockLambda
     (
-        "DestroyTransientBuffer"sv,
+        "DestroyTransientBuffer",
         DeviceBlockIssueParams{.gridSize = 1, .blockSize = 1},
         [ptr](KernelCallParamsCPU)
         {
@@ -699,10 +692,9 @@ GPUFenceCPU GPUQueueCPU::Barrier() const
 MRAY_HOST inline
 void GPUQueueCPU::IssueSemaphoreWait(GPUSemaphoreViewCPU& sem) const
 {
-    using namespace std::string_view_literals;
     IssueBlockLambda
     (
-        "SemWait"sv,
+        "SemWait",
         DeviceBlockIssueParams{.gridSize = 1, .blockSize = 1},
         [&](KernelCallParamsCPU)
         {
@@ -714,10 +706,9 @@ void GPUQueueCPU::IssueSemaphoreWait(GPUSemaphoreViewCPU& sem) const
 MRAY_HOST inline
 void GPUQueueCPU::IssueSemaphoreSignal(GPUSemaphoreViewCPU& sem) const
 {
-    using namespace std::string_view_literals;
     IssueBlockLambda
     (
-        "SemSignal"sv,
+        "SemSignal",
         DeviceBlockIssueParams{.gridSize = 1, .blockSize = 1},
         [&](KernelCallParamsCPU)
         {
@@ -730,14 +721,12 @@ void GPUQueueCPU::IssueSemaphoreSignal(GPUSemaphoreViewCPU& sem) const
 MRAY_HOST inline
 void GPUQueueCPU::IssueWait(const GPUFenceCPU& barrier) const
 {
-    using namespace std::string_view_literals;
-
     auto* barrierValue = barrier.completedKernelCounter;
     uint64_t valueToAchieve = barrier.valueToWait;
 
     IssueBlockLambda
     (
-        "WaitOtherQueue"sv,
+        "WaitOtherQueue",
         DeviceBlockIssueParams{.gridSize = 1, .blockSize = 1},
         [barrierValue, valueToAchieve](KernelCallParamsCPU)
         {

@@ -48,7 +48,7 @@ VisorDebugSystem::Callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverit
     else
         type = "UNKNOWN"sv;
 
-    MRAY_LOG("[Vulkan]:[{}]:[{}]\n{}",
+    MRAY_LOG("[Vulkan]:[{}]:[{}]\n{}\n",
              severity, type, pCallbackData->pMessage);
     return VK_FALSE;
 }
@@ -122,7 +122,6 @@ const std::string VisorVulkan::WindowTitle = Name + " "s + std::string(MRay::Ver
 
 bool VisorVulkan::EnableValidation(VkInstanceCreateInfo& vInfo)
 {
-    using namespace std::literals;
     static constexpr std::array<const char*, 1> RequestedLayers =
     {
         "VK_LAYER_KHRONOS_validation"
@@ -531,9 +530,9 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
                         &mainCommandPool);
 
     // Gen Descriptor Pool
-        // Finally Create a descriptor pool
+    // Finally Create a descriptor pool
     // TODO: Check if large pool has performance penalty
-    static const StaticVector<VkDescriptorPoolSize, 4> imguiPoolSizes =
+    static const StaticVector<VkDescriptorPoolSize, 4> descPoolSizes =
     {
         VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 32 },
         VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 32 },
@@ -546,8 +545,8 @@ MRayError VisorVulkan::QueryAndPickPhysicalDevice(const VisorConfig& visorConfig
         .pNext = nullptr,
         .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
         .maxSets = 32,
-        .poolSizeCount = static_cast<uint32_t>(imguiPoolSizes.size()),
-        .pPoolSizes = imguiPoolSizes.data()
+        .poolSizeCount = static_cast<uint32_t>(descPoolSizes.size()),
+        .pPoolSizes = descPoolSizes.data()
     };
     vkCreateDescriptorPool(deviceVk, &descPoolInfo,
                            VulkanHostAllocator::Functions(),

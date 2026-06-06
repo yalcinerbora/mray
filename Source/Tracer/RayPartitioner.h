@@ -156,8 +156,7 @@ BinaryPartitionOutput RayPartitioner::BinaryPartition(Span<const CommonIndex> dI
                                                       const GPUQueue& queue,
                                                       UnaryFunc&& UnaryF) const
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = system.CreateAnnotation("Ray BinaryPartition"sv);
+    static const auto annotation = system.CreateAnnotation("Ray BinaryPartition");
     const auto _ = annotation.AnnotateScope();
 
     // Determine output buffer
@@ -189,8 +188,7 @@ TernaryPartitionOutput RayPartitioner::TernaryPartition(Span<CommonIndex> dIndic
     static constexpr uint32_t FIRST = 0;
     static constexpr uint32_t SECOND = 1;
 
-    using namespace std::string_view_literals;
-    static const auto annotation = system.CreateAnnotation("Ray TernaryPartition"sv);
+    static const auto annotation = system.CreateAnnotation("Ray TernaryPartition");
     const auto _ = annotation.AnnotateScope();
 
     // Determine output buffer

@@ -226,8 +226,8 @@ void VulkanComputePipeline::BindSetData(VkDescriptorSet descriptorSet,
     DescriptorBindList<VkWriteDescriptorSet> writeSets;
     for(const auto& bindingData : bindingDataList)
     {
-        bool isBuffer = std::holds_alternative<VkDescriptorBufferInfo>(bindingData.dataInfo);
-        bool isImage = std::holds_alternative<VkDescriptorImageInfo>(bindingData.dataInfo);
+        bool isBuffer = HoldsAlternative<VkDescriptorBufferInfo>(bindingData.dataInfo);
+        bool isImage = HoldsAlternative<VkDescriptorImageInfo>(bindingData.dataInfo);
 
         VkWriteDescriptorSet writeInfo =
         {

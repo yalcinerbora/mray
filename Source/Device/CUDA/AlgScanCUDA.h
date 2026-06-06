@@ -103,12 +103,11 @@ void InclusiveSegmentedScan(Span<T> dScannedValues,
                             const GPUQueueCUDA& queue,
                             BinaryOp&& op)
 {
-    using namespace std::literals;
     assert(dValues.size() % segmentSize == 0);
     uint32_t totalBlocks = static_cast<uint32_t>(dValues.size() / segmentSize);
     queue.IssueBlockKernel<KCInclusiveSegmentedScan<T, BinaryOp>>
     (
-        "KCInclusiveSegmentedScan"sv,
+        "KCInclusiveSegmentedScan",
         DeviceBlockIssueParams{.gridSize = totalBlocks, .blockSize = TPB},
         //
         dScannedValues,

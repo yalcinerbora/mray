@@ -193,10 +193,9 @@ TEST(DefaultTriangle, Load)
     // dPrimKeys[0] must be zero, just memset here
     queue.MemsetAsync(dPrimKeys, 0x00);
 
-    using namespace std::literals;
     queue.IssueWorkKernel<KCAccessFirstTriangle>
     (
-        "GTest CheckDefaultTri"sv,
+        "GTest CheckDefaultTri",
         DeviceWorkIssueParams{.workCount = 1},
         //
         dIsValid,
@@ -289,11 +288,9 @@ TEST(DefaultTriangle, LoadMulti)
     Span<const PrimitiveKey> hPrimKeySpan(hPrimKeys.cbegin(),
                                           hPrimKeys.cend());
     queue.MemcpyAsync(dPrimKeys, hPrimKeySpan);
-
-    using namespace std::literals;
     queue.IssueWorkKernel<KCAccessFirstTriangle>
     (
-        "GTest CheckDefaultTri"sv,
+        "GTest CheckDefaultTri",
         DeviceWorkIssueParams{.workCount = TRI_COUNT},
         //
         dIsValid,

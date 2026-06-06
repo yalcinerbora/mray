@@ -85,8 +85,7 @@ uint32_t RadixSort(Span<Span<K>, 2> dKeyDoubleBuffer,
                     const Vector2ui& bitRange)
 {
     using namespace cub;
-    using namespace std::literals;
-    static const auto annotation = queue.CreateAnnotation("KCRadixSort"sv);
+    static const auto annotation = queue.CreateAnnotation("KCRadixSort");
     const auto _ = annotation.AnnotateScope();
 
     assert(dKeyDoubleBuffer[0].size() == dKeyDoubleBuffer[1].size());

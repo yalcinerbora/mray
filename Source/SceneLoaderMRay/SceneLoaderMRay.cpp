@@ -288,7 +288,7 @@ std::vector<TexturedAttributeData> TexturableAttributeLoad(const AttributeCountL
                 {
                     using T = std::remove_cvref_t<decltype(dataType)>::Type;
                     Variant<SceneTexId, T> texturable = node.AccessTexturableData<T>(name);
-                    if(std::holds_alternative<SceneTexId>(texturable))
+                    if(HoldsAlternative<SceneTexId>(texturable))
                     {
                         TextureId id = texMappings.at(std::get<SceneTexId>(texturable));
                         result[i].textures.emplace_back(id);
@@ -761,7 +761,7 @@ void SceneLoaderMRay::DryRunNodesForTex(std::vector<SceneTexId>& textureIds,
                 {
                     using T = std::remove_cvref_t<decltype(dataType)>::Type;
                     auto value = node.AccessTexturableData<T>(name);
-                    if(std::holds_alternative<SceneTexId>(value))
+                    if(HoldsAlternative<SceneTexId>(value))
                         textureIds.push_back(std::get<SceneTexId>(value));
                 });
             }

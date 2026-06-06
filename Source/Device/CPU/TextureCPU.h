@@ -267,7 +267,7 @@ class TextureCPU<2, T> : public TextureCPU_BC<T>
 
 class TextureBackingMemoryCPU
 {
-    friend Span<Byte> ToHandleCPU(const TextureBackingMemoryCPU&);
+    friend Byte* ToHandleCPU(const TextureBackingMemoryCPU&);
 
     private:
     const GPUDeviceCPU* gpu;
@@ -291,9 +291,9 @@ class TextureBackingMemoryCPU
 };
 
 inline
-Span<Byte> ToHandleCPU(const TextureBackingMemoryCPU& mem)
+Byte* ToHandleCPU(const TextureBackingMemoryCPU& mem)
 {
-    return Span<Byte>(static_cast<Byte*>(mem.memPtr), mem.size);
+    return static_cast<Byte*>(mem.memPtr);
 }
 
 }

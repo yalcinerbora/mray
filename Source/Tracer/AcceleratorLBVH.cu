@@ -737,8 +737,7 @@ void BaseAcceleratorLBVH::CastRays(// Output
                                    RayCastOptions options,
                                    const GPUQueue& queue)
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Ray Casting");
     const auto _ = annotation.AnnotateScope();
 
     // Scene may be empty, skip ray casting
@@ -774,7 +773,7 @@ void BaseAcceleratorLBVH::CastRays(// Output
     {
         queue.IssueWorkKernel<KCIntersectBaseLBVH>
         (
-            "(A)LBVHRayCast"sv,
+            "(A)LBVHRayCast",
             DeviceWorkIssueParams{.workCount = currentRayCount},
             // Output
             dCurrentKeys,
@@ -874,8 +873,7 @@ void BaseAcceleratorLBVH::CastVisibilityRays(// Output
                                              RayCastOptions options,
                                              const GPUQueue& queue)
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = gpuSystem.CreateAnnotation("Visibility Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Visibility Casting");
     const auto _ = annotation.AnnotateScope();
 
     // Scene may be empty, skip ray casting
@@ -892,7 +890,7 @@ void BaseAcceleratorLBVH::CastVisibilityRays(// Output
     // Assume visible, cull if hits anything
     queue.IssueWorkKernel<KCSetIsVisibleIndirect>
     (
-        "KCSetIsVisibleIndirect"sv,
+        "KCSetIsVisibleIndirect",
         DeviceWorkIssueParams{.workCount = currentRayCount},
         dIsVisibleBuffer,
         dRayIndices
@@ -920,7 +918,7 @@ void BaseAcceleratorLBVH::CastVisibilityRays(// Output
     {
         queue.IssueWorkKernel<KCIntersectBaseLBVH>
         (
-            "(A)LBVHRayCast"sv,
+            "(A)LBVHRayCast",
             DeviceWorkIssueParams{.workCount = currentRayCount},
             // Output
             dCurrentKeys,
@@ -1022,8 +1020,7 @@ void BaseAcceleratorLBVH::CastLocalRays(// Output
                                         RayCastOptions options,
                                         const GPUQueue& queue)
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting");
     const auto _ = annotation.AnnotateScope();
 
     // Scene may be empty, skip ray casting

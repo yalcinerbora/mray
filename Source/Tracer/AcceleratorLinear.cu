@@ -231,8 +231,7 @@ void BaseAcceleratorLinear::CastRays(// Output
                                      RayCastOptions options,
                                      const GPUQueue& queue)
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = gpuSystem.CreateAnnotation("Ray Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Ray Casting");
     const auto _ = annotation.AnnotateScope();
 
     // Scene may be empty, skip ray casting
@@ -261,7 +260,7 @@ void BaseAcceleratorLinear::CastRays(// Output
     {
         queue.IssueWorkKernel<KCIntersectBaseLinear>
         (
-            "(A)LinearRayCast"sv,
+            "(A)LinearRayCast",
             DeviceWorkIssueParams{.workCount = currentRayCount},
             // Output
             dCurrentKeys,
@@ -358,8 +357,7 @@ void BaseAcceleratorLinear::CastVisibilityRays(// Output
                                                RayCastOptions options,
                                                const GPUQueue& queue)
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = gpuSystem.CreateAnnotation("Visibility Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Visibility Casting");
     const auto _ = annotation.AnnotateScope();
 
     // Scene may be empty, skip ray casting
@@ -376,7 +374,7 @@ void BaseAcceleratorLinear::CastVisibilityRays(// Output
     // Assume visible, cull if hits anything
     queue.IssueWorkKernel<KCSetIsVisibleIndirect>
     (
-        "KCSetIsVisibleIndirect"sv,
+        "KCSetIsVisibleIndirect",
         DeviceWorkIssueParams{.workCount = currentRayCount},
         dIsVisibleBuffer,
         dRayIndices
@@ -396,7 +394,7 @@ void BaseAcceleratorLinear::CastVisibilityRays(// Output
     {
         queue.IssueWorkKernel<KCIntersectBaseLinear>
         (
-            "(A)LinearRayCast"sv,
+            "(A)LinearRayCast",
             DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dCurrentIndices.size())},
             // Output
             dCurrentKeys,
@@ -496,8 +494,7 @@ void BaseAcceleratorLinear::CastLocalRays(// Output
                                           RayCastOptions options,
                                           const GPUQueue& queue)
 {
-    using namespace std::string_view_literals;
-    static const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting"sv);
+    static const auto annotation = gpuSystem.CreateAnnotation("Local Ray Casting");
     const auto _ = annotation.AnnotateScope();
 
     // Scene may be empty, skip ray casting

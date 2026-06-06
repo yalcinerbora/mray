@@ -177,7 +177,7 @@ GenericTexturedGroupT<I, A>::ConvertToView(const std::vector<TextureId>& texIds,
                             static_cast<CommonKey>(texId));
         }
         const GenericTextureView& view = optView.Value();
-        if(!std::holds_alternative<ViewType>(view))
+        if(!HoldsAlternative<ViewType>(view))
         {
             throw MRayError("{:s}:{:d}: Given texture({:d}) does not have "
                             "a correct type for, Attribute {:d}",
@@ -214,7 +214,7 @@ GenericTexturedGroupT<I, A>::ConvertToView(const std::vector<Optional<TextureId>
                             static_cast<CommonKey>(texId.Value()));
         }
         const GenericTextureView& view = optView.Value();
-        if(!std::holds_alternative<ViewType>(view))
+        if(!HoldsAlternative<ViewType>(view))
         {
             throw MRayError("{:s}:{:d}: Given texture({:d}) does not have "
                             "a correct type for, Attribute {:d}",

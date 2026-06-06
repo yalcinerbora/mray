@@ -567,7 +567,7 @@ constexpr const TC& EmptyPrimitive<TC>::GetTransformContext() const
 inline
 std::string_view PrimGroupEmpty::TypeName()
 {
-    using namespace std::literals;
+    using namespace std::string_view_literals;
     static std::string_view name = "(P)Empty"sv;
     return name;
 }

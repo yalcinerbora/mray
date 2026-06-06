@@ -499,8 +499,8 @@ void FindAccelNames(std::array<std::string_view, 2>& linAccelNamePair,
     };
 
     using namespace std::string_view_literals;
-    Find(linAccelNamePair, AccelLine::LIN, "LIN");
-    Find(bvhAccelNamePair, AccelLine::BVH, "BVH");
+    Find(linAccelNamePair, AccelLine::LIN, "LIN"sv);
+    Find(bvhAccelNamePair, AccelLine::BVH, "BVH"sv);
     if(hwTag) Find(hwAccelNamePair, AccelLine::HW, *hwTag);
 }
 

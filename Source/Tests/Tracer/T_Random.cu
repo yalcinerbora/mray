@@ -64,10 +64,9 @@ TEST(Hash, Constexpr)
     //                             TOTAL_THREADS, TOTAL_THREADS,
     //                             TOTAL_THREADS});
     //const GPUQueue& q = s.BestDevice().GetComputeQueue(0);
-    //using namespace std::string_view_literals;
     //q.IssueWorkKernel<KCHashStatic>
     //(
-    //    "KCHashStatic"sv,
+    //    "KCHashStatic",
     //    DeviceWorkIssueParams{.workCount = TOTAL_THREADS},
     //    dOutputs,
     //    SoASpanTest(dInput2A, dInput2B, dInput2C, dInput2D)

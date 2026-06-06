@@ -363,14 +363,11 @@ void HashGridRenderer::PathTraceAndQuery()
         dIndices = dDeadAliveRayIndices.subspan(0, hDeadRayRanges[1] - hDeadRayRanges[0]);
         dKeys = dKeys.subspan(0, hDeadRayRanges[1] - hDeadRayRanges[0]);
 
-        //MRAY_LOG("Alive {}", dIndices.size());
-
         // Cast rays
-        using namespace std::string_view_literals;
         Span<BackupRNGState> dBackupRNGStates = rnGenerator->GetBackupStates();
         processQueue.IssueWorkKernel<KCSetBoundaryWorkKeysIndirect>
         (
-            "KCSetBoundaryWorkKeys"sv,
+            "KCSetBoundaryWorkKeys",
             DeviceWorkIssueParams{.workCount = static_cast<uint32_t>(dIndices.size())},
             dHitKeys,
             ToConstSpan(dIndices),
@@ -387,7 +384,6 @@ void HashGridRenderer::PathTraceAndQuery()
         );
 
         // Generate work keys from hit packs
-        using namespace std::string_literals;
         processQueue.IssueWorkKernel<KCGenerateSurfaceWorkKeysIndirect>
         (
             "KCGenerateSurfaceWorkKeysIndirect",
@@ -461,7 +457,6 @@ RendererOutput HashGridRenderer::DoRender()
     Timer timer; timer.Start();
     const GPUDevice& device = gpuSystem.BestDevice();
 
-    using namespace std::string_view_literals;
     const GPUQueue& processQueue = device.GetComputeQueue(0);
 
     // Change camera and reset hash table

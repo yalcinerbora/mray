@@ -119,7 +119,6 @@ void TransformGroupMulti::CommitReservations()
     queue.MemcpyAsync(dFlattenedRanges, Span<const Vector2ul>(hFlattenedRanges));
 
     uint32_t workCount = static_cast<uint32_t>(hFlattenedRanges.size());
-    using namespace std::literals;
     // AMD whines of using "this" which may result in host data access on GPU.
     // which may be true (if only "this"  is copied, not the whole class).
     // NVIDIA worked fine (because they do something non-standard or it is
@@ -132,7 +131,7 @@ void TransformGroupMulti::CommitReservations()
     auto dInvTransformsCpy    = dInvTransforms;
     queue.IssueWorkLambda
     (
-        "MultiTransform Construct Spans"sv,
+        "MultiTransform Construct Spans",
         DeviceWorkIssueParams{.workCount = workCount},
         [=] MRAY_HYBRID(KernelCallParams kp)
         {

@@ -296,7 +296,7 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
     // Wait all commands to complete before resize
     vkDeviceWaitIdle(handlesVk.deviceVk);
 
-    VkSwapchainKHR oldChain = Cleanup(false, !isFirstFix);
+    VkSwapchainKHR oldChain = Cleanup(false, false);
 
     // Capabilities
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(handlesVk.pDeviceVk,
@@ -385,7 +385,7 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
         .imageArrayLayers = 1,
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        .queueFamilyIndexCount = 999999999,
+        .queueFamilyIndexCount = 0,
         .pQueueFamilyIndices = nullptr,
         .preTransform = capabilities.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
@@ -524,31 +524,40 @@ MRayError Swapchain::FixSwapchain(bool isFirstFix)
     // swapchain's surface format change). For example user move the window
     // to a HDR screen etc, we need to shutdown imgui then re-init. This feels
     // wrong but w/e.
-    ImGui_ImplVulkan_InitInfo imguiInitInfo = {};
-    imguiInitInfo.ApiVersion = MRAY_VK_API_VERSION,
-    imguiInitInfo.Instance = handlesVk.instanceVk,
-    imguiInitInfo.PhysicalDevice = handlesVk.pDeviceVk,
-    imguiInitInfo.Device = handlesVk.deviceVk,
-    imguiInitInfo.QueueFamily = handlesVk.queueIndex;
-    imguiInitInfo.Queue = handlesVk.mainQueueVk;
-    imguiInitInfo.DescriptorPool = imguiDescPool;
-    imguiInitInfo.DescriptorPoolSize = 0;
-    imguiInitInfo.MinImageCount = requestedImgCount;
-    imguiInitInfo.ImageCount = imageCount;
-    imguiInitInfo.PipelineCache = nullptr;
-    imguiInitInfo.PipelineInfoMain = ImGui_ImplVulkan_PipelineInfo
+    //
+    if(isFirstFix)
     {
-        .RenderPass = renderPass,
-        .Subpass = 0,
-        .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
-        .ExtraDynamicStates = {},
-        .PipelineRenderingCreateInfo = {}
-    },
-    imguiInitInfo.UseDynamicRendering = false;
-    imguiInitInfo.Allocator = VulkanHostAllocator::Functions();
-    imguiInitInfo.CheckVkResultFn = &ImguiCallback;
-    imguiInitInfo.MinAllocationSize = 1_MiB;
-    ImGui_ImplVulkan_Init(&imguiInitInfo);
+        ImGui_ImplVulkan_InitInfo imguiInitInfo = {};
+        imguiInitInfo.ApiVersion         = MRAY_VK_API_VERSION,
+        imguiInitInfo.Instance           = handlesVk.instanceVk,
+        imguiInitInfo.PhysicalDevice     = handlesVk.pDeviceVk,
+        imguiInitInfo.Device             = handlesVk.deviceVk,
+        imguiInitInfo.QueueFamily        = handlesVk.queueIndex;
+        imguiInitInfo.Queue              = handlesVk.mainQueueVk;
+        imguiInitInfo.DescriptorPool     = imguiDescPool;
+        imguiInitInfo.DescriptorPoolSize = 0;
+        imguiInitInfo.MinImageCount      = requestedImgCount;
+        imguiInitInfo.ImageCount         = imageCount;
+        imguiInitInfo.PipelineCache      = nullptr;
+        imguiInitInfo.PipelineInfoMain   = ImGui_ImplVulkan_PipelineInfo
+        {
+            .RenderPass = renderPass,
+            .Subpass = 0,
+            .MSAASamples = VK_SAMPLE_COUNT_1_BIT,
+            .ExtraDynamicStates = {},
+            .PipelineRenderingCreateInfo = {}
+        },
+        imguiInitInfo.UseDynamicRendering = false;
+        imguiInitInfo.Allocator = VulkanHostAllocator::Functions();
+        imguiInitInfo.CheckVkResultFn = &ImguiCallback;
+        imguiInitInfo.MinAllocationSize = 1_MiB;
+        ImGui_ImplVulkan_Init(&imguiInitInfo);
+    }
+    else
+    {
+        ImGui_ImplVulkan_SetMinImageCount(requestedImgCount);
+    }
+
 
     return MRayError::OK;
 }
@@ -557,7 +566,9 @@ VkSwapchainKHR Swapchain::Cleanup(bool deleteSwapchain,
                                   bool issueImguiShutdown)
 {
     if(issueImguiShutdown)
+    {
         ImGui_ImplVulkan_Shutdown();
+    }
 
     vkDestroyRenderPass(handlesVk.deviceVk, renderPass,
                         VulkanHostAllocator::Functions());
@@ -586,16 +597,18 @@ MRayError Swapchain::Initialize(VulkanSystemView handles,
     surface     = surf;
     tryHDR      = isHDR;
 
-    static const StaticVector<VkDescriptorPoolSize, 1> imguiPoolSizes =
+    static const StaticVector<VkDescriptorPoolSize, 3> imguiPoolSizes =
     {
-        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512 },
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 512 },
+        VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_SAMPLER, 512 }
     };
     VkDescriptorPoolCreateInfo descPoolInfo =
     {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .pNext = nullptr,
         .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-        .maxSets = 1024,
+        .maxSets = 256,
         .poolSizeCount = static_cast<uint32_t>(imguiPoolSizes.size()),
         .pPoolSizes = imguiPoolSizes.data()
     };

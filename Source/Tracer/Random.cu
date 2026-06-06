@@ -786,10 +786,9 @@ void RNGGroupIndependent::GenerateNumbers(// Output
     // dimension)
     // so we disregard range, and give single random numbers
     uint32_t localGenCount = (currentRange[1] - currentRange[0]).Multiply();
-    using namespace std::string_view_literals;
     queue.IssueWorkKernel<KCGenRandomNumbersPCG32>
     (
-        "KCGenRandomNumbersPCG32"sv,
+        "KCGenRandomNumbersPCG32",
         DeviceWorkIssueParams{.workCount = localGenCount},
         //
         dNumbersOut,
@@ -814,10 +813,9 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
     // so we disregard range, and give single random numbers
     uint32_t localGenCount = (currentRange[1] - currentRange[0]).Multiply();
     uint32_t usedGenCount = static_cast<uint32_t>(dIndices.size());
-    using namespace std::string_view_literals;
     queue.IssueWorkKernel<KCGenRandomNumbersPCG32Indirect>
     (
-        "KCGenRandomNumbersPCG32Indirect"sv,
+        "KCGenRandomNumbersPCG32Indirect",
         DeviceWorkIssueParams{.workCount = usedGenCount},
         //
         dNumbersOut,
@@ -840,10 +838,9 @@ void RNGGroupIndependent::GenerateNumbersIndirect(// Output
     // dimension)
     // so we disregard range, and give single random numbers
     uint32_t localGenCount = (currentRange[1] - currentRange[0]).Multiply();
-    using namespace std::string_view_literals;
     queue.IssueWorkKernel<KCGenRandomNumbersPCG32Indirect>
     (
-        "KCGenRandomNumbersPCG32Indirect"sv,
+        "KCGenRandomNumbersPCG32Indirect",
         DeviceWorkIssueParams{.workCount = localGenCount},
         //
         dNumbersOut,
@@ -1026,11 +1023,10 @@ void RNGGroupSobol::GenerateNumbers(// Output
     assert(currentRange[1] != Vector2ui::Zero());
 
     uint32_t localGenCount = (currentRange[1] - currentRange[0]).Multiply();
-    using namespace std::string_view_literals;
     using namespace SobolDetail;
     queue.IssueWorkKernel<KCGenRandomNumbersGeneric<Sobol, LocalState, GlobalState>>
     (
-        "KCGenRandomNumbersSobol"sv,
+        "KCGenRandomNumbersSobol",
         DeviceWorkIssueParams{.workCount = localGenCount},
         //
         dNumbersOut,
@@ -1054,12 +1050,11 @@ void RNGGroupSobol::GenerateNumbersIndirect(// Output
 
     uint32_t localGenCount = (currentRange[1] - currentRange[0]).Multiply();
     uint32_t usedGenCount = static_cast<uint32_t>(dIndices.size());
-    using namespace std::string_view_literals;
     using namespace SobolDetail;
     static constexpr auto Kernel = KCGenRandomNumbersGenericIndirect<Sobol, LocalState, GlobalState>;
     queue.IssueWorkKernel<Kernel>
     (
-        "KCGenRandomNumbersSobolIndirect"sv,
+        "KCGenRandomNumbersSobolIndirect",
         DeviceWorkIssueParams{.workCount = usedGenCount},
         //
         dNumbersOut,
@@ -1087,10 +1082,9 @@ void RNGGroupSobol::GenerateNumbersIndirect(// Output
         SobolDetail::LocalState,
         SobolDetail::GlobalState
     >;
-    using namespace std::string_view_literals;
     queue.IssueWorkKernel<Kernel>
     (
-        "KCGenRandomNumbersSobolIndirect"sv,
+        "KCGenRandomNumbersSobolIndirect",
         DeviceWorkIssueParams{.workCount = localGenCount},
         //
         dNumbersOut,
@@ -1290,11 +1284,10 @@ void RNGGroupZSobol::GenerateNumbers(// Output
     assert(currentRange[1] != Vector2ui::Zero());
 
     uint32_t localGenCount = (currentRange[1] - currentRange[0]).Multiply();
-    using namespace std::string_view_literals;
     using namespace ZSobolDetail;
     queue.IssueWorkKernel<KCGenRandomNumbersGeneric<ZSobol, LocalState, GlobalState>>
     (
-        "KCGenRandomNumbersZSobol"sv,
+        "KCGenRandomNumbersZSobol",
         DeviceWorkIssueParams{.workCount = localGenCount},
         //
         dNumbersOut,
@@ -1318,12 +1311,11 @@ void RNGGroupZSobol::GenerateNumbersIndirect(// Output
 
     uint32_t localGenCount = (currentRange[1] - currentRange[0]).Multiply();
     uint32_t usedGenCount = static_cast<uint32_t>(dIndices.size());
-    using namespace std::string_view_literals;
     using namespace ZSobolDetail;
     static constexpr auto Kernel = KCGenRandomNumbersGenericIndirect<ZSobol, LocalState, GlobalState>;
     queue.IssueWorkKernel<Kernel>
     (
-        "KCGenRandomNumbersZSobolIndirect"sv,
+        "KCGenRandomNumbersZSobolIndirect",
         DeviceWorkIssueParams{.workCount = usedGenCount},
         //
         dNumbersOut,
@@ -1351,10 +1343,9 @@ void RNGGroupZSobol::GenerateNumbersIndirect(// Output
         ZSobolDetail::LocalState,
         ZSobolDetail::GlobalState
     >;
-    using namespace std::string_view_literals;
     queue.IssueWorkKernel<Kernel>
         (
-            "KCGenRandomNumbersZSobolIndirect"sv,
+            "KCGenRandomNumbersZSobolIndirect",
             DeviceWorkIssueParams{.workCount = localGenCount},
             //
             dNumbersOut,

@@ -653,8 +653,6 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
     // calculate that, we also need to reduce the AABBs beforehand,
     // to find and optimal Morton Code delta
     using namespace DeviceAlgorithms;
-    using namespace std::string_view_literals;
-
     // TODO: The memory usage can be optimized
     // by repurposing some buffers but currently no memory issues
     // and this happens in initialization time so fine
@@ -747,7 +745,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         uint32_t blockCount = BLOCK_PER_INSTANCE * processedAccelCount;
         queue.IssueBlockKernel<KCGeneratePrimAABBs<AcceleratorGroupLBVH<PG>>>
         (
-            "KCGeneratePrimAABBs"sv,
+            "KCGeneratePrimAABBs",
             DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
@@ -790,7 +788,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         uint32_t blockCount = BLOCK_PER_INSTANCE * processedAccelCount;
         queue.IssueBlockKernel<KCGenPrimCenters<AcceleratorGroupLBVH<PG>>>
         (
-            "KCGenPrimCenters"sv,
+            "KCGenPrimCenters",
             DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
@@ -815,7 +813,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         uint32_t blockCount = instanceCount * BLOCK_PER_INSTANCE;
         queue.IssueBlockKernel<KCGenMortonCode>
         (
-            "KCGenMortonCodes"sv,
+            "KCGenMortonCodes",
             DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
@@ -855,7 +853,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         uint32_t blockCount = processedAccelCount * BLOCK_PER_INSTANCE;
         queue.IssueBlockKernel<KCConstructLBVHInternalNodes>
         (
-            "KCConstructLBVHInternalNodes"sv,
+            "KCConstructLBVHInternalNodes",
             DeviceBlockIssueParams
             {
                 .gridSize = blockCount,
@@ -880,7 +878,7 @@ void AcceleratorGroupLBVH<PG>::MultiBuildLBVH(Pair<const CommonKey, const Accele
         uint32_t blockCount = BLOCK_PER_INSTANCE * processedAccelCount;
         queue.IssueBlockKernel<KCUnionLBVHBoundingBoxes>
         (
-            "KCUnionLBVHBoundingBoxes"sv,
+            "KCUnionLBVHBoundingBoxes",
             DeviceBlockIssueParams
             {
                 .gridSize = blockCount,

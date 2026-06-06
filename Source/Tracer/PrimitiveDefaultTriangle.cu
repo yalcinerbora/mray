@@ -280,10 +280,9 @@ void PrimGroupTriangle::Finalize(const GPUQueue& queue)
     assert(dIndicesAsU32.size() == dIndexList.size() * Vector3ui::Dims);
 
     uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
-    using namespace std::string_view_literals;
     queue.IssueBlockKernel<KCAdjustIndices>
     (
-        "KCAdjustIndices"sv,
+        "KCAdjustIndices",
         DeviceBlockIssueParams
         {
             .gridSize = totalRanges,
@@ -343,12 +342,11 @@ void PrimGroupTriangle::ApplyTransformations(const std::vector<PrimBatchKey>& pr
     queue.MemcpyAsync(dVertexRanges,
                       Span<const Vector2ul>(hVertexRanges.data(), batchCount));
 
-    using namespace std::string_view_literals;
     static constexpr uint32_t BLOCK_PER_BATCH = 128;
     uint32_t blockCount = uint32_t(dVertexRanges.size() * BLOCK_PER_BATCH);
     queue.IssueBlockKernel<KCApplyTransformsTriangle>
     (
-        "KCApplyTransformationsTriangle"sv,
+        "KCApplyTransformationsTriangle",
         DeviceBlockIssueParams
         {
             .gridSize = blockCount,
@@ -536,10 +534,9 @@ void PrimGroupSkinnedTriangle::Finalize(const GPUQueue& queue)
     assert(dIndicesAsU32.size() == dIndexList.size() * Vector3ui::Dims);
 
     uint32_t totalRanges = static_cast<uint32_t>(dVertexIndexRanges.size());
-    using namespace std::string_view_literals;
     queue.IssueBlockKernel<KCAdjustIndices>
     (
-        "KCAdjustIndices"sv,
+        "KCAdjustIndices",
         DeviceBlockIssueParams
         {
             .gridSize = totalRanges,
