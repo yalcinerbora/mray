@@ -90,25 +90,6 @@ struct KernelWeightsStatic1D
     }
 };
 
-//using YY = KernelWeightsStatic1D<BoxFilter>;
-//static constexpr auto P = YY::PADDING;
-//static constexpr auto D = YY::DIAMETER;
-//static constexpr auto R = YY::RADIUS;
-//
-//static constexpr auto UUUU = std::ceil(2 * 0.5);
-//static constexpr auto YYY = Math::Ceil(2 * 0.5);
-//static constexpr auto YYYSSS = 1 + Math::PrevFloat(1.0f);
-//
-//constexpr Float XAX(Float num)
-//{
-//    Float f = Float(uint32_t(num));
-//    return f + (f < num);
-//}
-//
-//static constexpr Float F = XAX(1e8);
-
-
-
 // We do dirt cheap (kinda) sampling over the filtering kernel
 // for image clamping. Since it is a temporary method
 // to reduce resolution of the frame during load time.
@@ -121,9 +102,11 @@ struct KernelWeightsStatic1D
 // size and since we can't use temp memory (if user set this parameter
 // scene do not fit to the memory so...
 //
-template<class Filter2D, uint32_t SPP>
+template<class Filter2D, uint32_t SPP_IN, uint32_t SCALE_FACTOR_IN>
 struct KernelWeightsStochasticStatic1D
 {
+    static constexpr uint32_t SPP = SPP_IN;
+    static constexpr uint32_t SCALE_FACTOR = SCALE_FACTOR_IN;
     static constexpr Float RADIUS = Filter2D::IDEAL_RADIUS;
     static constexpr uint32_t TOTAL_WIDTH = 2 * SPP;
 
@@ -132,18 +115,6 @@ struct KernelWeightsStochasticStatic1D
 
     using FloatArray = Array<Float, TOTAL_WIDTH>;
     using Filter = typename Filter2D::Filter1D;
-
-    //static constexpr Vector2 GenerateSampleAndXi(uint32_t i)
-    //{
-    //    Filter filter = Filter(RADIUS);
-    //    // "o" is radius relative equally spaced locations
-    //    Float o = SAMPLE_START + Float(i) * DELTA;
-    //    // Move to sample space [0, 1)
-    //    Float xi = (o + (RADIUS)) / (2 * RADIUS);
-    //    //
-    //    //return Vector2(xi, filter.Sample(xi).value);
-    //    return Vector2(xi, xi);
-    //}
 
     static constexpr FloatArray GenerateSamples()
     {
@@ -167,55 +138,28 @@ struct KernelWeightsStochasticStatic1D
         return samples;
     }
 
-    static constexpr uint32_t FindPadding()
-    {
-        FloatArray samples = GenerateSamples();
-        // It is symmetric so just find max
-        // Not optimal code but it is constexpr
-        uint32_t result = uint32_t(0);
-        for(uint32_t i = 0; i < TOTAL_WIDTH; i++)
-        {
-            Float s = samples[i];
-            if(s < 0.0f) continue;
-            result = Math::Max(result, uint32_t(Math::Ceil(s)));
-        }
-        return result;
-    }
-
-
-    // First time properly using constexpr math functionality
-    // of mray (thanks to njuffa!), whish me luck!
     static constexpr FloatArray GenerateWeights()
     {
         FloatArray offsets = GenerateSamples();
-
         FloatArray result = {};
         Filter filter = Filter(RADIUS);
-        Float sum = Float(0);
         for(uint32_t i = 0; i < TOTAL_WIDTH; i++)
         {
             result[i] = filter.Evaluate(offsets[i]);
             result[i] /= filter.Pdf(offsets[i]);
-            sum += result[i];
         }
         for(uint32_t i = 0; i < TOTAL_WIDTH; i++)
-            result[i] /= sum;
+            result[i] = result[i] / Float(SPP);
         return result;
     }
 
-
-    static constexpr FloatArray RelativeRange(FloatArray x, uint32_t factor)
+    static constexpr FloatArray Pixels()
     {
+        FloatArray x = GenerateSamples();
         for(uint32_t i = 0; i < TOTAL_WIDTH; i++)
         {
-            x[i] *= Float(factor);
+            x[i] *= Float(SCALE_FACTOR);
         }
-        return x;
-    }
-
-    static constexpr FloatArray ClampRange(FloatArray x)
-    {
-
         for(uint32_t i = 0; i < TOTAL_WIDTH; i++)
         {
             Float val = x[i];
@@ -223,19 +167,17 @@ struct KernelWeightsStochasticStatic1D
         }
         return x;
     }
+
+    static constexpr Vector2i FindPixelRange()
+    {
+        FloatArray x = Pixels();
+        auto newEnd = std::unique(x.begin(), x.end());
+        // We assume it is consecutive data
+        Vector2i result = Vector2i(*x.cbegin(), *(newEnd - 1));
+        assert(Math::Abs(result[0]) == result[1]);
+        return result;
+    }
 };
-
-////using KK = KernelWeightsStochasticStatic1D<TentFilter, 4>;
-////using KK = KernelWeightsStochasticStatic1D<MitchellNetravaliFilter, 8>;
-//using KK = KernelWeightsStochasticStatic1D<GaussianFilter, 8>;
-////using KK = KernelWeightsStochasticStatic1D<TentFilter, 128>;
-//static constexpr auto PAD = KK::FindPadding();
-//static constexpr auto SAMPLES = KK::GenerateSamples();
-//static constexpr auto RANGE = KK::RelativeRange(SAMPLES, 3);
-//static constexpr auto PIXES = KK::ClampRange(RANGE);
-//static constexpr auto WEIGHTS = KK::GenerateWeights();
-
-
 
 static constexpr uint32_t INVALID_MORTON = std::numeric_limits<uint32_t>::max();
 // Be careful changing these, these may have bank conflict implications
@@ -270,64 +212,6 @@ Vector2i FilterRadiusPixelRange(int32_t wh)
 {
     Vector2i range(-(wh - 1) / 2, (wh + 2) / 2);
     return range;
-}
-
-template<class Filter, class DataFetcher>
-MR_GF_DECL
-Vector4 FilterPixel(const Vector2ui& pixelCoord,
-                    //
-                    const Vector2ui& spp,
-                    FilterMode filterMode,
-                    const Filter& FilterFunc,
-                    const DataFetcher& FetchData)
-{
-    // We should sample "the peak" of the filter (so we need odd samples
-    //Vector2ui oddSPP = Vector2ui((spp[0] & 1u) == 0 ? spp[0] - 1 : spp[0],
-    //                             (spp[1] & 1u) == 0 ? spp[1] - 1 : spp[1]);
-    Vector2ui oddSPP = spp;
-
-    Vector2 wPixCoord = Vector2(pixelCoord);
-    // We use float as a catch-all type
-    // It is allocated as a max channel
-    Vector4 writePix = Vector4::Zero();
-    Float weightSum = Float(0);
-    // Stochastically sample the up level via the filter
-    // Mini Monte Carlo..
-
-    for(uint32_t sppY = 0; sppY < oddSPP[1]; sppY++)
-    for(uint32_t sppX = 0; sppX < oddSPP[0]; sppX++)
-    {
-        Vector2 dXY = Vector2(1) / Vector2(oddSPP);
-        // Create a quasi sampler by perfectly stratifying the
-        // sample space
-        Vector2 xi = dXY * Float(0.5) + dXY * Vector2(sppX, sppY);
-
-        Vector2 xy;
-        Float pdf, totalSampleInv;
-        if(filterMode == FilterMode::ACCUMULATE)
-        {
-            xy = xi * Float(2) * FilterFunc.Radius() - FilterFunc.Radius();
-            pdf = totalSampleInv = Float(1);
-        }
-        else
-        {
-            auto sample = FilterFunc.Sample(xi);
-            xy = sample.value;
-            pdf = sample.pdf;
-            totalSampleInv = dXY.Multiply();
-        }
-
-        // Eval the weight
-        Float weight = FilterFunc.Evaluate(xy);
-        Vector4 localPix = FetchData(wPixCoord + xy);
-        // Actual calculation
-        writePix += weight * localPix * totalSampleInv / pdf;
-        // Do the integration separately as well
-        // we need to compensate
-        weightSum += weight * totalSampleInv / pdf;
-    }
-    writePix /= weightSum;
-    return writePix;
 }
 
 MR_GF_DECL
@@ -587,7 +471,6 @@ void KCGenerateMipmapsStatic(// I-O
                 sLocalPixelsB[i] = pixOut[2];
                 sLocalPixelsA[i] = pixOut[3];
             }
-
             //
             BlockSynchronize();
 
@@ -706,25 +589,25 @@ void KCClampImageStatic(// Output
     using Kernel = StochasticFilterKernel;
     static constexpr Vector2ui TILE_SIZE = KC_CLAMP_IMAGE_TILE_SIZE;
     static_assert(TILE_SIZE.Multiply() == TPB);
+    // Create samples for TILE_SIZE*SCALE_FACTOR region in a;
+    static constexpr uint32_t SCALE_FACTOR = Kernel::SCALE_FACTOR;
+    static constexpr uint32_t PADDING      = Kernel::FindPixelRange()[1];
+    static constexpr uint32_t SPP          = Kernel::SPP;
+    static constexpr auto KERNEL_WEIGHTS   = Kernel::GenerateWeights();
+    static constexpr auto KERNEL_SAMPLES   = Kernel::GenerateSamples();
 
-    auto ReadPixel = [&](Vector2 rPixCoord) -> Vector4
-    {
-        // Find the upper level coordinate
-        using Graphics::ConvertPixelIndices;
-        rPixCoord = ConvertPixelIndices(rPixCoord,
-                                        Vector2(inputImageRes),
-                                        Vector2(outputImageRes));
-        Vector2ui rPixCoordInt = Vector2ui(Math::Round(rPixCoord));
-        // Data is tightly packed, we can directly find the lienar index
-        uint32_t pixCoordLinear = (rPixCoordInt[1] * inputImageRes[0] +
-                                   rPixCoordInt[0]);
+    // This is expanded since we need SCALE_FACTOR times more pixels
+    static constexpr uint32_t SHMEM_Y_SIZE = SCALE_FACTOR * (PADDING + KC_MIPMAP_GEN_TILE_SIZE[1]);
+    static constexpr Vector2ui SHMEM_SIZE_2D = Vector2ui(TILE_SIZE[0], SHMEM_Y_SIZE);
+    static constexpr uint32_t SHMEM_SIZE_1D = SHMEM_SIZE_2D.Multiply();
+    // Currently there are no bank conflicts, because TPB = 512
+    // TODO: See shared memory declaration of "KCGenerateMipmapsStatic" kernel
+    MRAY_SHARED_MEMORY Float sLocalPixelsR[SHMEM_SIZE_1D];
+    MRAY_SHARED_MEMORY Float sLocalPixelsG[SHMEM_SIZE_1D];
+    MRAY_SHARED_MEMORY Float sLocalPixelsB[SHMEM_SIZE_1D];
+    MRAY_SHARED_MEMORY Float sLocalPixelsA[SHMEM_SIZE_1D];
 
-        // Now the type fetch part, utilize surface variant to
-        // find the type
-        Vector4 outData = GenericReadFromBuffer(dBufferImage, surfaceOut,
-                                                pixCoordLinear);
-        return outData;
-    };
+    Vector2 scale = Vector2(inputImageRes) / Vector2(outputImageRes);
 
     KernelCallParams kp;
     // Loop over the tiles for this tex, each block is dedicated to a tile
@@ -732,50 +615,194 @@ void KCClampImageStatic(// Output
     for(uint32_t tileI = kp.blockId; tileI < totalTiles.Multiply();
         tileI += kp.gridSize)
     {
+        if(tileI != kp.blockId) BlockSynchronize();
 
+        Vector2ui tileI2D = Vector2ui(tileI % totalTiles[0],
+                                      tileI / totalTiles[0]);
+        // Assuming tile size of is 32x16, we need to access 66x34 pixels
+        // Given the kernel is 4x4. This is too much memory when texture is
+        // 4 channel (We could've written a separate kernel for each channel
+        // here we use single kernel for compile times and maintainability).
+        //
+        // So we duplicate the reads of x-axis and directly convolve the
+        // pixels to the shared memory. So we only need 32x34 pixel region.
+        // Which is comfortable to fit to shared memory
+        //
+        // Iteration is per shared-memory pixel and it is stored in
+        // row-major order.
         #ifdef MRAY_GPU_BACKEND_CPU
-            // This code is slow lets try this
+            // CPU thread loads all on first iteration. No notion of shared memory.
             if(kp.threadId == 0)
-            for(uint32_t pI = 0; pI < TILE_SIZE.Multiply(); pI++)
-            #else
+            for(uint32_t i = 0; i < SHMEM_SIZE_1D; i++)
+        #else
             // Load cooperatively
-            uint32_t pI = kp.threadId;
+            for(uint32_t i = kp.threadId; i < SHMEM_SIZE_1D; i += kp.blockSize)
         #endif
         {
-            Vector2ui localPI = Vector2ui(pI % TILE_SIZE[0],
-                                          pI / TILE_SIZE[0]);
-            Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
-                                         tileI / totalTiles[0]);
-            Vector2ui wPixCoordInt = tile2D * TILE_SIZE + localPI;
+            // 2D Version of our buffer
+            Vector2i sampleLocalTexel = Vector2i(i % SHMEM_SIZE_2D[0],
+                                                 i / SHMEM_SIZE_2D[0]);
+            // Calculate sample region
+            // We need to calculate couple pixels extra so..
+            sampleLocalTexel[1] -= PADDING;
+            // Now convert it to it be
+            // X dimension is in mip's coordinates,
+            // convert it to scaled region
+            sampleLocalTexel[0] *= SCALE_FACTOR;
+            // This is "sample" relative coordinates
+            // this means we upscaled sampling region by SCALE_FACTOR
+            // but only store double in the Y width since we convolve
+            // over X shortly without storing.
+
+            // Now calculate the mip loc
             //
-            if(wPixCoordInt[0] >= outputImageRes[0] ||
-               wPixCoordInt[1] >= outputImageRes[1])
+            Vector2i sampleGlobalTexel = sampleLocalTexel;
+            sampleGlobalTexel += Vector2i(tileI2D * TILE_SIZE * SCALE_FACTOR);
+            //
+            Vector2 localScale = scale / Vector2(SCALE_FACTOR);
+
+            // Convolve X
+            Vector4 pixOut = Vector4::Zero();
+            MRAY_UNROLL_LOOP
+            for(int32_t j = 0; j < SPP; j++)
+            {
+                // TODO: Do a lerp here maybe?
+                int32_t offset = int32_t(Math::Floor(KERNEL_SAMPLES[j] * localScale[0]));
+                Vector2i t = Vector2i(sampleGlobalTexel[0] + offset, sampleGlobalTexel[1]);
+                Vector2 tF = (Vector2(t) + Float(0.5)) * localScale - Float(0.5);
+                // TODO: Expose other out of bound methods later
+                Vector2i cT = Math::Clamp(Vector2i(tF), Vector2i::Zero(), Vector2i(inputImageRes - 1));
+                uint32_t linearCT = uint32_t(cT[1] * inputImageRes[0] + cT[0]);
+                Vector4 pixIn = GenericReadFromBuffer(dBufferImage, surfaceOut, linearCT);
+                using Math::FMA;
+                pixOut[0] = FMA(pixIn[0], KERNEL_WEIGHTS[j], pixOut[0]);
+                pixOut[1] = FMA(pixIn[1], KERNEL_WEIGHTS[j], pixOut[1]);
+                pixOut[2] = FMA(pixIn[2], KERNEL_WEIGHTS[j], pixOut[2]);
+                pixOut[3] = FMA(pixIn[3], KERNEL_WEIGHTS[j], pixOut[3]);
+            }
+            // Write!
+            sLocalPixelsR[i] = pixOut[0];
+            sLocalPixelsG[i] = pixOut[1];
+            sLocalPixelsB[i] = pixOut[2];
+            sLocalPixelsA[i] = pixOut[3];
+        }
+        //
+        BlockSynchronize();
+
+        #ifdef MRAY_GPU_BACKEND_CPU
+            // All the work is done by the first thread
+            // For CPU kernel call, we will do 1 thread per block
+            //
+            // These threads are logical each actual OS thread
+            // works on block, the kernel functions called inside
+            // a loop for each "thread".
+            if(kp.threadId == 0)
+            for(uint32_t i = 0; i < TILE_SIZE.Multiply(); i++)
+        #else
+            // Same thing but we exactly have enough threads in a block
+            // so no loops
+            uint32_t i = kp.threadId;
+        #endif
+        {
+            Vector2i outputLocalTexel = Vector2i(i % TILE_SIZE[0],
+                                                i / TILE_SIZE[0]);
+            Vector2i outputGlobalTexel = outputLocalTexel;
+            outputGlobalTexel += Vector2i(tileI2D * TILE_SIZE);
+
+            // Do not bother convolution if pixel is out of range
+            if(outputGlobalTexel[0] >= int32_t(outputImageRes[0]) ||
+               outputGlobalTexel[1] >= int32_t(outputImageRes[1]))
                 continue;
 
-            // Here read the data
-            Vector4 writePix = Vector4::Zero();
-            Vector2 wPixCoord = Vector2(wPixCoordInt);
-            for(uint32_t j = 0; j < Kernel::Dim[1]; j++)
-            for(uint32_t i = 0; i < Kernel::Dim[0]; i++)
+            // Convert mip local texel to shared memory texel
+            Vector2i shMemTexel = outputLocalTexel;
+            shMemTexel[1] *= int32_t(SCALE_FACTOR);
+            shMemTexel[1] += PADDING;
+
+            Vector4 pixOut = Vector4::Zero();
+            MRAY_UNROLL_LOOP
+            for(int32_t j = 0; j < SPP; j++)
             {
-                Vector2ui ij = Vector2ui(i, j);
-                Vector2 o = Kernel::Offsets[j][i];
-                Float w = Kernel::Weights[j][i].Multiply();
-                Vector4 pix = ReadPixel(wPixCoord + o);
-                writePix[0] = Math::FMA(writePix[0], w, pix[0]);
-                writePix[1] = Math::FMA(writePix[1], w, pix[1]);
-                writePix[2] = Math::FMA(writePix[2], w, pix[2]);
-                writePix[3] = Math::FMA(writePix[3], w, pix[3]);
+                // TODO: Do a lerp here maybe?
+                int32_t offset = int32_t(Math::Floor(KERNEL_SAMPLES[j] * SCALE_FACTOR));
+                Vector2i localReadTexel = Vector2i(shMemTexel[0], shMemTexel[1] + offset);
+                int32_t sI = localReadTexel[1] * SHMEM_SIZE_2D[0] + localReadTexel[0];
+                Float r = sLocalPixelsR[sI];
+                Float g = sLocalPixelsG[sI];
+                Float b = sLocalPixelsB[sI];
+                Float a = sLocalPixelsA[sI];
+                using Math::FMA;
+                pixOut[0] = FMA(r, KERNEL_WEIGHTS[j], pixOut[0]);
+                pixOut[1] = FMA(g, KERNEL_WEIGHTS[j], pixOut[1]);
+                pixOut[2] = FMA(b, KERNEL_WEIGHTS[j], pixOut[2]);
+                pixOut[3] = FMA(a, KERNEL_WEIGHTS[j], pixOut[3]);
             }
-            writePix[0] /= Float(Kernel::Dim.Multiply());
-            writePix[1] /= Float(Kernel::Dim.Multiply());
-            writePix[2] /= Float(Kernel::Dim.Multiply());
-            writePix[3] /= Float(Kernel::Dim.Multiply());
             // Finally write the pixel
-            TracerSurfView sOut = surfaceOut;
-            GenericWrite(sOut, writePix, wPixCoordInt);
+            TracerSurfView surf = surfaceOut;
+            GenericWrite(surf, pixOut, Vector2ui(outputGlobalTexel));
         }
     }
+}
+
+// Shelved Code: Old N^2 Filters with stochastic/accumulate modes
+#if 0
+
+template<class Filter, class DataFetcher>
+MR_GF_DECL
+Vector4 FilterPixel(const Vector2ui& pixelCoord,
+                    //
+                    const Vector2ui& spp,
+                    FilterMode filterMode,
+                    const Filter& FilterFunc,
+                    const DataFetcher& FetchData)
+{
+    // We should sample "the peak" of the filter (so we need odd samples
+    //Vector2ui oddSPP = Vector2ui((spp[0] & 1u) == 0 ? spp[0] - 1 : spp[0],
+    //                             (spp[1] & 1u) == 0 ? spp[1] - 1 : spp[1]);
+    Vector2ui oddSPP = spp;
+
+    Vector2 wPixCoord = Vector2(pixelCoord);
+    // We use float as a catch-all type
+    // It is allocated as a max channel
+    Vector4 writePix = Vector4::Zero();
+    Float weightSum = Float(0);
+    // Stochastically sample the up level via the filter
+    // Mini Monte Carlo..
+
+    for(uint32_t sppY = 0; sppY < oddSPP[1]; sppY++)
+    for(uint32_t sppX = 0; sppX < oddSPP[0]; sppX++)
+    {
+        Vector2 dXY = Vector2(1) / Vector2(oddSPP);
+        // Create a quasi sampler by perfectly stratifying the
+        // sample space
+        Vector2 xi = dXY * Float(0.5) + dXY * Vector2(sppX, sppY);
+
+        Vector2 xy;
+        Float pdf, totalSampleInv;
+        if(filterMode == FilterMode::ACCUMULATE)
+        {
+            xy = xi * Float(2) * FilterFunc.Radius() - FilterFunc.Radius();
+            pdf = totalSampleInv = Float(1);
+        }
+        else
+        {
+            auto sample = FilterFunc.Sample(xi);
+            xy = sample.value;
+            pdf = sample.pdf;
+            totalSampleInv = dXY.Multiply();
+        }
+
+        // Eval the weight
+        Float weight = FilterFunc.Evaluate(xy);
+        Vector4 localPix = FetchData(wPixCoord + xy);
+        // Actual calculation
+        writePix += weight * localPix * totalSampleInv / pdf;
+        // Do the integration separately as well
+        // we need to compensate
+        weightSum += weight * totalSampleInv / pdf;
+    }
+    writePix /= weightSum;
+    return writePix;
 }
 
 // ========================================= //
@@ -909,55 +936,44 @@ void KCClampImage(// Output
     for(uint32_t tileI = kp.blockId; tileI < totalTiles.Multiply();
         tileI += kp.gridSize)
     {
-        #ifdef MRAY_GPU_BACKEND_CPU
-            // This code is slow lets try this
-            if(kp.threadId == 0)
-            for(uint32_t pI = 0; pI < TILE_SIZE.Multiply(); pI++)
-        #else
-            // Load cooperatively
-            uint32_t pI = kp.threadId;
-        #endif
+        Vector2ui localPI = Vector2ui(pI % TILE_SIZE[0],
+                                        pI / TILE_SIZE[0]);
+        Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
+                                        tileI / totalTiles[0]);
+        Vector2ui wPixCoordInt = tile2D * TILE_SIZE + localPI;
+        //
+        if(wPixCoordInt[0] >= surfaceImageRes[0] ||
+            wPixCoordInt[1] >= surfaceImageRes[1])
+            continue;
+
+        // Generic filter, reader can be defined via lambda
+        Vector4 writePix = FilterPixel(wPixCoordInt, spp,
+                                        filterMode, FilterFunc,
+        [&](Vector2 rPixCoord) -> Vector4
         {
-            Vector2ui localPI = Vector2ui(pI % TILE_SIZE[0],
-                                          pI / TILE_SIZE[0]);
-            Vector2ui tile2D = Vector2ui(tileI % totalTiles[0],
-                                         tileI / totalTiles[0]);
-            Vector2ui wPixCoordInt = tile2D * TILE_SIZE + localPI;
-            //
-            if(wPixCoordInt[0] >= surfaceImageRes[0] ||
-               wPixCoordInt[1] >= surfaceImageRes[1])
-                continue;
+            // Find the upper level coordinate
+            using Graphics::ConvertPixelIndices;
+            rPixCoord = ConvertPixelIndices(rPixCoord,
+                                            Vector2(bufferImageRes),
+                                            Vector2(surfaceImageRes));
+            Vector2ui rPixCoordInt = Vector2ui(Math::Round(rPixCoord));
+            // Data is tightly packed, we can directly find the lienar index
+            uint32_t pixCoordLinear = (rPixCoordInt[1] * bufferImageRes[0] +
+                                        rPixCoordInt[0]);
 
-            // Generic filter, reader can be defined via lambda
-            Vector4 writePix = FilterPixel(wPixCoordInt, spp,
-                                           filterMode, FilterFunc,
-            [&](Vector2 rPixCoord) -> Vector4
-            {
-                // Find the upper level coordinate
-                using Graphics::ConvertPixelIndices;
-                rPixCoord = ConvertPixelIndices(rPixCoord,
-                                                Vector2(bufferImageRes),
-                                                Vector2(surfaceImageRes));
-                Vector2ui rPixCoordInt = Vector2ui(Math::Round(rPixCoord));
-                // Data is tightly packed, we can directly find the lienar index
-                uint32_t pixCoordLinear = (rPixCoordInt[1] * bufferImageRes[0] +
-                                           rPixCoordInt[0]);
-
-                // Now the type fetch part, utilize surface variant to
-                // find the type
-                Vector4 outData = GenericReadFromBuffer(dBufferImage, surfaceOut,
-                                                        pixCoordLinear);
-                return outData;
-            });
-            // Finally write the pixel
-            TracerSurfView sOut = surfaceOut;
-            GenericWrite(sOut, writePix, wPixCoordInt);
-
-            //TracerSurfView sOut = surfaceOut;
-            //GenericWrite(sOut, Vector4::Zero(), wPixCoordInt);
-        }
+            // Now the type fetch part, utilize surface variant to
+            // find the type
+            Vector4 outData = GenericReadFromBuffer(dBufferImage, surfaceOut,
+                                                    pixCoordLinear);
+            return outData;
+        });
+        // Finally write the pixel
+        TracerSurfView sOut = surfaceOut;
+        GenericWrite(sOut, writePix, wPixCoordInt);
     }
 }
+
+#endif
 
 MRAY_KERNEL MRAY_DEVICE_LAUNCH_BOUNDS_DEFAULT
 void KCExpandSamplesToPixels(// Outputs
@@ -1807,16 +1823,10 @@ void ClampImageFromBufferGeneric(// Output
                                  // Constants
                                  const Vector2ui& surfImageDims,
                                  const Vector2ui& bufferImageDims,
-                                 Filter filter,
+                                 Filter,
                                  const GPUQueue& queue)
 {
     using Math::DivideUp;
-    // Find maximum block count for state allocation
-    // TODO: Change this so that it is relative to the
-    // filter radius.
-    //static constexpr Vector2ui SPP = Vector2ui(4, 4);
-    static constexpr Vector2ui SPP = Vector2ui(8, 8);
-    //static constexpr Vector2ui SPP = Vector2ui(2, 2);
     static constexpr Vector2ui TILE_SIZE = KC_CLAMP_IMAGE_TILE_SIZE;
     static constexpr uint32_t THREAD_PER_BLOCK = TILE_SIZE.Multiply();
     uint32_t blockCount = DivideUp(surfImageDims, TILE_SIZE).Multiply();
@@ -1835,7 +1845,8 @@ void ClampImageFromBufferGeneric(// Output
         uint32_t blockSize = THREAD_PER_BLOCK;
     #endif
 
-    queue.IssueBlockKernel<KCClampImage<THREAD_PER_BLOCK, Filter>>
+    using FilterKernel = KernelWeightsStochasticStatic1D<Filter, 5, 2>;
+    queue.IssueBlockKernel<KCClampImageStatic<THREAD_PER_BLOCK, FilterKernel>>
     (
         "KCClampImage",
         DeviceBlockIssueParams
@@ -1849,12 +1860,7 @@ void ClampImageFromBufferGeneric(// Output
         dDataBuffer,
         // Constants
         surfImageDims,
-        bufferImageDims,
-        SPP,
-        // Use sampling here, quality is not that important
-        // (We are clamping textures)
-        FilterMode::SAMPLING,
-        filter
+        bufferImageDims
     );
 }
 
