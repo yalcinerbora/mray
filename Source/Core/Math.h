@@ -765,12 +765,12 @@ MR_PF_DEF T ErrFunc(T x) noexcept
         using F = float;
         F t;
         t = -1.64611265e-6f;            // -0x1.b9e000p-20
-        t = FMA(t, x, 2.95254722e-5f);  //  0x1.ef5af0p-16
+        t = FMA(t, x,  2.95254722e-5f); //  0x1.ef5af0p-16
         t = FMA(t, x, -2.33422339e-4f); // -0x1.e985aap-13
-        t = FMA(t, x, 1.04246172e-3f);  //  0x1.11466cp-10
+        t = FMA(t, x,  1.04246172e-3f); //  0x1.11466cp-10
         t = FMA(t, x, -2.55015842e-3f); // -0x1.4e411ep-9
-        t = FMA(t, x, 3.19798535e-4f);  //  0x1.4f5544p-12
-        t = FMA(t, x, 2.76054665e-2f);  //  0x1.c449b8p-6
+        t = FMA(t, x,  3.19798535e-4f); //  0x1.4f5544p-12
+        t = FMA(t, x,  2.76054665e-2f); //  0x1.c449b8p-6
         t = FMA(t, x, -1.48274124e-1f); // -0x1.2faa58p-3
         t = FMA(t, x, -9.18447673e-1f); // -0x1.d63ec6p-1
         t = FMA(t, x, -1.62790680e+0f); // -0x1.a0be80p+0
@@ -788,49 +788,62 @@ MR_PF_DEF T ErrFunc(T x) noexcept
 template<FloatC T>
 MR_PF_DEF T InvErrFunc(T x) noexcept
 {
-    #ifdef MRAY_DEVICE_CODE_PATH
-        if constexpr(std::is_same_v<T, float>)  return erfinvf(x);
-        if constexpr(std::is_same_v<T, double>) return erfinv(x);
-    #endif
-    // Checked the pbrt-v4, it has similar impl
-    // of this (From a stackoverflow post).
-    // https://stackoverflow.com/a/49743348
-    //
-    // https://people.maths.ox.ac.uk/gilesm/codes/erfinv/gems.pdf
-    // I've checked other sites and find this
-    // http://www.mimirgames.com/articles/programming/approximations-of-the-inverse-error-function
-    // However could not implement it properly (numerical precision errors)
-    // Using the stackoverflow one
-    //
-    T t = Log(FMA(x, T(0) - x, T(1)));
-    T p ;
-    if(Abs(t) > T(6.125))
+    constexpr auto CodeCPU = [](T x)
     {
-        p =           T(+3.03697567e-10);
-        p = FMA(p, t, T(+2.93243101e-8));
-        p = FMA(p, t, T(+1.22150334e-6));
-        p = FMA(p, t, T(+2.84108955e-5));
-        p = FMA(p, t, T(+3.93552968e-4));
-        p = FMA(p, t, T(+3.02698812e-3));
-        p = FMA(p, t, T(+4.83185798e-3));
-        p = FMA(p, t, T(-2.64646143e-1));
-        p = FMA(p, t, T(+8.40016484e-1));
+        // Checked the pbrt-v4, it has similar impl
+        // of this (From a stackoverflow post).
+        // https://stackoverflow.com/a/49743348
+        //
+        // https://people.maths.ox.ac.uk/gilesm/codes/erfinv/gems.pdf
+        // I've checked other sites and find this
+        // http://www.mimirgames.com/articles/programming/approximations-of-the-inverse-error-function
+        // However could not implement it properly (numerical precision errors)
+        // Using the stackoverflow one
+        //
+        T t = Log(FMA(x, T(0) - x, T(1)));
+        T p;
+        if(Abs(t) > T(6.125))
+        {
+            p = T(+3.03697567e-10);
+            p = FMA(p, t, T(+2.93243101e-8));
+            p = FMA(p, t, T(+1.22150334e-6));
+            p = FMA(p, t, T(+2.84108955e-5));
+            p = FMA(p, t, T(+3.93552968e-4));
+            p = FMA(p, t, T(+3.02698812e-3));
+            p = FMA(p, t, T(+4.83185798e-3));
+            p = FMA(p, t, T(-2.64646143e-1));
+            p = FMA(p, t, T(+8.40016484e-1));
+        }
+        else
+        {
+            p = T(5.438778320e-9);
+            p = FMA(p, t, T(+1.43285448e-7));
+            p = FMA(p, t, T(+1.22774793e-6));
+            p = FMA(p, t, T(+1.12963626e-7));
+            p = FMA(p, t, T(-5.61530760e-5));
+            p = FMA(p, t, T(-1.47697632e-4));
+            p = FMA(p, t, T(+2.31468678e-3));
+            p = FMA(p, t, T(+1.15392581e-2));
+            p = FMA(p, t, T(-2.32015476e-1));
+            p = FMA(p, t, T(+8.86226892e-1));
+        }
+        T r = x * p;
+        return r;
+    };
+
+    if(std::is_constant_evaluated())
+    {
+        return CodeCPU(x);
     }
     else
     {
-        p =           T(5.438778320e-9);
-        p = FMA(p, t, T(+1.43285448e-7));
-        p = FMA(p, t, T(+1.22774793e-6));
-        p = FMA(p, t, T(+1.12963626e-7));
-        p = FMA(p, t, T(-5.61530760e-5));
-        p = FMA(p, t, T(-1.47697632e-4));
-        p = FMA(p, t, T(+2.31468678e-3));
-        p = FMA(p, t, T(+1.15392581e-2));
-        p = FMA(p, t, T(-2.32015476e-1));
-        p = FMA(p, t, T(+8.86226892e-1));
+        #ifdef MRAY_DEVICE_CODE_PATH
+            if constexpr(std::is_same_v<T, float>)  return erfinvf(x);
+            if constexpr(std::is_same_v<T, double>) return erfinv(x);
+        #else
+            return CodeCPU(x);
+        #endif
     }
-    T r = x * p;
-    return r;
 }
 
 template<FloatC T>
@@ -1071,15 +1084,46 @@ MR_PF_DEF T Ceil(T x) noexcept
         using I = IntegralSister<T>;
         static_assert(std::numeric_limits<T>::is_iec559,
                       "constexpr ceil only works for ieee754 floats");
+        // Generic version of
+        // https://stackoverflow.com/questions/8377412/ceil-function-how-can-we-implement-it-ourselves
+        I MANTISSA_BITS = 0;
+        I EXPONENT_BITS = 0;
+        if constexpr(std::is_same_v<float, T>)
+        {
+            EXPONENT_BITS = 8;
+            MANTISSA_BITS = 23;
+        }
+        else if constexpr(std::is_same_v<double, T>)
+        {
+            EXPONENT_BITS = 11;
+            MANTISSA_BITS = 52;
+        }
+        else if constexpr(std::is_same_v<Half, T>)
+        {
+            EXPONENT_BITS = 5;
+            MANTISSA_BITS = 10;
+        }
+        I EXPONENT_MASK = (I(1) << EXPONENT_BITS) - I(1);
+        I EXPONENT_OFFSET = (I(1) << (8 -1)) - I(1);
         //
+        I input = Bit::BitCast<I>(x);
+        I exponent = ((input >> MANTISSA_BITS) & EXPONENT_MASK) - EXPONENT_OFFSET;
+        if(exponent < 0) return T(x > 0);
 
-        // Not good, but it is constexpr
-        // so no undefined behavour is allowed
-        // we can get sloppy code.
-        // Also for large numbers this will shit the bed
-        //
-        if(x < T(0)) return T(I(x - PrevFloat<T>(1)));
-        else         return T(I(x + PrevFloat<T>(1)));
+        // Most significant "exponent" amount of bits will map to an integer
+        // in the mantissa part.
+        I maskedMantissaBitCount = MANTISSA_BITS - exponent;
+        // This is when float is large, so it has no decimal points.
+        // aka. ~7 digits (for float), all in the whole part fraction is all zeroes.
+        if(maskedMantissaBitCount <= 0) return x;
+
+
+        I mantissaMask = (~I(0)) << maskedMantissaBitCount;
+        I output = input & mantissaMask;
+
+        T result = Bit::BitCast<T>(output);
+        if(x > 0 && output != input) result++;
+        return result;
     }
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::ceil(x);
@@ -1101,7 +1145,19 @@ MR_PF_DEF T Floor(T x) noexcept
         // Also for large numbers this will shit the bed
         //
         using I = IntegralSister<T>;
-        return T(I(x));
+        I MANTISSA_BITS = 0;
+             if constexpr(std::is_same_v<float, T>)  MANTISSA_BITS = 23;
+        else if constexpr(std::is_same_v<double, T>) MANTISSA_BITS = 52;
+        else if constexpr(std::is_same_v<Half, T>)   MANTISSA_BITS = 10;
+        //
+        T MAX_VAL = T(I(1) << MANTISSA_BITS);
+        // These are whole integers already
+        if(x > MAX_VAL) return x;
+
+        if(x < Float(0) && Math::Ceil(x) != x)
+            return T(I(x)) - Float(1);
+        else 
+            return T(I(x));
     }
     #ifndef MRAY_DEVICE_CODE_PATH
         return std::floor(x);

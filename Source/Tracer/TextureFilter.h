@@ -106,14 +106,6 @@ class TextureFilterT : public TextureFilterI
     // Constructors & Destructor
             TextureFilterT(const GPUSystem&, Float filterRadius);
 
-   //size_t   AllocSizeForMipGenFilterKernel(Float filterRadius);
-   //size_t   AllocSizeForMipClampImageFilterKernel(Float filterRadius);
-
-    //
-   //void    GenerateMipsStatic(Span<Byte>& tempKernelMemory,
-   //                           const std::vector<MipArray<TracerSurfRef>>&,
-   //                           const std::vector<MipGenParams>&) const override;
-
     void    GenerateMips(const std::vector<MipArray<TracerSurfRef>>&,
                          const std::vector<MipGenParams>&) const override;
     void    ClampImageFromBuffer(// Output

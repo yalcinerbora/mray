@@ -133,6 +133,18 @@ struct KernelWeightsStochasticStatic1D
     using FloatArray = Array<Float, TOTAL_WIDTH>;
     using Filter = typename Filter2D::Filter1D;
 
+    //static constexpr Vector2 GenerateSampleAndXi(uint32_t i)
+    //{
+    //    Filter filter = Filter(RADIUS);
+    //    // "o" is radius relative equally spaced locations
+    //    Float o = SAMPLE_START + Float(i) * DELTA;
+    //    // Move to sample space [0, 1)
+    //    Float xi = (o + (RADIUS)) / (2 * RADIUS);
+    //    //
+    //    //return Vector2(xi, filter.Sample(xi).value);
+    //    return Vector2(xi, xi);
+    //}
+
     static constexpr FloatArray GenerateSamples()
     {
         Filter filter = Filter(RADIUS);
@@ -190,14 +202,39 @@ struct KernelWeightsStochasticStatic1D
             result[i] /= sum;
         return result;
     }
+
+
+    static constexpr FloatArray RelativeRange(FloatArray x, uint32_t factor)
+    {
+        for(uint32_t i = 0; i < TOTAL_WIDTH; i++)
+        {
+            x[i] *= Float(factor);
+        }
+        return x;
+    }
+
+    static constexpr FloatArray ClampRange(FloatArray x)
+    {
+
+        for(uint32_t i = 0; i < TOTAL_WIDTH; i++)
+        {
+            Float val = x[i];
+            x[i] = (val < Float(0)) ? Math::Floor(val) : Math::Ceil(val);
+        }
+        return x;
+    }
 };
 
-//using KK = KernelWeightsStochasticStatic1D<BoxFilter, 0>;
-using KK = KernelWeightsStochasticStatic1D<MitchellNetravaliFilter, 2>;
-static constexpr auto PAD = KK::FindPadding();
-static constexpr auto SAMPLES = KK::GenerateSamples();
-static constexpr auto WEIGHTS = KK::GenerateWeights();
-static constexpr auto XX = MitchellNetravaliFilter1D(2.0f);
+////using KK = KernelWeightsStochasticStatic1D<TentFilter, 4>;
+////using KK = KernelWeightsStochasticStatic1D<MitchellNetravaliFilter, 8>;
+//using KK = KernelWeightsStochasticStatic1D<GaussianFilter, 8>;
+////using KK = KernelWeightsStochasticStatic1D<TentFilter, 128>;
+//static constexpr auto PAD = KK::FindPadding();
+//static constexpr auto SAMPLES = KK::GenerateSamples();
+//static constexpr auto RANGE = KK::RelativeRange(SAMPLES, 3);
+//static constexpr auto PIXES = KK::ClampRange(RANGE);
+//static constexpr auto WEIGHTS = KK::GenerateWeights();
+
 
 
 static constexpr uint32_t INVALID_MORTON = std::numeric_limits<uint32_t>::max();
