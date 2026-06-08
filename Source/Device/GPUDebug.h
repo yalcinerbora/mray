@@ -25,7 +25,7 @@ template<WriteMode MODE = DEFAULT, class T>
 void DumpGPUMemToStream(std::ostream& s,
                         Span<const T> data,
                         const GPUQueue& queue,
-                        std::string_view separator = "\n"sv)
+                        std::string_view separator = "\n")
 {
     std::vector<T> hostBuffer(data.size());
     queue.MemcpyAsync(Span<T>(hostBuffer), data);

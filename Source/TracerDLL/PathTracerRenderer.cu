@@ -194,7 +194,8 @@ PathTracerRendererT<SC>::FindMaxWorkCount() const
 template<SpectrumContextC SC>
 uint32_t
 PathTracerRendererT<SC>::FindMaxSamplePerIteration(uint32_t rayCount,
-                                                   PathTraceRDetail::SampleMode sampleMode)
+                                                   PathTraceRDetail::SampleMode sampleMode,
+                                                   bool sampleMedia)
 {
     uint32_t camSample = curCamWork->StochasticFilterSampleRayRNList().TotalRNCount();
     uint32_t spectrumSample = (spectrumContext)
@@ -209,7 +210,7 @@ PathTracerRendererT<SC>::FindMaxSamplePerIteration(uint32_t rayCount,
         {
             return Math::Max(l, r);
         },
-        [sampleMode](const auto& renderWorkStruct) -> uint32_t
+        [sampleMode, sampleMedia](const auto& renderWorkStruct) -> uint32_t
         {
             // TODO: Report bug (MSVC):
             // This:
@@ -222,29 +223,33 @@ PathTracerRendererT<SC>::FindMaxSamplePerIteration(uint32_t rayCount,
             // Anyway report it...
             if(sampleMode == PathTraceRDetail::SampleMode::E::PURE)
                 return renderWorkStruct.workPtr->SampleRNList(0).TotalRNCount();
+            else if(sampleMedia)
+                return renderWorkStruct.workPtr->SampleRNList(2).TotalRNCount();
             else
                 return Math::Max(renderWorkStruct.workPtr->SampleRNList(0).TotalRNCount(),
                                  renderWorkStruct.workPtr->SampleRNList(1).TotalRNCount());
         }
     );
     //
-    maxSample = std::transform_reduce
-    (
-        currentMediumWorks.cbegin(), currentMediumWorks.cend(), maxSample,
-        [](uint32_t l, uint32_t r) -> uint32_t
-        {
-            return Math::Max(l, r);
-        },
-        [sampleMode](const auto& renderMediaWorkStruct) -> uint32_t
-        {
-            if(sampleMode == PathTraceRDetail::SampleMode::E::PURE)
-                return renderMediaWorkStruct.workPtr->SampleRNList(0).TotalRNCount();
-            else
-                return Math::Max(renderMediaWorkStruct.workPtr->SampleRNList(0).TotalRNCount(),
-                                 renderMediaWorkStruct.workPtr->SampleRNList(1).TotalRNCount());
-        }
-    );
-
+    if(sampleMedia)
+    {
+        maxSample = std::transform_reduce
+        (
+            currentMediumWorks.cbegin(), currentMediumWorks.cend(), maxSample,
+            [](uint32_t l, uint32_t r) -> uint32_t
+            {
+                return Math::Max(l, r);
+            },
+            [sampleMode](const auto& renderMediaWorkStruct) -> uint32_t
+            {
+                if(sampleMode == PathTraceRDetail::SampleMode::E::PURE)
+                    return renderMediaWorkStruct.workPtr->SampleRNList(0).TotalRNCount();
+                else
+                    return Math::Max(renderMediaWorkStruct.workPtr->SampleRNList(0).TotalRNCount(),
+                                     renderMediaWorkStruct.workPtr->SampleRNList(1).TotalRNCount());
+            }
+        );
+    }
     return rayCount * maxSample;
 }
 
@@ -344,8 +349,8 @@ PathTracerRendererT<SC>::DoRenderPassPure(Span<RayIndex> dIndices,
         [&, this](const auto& workI, Span<uint32_t> dLocalIndices, uint32_t)
         {
             FillRandomBuffer(dRandomNumBuffer, dPathRNGDimensions,
-                                dLocalIndices, workI.SampleRNList(0),
-                                rnGenerator, processQueue);
+                             dLocalIndices, workI.SampleRNList(0),
+                             rnGenerator, processQueue);
             workI.DoWork_0(dRayState, dRays,
                             dRayCones, dLocalIndices,
                             dRandomNumBuffer, dHits,
@@ -1530,7 +1535,7 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
         // This should be fine
         if(currentOptions.sampleMode == SampleMode::E::NEE)
             MRAY_WARNING_LOG("[%s]: While \"sampleMedia\" is true, \"sampleMode\" "
-                             "can not be NEE. It is assumed as NEE_WITH_MIS.");
+                             "can not be just NEE. It is assumed as NEE_WITH_MIS.");
     }
 
     // ========================= //
@@ -1542,7 +1547,9 @@ PathTracerRendererT<SC>::StartRender(const RenderImageParams& rIP,
     bool doMediaSampleWithNEE = (hasShadowRays && currentOptions.sampleMedia == true);
 
     //
-    uint32_t maxSampleCount = FindMaxSamplePerIteration(maxRayCount, currentOptions.sampleMode);
+    uint32_t maxSampleCount = FindMaxSamplePerIteration(maxRayCount,
+                                                        currentOptions.sampleMode,
+                                                        currentOptions.sampleMedia);
     uint32_t mediaPDFRatioCount = (doMediaSampleWithNEE) ? maxRayCount : 0;
     uint32_t maxShadowRayCount = (hasShadowRays) ? maxRayCount : 0;
     uint32_t isVisibleIntCount = (hasShadowRays) ? Bitspan<uint32_t>::CountT(maxRayCount) : 0;

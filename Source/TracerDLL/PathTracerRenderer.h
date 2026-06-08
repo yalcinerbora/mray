@@ -95,7 +95,9 @@ class PathTracerRendererT final : public PathTracerRendererBase
 
     // Helpers
     uint32_t            FindMaxWorkCount() const;
-    uint32_t            FindMaxSamplePerIteration(uint32_t rayCount, PathTraceRDetail::SampleMode);
+    uint32_t            FindMaxSamplePerIteration(uint32_t rayCount,
+                                                  PathTraceRDetail::SampleMode,
+                                                  bool sampleMedia);
     Span<RayIndex>      DoRenderPassPure(Span<RayIndex>, Span<CommonKey>,
                                          const GPUQueue&);
     Span<RayIndex>      DoRenderPassNEE(Span<RayIndex>, Span<CommonKey>,
