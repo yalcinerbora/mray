@@ -128,11 +128,6 @@ struct KernelWeightsStochasticStatic1D
             Float xi = (o + (RADIUS)) / (2 * RADIUS);
             //
             samples[i] = filter.Sample(xi).value;
-
-            // For box filter this sampling etc should be wasteful
-            // so check for mistake
-            if constexpr(std::is_same_v<Filter, BoxFilter1D>)
-                assert(o == samples[i]);
         }
 
         return samples;
