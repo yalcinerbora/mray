@@ -299,7 +299,7 @@ void KCGenerateMipmapsStatic(// I-O
     assert(dSurfaces.size() == dMipGenParamsList.size());
 
     // This is expanded since we need 2x more pixels
-    static constexpr uint32_t SHMEM_Y_SIZE   = 2 * (Kernel::PADDING + KC_MIPMAP_GEN_TILE_SIZE[1]);
+    static constexpr uint32_t SHMEM_Y_SIZE   = 2 * (Kernel::PADDING + KC_MIPMAP_GEN_TILE_SIZE[1]) + 1;
     static constexpr Vector2ui SHMEM_SIZE_2D = Vector2ui(TILE_SIZE[0], SHMEM_Y_SIZE);
     static constexpr uint32_t SHMEM_SIZE_1D  = SHMEM_SIZE_2D.Multiply();
     // TODO: Bank conflicts
@@ -336,25 +336,11 @@ void KCGenerateMipmapsStatic(// I-O
         Vector2ui parentRes = Graphics::TextureMipSize(curParams.mipZeroRes,
                                                        currentMipLevel - 1);
         Vector2 scale = Vector2(parentRes) / Vector2(mipRes);
-        auto KernelPhaseOffset = [](uint32_t globalXOrY, Float scale)
-        {
-            Float texel = (Float(globalXOrY) + Float(0.5)) * scale;
-            Float result = texel - Math::Floor(texel);
-            // TODO: Hack, we shift the phase offset towards center
-            // since the phase period is most 1 pixel wide.
-            // (Maybe two if both image sizes are odd?)
-            //
-            // So instead of drifting towards "top-right"
-            // we drift "inside-out"
-            //
-            // Could not fix this unfortunately :(
-            result -= Float(0.5);
-            return result;
-        };
+        //
         // Check if we require to use unaligned filters
         // (meanin we will caclulate them on the fly
-        bool isEvenX = ((mipRes[0] & 0x1) == 0 && (parentRes[0] & 0x1) == 0);
-        bool isEvenY = ((mipRes[1] & 0x1) == 0 && (parentRes[1] & 0x1) == 0);
+        bool isEvenX = (parentRes[0] == 2 * mipRes[0]);
+        bool isEvenY = (parentRes[1] == 2 * mipRes[1]);
         // Skip this mip if it is already loaded.
         // This may happen when a texture has up to x amount of mips
         // but it can support log2(floor(max(res))) amount so we generate
@@ -412,8 +398,12 @@ void KCGenerateMipmapsStatic(// I-O
                 int32_t mipLocalTexelX = (i % TILE_SIZE[0]);
                 int32_t mipGlobalTexelX = mipLocalTexelX;
                 mipGlobalTexelX += int32_t(tileI2D[0] * TILE_SIZE[0]);
-                Float phaseOffsetX = Float(0);
-                if(!isEvenX) phaseOffsetX = KernelPhaseOffset(mipGlobalTexelX, scale[0]);
+                // Output center in parent texels, the window is anchored
+                // around it (equals 2m on the fast path)
+                Float cX = (Float(mipGlobalTexelX) + Float(0.5)) * scale[0];
+                int32_t anchorX = isEvenX ? (2 * mipGlobalTexelX)
+                                          : int32_t(Math::Floor(cX + Float(0.5))) - 1;
+                parentGlobalTexel[0] = anchorX;
 
                 // This is the top left pixel of the region we try to convolve
                 // "parentGlobalTexel + 0.5" is the exact location that we will
@@ -440,8 +430,7 @@ void KCGenerateMipmapsStatic(// I-O
                     }
                     else
                     {
-                        Float o = (Float(j) + phaseOffsetX) * Kernel::DELTA;
-                        o += Kernel::SAMPLE_START;
+                        Float o = (Float(anchorX + offset) + Float(0.5) - cX) / scale[0];
                         //
                         Float weight = runtimeFilter.Evaluate(o);
                         filterSumX += weight;
@@ -493,13 +482,12 @@ void KCGenerateMipmapsStatic(// I-O
                 if(mipGlobalTexel[0] >= int32_t(mipRes[0]) || mipGlobalTexel[1] >= int32_t(mipRes[1]))
                     continue;
 
-                Float phaseOffsetY = Float(0);
-                if(!isEvenY) phaseOffsetY = KernelPhaseOffset(mipGlobalTexel[1], scale[1]);
-
-                // Convert mip local texel to shared memory texel
-                Vector2i shMemTexel = mipLocalTexel;
-                shMemTexel[1] *= int32_t(2);
-                shMemTexel[1] += Kernel::PADDING;
+                // Shared memory row "r" holds parent row "baseY + r".
+                // Anchor the window around the output center (2m on the fast path)
+                int32_t baseY = int32_t(tileI2D[1] * TILE_SIZE[1] * 2) - int32_t(Kernel::PADDING);
+                Float cY = (Float(mipGlobalTexel[1]) + Float(0.5)) * scale[1];
+                int32_t anchorY = isEvenY ? (2 * mipGlobalTexel[1])
+                                          : int32_t(Math::Floor(cY + Float(0.5))) - 1;
 
                 Vector4 pixOut = Vector4::Zero();
                 Float filterSumY = Float(0);
@@ -507,8 +495,8 @@ void KCGenerateMipmapsStatic(// I-O
                 for(int32_t j = 0; j < int32_t(Kernel::TOTAL_WIDTH); j++)
                 {
                     int32_t offset = j - int32_t(Kernel::PADDING);
-                    Vector2i localReadTexel = Vector2i(shMemTexel[0], shMemTexel[1] + offset);
-                    int32_t sI = localReadTexel[1] * SHMEM_SIZE_2D[0] + localReadTexel[0];
+                    int32_t shRow = anchorY + offset - baseY;
+                    int32_t sI = shRow * int32_t(SHMEM_SIZE_2D[0]) + mipLocalTexel[0];
                     Float r = sLocalPixelsR[sI];
                     Float g = sLocalPixelsG[sI];
                     Float b = sLocalPixelsB[sI];
@@ -524,8 +512,7 @@ void KCGenerateMipmapsStatic(// I-O
                     }
                     else
                     {
-                        Float o = (Float(j) + phaseOffsetY) * Kernel::DELTA;
-                        o += Kernel::SAMPLE_START;
+                        Float o = (Float(anchorY + offset) + Float(0.5) - cY) / scale[1];
                         //
                         Float weight = runtimeFilter.Evaluate(o);
                         filterSumY += weight;

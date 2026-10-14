@@ -562,7 +562,7 @@ Expected<ImageHeader> ImageFileDDS::ReadHeader()
         }
 
         using enum MiscFlagsDX10::F;
-        MiscFlagsDX10 miscFlags = std::bit_cast<MiscFlagBitsDX10>(headerDX10.Value().miscFlag);
+        MiscFlagsDX10 miscFlags = MiscFlagsDX10(headerDX10.Value().miscFlag);
         if(miscFlags[TEXTURECUBE])
         {
             return MRayError("File \"{}\" has cube texture, it is not "
